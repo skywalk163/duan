@@ -395,6 +395,87 @@ function toggleExamples() {
 }
 
 // =============================================================================
+// 语法参考（全页弹窗）
+// =============================================================================
+
+let _grammarLoaded = false;
+
+function openGrammarModal() {
+    document.getElementById('grammarOverlay').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    loadGrammar();
+}
+
+function closeGrammarModal() {
+    document.getElementById('grammarOverlay').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function closeModals() {
+    closeShareModal();
+    closeGrammarModal();
+}
+
+function loadGrammar() {
+    if (_grammarLoaded) return;
+    _grammarLoaded = true;
+
+    const panel = document.getElementById('grammarModalBody');
+    panel.innerHTML = '<div class="grammar-loading">📖 加载语法参考中...</div>';
+
+    fetch(API_BASE + '/api/grammar')
+        .then(r => {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        })
+        .then(data => {
+            renderGrammar(data.categories);
+        })
+        .catch(err => {
+            panel.innerHTML = `<div class="output-line error">加载失败: ${err.message}</div>`;
+            _grammarLoaded = false;
+        });
+}
+
+function renderGrammar(categories) {
+    const panel = document.getElementById('grammarModalBody');
+
+    let html = `
+        <div class="grammar-intro">
+            <p>快速入门段言编程语言的语法，适合新手查阅。点击「示例」可加载对应代码体验。</p>
+        </div>
+    `;
+
+    categories.forEach(cat => {
+        html += `<div class="grammar-category">`;
+        html += `<h4 class="grammar-cat-title">${cat.category}</h4>`;
+        html += `<div class="grammar-items">`;
+
+        cat.items.forEach(item => {
+            html += `<div class="grammar-item">`;
+            // 处理多行语法
+            const syntaxLines = item.syntax.split('\n');
+            html += `<div class="grammar-syntax">`;
+            syntaxLines.forEach(line => {
+                html += `<code>${escapeHtml(line)}</code>`;
+            });
+            html += `</div>`;
+            if (item.description) {
+                html += `<div class="grammar-desc">${item.description}</div>`;
+            }
+            if (item.example) {
+                html += `<div class="grammar-example">例: ${escapeHtml(item.example)}</div>`;
+            }
+            html += `</div>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    panel.innerHTML = html;
+}
+
+// =============================================================================
 // Tab 切换
 // =============================================================================
 
@@ -402,7 +483,8 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.output-panel').forEach(p => p.classList.add('hidden'));
 
-    document.querySelector(`.tab[data-tab="${tabName}"]`).classList.add('active');
+    const tabEl = document.querySelector(`.tab[data-tab="${tabName}"]`);
+    if (tabEl) tabEl.classList.add('active');
     document.getElementById(`${tabName}Panel`).classList.remove('hidden');
 }
 
@@ -500,6 +582,7 @@ document.addEventListener('keydown', function(e) {
     // Escape 关闭弹窗
     if (e.key === 'Escape') {
         closeShareModal();
+        closeGrammarModal();
     }
 });
 

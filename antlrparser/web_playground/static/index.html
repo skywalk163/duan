@@ -28,6 +28,10 @@
             </button>
         </div>
         <div class="nav-right">
+            <button class="btn btn-grammar" onclick="openGrammarModal()" title="语法速查">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1.5A1.5 1.5 0 00.5 3v10A1.5 1.5 0 002 14.5h12a1.5 1.5 0 001.5-1.5V3A1.5 1.5 0 0014 1.5H2zM2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
+                语法
+            </button>
             <button class="btn btn-share" onclick="shareCode()" id="shareBtn">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M10.5 3.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm-5 9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm7.5 0a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM4.36 5.64l4.28 2.72m4.28-2.72l-4.28 2.72"/></svg>
                 分享
@@ -79,6 +83,9 @@
                     <div id="tokensPanel" class="output-panel hidden">
                         <div class="output-placeholder">点击「运行」查看 Token 分析</div>
                     </div>
+                    <div id="grammarPanel" class="output-panel hidden">
+                        <div class="grammar-loading">加载语法参考中...</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -102,8 +109,24 @@
         </div>
     </div>
 
+    <!-- 语法参考弹窗（全页） -->
+    <div class="grammar-overlay hidden" id="grammarOverlay" onclick="closeGrammarModal()">
+        <div class="grammar-modal" onclick="event.stopPropagation()">
+            <div class="grammar-modal-header">
+                <div class="grammar-modal-title">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1.5A1.5 1.5 0 00.5 3v10A1.5 1.5 0 002 14.5h12a1.5 1.5 0 001.5-1.5V3A1.5 1.5 0 0014 1.5H2zM2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
+                    段言语法速查
+                </div>
+                <button class="btn btn-close" onclick="closeGrammarModal()" title="关闭">✕</button>
+            </div>
+            <div class="grammar-modal-body" id="grammarModalBody">
+                <div class="grammar-loading">📖 加载语法参考中...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- 覆盖层 -->
-    <div class="overlay hidden" id="overlay" onclick="closeShareModal()"></div>
+    <div class="overlay hidden" id="overlay" onclick="closeModals()"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.min.js"></script>
     <script src="/static/app.js"></script>
