@@ -1,0 +1,2 @@
+# 段言（Duan）ANTLR 解析器依赖
+antlr4-python3-runtime>=4.13
