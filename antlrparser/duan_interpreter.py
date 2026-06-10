@@ -24,6 +24,9 @@ from duan_ast import (
     ImportStatement, ExportStatement,
 )
 
+# 导入模块解析器
+from duan_module import ModuleResolver, ModuleError
+
 # =============================================================================
 # 运行时值类型
 # =============================================================================
@@ -191,13 +194,17 @@ class Environment:
 
 class Interpreter:
     """段言解释器 - 将 AST 解释执行为结果"""
-    
-    def __init__(self):
+
+    def __init__(self, search_paths: List[str] = None):
         self.global_env = Environment(name="全局")
         self.env = self.global_env
         self.output_lines: List[str] = []  # 打印/输出捕获
         self._break_encountered = False  # 标记是否遇到跳出
         self._register_builtins()
+        # 模块系统
+        self.module_resolver = ModuleResolver(search_paths=search_paths or ['.'])
+        self.current_filepath: Optional[str] = None  # 当前执行的文件路径
+        self._imported_modules: Set[str] = set()  # 已完全处理的模块（防循环）
     
     def _register_builtins(self):
         """注册内置函数"""
@@ -308,16 +315,24 @@ class Interpreter:
             return self._interpret_module(node)
         return self._execute(node)
     
-    def interpret_module(self, module: Module) -> Optional[DuanValue]:
+    def interpret_module(self, module: Module, module_name: str = None) -> Optional[DuanValue]:
         """解释执行模块"""
-        return self._interpret_module(module)
+        return self._interpret_module(module, module_name=module_name)
     
-    def _interpret_module(self, module: Module) -> Optional[DuanValue]:
-        # 先注册所有段落定义
+    def _interpret_module(self, module: Module, module_name: str = None) -> Optional[DuanValue]:
+        # 记录本模块为已处理（防止循环导入时重复执行）
+        if module_name:
+            self._imported_modules.add(module_name)
+
+        # 先处理导入（导入的段落优先注册到环境）
+        for imp in module.imports:
+            self._exec_import(imp)
+
+        # 再注册当前模块的所有段落定义
         for seg in module.segments:
             func = DuanFunction(seg, self.env)
             self.env.define(seg.name, DuanValue(func, '段'))
-        
+
         # 然后顺序执行顶层语句
         result = None
         for stmt in module.statements:
@@ -339,6 +354,9 @@ class Interpreter:
         self.output_lines = []
         self._break_encountered = False
         self._register_builtins()
+        self.module_resolver.clear_cache()
+        self.current_filepath = None
+        self._imported_modules.clear()
     
     def get_output(self) -> str:
         """获取所有输出"""
@@ -671,7 +689,12 @@ class Interpreter:
         if isinstance(node, ThrowStatement):
             val = self._eval(node.value)
             raise DuanError(str(val), val)
-        # 跳过类型定义、导入导出等
+        if isinstance(node, ImportStatement):
+            return self._exec_import(node)
+        if isinstance(node, ExportStatement):
+            # 导出语句在模块加载时已被处理，此处忽略
+            return None
+        # 跳过类型定义等
         return None
     
     def _exec_var_decl(self, node: VariableDeclaration):
@@ -780,7 +803,82 @@ class Interpreter:
             catch_var = node.catch_var
             self.env.define(catch_var, e.value)
             self._execute_block(node.catch_body)
-    
+
+    def _exec_import(self, node: ImportStatement):
+        """执行导入语句"""
+        # ----- 直接导入（无模块名）：在当前环境中查找已注册的符号 -----
+        if not node.module:
+            for name in node.names:
+                if not self.env.has(name):
+                    raise RuntimeError(
+                        f"直接导入失败: 未找到符号 '{name}'"
+                    )
+            return
+
+        # ----- 从模块导入 -----
+        # 已处理过的模块直接跳过
+        if node.module in self._imported_modules:
+            return
+
+        # 计算 from_dir
+        from_dir = None
+        if self.current_filepath:
+            from_dir = os.path.dirname(os.path.abspath(self.current_filepath))
+
+        # 加载模块 AST
+        try:
+            module_ast, filepath = self.module_resolver.load_module(node.module, from_dir)
+        except ModuleError as e:
+            raise RuntimeError(f"导入失败: {e}")
+
+        # ----- 递归处理被导入模块自身的依赖 -----
+        self._imported_modules.add(node.module)
+
+        old_filepath = self.current_filepath
+        self.current_filepath = filepath
+        try:
+            for sub_import in module_ast.imports:
+                self._exec_import(sub_import)
+
+            # 将被导入模块的所有段落到全局环境（确保内部交叉调用可用）
+            for seg in module_ast.segments:
+                if not self.env.has(seg.name):
+                    func = DuanFunction(seg, self.global_env)
+                    self.env.define(seg.name, DuanValue(func, '段'))
+
+            # 执行被导入模块的顶层语句
+            old_env = self.env
+            self.env = self.global_env
+            try:
+                for stmt in module_ast.statements:
+                    try:
+                        self._execute(stmt)
+                    except (ReturnSignal, BreakSignal, ContinueSignal):
+                        pass
+            finally:
+                self.env = old_env
+        finally:
+            self.current_filepath = old_filepath
+
+        # ----- 验证并注册请求的导出符号 -----
+        export_names = {exp.name for exp in module_ast.exports}
+        segments_map = {seg.name: seg for seg in module_ast.segments}
+
+        # 如果指定了要导入的名称，验证其可导出性
+        if node.names:
+            for name in node.names:
+                if name not in segments_map:
+                    raise RuntimeError(
+                        f"模块 '{node.module}' 中未找到导出符号 '{name}'"
+                    )
+                if export_names and name not in export_names:
+                    raise RuntimeError(
+                        f"符号 '{name}' 未在模块 '{node.module}' 中导出"
+                    )
+                if not self.env.has(name):
+                    func = DuanFunction(segments_map[name], self.global_env)
+                    self.env.define(name, DuanValue(func, '段'))
+
     def _execute_block(self, statements: List[ASTNode]):
         """执行语句块"""
         for stmt in statements:
@@ -823,26 +921,55 @@ class Interpreter:
 # 高层解释接口
 # =============================================================================
 
-def run_source(source: str) -> Interpreter:
-    """解析并执行段言源代码"""
+def run_source(source: str, filepath: str = None, search_paths: List[str] = None) -> Interpreter:
+    """解析并执行段言源代码
+
+    Args:
+        source: 段言源代码
+        filepath: 源文件路径（用于模块相对导入）
+        search_paths: 模块搜索路径列表
+
+    Returns:
+        执行后的解释器实例
+    """
     from duan_visitor import DuanParser
-    
+
     parser = DuanParser()
     module = parser.parse(source)
     if module is None:
         errors = '\n'.join(parser.errors)
         raise RuntimeError(f"解析失败:\n{errors}")
-    
-    interpreter = Interpreter()
-    interpreter.interpret_module(module)
+
+    interpreter = Interpreter(search_paths=search_paths)
+    if filepath:
+        interpreter.current_filepath = filepath
+    # 从文件路径推导模块名
+    module_name = None
+    if filepath:
+        module_name = os.path.splitext(os.path.basename(filepath))[0]
+    interpreter.interpret_module(module, module_name=module_name)
     return interpreter
 
 
-def run_file(filepath: str) -> Interpreter:
-    """从文件读取段言源代码并执行"""
-    with open(filepath, 'r', encoding='utf-8') as f:
+def run_file(filepath: str, search_paths: List[str] = None) -> Interpreter:
+    """从文件读取段言源代码并执行
+
+    Args:
+        filepath: 段言源文件路径
+        search_paths: 模块搜索路径列表
+
+    Returns:
+        执行后的解释器实例
+    """
+    abs_path = os.path.abspath(filepath)
+    with open(abs_path, 'r', encoding='utf-8') as f:
         source = f.read()
-    return run_source(source)
+
+    # 默认在文件所在目录搜索模块
+    file_dir = os.path.dirname(abs_path)
+    paths = search_paths or [file_dir, '.']
+
+    return run_source(source, filepath=abs_path, search_paths=paths)
 
 
 # =============================================================================

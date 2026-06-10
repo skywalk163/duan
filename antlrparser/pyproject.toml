@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "duan-lang"
+version = "0.1.0"
+description = "段言（Duan）编程语言 - 中文编程语言解释器"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Duan Language Contributors"},
+]
+keywords = ["chinese", "programming-language", "cnlang"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+dependencies = [
+    "antlr4-python3-runtime>=4.13",
+]
+
+[project.urls]
+Homepage = "https://github.com/duan-lang/duan"
+Repository = "https://github.com/duan-lang/duan"
+
+[project.scripts]
+duan = "cli:main"
+
+[tool.setuptools.packages.find]
+include = ["antlrparser*"]

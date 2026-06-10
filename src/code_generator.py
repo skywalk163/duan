@@ -25,6 +25,13 @@ class PythonCodeGenerator:
         self.indent_str = "    "  # 4空格缩进
         self.output_lines: List[str] = []
         
+        # 中文数字映射
+        self.chinese_numbers = {
+            '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
+            '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
+            '十': 10, '百': 100, '千': 1000, '万': 10000
+        }
+        
         # 运算符映射
         self.operator_map = {
             '+': '+',
@@ -37,12 +44,23 @@ class PythonCodeGenerator:
             '!=': '!=',
             '>=': '>=',
             '<=': '<=',
+            '加': '+',
+            '减': '-',
+            '乘': '*',
+            '除': '/',
+            '大于': '>',
+            '小于': '<',
+            '等于': '==',
+            '不等于': '!=',
+            '大于等于': '>=',
+            '小于等于': '<=',
         }
         
         # 内置函数映射
         self.builtin_map = {
             # 基础函数
             '打印': 'print',
+            '显示': 'print',
             '读取': 'input',
             '长': 'len',
             '首': 'lambda x: x[0]',
@@ -94,6 +112,7 @@ class PythonCodeGenerator:
             '列表排序': '_duan_builtin.列表排序',
             '列表反转': '_duan_builtin.列表反转',
             '列表包含': '_duan_builtin.列表包含',
+            '列表创建': '_duan_builtin.列表创建',
             
             # 字典工具
             '字典创建': '_duan_builtin.字典创建',
@@ -125,9 +144,14 @@ class PythonCodeGenerator:
         
         # 添加标准库导入
         self._add_line("# 导入段言标准库")
+        self._add_line("import sys")
+        self._add_line("import importlib.util")
         self._add_line("try:")
-        self._add_line("    from stdlib import builtins as _duan_builtin")
-        self._add_line("except ImportError:")
+        self._add_line("    # 尝试从src/stdlib导入")
+        self._add_line("    spec = importlib.util.spec_from_file_location('duan_builtins', 'src/stdlib/builtins.py')")
+        self._add_line("    _duan_builtin = importlib.util.module_from_spec(spec)")
+        self._add_line("    spec.loader.exec_module(_duan_builtin)")
+        self._add_line("except:")
         self._add_line("    # 如果无法导入，使用内置函数占位")
         self._add_line("    import types")
         self._add_line("    _duan_builtin = types.ModuleType('_duan_builtin')")
@@ -136,6 +160,13 @@ class PythonCodeGenerator:
         self._add_line("    _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
         self._add_line("    _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
         self._add_line("    _duan_builtin.打印 = print")
+        self._add_line("    _duan_builtin.列表创建 = list")
+        self._add_line("    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
+        self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
+        self._add_line("    _duan_builtin.字符串长度 = len")
+        self._add_line("    _duan_builtin.字典创建 = dict")
+        self._add_line("    _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
+        self._add_line("    _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
         self._add_line("")
         
         # 生成语句
@@ -175,6 +206,18 @@ class PythonCodeGenerator:
             self._add_line("break")
         elif isinstance(stmt, ContinueStmt):
             self._add_line("continue")
+        elif isinstance(stmt, ParagraphCall):
+            # 动词调用作为独立语句
+            expr_code = self._generate_expr(stmt)
+            self._add_line(expr_code)
+        elif isinstance(stmt, Identifier):
+            # 标识符作为独立语句（可能是段落调用或变量引用）
+            expr_code = self._generate_expr(stmt)
+            self._add_line(expr_code)
+        elif isinstance(stmt, BinaryOp):
+            # 二元运算作为独立语句
+            expr_code = self._generate_expr(stmt)
+            self._add_line(expr_code)
         elif hasattr(stmt, '__class__') and stmt.__class__.__name__ == 'ClassDefinition':
             # 类定义（新增）
             self._generate_class_definition(stmt)
@@ -362,6 +405,9 @@ class PythonCodeGenerator:
             return str(expr)
         
         if isinstance(expr, NumberLiteral):
+            # 检查是否是中文数字
+            if expr.value in self.chinese_numbers:
+                return str(self.chinese_numbers[expr.value])
             return str(expr.value)
         
         elif isinstance(expr, StringLiteral):
@@ -370,7 +416,11 @@ class PythonCodeGenerator:
             return f'"{escaped}"'
         
         elif isinstance(expr, Identifier):
-            return self._sanitize_name(expr.name)
+            name = self._sanitize_name(expr.name)
+            # 检查是否是中文数字
+            if expr.name in self.chinese_numbers:
+                return str(self.chinese_numbers[expr.name])
+            return name
         
         # 检查 ast_nodes 模块中的 Identifier（兼容两种定义）
         elif hasattr(expr, 'name') and hasattr(expr, 'line'):
