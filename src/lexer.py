@@ -82,10 +82,13 @@ class Lexer:
         line = 1
         col = 1
         n = len(source)
-        
+
+        # 预扫描：收集用户定义的标识符
+        user_definitions = self._scan_user_definitions(source)
+
         # 处理缩进
         indent_stack = [0]
-        
+
         while i < n:
             # 处理换行
             if source[i] == '\n':
@@ -204,7 +207,7 @@ class Lexer:
             
             # 处理标识符和关键字（核心：无空格分词）
             if self._is_han(source[i]) or source[i].isalpha() or source[i] == '_':
-                new_tokens, consumed = self._tokenize_identifier_or_keyword(source, i, line, col)
+                new_tokens, consumed = self._tokenize_identifier_or_keyword(source, i, line, col, user_definitions)
                 tokens.extend(new_tokens)
                 col += consumed
                 i += consumed
@@ -415,23 +418,26 @@ class Lexer:
         
         return Token(TokenType.CHINESE_NUM, value, line, col), 1
     
-    def _tokenize_identifier_or_keyword(self, source: str, i: int, line: int, col: int) -> Tuple[List[Token], int]:
+    def _tokenize_identifier_or_keyword(self, source: str, i: int, line: int, col: int, user_definitions: Set[str] = None) -> Tuple[List[Token], int]:
         """
         处理标识符和关键字（核心：三层分词机制）
-        
+
         决策29：
         1. 类型切换自动分词 - 甲加1 → [甲] [加] [1]
         2. 双字关键词优先匹配 - 定义甲 → [定义] [甲]
         3. 元数驱动参数收集 - 打印 甲 → [打印] [甲]
         """
+        if user_definitions is None:
+            user_definitions = set()
+
         tokens = []
         start = i
         n = len(source)
-        
+
         # 收集连续的汉字（或英文标识符）
         if self._is_han(source[i]):
             # 汉字处理：实现三层分词
-            consumed = self._tokenize_chinese_sequence(source, i, line, col, tokens)
+            consumed = self._tokenize_chinese_sequence(source, i, line, col, tokens, user_definitions)
             return tokens, consumed
         else:
             # 英文标识符：收集连续的字母、数字、下划线
@@ -447,40 +453,43 @@ class Lexer:
             
             return tokens, j - i
     
-    def _tokenize_chinese_sequence(self, source: str, i: int, line: int, col: int, tokens: List[Token]) -> int:
+    def _tokenize_chinese_sequence(self, source: str, i: int, line: int, col: int, tokens: List[Token], user_definitions: Set[str] = None) -> int:
         """
         处理连续的汉字序列（实现三层分词）
-        
+
         这是核心方法，实现决策29的三层机制
         """
+        if user_definitions is None:
+            user_definitions = set()
+
         n = len(source)
         consumed = 0
         current_col = col
-        
+
         while i + consumed < n:
             pos = i + consumed
             ch = source[pos]
-            
+
             # 遇到非汉字，结束
             if not self._is_han(ch):
                 break
-            
+
             # 遇到符号，结束
             if ch in SYMBOL_MAP or ch in '。：；，（）【】':
                 break
-            
+
             # 检查是否是简单中文数字（一～十）
             if ch in self.SIMPLE_CHINESE_NUMBERS:
                 # 检查下一个位置是否是关键字或符号
                 next_pos = pos + 1
-                
+
                 # 情况1：下一个字符不是汉字（如 "三。" 中的 "。"）
                 # 情况2：下一个字符是关键字（如 "三加" 中的 "加"）
                 # 情况3：下一个字符是符号
                 # 在这些情况下，当前中文数字应该独立输出
-                
+
                 is_standalone_num = False
-                
+
                 if next_pos >= n:
                     # 到达字符串末尾
                     is_standalone_num = True
@@ -496,7 +505,7 @@ class Lexer:
                     elif source[next_pos] in SYMBOL_MAP or source[next_pos] in '。：；，（）【】':
                         # 下一个是符号
                         is_standalone_num = True
-                
+
                 if is_standalone_num:
                     # 单独的中文数字，输出为数字
                     value = self.CHINESE_DIGITS[ch]
@@ -504,10 +513,33 @@ class Lexer:
                     consumed += 1
                     current_col += 1
                     continue
+
+            # 先收集完整的汉字序列
+            j = pos
+            while j < n and self._is_han(source[j]):
+                # 遇到符号停止
+                if source[j] in SYMBOL_MAP or source[j] in '。：；，（）【】':
+                    break
+                j += 1
+            
+            full_identifier = source[pos:j]
+            
+            # 检查完整标识符是否在用户定义中
+            if full_identifier in user_definitions:
+                # 完整标识符在用户定义中，优先作为标识符，不拆分
+                tokens.append(Token(TokenType.IDENTIFIER, full_identifier, line, current_col))
+                consumed += len(full_identifier)
+                current_col += len(full_identifier)
+                continue
             
             # 第一层：尝试最长匹配关键字
             keyword, length = self._match_keyword(source, pos)
             
+            # 再次检查单个关键字是否在用户定义中
+            if keyword and keyword in user_definitions:
+                # 用户定义的标识符，不作为关键字
+                keyword = None
+
             if keyword:
                 # 匹配到关键字
                 tokens.append(Token(TokenType.KEYWORD, keyword, line, current_col))
@@ -515,78 +547,96 @@ class Lexer:
                 current_col += length
             else:
                 # 未匹配到关键字，收集标识符
-                # 收集连续汉字直到遇到关键字或符号
-                j = pos + 1
-                while j < n:
-                    next_ch = source[j]
-                    
-                    # 遇到符号，结束
-                    if next_ch in SYMBOL_MAP or next_ch in '。：；，（）【」』':
-                        break
-                    
-                    # 遇到数字，可以继续（支持 "变量1" 这样的标识符）
-                    if next_ch.isdigit():
-                        j += 1
-                        continue
-                    
-                    # 遇到非汉字，结束
-                    if not self._is_han(next_ch):
-                        break
-                    
-                    # 检查是否是简单中文数字（一～十）
-                    if next_ch in self.SIMPLE_CHINESE_NUMBERS:
-                        # 检查下一个字符，如果后面不是汉字或后面是关键字，则作为数字分离
-                        check_pos = j + 1
-                        should_break = False
-                        
-                        if check_pos >= n:
-                            should_break = True
-                        elif not self._is_han(source[check_pos]):
-                            should_break = True
-                        else:
-                            check_keyword, _ = self._match_keyword(source, check_pos)
-                            if check_keyword:
-                                should_break = True
-                        
-                        if should_break:
-                            # 单独的中文数字，当前标识符结束
-                            break
-                    
-                    # 检查从当前位置是否能匹配关键字
-                    next_keyword, next_length = self._match_keyword(source, j)
-                    if next_keyword:
-                        # 下一个位置是关键字，当前标识符结束
-                        break
-                    
-                    j += 1
-                
-                identifier = source[pos:j]
-                tokens.append(Token(TokenType.IDENTIFIER, identifier, line, current_col))
-                consumed += len(identifier)
-                current_col += len(identifier)
+                # 使用前面收集的完整标识符
+                if full_identifier:
+                    tokens.append(Token(TokenType.IDENTIFIER, full_identifier, line, current_col))
+                    consumed += len(full_identifier)
+                    current_col += len(full_identifier)
+                else:
+                    # 单个非关键字汉字
+                    tokens.append(Token(TokenType.IDENTIFIER, ch, line, current_col))
+                    consumed += 1
+                    current_col += 1
         
         return consumed
     
     def _scan_user_definitions(self, source: str) -> Set[str]:
         """
         预扫描：收集用户定义的变量名和函数名
-        
+
         用于避免将用户定义的标识符错误拆分为关键字
         """
         definitions = set()
         i = 0
         n = len(source)
-        
+
         while i < n:
+            # 查找段落定义：《段名》段 或 "段落 段名 参数 参数名"
+            if source[i] == '《':
+                j = i + 1
+                # 收集段名
+                k = j
+                while k < n and source[k] != '》':
+                    k += 1
+                if k < n and k > j:
+                    definitions.add(source[j:k])
+                i = k + 1
+                continue
+            
+            # 查找 "段落 段名 参数 参数名" 格式
+            if source[i:i+2] == '段落':
+                j = i + 2
+                # 跳过空白
+                while j < n and source[j] in ' \t':
+                    j += 1
+                # 收集段名
+                k = j
+                while k < n and self._is_han(source[k]):
+                    k += 1
+                if k > j:
+                    definitions.add(source[j:k])
+                
+                # 检查是否有 "参数" 关键字
+                j = k
+                while j < n and source[j] in ' \t':
+                    j += 1
+                if source[j:j+2] == '参数':
+                    j += 2
+                    # 跳过空白
+                    while j < n and source[j] in ' \t':
+                        j += 1
+                    # 收集参数名（可能多个参数）
+                    while j < n:
+                        k = j
+                        while k < n and self._is_han(source[k]) and source[k] not in '。':
+                            k += 1
+                        if k > j:
+                            param_name = source[j:k]
+                            definitions.add(param_name)
+                        j = k
+                        # 跳过空白
+                        while j < n and source[j] in ' \t':
+                            j += 1
+                        # 检查是否结束
+                        if j >= n or source[j] == '。':
+                            break
+                i = j
+                continue
+            
             # 查找 "定义" 或 "设" 开头的定义语句
             if source[i:i+2] == '定义':
                 j = i + 2
                 # 跳过空白
                 while j < n and source[j] in ' \t':
                     j += 1
-                # 收集标识符
+                # 收集标识符（只收集到下一个关键字或符号）
                 k = j
                 while k < n and self._is_han(source[k]):
+                    # 检查是否遇到关键字
+                    next_kw, length = self._match_keyword(source, k)
+                    if next_kw and next_kw in ALL_KEYWORDS:
+                        # 遇到关键字，停止
+                        break
                     k += 1
                 if k > j:
                     definitions.add(source[j:k])
@@ -604,5 +654,5 @@ class Lexer:
                 i = j
             else:
                 i += 1
-        
+
         return definitions
