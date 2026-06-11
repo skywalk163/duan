@@ -135,6 +135,13 @@ class DictLiteral(ASTNode):
     entries: List[DictEntry] = field(default_factory=list)
 
 
+@dataclass
+class NewExpression(ASTNode):
+    """类实例化表达式（新类名()）"""
+    class_name: str = ""
+    arguments: List[ASTNode] = field(default_factory=list)
+
+
 # =============================================================================
 # 语句节点
 # =============================================================================
@@ -270,6 +277,75 @@ class ErrorTypeDefinition(ASTNode):
 
 
 # =============================================================================
+# 类和接口定义
+# =============================================================================
+
+@dataclass
+class MethodDefinition(ASTNode):
+    """方法定义"""
+    name: str = ""
+    parameters: List[Parameter] = field(default_factory=list)
+    body: List[ASTNode] = field(default_factory=list)
+    return_type: Optional[str] = None
+    is_static: bool = False
+
+
+@dataclass
+class ConstructorDefinition(ASTNode):
+    """构造函数定义"""
+    name: str = ""
+    parameters: List[Parameter] = field(default_factory=list)
+    body: List[ASTNode] = field(default_factory=list)
+
+
+@dataclass
+class ClassDefinition(ASTNode):
+    """类定义"""
+    name: str = ""
+    generic_params: List[str] = field(default_factory=list)  # 泛型参数列表
+    superclasses: List[str] = field(default_factory=list)
+    interfaces: List[str] = field(default_factory=list)
+    fields: List[ASTNode] = field(default_factory=list)  # 包含 varDecl
+    methods: List[MethodDefinition] = field(default_factory=list)
+    constructor: Optional[ConstructorDefinition] = None
+
+
+@dataclass
+class InterfaceMethod(ASTNode):
+    """接口方法签名"""
+    name: str = ""
+    parameters: List[Parameter] = field(default_factory=list)
+    return_type: str = ""
+
+
+@dataclass
+class InterfaceProperty(ASTNode):
+    """接口属性签名"""
+    name: str = ""
+    type_annotation: str = ""
+
+
+@dataclass
+class InterfaceDefinition(ASTNode):
+    """接口定义"""
+    name: str = ""
+    superinterfaces: List[str] = field(default_factory=list)
+    methods: List[InterfaceMethod] = field(default_factory=list)
+    properties: List[InterfaceProperty] = field(default_factory=list)
+
+
+# =============================================================================
+# 类型注解节点（泛型支持）
+# =============================================================================
+
+@dataclass
+class GenericType(ASTNode):
+    """泛型类型"""
+    base_type: str = ""
+    type_arguments: List[str] = field(default_factory=list)
+
+
+# =============================================================================
 # 模块节点
 # =============================================================================
 
@@ -293,6 +369,8 @@ class Module(ASTNode):
     imports: List[ImportStatement] = field(default_factory=list)
     exports: List[ExportStatement] = field(default_factory=list)
     segments: List[SegmentDefinition] = field(default_factory=list)
+    classes: List[ClassDefinition] = field(default_factory=list)
+    interfaces: List[InterfaceDefinition] = field(default_factory=list)
     data_types: List[DataTypeDefinition] = field(default_factory=list)
     error_types: List[ErrorTypeDefinition] = field(default_factory=list)
     statements: List[ASTNode] = field(default_factory=list)

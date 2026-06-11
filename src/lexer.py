@@ -296,6 +296,12 @@ class Lexer:
             elif mapped == '>':
                 # 右书名号 》
                 return Token(TokenType.RBOOK, ch, line, col), 1
+            elif mapped == '\\':
+                # 顿号（参数分隔符）
+                return Token(TokenType.COMMA, ch, line, col), 1
+            else:
+                # 其他符号
+                return Token(TokenType.COMMA, ch, line, col), 1
         
         # 英文符号
         if ch == '.':
@@ -579,7 +585,10 @@ class Lexer:
                 while k < n and source[k] != '》':
                     k += 1
                 if k < n and k > j:
-                    definitions.add(source[j:k])
+                    name = source[j:k]
+                    # 排除关键字
+                    if name not in ALL_KEYWORDS:
+                        definitions.add(name)
                 i = k + 1
                 continue
             
@@ -594,7 +603,10 @@ class Lexer:
                 while k < n and self._is_han(source[k]):
                     k += 1
                 if k > j:
-                    definitions.add(source[j:k])
+                    segment_name = source[j:k]
+                    # 排除关键字
+                    if segment_name not in ALL_KEYWORDS:
+                        definitions.add(segment_name)
                 
                 # 检查是否有 "参数" 关键字
                 j = k
@@ -612,7 +624,9 @@ class Lexer:
                             k += 1
                         if k > j:
                             param_name = source[j:k]
-                            definitions.add(param_name)
+                            # 排除关键字
+                            if param_name not in ALL_KEYWORDS:
+                                definitions.add(param_name)
                         j = k
                         # 跳过空白
                         while j < n and source[j] in ' \t':
@@ -639,7 +653,10 @@ class Lexer:
                         break
                     k += 1
                 if k > j:
-                    definitions.add(source[j:k])
+                    name = source[j:k]
+                    # 排除关键字
+                    if name not in ALL_KEYWORDS:
+                        definitions.add(name)
                 i = k
             elif source[i] == '设':
                 j = i + 1
@@ -650,7 +667,10 @@ class Lexer:
                         break
                     j += 1
                 if j > i + 1:
-                    definitions.add(source[i+1:j])
+                    name = source[i+1:j]
+                    # 排除关键字
+                    if name not in ALL_KEYWORDS:
+                        definitions.add(name)
                 i = j
             else:
                 i += 1

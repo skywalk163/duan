@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "duan-lang"
+version = "0.1.0"
+description = "段言（Duan）- 中文编程语言"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+
+[project.urls]
+"Homepage" = "https://github.com/dumate/duan"
+"Repository" = "https://github.com/dumate/duan"
+
+[project.scripts]
+duan = "antlrparser.duan_cli:main"
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "antlrparser/test"]
+pythonpath = ["antlrparser", "src"]
+
+[tool.flake8]
+max-line-length = 120
+exclude = ["*.pyc", "__pycache__", "*.egg-info"]
+
+[tool.black]
+line-length = 120
+target-version = ["py310"]

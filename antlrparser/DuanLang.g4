@@ -48,8 +48,73 @@ moduleDecl
 
 definition
     : paragraphDef
+    | classDef
+    | interfaceDef
     | dataTypeDef
     | errorTypeDef
+    ;
+
+// ----- 类定义 -----
+
+classDef
+    : BOOK_L ID genericParams? BOOK_R K_CLASS
+      ( K_INHERIT typeAnnotation ( COMMA typeAnnotation )* )?
+      ( K_USE typeAnnotation ( COMMA typeAnnotation )* )?
+      COLON
+      classMember*
+      K_END DOT?
+    ;
+
+genericParams
+    : LEFT_ANGLE ID (COMMA ID)* RIGHT_ANGLE
+    ;
+
+classMember
+    : varDecl
+    | methodDef
+    | constructorDef
+    ;
+
+methodDef
+    : BOOK_L ID BOOK_R K_METHOD
+      LPAREN paramList? RPAREN
+      ( PIPE typeAnnotation )?
+      COLON
+      block
+      K_END DOT?
+    ;
+
+constructorDef
+    : BOOK_L ID BOOK_R
+      LPAREN paramList? RPAREN
+      COLON
+      block
+      K_END DOT?
+    ;
+
+// ----- 接口定义 -----
+
+interfaceDef
+    : BOOK_L ID BOOK_R K_INTERFACE
+      ( K_INHERIT typeAnnotation ( COMMA typeAnnotation )* )?
+      COLON
+      interfaceMember*
+      K_END DOT?
+    ;
+
+interfaceMember
+    : methodSignature DOT?
+    | propertySignature DOT?
+    ;
+
+methodSignature
+    : BOOK_L ID BOOK_R K_METHOD
+      LPAREN paramList? RPAREN
+      PIPE typeAnnotation
+    ;
+
+propertySignature
+    : ID COLON typeAnnotation
     ;
 
 // ----- 段落定义 -----
@@ -274,6 +339,7 @@ primary
     | LBRACKET dictLiteral RBRACKET
     | LBRACKET exprList? RBRACKET
     | BOOK_L ID BOOK_R                                 // 《段落名》
+    | K_NEW ID LPAREN exprList? RPAREN                 // 新 类名() - 实例化
     ;
 
 dictLiteral
@@ -286,13 +352,21 @@ dictEntry
 
 typeAnnotation
     : builtinType
+    | genericType
     | ID
+    ;
+
+genericType
+    : ID LBRACKET typeAnnotation ( COMMA typeAnnotation )* RBRACKET
     ;
 
 builtinType
     : T_NUMBER | T_INT | T_FLOAT
-    | T_STRING | T_LIST | T_DICT | T_SET
-    | T_BOOL | K_NULL | T_ANY
+    | T_STRING | T_BOOL | K_NULL | T_ANY
+    | T_LIST | T_DICT | T_SET
+    | T_LIST LBRACKET typeAnnotation RBRACKET
+    | T_DICT LBRACKET typeAnnotation COMMA typeAnnotation RBRACKET
+    | T_SET LBRACKET typeAnnotation RBRACKET
     ;
 
 exprList
@@ -304,21 +378,11 @@ exprList
 // LEXER RULES
 // ================================================================
 
-// ----- 注释（lexer mode 实现）-----
+// ----- 注释处理 -----
 
 COMMENT_START
-    : '```' -> pushMode(COMMENT_MODE), skip
+    : '```' .*? '```' -> skip
     ;
-
-mode COMMENT_MODE;
-COMMENT_CLOSE
-    : '```' -> popMode, skip
-    ;
-COMMENT_CONTENT
-    : . -> skip
-    ;
-
-mode DEFAULT_MODE;
 
 // ----- 双字关键字（决策27）- 长关键字在前避免部分匹配 -----
 
@@ -340,6 +404,9 @@ K_LT       : '小于' ;
 K_DEFINE   : '定义' ;
 K_EQUAL    : '等于' ;    // 同时用于赋值和比较（由 Parser 上下文决定语义）
 K_SEGMENT  : '段' ;
+K_CLASS    : '类' ;
+K_INTERFACE: '接口' ;
+K_NEW      : '新' ;
 K_DATA_TYPE: '数据类型' ;
 K_ERROR_TYPE: '错误' ;
 K_CONST    : '常量' ;
@@ -425,6 +492,10 @@ GE         : '>=' ;
 LE         : '<=' ;
 GT         : '>' ;
 LT         : '<' ;
+
+// 泛型角括号（使用中文角括号）
+LEFT_ANGLE  : '〈' ;  // U+3008
+RIGHT_ANGLE : '〉' ;  // U+3009
 
 // 逻辑符号
 NOT        : '!' ;

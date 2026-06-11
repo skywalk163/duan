@@ -36,12 +36,14 @@ except ImportError:
 from duan_ast import (
     ASTNode, NumberLiteral, StringLiteral, BooleanLiteral, NullLiteral,
     Identifier, SegmentName, ModuleName, BinaryOp, UnaryOp, FunctionCall,
-    PipeExpression, PropertyAccess, IndexAccess, ListLiteral,
+    PipeExpression, PropertyAccess, IndexAccess, ListLiteral, NewExpression,
     VariableDeclaration, Assignment, IfStatement, ForeachStatement,
     WhileStatement, BreakStatement, ContinueStatement, ReturnStatement,
     TryStatement, ThrowStatement, PrintStatement, ExpressionStatement,
     Parameter, SegmentDefinition, DataTypeField, DataTypeDefinition,
     ErrorTypeDefinition, ImportStatement, ExportStatement, Module,
+    ClassDefinition, InterfaceDefinition, MethodDefinition, ConstructorDefinition,
+    InterfaceMethod, InterfaceProperty,
 )
 
 # 导入自定义分词器
@@ -98,6 +100,10 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
                 defn = self.visitDefinition(child)
                 if isinstance(defn, SegmentDefinition):
                     module.segments.append(defn)
+                elif isinstance(defn, ClassDefinition):
+                    module.classes.append(defn)
+                elif isinstance(defn, InterfaceDefinition):
+                    module.interfaces.append(defn)
                 elif isinstance(defn, DataTypeDefinition):
                     module.data_types.append(defn)
                 elif isinstance(defn, ErrorTypeDefinition):
@@ -145,6 +151,171 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
             modifiers=[],
         )
 
+    def visitClassDef(self, ctx: DuanLangParser.ClassDefContext):
+        """类定义"""
+        name = ctx.ID().getText()
+        line = ctx.start.line
+        col = ctx.start.column
+        
+        # 提取泛型参数
+        generic_params = []
+        if ctx.genericParams():
+            for id_ctx in ctx.genericParams().ID():
+                generic_params.append(id_ctx.getText())
+
+        superclasses = []
+        interfaces = []
+        
+        # 处理继承和实现
+        child_list = list(ctx.getChildren())
+        inherit_found = False
+        use_found = False
+        
+        for child in child_list:
+            if hasattr(child, 'getText'):
+                txt = child.getText()
+                if txt == '继承':
+                    inherit_found = True
+                    use_found = False
+                elif txt == '使用':
+                    use_found = True
+                    inherit_found = False
+                elif inherit_found and isinstance(child, DuanLangParser.TypeAnnotationContext):
+                    superclasses.append(self.visitTypeAnnotation(child))
+                elif use_found and isinstance(child, DuanLangParser.TypeAnnotationContext):
+                    interfaces.append(self.visitTypeAnnotation(child))
+
+        fields = []
+        methods = []
+        constructor = None
+
+        for member in ctx.classMember():
+            if member.varDecl():
+                fields.append(self.visitVarDecl(member.varDecl()))
+            elif member.methodDef():
+                method = self.visitMethodDef(member.methodDef())
+                # 如果方法名为"初始化"，则作为构造函数
+                if method.name == '初始化':
+                    constructor = ConstructorDefinition(
+                        line=method.line,
+                        column=method.column,
+                        parameters=method.parameters,
+                        body=method.body
+                    )
+                else:
+                    methods.append(method)
+            elif member.constructorDef():
+                constructor = self.visitConstructorDef(member.constructorDef())
+
+        return ClassDefinition(
+            line=line, column=col,
+            name=name,
+            generic_params=generic_params,
+            superclasses=superclasses,
+            interfaces=interfaces,
+            fields=fields,
+            methods=methods,
+            constructor=constructor,
+        )
+
+    def visitMethodDef(self, ctx: DuanLangParser.MethodDefContext):
+        """方法定义"""
+        name = ctx.ID().getText()
+        line = ctx.start.line
+        col = ctx.start.column
+
+        params = []
+        if ctx.paramList():
+            params = self.visitParamList(ctx.paramList())
+
+        return_type = None
+        if ctx.typeAnnotation():
+            return_type = self.visitTypeAnnotation(ctx.typeAnnotation())
+
+        body = []
+        if ctx.block():
+            body = self.visitBlock(ctx.block())
+
+        return MethodDefinition(
+            line=line, column=col,
+            name=name,
+            parameters=params,
+            body=body,
+            return_type=return_type,
+            is_static=False,
+        )
+
+    def visitConstructorDef(self, ctx: DuanLangParser.ConstructorDefContext):
+        """构造函数定义"""
+        name = ctx.ID().getText()
+        line = ctx.start.line
+        col = ctx.start.column
+
+        params = []
+        if ctx.paramList():
+            params = self.visitParamList(ctx.paramList())
+
+        body = []
+        if ctx.block():
+            body = self.visitBlock(ctx.block())
+
+        return ConstructorDefinition(
+            line=line, column=col,
+            name=name,
+            parameters=params,
+            body=body,
+        )
+
+    def visitInterfaceDef(self, ctx: DuanLangParser.InterfaceDefContext):
+        """接口定义"""
+        name = ctx.ID().getText()
+        line = ctx.start.line
+        col = ctx.start.column
+
+        superinterfaces = []
+        inherit_found = False
+        
+        for child in ctx.getChildren():
+            if hasattr(child, 'getText') and child.getText() == '继承':
+                inherit_found = True
+            elif inherit_found and isinstance(child, DuanLangParser.TypeAnnotationContext):
+                superinterfaces.append(self.visitTypeAnnotation(child))
+
+        methods = []
+        properties = []
+
+        for member in ctx.interfaceMember():
+            if member.methodSignature():
+                ms = member.methodSignature()
+                method_name = ms.ID().getText()
+                params = []
+                if ms.paramList():
+                    params = self.visitParamList(ms.paramList())
+                return_type = self.visitTypeAnnotation(ms.typeAnnotation())
+                methods.append(InterfaceMethod(
+                    line=ms.start.line, column=ms.start.column,
+                    name=method_name,
+                    parameters=params,
+                    return_type=return_type,
+                ))
+            elif member.propertySignature():
+                ps = member.propertySignature()
+                prop_name = ps.ID().getText()
+                prop_type = ps.typeAnnotation().getText()
+                properties.append(InterfaceProperty(
+                    line=ps.start.line, column=ps.start.column,
+                    name=prop_name,
+                    type_annotation=prop_type,
+                ))
+
+        return InterfaceDefinition(
+            line=line, column=col,
+            name=name,
+            superinterfaces=superinterfaces,
+            methods=methods,
+            properties=properties,
+        )
+
     def visitParamList(self, ctx: DuanLangParser.ParamListContext):
         """参数列表"""
         return [self.visitParam(p) for p in ctx.param()]
@@ -185,6 +356,10 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
         """定义分发"""
         if ctx.paragraphDef():
             return self.visitParagraphDef(ctx.paragraphDef())
+        elif ctx.classDef():
+            return self.visitClassDef(ctx.classDef())
+        elif ctx.interfaceDef():
+            return self.visitInterfaceDef(ctx.interfaceDef())
         elif ctx.dataTypeDef():
             return self.visitDataTypeDef(ctx.dataTypeDef())
         elif ctx.errorTypeDef():
@@ -640,6 +815,14 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
             return BooleanLiteral(line=line, column=col, value=False)
         if ctx.K_NULL():
             return NullLiteral(line=line, column=col)
+
+        # 实例化表达式：新 类名() - 必须在 ID 检查之前
+        if ctx.K_NEW():
+            class_name = ctx.ID().getText()
+            arguments = []
+            if ctx.exprList():
+                arguments = self.visitExprList(ctx.exprList())
+            return NewExpression(line=line, column=col, class_name=class_name, arguments=arguments)
 
         if ctx.ID():
             return Identifier(line=line, column=col, name=ctx.ID().getText())

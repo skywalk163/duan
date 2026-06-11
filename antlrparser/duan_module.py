@@ -2,10 +2,12 @@
 段言（Duan）编程语言 - 模块解析器
 
 实现功能：
-1. 模块查找（搜索 .duan 文件）
+1. 模块查找（搜索 .duan 文件和目录模块）
 2. 模块解析（使用 ANTLR 解析器）
 3. 模块缓存（避免重复解析）
 4. 搜索路径管理（当前目录 + DUAN_PATH 环境变量）
+5. 目录模块（包）支持
+6. 循环导入检测
 """
 
 import os
@@ -72,7 +74,7 @@ class ModuleResolver:
         查找模块文件路径
 
         Args:
-            module_name: 模块名（不含扩展名）
+            module_name: 模块名（不含扩展名，支持包路径如 'math.utils'）
             from_dir: 发起导入的模块所在目录（用于相对查找）
 
         Returns:
@@ -81,8 +83,9 @@ class ModuleResolver:
         Raises:
             ModuleNotFoundError: 未找到模块
         """
-        module_file = f"{module_name}.duan"
-
+        # 处理包路径（如 'math.utils'）
+        parts = module_name.split('.')
+        
         # 构建搜索目录列表
         search_dirs = []
 
@@ -105,11 +108,20 @@ class ModuleResolver:
             if not search_path.is_absolute():
                 search_path = Path.cwd() / search_path
 
-            module_path = search_path / module_file
+            # 尝试查找文件模块
+            module_file = f"{parts[-1]}.duan"
+            module_path = search_path.joinpath(*parts[:-1]) / module_file
             searched.append(str(module_path))
 
             if module_path.exists():
                 return str(module_path.resolve())
+
+            # 尝试查找目录模块（包）
+            dir_module_path = search_path.joinpath(*parts) / "__模块__.duan"
+            searched.append(str(dir_module_path))
+
+            if dir_module_path.exists():
+                return str(dir_module_path.resolve())
 
         raise ModuleNotFoundError(module_name, searched)
 
@@ -179,16 +191,18 @@ class ModuleResolver:
         for exp in module_ast.exports:
             export_names.add(exp.name)
 
-        # 构建 符号名 -> SegmentDefinition 映射
-        segments_map = {}
+        # 构建 符号名 -> 定义映射（包括段落和类）
+        symbols_map = {}
         for seg in module_ast.segments:
-            segments_map[seg.name] = seg
+            symbols_map[seg.name] = ('segment', seg)
+        for cls in module_ast.classes:
+            symbols_map[cls.name] = ('class', cls)
 
         # 如果指定了导入的符号名，只导入这些
         if import_stmt.names:
             result = {}
             for name in import_stmt.names:
-                if name not in segments_map:
+                if name not in symbols_map:
                     raise ModuleError(
                         f"模块 '{module_name}' 中未找到导出符号 '{name}'"
                     )
@@ -196,14 +210,14 @@ class ModuleResolver:
                     raise ModuleError(
                         f"符号 '{name}' 未在模块 '{module_name}' 中导出"
                     )
-                result[name] = segments_map[name]
+                result[name] = symbols_map[name]
             return result
         else:
             # 导入全部导出符号
             if not export_names:
-                return segments_map  # 无导出声明时导入所有段落
-            return {name: segments_map[name] for name in export_names
-                    if name in segments_map}
+                return symbols_map  # 无导出声明时导入所有符号（段落和类）
+            return {name: symbols_map[name] for name in export_names
+                    if name in symbols_map}
 
     def clear_cache(self):
         """清空模块缓存"""
