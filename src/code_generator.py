@@ -10,7 +10,7 @@ from keywords import VERB_ARITY
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess
 
 
 # =============================================================================
@@ -107,6 +107,7 @@ class PythonCodeGenerator:
             
             # 列表工具
             '列表长度': '_duan_builtin.列表长度',
+            '列表获取': '_duan_builtin.列表获取',
             '列表追加': '_duan_builtin.列表追加',
             '列表弹出': '_duan_builtin.列表弹出',
             '列表排序': '_duan_builtin.列表排序',
@@ -218,6 +219,9 @@ class PythonCodeGenerator:
             # 二元运算作为独立语句
             expr_code = self._generate_expr(stmt)
             self._add_line(expr_code)
+        elif hasattr(stmt, '__class__') and stmt.__class__.__name__ == 'SelfAssignment':
+            # self赋值语句（新增）
+            self._generate_self_assignment(stmt)
         elif hasattr(stmt, '__class__') and stmt.__class__.__name__ == 'ClassDefinition':
             # 类定义（新增）
             self._generate_class_definition(stmt)
@@ -312,6 +316,12 @@ class PythonCodeGenerator:
         else:
             self._add_line("return")
     
+    def _generate_self_assignment(self, stmt):
+        """生成self赋值语句"""
+        attr_name = self._sanitize_name(stmt.attr_name)
+        value = self._generate_expr(stmt.value)
+        self._add_line(f"self.{attr_name} = {value}")
+    
     def _generate_class_definition(self, stmt):
         """生成类定义"""
         class_name = self._sanitize_name(stmt.name)
@@ -365,7 +375,7 @@ class PythonCodeGenerator:
         
         params_str = ', '.join(params)
         
-        # 方法定义
+        # 方法定义（必须包含括号）
         self._add_line(f"def {method_name}({params_str}):")
         
         self.indent_level += 1
@@ -469,6 +479,27 @@ class PythonCodeGenerator:
             obj = self._generate_expr(expr.obj)
             index = self._generate_expr(expr.index)
             return f"{obj}[{index}]"
+        
+        elif isinstance(expr, ClassInstantiation):
+            # 类实例化：类名(参数...)
+            class_name = self._sanitize_name(expr.class_name)
+            args = [self._generate_expr(arg) for arg in expr.args]
+            args_str = ', '.join(args)
+            return f"{class_name}({args_str})"
+        
+        elif isinstance(expr, MemberAccess):
+            # 成员访问：obj.member 或 obj.method(args...)
+            obj = self._generate_expr(expr.obj)
+            member = self._sanitize_name(expr.member)
+            
+            if expr.is_method_call:
+                # 方法调用
+                args = [self._generate_expr(arg) for arg in expr.args]
+                args_str = ', '.join(args)
+                return f"{obj}.{member}({args_str})"
+            else:
+                # 属性访问
+                return f"{obj}.{member}"
         
         else:
             raise ValueError(f"未知表达式类型: {type(expr).__name__}")

@@ -213,6 +213,87 @@ class ExportStmt(ASTNode):
         return f"ExportStmt({', '.join(self.symbols)})"
 
 
+class Parameter(ASTNode):
+    """参数定义"""
+    def __init__(self, name: str, type_annotation: str = None, default_value: ASTNode = None):
+        self.name = name
+        self.type_annotation = type_annotation
+        self.default_value = default_value
+    
+    def __repr__(self):
+        return f"Parameter({self.name})"
+
+
+class AttributeDeclaration(ASTNode):
+    """属性声明"""
+    def __init__(self, name: str, type_annotation: str = None, default_value: ASTNode = None):
+        self.name = name
+        self.type_annotation = type_annotation
+        self.default_value = default_value
+    
+    def __repr__(self):
+        return f"AttributeDeclaration({self.name})"
+
+
+class MethodDefinition(ASTNode):
+    """方法定义"""
+    def __init__(self, name: str, parameters: List[Parameter], body: List[ASTNode], 
+                 return_type: str = None, is_constructor: bool = False):
+        self.name = name
+        self.parameters = parameters
+        self.body = body
+        self.return_type = return_type
+        self.is_constructor = is_constructor
+    
+    def __repr__(self):
+        return f"MethodDefinition({self.name})"
+
+
+class SelfAssignment(ASTNode):
+    """self赋值语句：己属性名 为 值"""
+    def __init__(self, attr_name: str, value: ASTNode):
+        self.attr_name = attr_name
+        self.value = value
+    
+    def __repr__(self):
+        return f"SelfAssignment(self.{self.attr_name})"
+
+
+class ClassDefinition(ASTNode):
+    """类定义"""
+    def __init__(self, name: str, attributes: List[AttributeDeclaration], 
+                 methods: List[MethodDefinition], base_class: str = None):
+        self.name = name
+        self.attributes = attributes
+        self.methods = methods
+        self.base_class = base_class
+    
+    def __repr__(self):
+        return f"ClassDefinition({self.name})"
+
+
+class ClassInstantiation(ASTNode):
+    """类实例化（新建 类名 参数...）"""
+    def __init__(self, class_name: str, args: List[ASTNode]):
+        self.class_name = class_name
+        self.args = args
+    
+    def __repr__(self):
+        return f"ClassInstantiation({self.class_name})"
+
+
+class MemberAccess(ASTNode):
+    """成员访问（对象.属性 或 对象.方法()）"""
+    def __init__(self, obj: ASTNode, member: str, is_method_call: bool = False, args: List[ASTNode] = None):
+        self.obj = obj
+        self.member = member
+        self.is_method_call = is_method_call
+        self.args = args or []
+    
+    def __repr__(self):
+        return f"MemberAccess({self.obj}.{self.member})"
+
+
 # =============================================================================
 # 递归下降解析器
 # =============================================================================
@@ -360,10 +441,18 @@ class DuanParser:
         # 段落定义：段落 段名 参数 参数名
         if tok.type == TokenType.KEYWORD and tok.value == '段落':
             return self._parse_paragraph_v2()
+        
+        # 类定义：类 类名
+        if tok.type == TokenType.KEYWORD and tok.value == '类':
+            return self._parse_class_definition()
 
         # 动词调用作为独立语句
         if tok.type == TokenType.KEYWORD and tok.value in VERB_ARITY:
             return self._parse_expr_stmt()
+        
+        # self赋值语句：己属性名 为 值
+        if tok.type == TokenType.KEYWORD and tok.value == '己':
+            return self._parse_self_assignment()
         
         # 赋值语句：标识符 等于 值。
         if tok.type == TokenType.IDENTIFIER:
@@ -378,6 +467,58 @@ class DuanParser:
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
         return expr
+    
+    def _parse_self_assignment(self) -> ASTNode:
+        """解析self赋值语句：己属性名 为 值。
+        
+        语法：己属性名 为 值。
+        生成：self.属性名 = 值
+        """
+        # 己
+        self._consume(TokenType.KEYWORD, '己')
+        
+        # 属性名（可能以"己"开头，但已经被消费了）
+        # 这里属性名可能是单个标识符，也可能带类型等
+        attr_name_tokens = []
+        
+        # 收集属性名，直到遇到"为"关键字
+        while self._current():
+            tok = self._current()
+            
+            if tok.type == TokenType.KEYWORD and tok.value == '为':
+                break
+            
+            if tok.type == TokenType.IDENTIFIER:
+                attr_name_tokens.append(tok.value)
+                self._consume(TokenType.IDENTIFIER)
+            elif tok.type == TokenType.KEYWORD and tok.value not in ('为', '结束'):
+                # 属性名可能包含关键字
+                attr_name_tokens.append(tok.value)
+                self._consume(TokenType.KEYWORD)
+            else:
+                break
+        
+        # 拼接属性名（处理"己名称"这种"己"+"名称"的情况）
+        attr_name = ''.join(attr_name_tokens)
+        
+        # 为
+        if self._match(TokenType.KEYWORD, '为'):
+            self._consume(TokenType.KEYWORD, '为')
+        elif self._match(TokenType.KEYWORD, '等于'):
+            self._consume(TokenType.KEYWORD, '等于')
+        else:
+            # 兼容其他赋值操作符
+            raise SyntaxError(f"期望'为'或'等于'，但得到: {self._current()}")
+        
+        # 值
+        value = self._parse_expr()
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        # 创建赋值节点（self.attr_name = value）
+        return SelfAssignment(attr_name, value)
     
     def _parse_assignment_stmt(self) -> ASTNode:
         """解析赋值语句：标识符 等于 值。"""
@@ -907,6 +1048,32 @@ class DuanParser:
         if tok.type == TokenType.KEYWORD and tok.value in VERB_ARITY and tok.value not in operator_verbs:
             verb_name = tok.value
             self._consume()
+            
+            # 特殊处理：新建（类实例化）
+            if verb_name == '新建':
+                # 新建 类名 参数...
+                class_name_tok = self._current()
+                if class_name_tok and class_name_tok.type == TokenType.IDENTIFIER:
+                    class_name = class_name_tok.value
+                    self._consume()
+                    
+                    # 收集参数（直到遇到阻断符）
+                    args = []
+                    while self._current():
+                        next_tok = self._current()
+                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            break
+                        if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                            break
+                        arg = self._collect_primary_arg()
+                        if arg:
+                            args.append(arg)
+                        else:
+                            break
+                    
+                    expr = ClassInstantiation(class_name, args)
+                    return self._parse_postfix(expr)
+            
             # 收集参数（元数驱动）
             arity = VERB_ARITY[verb_name]
             args = []
@@ -922,8 +1089,8 @@ class DuanParser:
                         break
                     if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                         break
-                    # 收集单个参数token
-                    arg = self._collect_single_arg()
+                    # 收集单个primary参数（不进行段落调用检测）
+                    arg = self._collect_primary_arg()
                     if arg:
                         args.append(arg)
                     else:
@@ -932,7 +1099,7 @@ class DuanParser:
                 # 固定参数数量
                 for _ in range(arity):
                     if self._current() and self._current().type not in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN):
-                        arg = self._collect_single_arg()
+                        arg = self._collect_primary_arg()
                         if arg:
                             args.append(arg)
 
@@ -945,8 +1112,66 @@ class DuanParser:
 
         raise SyntaxError(f"意外的 Token: {tok.type} = {tok.value}")
 
+    def _collect_primary_arg(self) -> Optional[ASTNode]:
+        """收集单个primary参数（不进行段落调用检测）"""
+        tok = self._current()
+        if tok is None:
+            return None
+
+        # 数字
+        if tok.type == TokenType.NUMBER:
+            self._consume()
+            return NumberLiteral(tok.value)
+
+        # 中文数字
+        if tok.type == TokenType.CHINESE_NUM:
+            self._consume()
+            return NumberLiteral(tok.value)
+
+        # 字符串
+        if tok.type == TokenType.STRING:
+            self._consume()
+            return StringLiteral(tok.value)
+
+        # 标识符（直接返回，不进行段落调用检测）
+        if tok.type == TokenType.IDENTIFIER:
+            name = tok.value
+            self._consume()
+            expr = Identifier(name)
+            return self._parse_postfix(expr)
+
+        # 关键字作为标识符
+        if tok.type == TokenType.KEYWORD:
+            name = tok.value
+            self._consume()
+            expr = Identifier(name)
+            return self._parse_postfix(expr)
+
+        # 特殊值
+        if tok.type == TokenType.KEYWORD and tok.value in KEYWORDS_SPECIAL:
+            self._consume()
+            if tok.value == '真':
+                return Identifier('True')
+            elif tok.value == '假':
+                return Identifier('False')
+            else:  # '空'
+                return Identifier('None')
+
+        # 书名号段落调用
+        if tok.type == TokenType.LBOOK:
+            return self._parse_paragraph_call()
+
+        # 括号表达式
+        if tok.type == TokenType.LPAREN:
+            self._consume(TokenType.LPAREN)
+            expr = self._parse_expr()
+            self._consume(TokenType.RPAREN)
+            return expr
+
+        return None
+
     def _collect_single_arg(self) -> Optional[ASTNode]:
-        """收集单个参数（避免递归）"""
+        """收集单个参数（可能包含段落调用）"""
         tok = self._current()
         if tok is None:
             return None
@@ -1002,32 +1227,124 @@ class DuanParser:
                     elif next_tok.type == TokenType.STRING:
                         args.append(StringLiteral(self._consume().value))
                     elif next_tok.type == TokenType.IDENTIFIER:
-                        # 收集标识符（可能嵌套段落调用）
-                        sub_name = self._consume().value
-                        # 检查是否是嵌套的段落调用
-                        sub_args = []
-                        while self._current():
-                            sub_next = self._current()
-                            if sub_next.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
-                                break
-                            if sub_next.type == TokenType.KEYWORD and (sub_next.value in operator_verbs or sub_next.value in KEYWORDS_DOUBLE):
-                                break
-                            # 只收集primary
-                            if sub_next.type == TokenType.IDENTIFIER:
-                                sub_args.append(Identifier(self._consume().value))
-                            elif sub_next.type == TokenType.NUMBER:
-                                sub_args.append(NumberLiteral(self._consume().value))
-                            elif sub_next.type == TokenType.CHINESE_NUM:
-                                sub_args.append(NumberLiteral(self._consume().value))
-                            elif sub_next.type == TokenType.STRING:
-                                sub_args.append(StringLiteral(self._consume().value))
-                            else:
-                                break
-                        
-                        if sub_args:
-                            args.append(ParagraphCall(sub_name, sub_args))
-                        else:
-                            args.append(Identifier(sub_name))
+                        # 收集标识符作为独立参数（不嵌套）
+                        args.append(Identifier(self._consume().value))
+                    else:
+                        break
+                
+                # 如果有参数，作为段落调用
+                if args:
+                    expr = ParagraphCall(name, args)
+                else:
+                    expr = Identifier(name)
+            
+            return self._parse_postfix(expr)
+        
+        # 关键字作为标识符（如参数名）
+        if tok.type == TokenType.KEYWORD:
+            name = tok.value
+            self._consume()
+            
+            # 同样检查是否是段落调用
+            args = []
+            while self._current():
+                next_tok = self._current()
+                if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                    break
+                if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                    break
+                
+                arg = self._collect_primary_arg()
+                if arg:
+                    args.append(arg)
+                else:
+                    break
+            
+            if args:
+                expr = ParagraphCall(name, args)
+            else:
+                expr = Identifier(name)
+            
+            return self._parse_postfix(expr)
+        
+        # 特殊值
+        if tok.type == TokenType.KEYWORD and tok.value in KEYWORDS_SPECIAL:
+            self._consume()
+            if tok.value == '真':
+                return Identifier('True')
+            elif tok.value == '假':
+                return Identifier('False')
+            else:  # '空'
+                return Identifier('None')
+
+        # 段落调用
+        if tok.type == TokenType.LBOOK:
+            return self._parse_paragraph_call()
+
+        # 括号表达式
+        if tok.type == TokenType.LPAREN:
+            self._consume(TokenType.LPAREN)
+            expr = self._parse_expr()
+            self._consume(TokenType.RPAREN)
+            return expr
+
+        # 注意：不再递归处理动词，避免无限循环
+        # 动词作为独立语句处理，不作为参数
+        return None
+
+        # 数字
+        if tok.type == TokenType.NUMBER:
+            self._consume()
+            return NumberLiteral(tok.value)
+
+        # 中文数字
+        if tok.type == TokenType.CHINESE_NUM:
+            self._consume()
+            return NumberLiteral(tok.value)
+
+        # 字符串
+        if tok.type == TokenType.STRING:
+            self._consume()
+            return StringLiteral(tok.value)
+
+        # 标识符
+        if tok.type == TokenType.IDENTIFIER:
+            name = tok.value
+            self._consume()
+            
+            # 运算符动词（不应收集为参数）
+            operator_verbs = {'加', '减', '乘', '除', '加上', '减去', '乘以', '除以', '大于', '小于', '等于', '不等于', '大于等于', '小于等于'}
+            
+            # 检查下一个token是否是运算符动词
+            next_tok = self._current()
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in operator_verbs:
+                # 下一个是运算符，不收集参数，直接返回标识符
+                expr = Identifier(name)
+            else:
+                # 检查是否是段落调用（标识符后跟参数）
+                args = []
+                while self._current():
+                    next_tok = self._current()
+                    # 停止条件：句号、逗号、右括号
+                    if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                        break
+                    # 遇到运算符动词停止
+                    if next_tok.type == TokenType.KEYWORD and next_tok.value in operator_verbs:
+                        break
+                    # 遇到其他关键字（除运算符动词外）停止
+                    if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                        break
+                    
+                    # 收集单个参数（只收集primary，不包含运算）
+                    if next_tok.type == TokenType.NUMBER:
+                        args.append(NumberLiteral(self._consume().value))
+                    elif next_tok.type == TokenType.CHINESE_NUM:
+                        args.append(NumberLiteral(self._consume().value))
+                    elif next_tok.type == TokenType.STRING:
+                        args.append(StringLiteral(self._consume().value))
+                    elif next_tok.type == TokenType.IDENTIFIER:
+                        # 收集标识符作为独立参数（不嵌套）
+                        args.append(Identifier(self._consume().value))
                     else:
                         break
                 
@@ -1093,9 +1410,50 @@ class DuanParser:
         return None
     
     def _parse_postfix(self, expr: ASTNode) -> ASTNode:
-        """解析后缀表达式（索引访问等）"""
+        """解析后缀表达式（索引访问、成员访问等）"""
         while self._current():
             tok = self._current()
+            
+            # 成员访问：obj.member 或 obj.method()
+            # 注意：需要区分英文点号(.)和中文句号(。)
+            is_dot_access = False
+            if tok.type == TokenType.DOT:
+                # 检查是否是英文点号（成员访问）还是中文句号（语句结束）
+                if tok.value == '.':
+                    is_dot_access = True
+                # 中文句号(。)是语句结束符，不进行成员访问
+            
+            if is_dot_access:
+                self._consume()  # 消耗点号
+                
+                # 获取成员名
+                member_tok = self._current()
+                if member_tok and member_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    member_name = member_tok.value
+                    self._consume()
+                    
+                    # 检查是否是方法调用（后面跟着参数）
+                    args = []
+                    while self._current():
+                        next_tok = self._current()
+                        # 阻断符：句号、逗号、右括号、右中括号、关键字
+                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            break
+                        if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                            break
+                        
+                        # 收集参数
+                        arg = self._collect_primary_arg()
+                        if arg:
+                            args.append(arg)
+                        else:
+                            break
+                    
+                    is_method_call = len(args) > 0
+                    expr = MemberAccess(expr, member_name, is_method_call, args)
+                    continue
+                else:
+                    raise SyntaxError(f"期望成员名，但得到: {member_tok}")
             
             # 索引访问：[index] 或 【index】
             if tok.type == TokenType.LBRACKET:
@@ -1139,6 +1497,173 @@ class DuanParser:
         
         # 否则是字符串字面量
         return StringLiteral(name)
+    
+    # =============================================================================
+    # 类定义解析
+    # =============================================================================
+    
+    def _parse_class_definition(self) -> ClassDefinition:
+        """解析类定义
+        
+        语法：
+        类 类名。
+          属性 属性名。
+          属性 属性名。
+          
+          构造 参数 参数名 参数名。
+            己属性名 为 参数名。
+          结束。
+          
+          段落 方法名 参数 参数名。
+            方法体。
+          结束。
+        结束。
+        
+        或带继承：
+        类 类名 继承 父类名。
+          ...
+        结束。
+        """
+        # 类
+        self._consume(TokenType.KEYWORD, '类')
+        
+        # 类名
+        name_tok = self._consume(TokenType.IDENTIFIER)
+        class_name = name_tok.value
+        
+        # 继承？（可选）
+        base_class = None
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '继承':
+            self._consume(TokenType.KEYWORD, '继承')
+            base_tok = self._consume(TokenType.IDENTIFIER)
+            base_class = base_tok.value
+        
+        # 句号
+        self._consume(TokenType.DOT)
+        
+        # 类体
+        attributes = []
+        methods = []
+        
+        # 解析类体（直到遇到"结束"）
+        while self._current():
+            tok = self._current()
+            
+            # 结束关键字
+            if tok.type == TokenType.KEYWORD and tok.value == '结束':
+                self._consume(TokenType.KEYWORD, '结束')
+                self._consume(TokenType.DOT)
+                break
+            
+            # 属性声明
+            if tok.type == TokenType.KEYWORD and tok.value == '属性':
+                attr = self._parse_attribute_declaration()
+                attributes.append(attr)
+            
+            # 构造函数
+            elif tok.type == TokenType.KEYWORD and tok.value == '构造':
+                method = self._parse_method_definition(is_constructor=True)
+                methods.append(method)
+            
+            # 方法定义
+            elif tok.type == TokenType.KEYWORD and tok.value == '段落':
+                method = self._parse_method_definition(is_constructor=False)
+                methods.append(method)
+            
+            # 空行或其他情况
+            else:
+                # 跳过当前token继续
+                if tok.type == TokenType.DOT:
+                    self._consume(TokenType.DOT)
+                else:
+                    break
+        
+        return ClassDefinition(
+            name=class_name,
+            attributes=attributes,
+            methods=methods,
+            base_class=base_class
+        )
+    
+    def _parse_attribute_declaration(self) -> AttributeDeclaration:
+        """解析属性声明
+        
+        语法：属性 属性名。
+        """
+        # 属性
+        self._consume(TokenType.KEYWORD, '属性')
+        
+        # 属性名
+        name_tok = self._consume(TokenType.IDENTIFIER)
+        attr_name = name_tok.value
+        
+        # 句号
+        self._consume(TokenType.DOT)
+        
+        return AttributeDeclaration(name=attr_name)
+    
+    def _parse_method_definition(self, is_constructor=False) -> MethodDefinition:
+        """解析方法定义
+        
+        语法：
+        构造 参数 参数名 参数名。
+          方法体。
+        结束。
+        
+        或：
+        段落 方法名 参数 参数名。
+          方法体。
+        结束。
+        """
+        method_name = None
+        
+        if is_constructor:
+            # 构造
+            self._consume(TokenType.KEYWORD, '构造')
+            method_name = '__init__'
+        else:
+            # 段落
+            self._consume(TokenType.KEYWORD, '段落')
+            name_tok = self._consume(TokenType.IDENTIFIER)
+            method_name = name_tok.value
+        
+        # 参数列表
+        parameters = []
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '参数':
+            self._consume(TokenType.KEYWORD, '参数')
+            
+            # 收集参数
+            while self._current() and self._current().type == TokenType.IDENTIFIER:
+                param_tok = self._consume(TokenType.IDENTIFIER)
+                parameters.append(Parameter(name=param_tok.value))
+        
+        # 句号
+        self._consume(TokenType.DOT)
+        
+        # 方法体
+        body = []
+        while self._current():
+            tok = self._current()
+            
+            # 结束关键字
+            if tok.type == TokenType.KEYWORD and tok.value == '结束':
+                self._consume(TokenType.KEYWORD, '结束')
+                self._consume(TokenType.DOT)
+                break
+            
+            # 解析语句
+            stmt = self._parse_statement()
+            if stmt:
+                body.append(stmt)
+            else:
+                break
+        
+        return MethodDefinition(
+            name=method_name,
+            parameters=parameters,
+            body=body,
+            is_constructor=is_constructor
+        )
 
 
 # =============================================================================
