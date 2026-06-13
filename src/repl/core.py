@@ -9,7 +9,7 @@
 
 import sys
 import os
-from typing import Optional
+from typing import List, Optional
 
 # 添加路径
 _current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(_current_dir, 'src'))
 sys.path.insert(0, os.path.join(_current_dir, 'antlrparser'))
 
 from .executor import Executor, Environment
+from .commands import CommandHandler
 
 
 # =============================================================================
@@ -31,75 +32,178 @@ class DuanREPL:
     - 代码执行
     - 环境管理
     - 历史记录
-    - 自动补全（预留）
+    - 多行支持
+    - 命令处理
     """
 
-    def __init__(self):
-        """初始化REPL"""
-        self.executor = Executor()
-        self.history = []
-        self._setup_welcome()
+    def __init__(self, enhanced: bool = False):
+        """初始化REPL
 
-    def _setup_welcome(self):
-        """设置欢迎信息"""
-        self.welcome = """
-=== 段言 REPL v1.0 ===
-输入段言代码即可执行。
-输入 帮助 获取命令列表。
-输入 退出 退出REPL。
-"""
+        Args:
+            enhanced: 是否使用增强模式（prompt_toolkit）
+        """
+        self.executor = Executor()
+        self.command_handler = CommandHandler(
+            env=self.executor.env.variables,
+            executor=self.executor
+        )
+        self.buffer: List[str] = []
+        self.history: List[str] = []
+        self.debug_mode = False
+        self.enhanced = enhanced
+
+        # 尝试加载增强模式
+        if enhanced:
+            try:
+                from .enhanced import EnhancedREPL, HAS_PROMPT_TOOLKIT
+                if HAS_PROMPT_TOOLKIT:
+                    self._enhanced_impl = EnhancedREPL(self)
+                    self._use_enhanced = True
+                else:
+                    self._use_enhanced = False
+            except ImportError:
+                self._use_enhanced = False
+        else:
+            self._use_enhanced = False
+
+    def _is_multiline_start(self, line: str) -> bool:
+        """判断是否是多行开始"""
+        starters = ['段落', '类', '接口', '如果', '当', '遍历', '尝试']
+        for s in starters:
+            if line.startswith(s) and (line.endswith(':') or line.endswith('：')):
+                return True
+        return False
+
+    def _is_multiline_end(self, line: str) -> bool:
+        """判断是否是多行结束"""
+        return line.strip() in ['结束。', '结束', '结束。', '否则', '否则：', '否则:']
+
+    def execute_buffer(self) -> Optional[str]:
+        """执行缓冲区代码"""
+        code = '\n'.join(self.buffer)
+        self.buffer = []
+        self.history.append(code)
+
+        try:
+            self.executor.execute(code)
+            return "执行完成"
+        except Exception as e:
+            return f"错误: {e}"
+
+    def process_input(self, line: str) -> Optional[str]:
+        """处理输入"""
+        line = line.strip()
+
+        # 空行
+        if not line:
+            if self.buffer:
+                return self.execute_buffer()
+            return None
+
+        # 注释
+        if line.startswith('#'):
+            return None
+
+        # 命令（以 : 开头）
+        if line.startswith(':'):
+            result = self.command_handler.handle(line)
+            self.history.append(line)
+
+            if result == 'CLEAR':
+                os.system('cls' if os.name == 'nt' else 'clear')
+                self.print_banner()
+                return None
+            elif result == 'RESET':
+                self.executor.reset()
+                return "环境已重置"
+
+            return result
+
+        # 多行检测
+        if self._is_multiline_start(line):
+            self.buffer.append(line)
+            return None
+
+        # 添加到缓冲区
+        if self.buffer:
+            self.buffer.append(line)
+            if self._is_multiline_end(line):
+                return self.execute_buffer()
+            return None
+
+        # 单行执行
+        return self.execute_line(line)
+
+    def print_banner(self):
+        """打印欢迎信息"""
+        print("""
+╔══════════════════════════════════════════════╗
+║           段言 (DuanLang) REPL              ║
+║           版本: 1.0.0                        ║
+║                                              ║
+║  输入段言代码，按 Enter 执行                  ║
+║  输入 :help 获取帮助                         ║
+║  输入 :exit 或按 Ctrl+D 退出                 ║
+╚══════════════════════════════════════════════╝
+""")
 
     def run(self):
-        """运行REPL主循环"""
-        print(self.welcome)
+        """启动REPL主循环"""
+        self.print_banner()
 
         while True:
             try:
                 # 读取输入
-                code = input("段言> ").strip()
+                if self.buffer:
+                    prompt = "...   "
+                else:
+                    prompt = "段言> "
 
-                if not code:
-                    continue
+                line = self.read_input(prompt)
 
-                # 处理特殊命令
-                if code in ['退出', 'exit', 'quit', 'q']:
+                if line is None:
+                    break
+
+                # 处理输入
+                result = self.process_input(line)
+
+                # 显示结果
+                if result and result != 'EXIT':
+                    print(result)
+
+                if result == 'EXIT':
                     print("再见！")
                     break
 
-                if code in ['帮助', 'help', 'h', '?']:
-                    self._show_help()
-                    continue
-
-                if code in ['历史', 'history', 'hi']:
-                    self._show_history()
-                    continue
-
-                if code in ['重置', 'reset', 'clear']:
-                    self.executor.reset()
-                    print("环境已重置。")
-                    continue
-
-                if code in ['环境', 'env', 'e']:
-                    self._show_env()
-                    continue
-
-                # 执行代码
-                self.history.append(code)
-                result = self.executor.execute(code)
-
-                # 显示结果
-                if result is not None:
-                    print(f"=> {result}")
-
             except KeyboardInterrupt:
-                print("\n按 Ctrl+C 退出请输入 退出。")
+                print("\n^C")
+                self.buffer = []
             except EOFError:
                 print("\n再见！")
                 break
-            except Exception as e:
-                print(f"错误: {e}")
 
-    def execute(self, code: str) -> any:
+    def read_input(self, prompt: str) -> Optional[str]:
+        """读取用户输入"""
+        try:
+            return input(prompt)
+        except EOFError:
+            return None
+
+    def execute_line(self, line: str) -> Optional[str]:
+        """执行单行代码"""
+        self.history.append(line)
+
+        try:
+            result = self.executor.execute(line)
+
+            if result is not None:
+                return str(result)
+
+            return None
+        except Exception as e:
+            return f"错误: {e}"
+
+    def execute(self, code: str):
         """执行代码并返回结果
 
         Args:
@@ -109,53 +213,6 @@ class DuanREPL:
             执行结果
         """
         return self.executor.execute(code)
-
-    def _show_help(self):
-        """显示帮助信息"""
-        print("""
-=== 段言 REPL 帮助 ===
-
-命令:
-  帮助, help     显示此帮助信息
-  退出, exit     退出REPL
-  历史, history  显示历史记录
-  重置, reset    重置执行环境
-  环境, env      显示当前环境变量
-
-代码示例:
-  设 甲 为 3。           # 变量声明
-  甲 加 5               # 简单表达式
-  打印(甲)。            # 打印输出
-  段落 平方 接收 数值:   # 函数定义
-      返回 数值 * 数值。
-  结束。
-""")
-
-    def _show_history(self):
-        """显示历史记录"""
-        print("=== 历史记录 ===")
-        for i, cmd in enumerate(self.history, 1):
-            print(f"{i}: {cmd}")
-
-    def _show_env(self):
-        """显示当前环境"""
-        print("=== 当前环境 ===")
-        variables = self.executor.env.variables
-        functions = self.executor.env.functions
-
-        if variables:
-            print("变量:")
-            for name, value in variables.items():
-                print(f"  {name} = {value}")
-        else:
-            print("变量: (空)")
-
-        if functions:
-            print("函数:")
-            for name in functions.keys():
-                print(f"  {name}()")
-        else:
-            print("函数: (空)")
 
 
 # =============================================================================
