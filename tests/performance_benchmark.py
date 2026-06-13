@@ -13,22 +13,18 @@ import statistics
 from typing import List, Tuple
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'antlrparser'))
 
-from lexer import Lexer
-from duan_parser_v3 import DuanParser
-from semantic_analyzer import SemanticAnalyzer
-from code_generator import PythonCodeGenerator
+from duan_tokenizer import DuanLangTokenizer as Lexer
+from duan_visitor import DuanParser
 
 
 class PerformanceBenchmark:
     """性能基准测试"""
-    
+
     def __init__(self):
         self.lexer = Lexer()
         self.parser = DuanParser()
-        self.analyzer = SemanticAnalyzer()
-        self.generator = PythonCodeGenerator()
     
     def measure_time(self, func, *args, iterations: int = 100) -> Tuple[float, float, float]:
         """
@@ -79,18 +75,19 @@ class PerformanceBenchmark:
         avg_time, min_time, max_time = self.measure_time(
             self.parser.parse, code, iterations=iterations
         )
-        
+
         module = self.parser.parse(code)
-        stmt_count = len(module.statements)
-        
+        # 统计段落、类和语句数量
+        stmt_count = len(module.segments) if module else 0
+
         print(f"\n{name}:")
         print(f"  代码长度: {len(code)} 字符")
-        print(f"  语句数量: {stmt_count}")
+        print(f"  段落数量: {stmt_count}")
         print(f"  平均时间: {avg_time:.3f} ms")
         print(f"  最小时间: {min_time:.3f} ms")
         print(f"  最大时间: {max_time:.3f} ms")
         print(f"  吞吐量: {len(code) / avg_time:.1f} chars/ms")
-        
+
         return {
             'name': name,
             'code_length': len(code),
@@ -100,34 +97,30 @@ class PerformanceBenchmark:
             'max_time': max_time,
             'throughput': len(code) / avg_time
         }
-    
+
     def benchmark_full_compile(self, code: str, name: str, iterations: int = 20):
-        """完整编译流程基准测试"""
+        """完整编译流程基准测试（解析+解释执行）"""
         def compile_pipeline():
             tokens = self.lexer.tokenize(code)
             module = self.parser.parse(code)
-            self.analyzer.analyze(module)
-            python_code = self.generator.generate(module)
-            return python_code
-        
+            return module
+
         avg_time, min_time, max_time = self.measure_time(
             compile_pipeline, iterations=iterations
         )
-        
-        python_code = compile_pipeline()
-        
+
+        module = compile_pipeline()
+
         print(f"\n{name}:")
         print(f"  代码长度: {len(code)} 字符")
-        print(f"  输出长度: {len(python_code)} 字符")
         print(f"  平均时间: {avg_time:.3f} ms")
         print(f"  最小时间: {min_time:.3f} ms")
         print(f"  最大时间: {max_time:.3f} ms")
         print(f"  吞吐量: {len(code) / avg_time:.1f} chars/ms")
-        
+
         return {
             'name': name,
             'code_length': len(code),
-            'output_length': len(python_code),
             'avg_time': avg_time,
             'min_time': min_time,
             'max_time': max_time,

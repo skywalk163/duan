@@ -10,7 +10,7 @@ from keywords import VERB_ARITY
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList
 
 
 # =============================================================================
@@ -207,14 +207,18 @@ class PythonCodeGenerator:
             self._add_line("break")
         elif isinstance(stmt, ContinueStmt):
             self._add_line("continue")
+        elif isinstance(stmt, TryStmt):
+            self._generate_try_stmt(stmt)
+        elif isinstance(stmt, ThrowStmt):
+            self._generate_throw_stmt(stmt)
         elif isinstance(stmt, ParagraphCall):
             # 动词调用作为独立语句
             expr_code = self._generate_expr(stmt)
             self._add_line(expr_code)
         elif isinstance(stmt, Identifier):
-            # 标识符作为独立语句（可能是段落调用或变量引用）
-            expr_code = self._generate_expr(stmt)
-            self._add_line(expr_code)
+            # 标识符作为独立语句：生成为段落调用（带括号）
+            name = self._sanitize_name(stmt.name)
+            self._add_line(f"{name}()")
         elif isinstance(stmt, BinaryOp):
             # 二元运算作为独立语句
             expr_code = self._generate_expr(stmt)
@@ -287,20 +291,33 @@ class PythonCodeGenerator:
         """生成段落定义"""
         name = self._sanitize_name(stmt.name)
         
-        # 参数列表
+        # 从段落体中提取参数声明
         params = []
-        for param in stmt.params:
-            param_name = self._sanitize_name(param['name'])
-            params.append(param_name)
+        body_without_params = []
+        for s in (stmt.body or []):
+            if isinstance(s, Parameter):
+                params.append(self._sanitize_name(s.name))
+            elif isinstance(s, ParameterList):
+                # 处理参数列表语句
+                for param_name in s.params:
+                    params.append(self._sanitize_name(param_name))
+            else:
+                body_without_params.append(s)
         
-        params_str = ', '.join(params)
+        # 如果段落头有参数定义，也加入
+        for param in (stmt.params or []):
+            param_name = self._sanitize_name(param['name'])
+            if param_name not in params:
+                params.append(param_name)
+        
+        params_str = ', '.join(params) if params else ''
         
         # 函数定义
         self._add_line(f"def {name}({params_str}):")
         
         self.indent_level += 1
-        if stmt.body:
-            for s in stmt.body:
+        if body_without_params:
+            for s in body_without_params:
                 self._generate_statement(s)
         else:
             self._add_line("pass")
@@ -315,6 +332,43 @@ class PythonCodeGenerator:
             self._add_line(f"return {value}")
         else:
             self._add_line("return")
+    
+    def _generate_try_stmt(self, stmt: TryStmt):
+        """生成异常捕获语句"""
+        # try块
+        self._add_line("try:")
+        self.indent_level += 1
+        if stmt.try_body:
+            for s in stmt.try_body:
+                self._generate_statement(s)
+        else:
+            self._add_line("pass")
+        self.indent_level -= 1
+        
+        # except块
+        if stmt.catch_body:
+            if stmt.catch_var:
+                self._add_line(f"except Exception as {stmt.catch_var}:")
+            else:
+                self._add_line("except Exception:")
+            
+            self.indent_level += 1
+            for s in stmt.catch_body:
+                self._generate_statement(s)
+            self.indent_level -= 1
+        
+        # finally块
+        if stmt.finally_body:
+            self._add_line("finally:")
+            self.indent_level += 1
+            for s in stmt.finally_body:
+                self._generate_statement(s)
+            self.indent_level -= 1
+    
+    def _generate_throw_stmt(self, stmt: ThrowStmt):
+        """生成抛出异常语句"""
+        value = self._generate_expr(stmt.value)
+        self._add_line(f"raise {value}")
     
     def _generate_self_assignment(self, stmt):
         """生成self赋值语句"""
@@ -514,16 +568,30 @@ class PythonCodeGenerator:
     
     def _generate_import_stmt(self, stmt: ImportStmt):
         """生成导入语句"""
+        # 将中文模块名转换为Python模块名
+        # 例如："数学工具" → "stdlib.数学工具"
+        module_name = stmt.module_name
+        if self._is_chinese(module_name):
+            # 如果是中文模块名，假设在stdlib目录下
+            module_name = f"stdlib.{module_name}"
+        
         if stmt.symbols:
             # 从...导入：from module import symbol1, symbol2
             symbols_str = ', '.join(stmt.symbols)
-            self._add_line(f"from {stmt.module_name} import {symbols_str}")
+            self._add_line(f"from {module_name} import {symbols_str}")
         else:
             # 导入整个模块：import module
             if stmt.alias:
-                self._add_line(f"import {stmt.module_name} as {stmt.alias}")
+                self._add_line(f"import {module_name} as {stmt.alias}")
             else:
-                self._add_line(f"import {stmt.module_name}")
+                self._add_line(f"import {module_name}")
+    
+    def _is_chinese(self, text: str) -> bool:
+        """判断字符串是否包含中文"""
+        for char in text:
+            if '\u4e00' <= char <= '\u9fff':
+                return True
+        return False
     
     def _generate_export_stmt(self, stmt: ExportStmt):
         """生成导出语句"""

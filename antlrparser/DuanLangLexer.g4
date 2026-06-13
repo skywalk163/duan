@@ -1,13 +1,13 @@
 /*
  * 段言（Duan）编程语言 ANTLR4 词法定义
  *
- * 版本: v1.0
- * 独立的 Lexer 语法，支持 lexer mode 实现代码块注释
+ * 版本: v1.2
+ * 恢复原始注释 token 定义以保持与 Parser 同步
  */
 
 lexer grammar DuanLangLexer;
 
-// ----- 注释（lexer mode 实现）-----
+// ----- 注释（保持原始定义）-----
 
 LINE_COMMENT
     : '#' ~[\r\n]* -> channel(HIDDEN)
@@ -43,10 +43,13 @@ K_NE       : '不等于' ;
 K_GT       : '大于' ;
 K_LT       : '小于' ;
 
-// 定义声明
-K_DEFINE   : '定义' ;
-K_EQUAL    : '等于' ;    // 同时用于赋值和比较（由 Parser 上下文决定语义）
-K_SEGMENT  : '段' ;
+// 定义声明（统一语法）
+K_SET      : '设' ;        // 变量声明：设 甲 为 三
+K_AS       : '为' ;        // 赋值连接符
+K_DEFINE   : '定义' ;      // 保留兼容
+K_EQUAL    : '等于' ;      // 同时用于赋值和比较（由 Parser 上下文决定语义）
+K_SEGMENT  : '段落' ;      // 统一：段落（而非"段"）
+K_RECEIVE  : '接收' ;      // 参数声明：段落 平方 接收 数值
 K_DATA_TYPE: '数据类型' ;
 K_ERROR_TYPE: '错误' ;
 K_CONST    : '常量' ;
@@ -73,13 +76,63 @@ K_RETURN   : '返回' ;
 K_PRINT    : '打印' ;
 K_OUTPUT   : '输出' ;
 K_INPUT    : '输入' ;
+K_READ     : '读取' ;
 
-// 作用域控制
+// 列表操作动词
+K_FIRST    : '首' ;
+K_LAST     : '末' ;
+K_REST     : '余' ;
+K_LENGTH   : '长' ;
+K_SORT     : '排序' ;
+K_REVERSE  : '反转' ;
+K_SUM      : '求和' ;
+K_MAX      : '求最大' ;
+K_MIN      : '求最小' ;
+K_UNIQUE   : '去重' ;
+K_FILTER   : '筛选' ;
+K_MAP      : '映射' ;
+
+// 字符串操作动词
+K_TO_INT   : '转整数' ;
+K_TO_FLOAT : '转浮点' ;
+K_TO_STR   : '转字符串' ;
+K_STR_LEN  : '字符串长度' ;
+K_STR_SPLIT: '分割字符串' ;
+K_STR_JOIN : '连接字符串' ;
+K_STR_REPLACE: '替换字符串' ;
+K_STR_TRIM : '去除空白' ;
+
+// 文件操作动词
+K_READ_FILE  : '读取文件' ;
+K_WRITE_FILE : '写入文件' ;
+K_APPEND_FILE: '追加文件' ;
+K_FILE_EXISTS: '文件存在' ;
+K_DIR_EXISTS : '目录存在' ;
+K_MAKE_DIR   : '创建目录' ;
+K_REMOVE_FILE: '删除文件' ;
+K_REMOVE_DIR : '删除目录' ;
+
+// 系统操作动词
+K_ENV       : '环境变量' ;
+K_SET_ENV   : '设置环境变量' ;
+K_ARGS      : '参数列表' ;
+K_EXIT      : '退出程序' ;
+K_CWD       : '当前目录' ;
+K_CD        : '切换目录' ;
+K_EXEC      : '执行命令' ;
+
+// 类相关（统一语法）
+K_CLASS    : '类' ;
+K_INTERFACE: '接口' ;     // 新增：接口定义
 K_INHERIT  : '继承' ;
+K_IMPLEMENTS: '实现' ;    // 新增：实现接口
 K_USE      : '使用' ;
 K_PARENT   : '父' ;
-K_SELF     : '自我' ;
+K_SELF     : '己' ;       // 统一：己（而非"自我"）
 K_METHOD   : '方法' ;
+K_ATTRIBUTE: '属性' ;     // 新增：属性声明
+K_CONSTRUCTOR: '构造' ;   // 新增：构造函数
+K_NEW      : '新建' ;     // 新增：实例化对象
 
 // 逻辑运算
 K_AND      : '且' ;
@@ -97,6 +150,7 @@ K_POW      : '幂' ;
 // 连接符/管道
 K_AND_WORD : '并' ;
 K_OF       : '之' ;
+K_AT       : '于' ;     // 新增：用于遍历语句
 K_DE       : '的' ;
 
 // 特殊值
@@ -126,12 +180,15 @@ PLUS       : '+' ;
 MINUS      : '-' ;
 
 // 比较符号
-EQ         : '==' ;
+EQ         : '==' ;           // 仅用于比较
 NE         : '!=' ;
 GE         : '>=' ;
 LE         : '<=' ;
 GT         : '>' ;
 LT         : '<' ;
+
+// 赋值符号
+ASSIGN     : '=' ;            // 仅用于赋值
 
 // 逻辑符号
 NOT        : '!' ;
@@ -146,7 +203,8 @@ PATH_SEP   : '/' | '／' ;
 
 // ----- 标点符号（中英文双模式）-----
 
-DOT        : '。' | '.' ;        // 句号：语句结束
+DOT        : '.' ;               // 英文点号：属性访问
+PERIOD     : '。' ;              // 中文句号：语句结束
 COMMA      : '，' | ',' ;        // 逗号：分隔符/管道
 COLON      : '：' | ':' ;        // 冒号：块定义/类型注解
 SEMICOLON  : '；' | ';' ;        // 分号：多语句分隔
@@ -199,7 +257,7 @@ NEWLINE
     ;
 
 WS
-    : [ \t\r\n]+ -> skip
+    : [ \t]+ -> skip
     ;
 
 // ----- 未知字符（捕获错误）-----
