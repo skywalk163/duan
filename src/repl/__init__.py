@@ -7,5 +7,6 @@
 from .executor import Executor, Environment
 from .commands import CommandHandler
 from .core import DuanREPL
+from .completer import DuanCompleter, PromptToolkitCompleter, HAS_PROMPT_TOOLKIT
 
-__all__ = ['Executor', 'Environment', 'CommandHandler', 'DuanREPL']
+__all__ = ['Executor', 'Environment', 'CommandHandler', 'DuanREPL', 'DuanCompleter', 'PromptToolkitCompleter', 'HAS_PROMPT_TOOLKIT']
