@@ -6,7 +6,6 @@ import os
 
 # 添加antlrparser目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'antlrparser'))
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'antlrparser', 'duan_parser'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from antlr4 import *

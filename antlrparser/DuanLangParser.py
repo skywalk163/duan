@@ -1,4 +1,4 @@
-# Generated from DuanLangParser.g4 by ANTLR 4.13.2
+# Generated from DuanLangParser.g4 by ANTLR 4.13.1
 # encoding: utf-8
 from antlr4 import *
 from io import StringIO
@@ -672,7 +672,7 @@ class DuanLangParser ( Parser ):
 
     def __init__(self, input:TokenStream, output:TextIO = sys.stdout):
         super().__init__(input, output)
-        self.checkVersion("4.13.2")
+        self.checkVersion("4.13.1")
         self._interp = ParserATNSimulator(self, self.atn, self.decisionsToDFA, self.sharedContextCache)
         self._predicates = None
 
@@ -726,14 +726,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_program
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterProgram" ):
-                listener.enterProgram(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitProgram" ):
-                listener.exitProgram(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitProgram" ):
@@ -818,14 +810,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_moduleDecl
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterModuleDecl" ):
-                listener.enterModuleDecl(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitModuleDecl" ):
-                listener.exitModuleDecl(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitModuleDecl" ):
                 return visitor.visitModuleDecl(self)
@@ -885,14 +869,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_definition
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterDefinition" ):
-                listener.enterDefinition(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitDefinition" ):
-                listener.exitDefinition(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitDefinition" ):
@@ -993,14 +969,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_paragraphDef
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterParagraphDef" ):
-                listener.enterParagraphDef(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitParagraphDef" ):
-                listener.exitParagraphDef(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitParagraphDef" ):
@@ -1119,14 +1087,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_classDef
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterClassDef" ):
-                listener.enterClassDef(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitClassDef" ):
-                listener.exitClassDef(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitClassDef" ):
@@ -1259,14 +1219,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_genericParams
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterGenericParams" ):
-                listener.enterGenericParams(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitGenericParams" ):
-                listener.exitGenericParams(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitGenericParams" ):
                 return visitor.visitGenericParams(self)
@@ -1335,14 +1287,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_classMember
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterClassMember" ):
-                listener.enterClassMember(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitClassMember" ):
-                listener.exitClassMember(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitClassMember" ):
@@ -1435,14 +1379,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_methodDef
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterMethodDef" ):
-                listener.enterMethodDef(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitMethodDef" ):
-                listener.exitMethodDef(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitMethodDef" ):
@@ -1546,14 +1482,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_constructorDef
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterConstructorDef" ):
-                listener.enterConstructorDef(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitConstructorDef" ):
-                listener.exitConstructorDef(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitConstructorDef" ):
                 return visitor.visitConstructorDef(self)
@@ -1654,14 +1582,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_attributeDecl
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAttributeDecl" ):
-                listener.enterAttributeDecl(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAttributeDecl" ):
-                listener.exitAttributeDecl(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAttributeDecl" ):
@@ -1767,14 +1687,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_interfaceDef
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterInterfaceDef" ):
-                listener.enterInterfaceDef(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitInterfaceDef" ):
-                listener.exitInterfaceDef(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitInterfaceDef" ):
@@ -1885,14 +1797,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_interfaceMember
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterInterfaceMember" ):
-                listener.enterInterfaceMember(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitInterfaceMember" ):
-                listener.exitInterfaceMember(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitInterfaceMember" ):
                 return visitor.visitInterfaceMember(self)
@@ -1975,14 +1879,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_paramList
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterParamList" ):
-                listener.enterParamList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitParamList" ):
-                listener.exitParamList(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitParamList" ):
                 return visitor.visitParamList(self)
@@ -2049,14 +1945,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_param
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterParam" ):
-                listener.enterParam(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitParam" ):
-                listener.exitParam(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitParam" ):
                 return visitor.visitParam(self)
@@ -2120,14 +2008,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_block
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterBlock" ):
-                listener.enterBlock(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitBlock" ):
-                listener.exitBlock(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitBlock" ):
@@ -2201,14 +2081,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_dataTypeDef
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterDataTypeDef" ):
-                listener.enterDataTypeDef(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitDataTypeDef" ):
-                listener.exitDataTypeDef(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitDataTypeDef" ):
@@ -2290,14 +2162,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_dataTypeField
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterDataTypeField" ):
-                listener.enterDataTypeField(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitDataTypeField" ):
-                listener.exitDataTypeField(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitDataTypeField" ):
                 return visitor.visitDataTypeField(self)
@@ -2374,14 +2238,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_errorTypeDef
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterErrorTypeDef" ):
-                listener.enterErrorTypeDef(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitErrorTypeDef" ):
-                listener.exitErrorTypeDef(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitErrorTypeDef" ):
@@ -2466,14 +2322,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_importStmt
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterImportStmt" ):
-                listener.enterImportStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitImportStmt" ):
-                listener.exitImportStmt(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitImportStmt" ):
@@ -2564,14 +2412,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_exportStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExportStmt" ):
-                listener.enterExportStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExportStmt" ):
-                listener.exitExportStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitExportStmt" ):
                 return visitor.visitExportStmt(self)
@@ -2653,14 +2493,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_path
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPath" ):
-                listener.enterPath(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPath" ):
-                listener.exitPath(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPath" ):
                 return visitor.visitPath(self)
@@ -2740,14 +2572,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_importList
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterImportList" ):
-                listener.enterImportList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitImportList" ):
-                listener.exitImportList(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitImportList" ):
                 return visitor.visitImportList(self)
@@ -2805,14 +2629,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_importItem
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterImportItem" ):
-                listener.enterImportItem(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitImportItem" ):
-                listener.exitImportItem(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitImportItem" ):
@@ -2914,14 +2730,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_stmt
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterStmt" ):
-                listener.enterStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitStmt" ):
-                listener.exitStmt(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitStmt" ):
@@ -3061,14 +2869,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_varDecl
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterVarDecl" ):
-                listener.enterVarDecl(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitVarDecl" ):
-                listener.exitVarDecl(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitVarDecl" ):
                 return visitor.visitVarDecl(self)
@@ -3171,14 +2971,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_assignStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAssignStmt" ):
-                listener.enterAssignStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAssignStmt" ):
-                listener.exitAssignStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAssignStmt" ):
                 return visitor.visitAssignStmt(self)
@@ -3249,14 +3041,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_target
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterTarget" ):
-                listener.enterTarget(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitTarget" ):
-                listener.exitTarget(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitTarget" ):
@@ -3358,14 +3142,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_ifStmt
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterIfStmt" ):
-                listener.enterIfStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitIfStmt" ):
-                listener.exitIfStmt(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitIfStmt" ):
@@ -3477,14 +3253,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_foreachStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterForeachStmt" ):
-                listener.enterForeachStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitForeachStmt" ):
-                listener.exitForeachStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitForeachStmt" ):
                 return visitor.visitForeachStmt(self)
@@ -3558,14 +3326,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_foreachVar
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterForeachVar" ):
-                listener.enterForeachVar(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitForeachVar" ):
-                listener.exitForeachVar(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitForeachVar" ):
@@ -3654,14 +3414,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_whileStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterWhileStmt" ):
-                listener.enterWhileStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitWhileStmt" ):
-                listener.exitWhileStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitWhileStmt" ):
                 return visitor.visitWhileStmt(self)
@@ -3731,14 +3483,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_returnStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterReturnStmt" ):
-                listener.enterReturnStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitReturnStmt" ):
-                listener.exitReturnStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitReturnStmt" ):
                 return visitor.visitReturnStmt(self)
@@ -3798,14 +3542,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_breakStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterBreakStmt" ):
-                listener.enterBreakStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitBreakStmt" ):
-                listener.exitBreakStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitBreakStmt" ):
                 return visitor.visitBreakStmt(self)
@@ -3856,14 +3592,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_continueStmt
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterContinueStmt" ):
-                listener.enterContinueStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitContinueStmt" ):
-                listener.exitContinueStmt(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitContinueStmt" ):
@@ -3938,14 +3666,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_tryStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterTryStmt" ):
-                listener.enterTryStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitTryStmt" ):
-                listener.exitTryStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitTryStmt" ):
                 return visitor.visitTryStmt(self)
@@ -4015,14 +3735,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_throwStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterThrowStmt" ):
-                listener.enterThrowStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitThrowStmt" ):
-                listener.exitThrowStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitThrowStmt" ):
                 return visitor.visitThrowStmt(self)
@@ -4083,14 +3795,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_printStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPrintStmt" ):
-                listener.enterPrintStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPrintStmt" ):
-                listener.exitPrintStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPrintStmt" ):
                 return visitor.visitPrintStmt(self)
@@ -4150,14 +3854,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_exprStmt
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExprStmt" ):
-                listener.enterExprStmt(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExprStmt" ):
-                listener.exitExprStmt(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitExprStmt" ):
                 return visitor.visitExprStmt(self)
@@ -4199,14 +3895,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_expr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExpr" ):
-                listener.enterExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExpr" ):
-                listener.exitExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitExpr" ):
@@ -4262,14 +3950,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_pipelineExpr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPipelineExpr" ):
-                listener.enterPipelineExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPipelineExpr" ):
-                listener.exitPipelineExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPipelineExpr" ):
@@ -4338,14 +4018,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_andExpr
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAndExpr" ):
-                listener.enterAndExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAndExpr" ):
-                listener.exitAndExpr(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAndExpr" ):
                 return visitor.visitAndExpr(self)
@@ -4407,14 +4079,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_orExpr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterOrExpr" ):
-                listener.enterOrExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitOrExpr" ):
-                listener.exitOrExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitOrExpr" ):
@@ -4478,14 +4142,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_comparisonExpr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterComparisonExpr" ):
-                listener.enterComparisonExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitComparisonExpr" ):
-                listener.exitComparisonExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitComparisonExpr" ):
@@ -4572,14 +4228,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_compOp
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterCompOp" ):
-                listener.enterCompOp(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitCompOp" ):
-                listener.exitCompOp(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitCompOp" ):
                 return visitor.visitCompOp(self)
@@ -4635,14 +4283,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_additiveExpr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAdditiveExpr" ):
-                listener.enterAdditiveExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAdditiveExpr" ):
-                listener.exitAdditiveExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAdditiveExpr" ):
@@ -4705,14 +4345,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_addOp
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterAddOp" ):
-                listener.enterAddOp(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitAddOp" ):
-                listener.exitAddOp(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitAddOp" ):
                 return visitor.visitAddOp(self)
@@ -4768,14 +4400,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_multiplicativeExpr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterMultiplicativeExpr" ):
-                listener.enterMultiplicativeExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitMultiplicativeExpr" ):
-                listener.exitMultiplicativeExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitMultiplicativeExpr" ):
@@ -4850,14 +4474,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_multOp
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterMultOp" ):
-                listener.enterMultOp(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitMultOp" ):
-                listener.exitMultOp(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitMultOp" ):
                 return visitor.visitMultOp(self)
@@ -4919,14 +4535,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_unaryExpr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterUnaryExpr" ):
-                listener.enterUnaryExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitUnaryExpr" ):
-                listener.exitUnaryExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitUnaryExpr" ):
@@ -5068,14 +4676,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_postfixExpr
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPostfixExpr" ):
-                listener.enterPostfixExpr(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPostfixExpr" ):
-                listener.exitPostfixExpr(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPostfixExpr" ):
@@ -5362,14 +4962,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_primary
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterPrimary" ):
-                listener.enterPrimary(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitPrimary" ):
-                listener.exitPrimary(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitPrimary" ):
@@ -6060,14 +5652,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_dictLiteral
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterDictLiteral" ):
-                listener.enterDictLiteral(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitDictLiteral" ):
-                listener.exitDictLiteral(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitDictLiteral" ):
                 return visitor.visitDictLiteral(self)
@@ -6127,14 +5711,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_dictEntry
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterDictEntry" ):
-                listener.enterDictEntry(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitDictEntry" ):
-                listener.exitDictEntry(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitDictEntry" ):
                 return visitor.visitDictEntry(self)
@@ -6181,14 +5757,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_typeAnnotation
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterTypeAnnotation" ):
-                listener.enterTypeAnnotation(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitTypeAnnotation" ):
-                listener.exitTypeAnnotation(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitTypeAnnotation" ):
@@ -6269,14 +5837,6 @@ class DuanLangParser ( Parser ):
         def getRuleIndex(self):
             return DuanLangParser.RULE_builtinType
 
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterBuiltinType" ):
-                listener.enterBuiltinType(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitBuiltinType" ):
-                listener.exitBuiltinType(self)
-
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitBuiltinType" ):
                 return visitor.visitBuiltinType(self)
@@ -6331,14 +5891,6 @@ class DuanLangParser ( Parser ):
 
         def getRuleIndex(self):
             return DuanLangParser.RULE_exprList
-
-        def enterRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "enterExprList" ):
-                listener.enterExprList(self)
-
-        def exitRule(self, listener:ParseTreeListener):
-            if hasattr( listener, "exitExprList" ):
-                listener.exitExprList(self)
 
         def accept(self, visitor:ParseTreeVisitor):
             if hasattr( visitor, "visitExprList" ):
