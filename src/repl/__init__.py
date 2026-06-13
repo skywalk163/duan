@@ -6,5 +6,6 @@
 
 from .executor import Executor
 from .core import DuanREPL
+from .commands import CommandHandler
 
-__all__ = ['Executor', 'DuanREPL']
+__all__ = ['Executor', 'DuanREPL', 'CommandHandler']
