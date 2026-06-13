@@ -4,8 +4,8 @@
 提供交互式开发环境。
 """
 
-from .executor import Executor
-from .core import DuanREPL
+from .executor import Executor, Environment
 from .commands import CommandHandler
+from .core import DuanREPL
 
-__all__ = ['Executor', 'DuanREPL', 'CommandHandler']
+__all__ = ['Executor', 'Environment', 'CommandHandler', 'DuanREPL']
