@@ -38,6 +38,15 @@ class Module(ASTNode):
         return f"Module({len(self.statements)} statements)"
 
 
+class ParameterList(ASTNode):
+    """参数列表（用于参数声明语句）"""
+    def __init__(self, params: List[str]):
+        self.params = params
+    
+    def __repr__(self):
+        return f"ParameterList({self.params})"
+
+
 class VarDecl(ASTNode):
     """变量声明"""
     def __init__(self, name: str, value: ASTNode):
@@ -169,6 +178,28 @@ class ContinueStmt(ASTNode):
     """跳过语句"""
     def __repr__(self):
         return "跳过"
+
+
+class TryStmt(ASTNode):
+    """异常捕获语句"""
+    def __init__(self, try_body: List[ASTNode], catch_var: str = None, 
+                 catch_body: List[ASTNode] = None, finally_body: List[ASTNode] = None):
+        self.try_body = try_body
+        self.catch_var = catch_var  # 捕获的异常变量名
+        self.catch_body = catch_body or []
+        self.finally_body = finally_body or []
+    
+    def __repr__(self):
+        return f"TryStmt(catch: {self.catch_var})"
+
+
+class ThrowStmt(ASTNode):
+    """抛出异常语句"""
+    def __init__(self, value: ASTNode):
+        self.value = value
+    
+    def __repr__(self):
+        return f"ThrowStmt({self.value})"
 
 
 class Pipeline(ASTNode):
@@ -434,6 +465,18 @@ class DuanParser:
             self._consume(TokenType.DOT)
             return ContinueStmt()
         
+        # 参数声明：参数
+        if tok.type == TokenType.KEYWORD and tok.value == '参数':
+            return self._parse_parameter_stmt()
+        
+        # 异常捕获：尝试
+        if tok.type == TokenType.KEYWORD and tok.value == '尝试':
+            return self._parse_try_stmt()
+        
+        # 抛出异常：抛出
+        if tok.type == TokenType.KEYWORD and tok.value == '抛出':
+            return self._parse_throw_stmt()
+        
         # 段落定义：《段名》段 或 "段落 段名 参数 参数名"
         if tok.type == TokenType.LBOOK:
             return self._parse_paragraph()
@@ -544,15 +587,34 @@ class DuanParser:
         return VarDecl(name, value)
     
     def _parse_import_stmt(self) -> ImportStmt:
-        """解析导入语句：导入《模块名》。 或 导入《模块名》为别名。"""
+        """解析导入语句
+        
+        语法：
+        1. 导入 模块名。
+        2. 导入《模块名》。
+        3. 导入 模块名 为 别名。
+        4. 导入《模块名》为 别名。
+        """
         # 导入
         self._consume(TokenType.KEYWORD, '导入')
         
-        # 《模块名》
-        self._consume(TokenType.LBOOK)
-        name_tok = self._consume(TokenType.IDENTIFIER)
-        module_name = name_tok.value
-        self._consume(TokenType.RBOOK)
+        # 模块名（可以是标识符、关键字或书名号包裹）
+        module_name = None
+        if self._match(TokenType.LBOOK):
+            # 书名号语法：《模块名》
+            self._consume(TokenType.LBOOK)
+            name_tok = self._consume(TokenType.IDENTIFIER)
+            module_name = name_tok.value
+            self._consume(TokenType.RBOOK)
+        else:
+            # 简单语法：模块名（可以是标识符或关键字）
+            tok = self._current()
+            if tok.type == TokenType.IDENTIFIER:
+                module_name = self._consume(TokenType.IDENTIFIER).value
+            elif tok.type == TokenType.KEYWORD:
+                module_name = self._consume(TokenType.KEYWORD).value
+            else:
+                raise SyntaxError(f"期望模块名，但得到: {tok}")
         
         # 检查是否有别名：为
         alias = None
@@ -561,48 +623,80 @@ class DuanParser:
             alias_tok = self._consume(TokenType.IDENTIFIER)
             alias = alias_tok.value
         
-        # 句号
-        self._consume(TokenType.DOT)
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
         
         return ImportStmt(module_name, symbols=None, alias=alias)
     
     def _parse_from_import_stmt(self) -> ImportStmt:
-        """解析从...导入语句：从《模块名》导入《符号1》，《符号2》。"""
+        """解析从...导入语句
+        
+        语法：
+        1. 从 模块名 导入 符号一 符号二。
+        2. 从《模块名》导入《符号一》，《符号二》。
+        3. 从 模块名 导入《符号一》《符号二》。
+        """
         # 从
         self._consume(TokenType.KEYWORD, '从')
         
-        # 《模块名》
-        self._consume(TokenType.LBOOK)
-        name_tok = self._consume(TokenType.IDENTIFIER)
-        module_name = name_tok.value
-        self._consume(TokenType.RBOOK)
+        # 模块名（可以是标识符、关键字或书名号包裹）
+        module_name = None
+        if self._match(TokenType.LBOOK):
+            # 书名号语法：《模块名》
+            self._consume(TokenType.LBOOK)
+            name_tok = self._consume(TokenType.IDENTIFIER)
+            module_name = name_tok.value
+            self._consume(TokenType.RBOOK)
+        else:
+            # 简单语法：模块名（可以是标识符或关键字）
+            tok = self._current()
+            if tok.type == TokenType.IDENTIFIER:
+                module_name = self._consume(TokenType.IDENTIFIER).value
+            elif tok.type == TokenType.KEYWORD:
+                module_name = self._consume(TokenType.KEYWORD).value
+            else:
+                raise SyntaxError(f"期望模块名，但得到: {tok}")
         
         # 导入
         self._consume(TokenType.KEYWORD, '导入')
         
-        # 《符号1》，《符号2》，...
+        # 符号列表（可以是书名号包裹、标识符或关键字）
         symbols = []
         while True:
-            self._consume(TokenType.LBOOK)
-            symbol_tok = self._consume(TokenType.IDENTIFIER)
-            symbols.append(symbol_tok.value)
-            self._consume(TokenType.RBOOK)
+            # 读取符号
+            if self._match(TokenType.LBOOK):
+                # 书名号语法：《符号》
+                self._consume(TokenType.LBOOK)
+                symbol_tok = self._consume(TokenType.IDENTIFIER)
+                symbols.append(symbol_tok.value)
+                self._consume(TokenType.RBOOK)
+            elif self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                # 简单语法：符号名（可以是标识符或关键字）
+                tok = self._consume()
+                symbols.append(tok.value)
+            else:
+                break
             
             # 检查是否有逗号（继续导入）
             if self._match(TokenType.COMMA):
                 self._consume(TokenType.COMMA)
                 continue
             
-            # 检查是否有别名：为
-            if self._match(TokenType.KEYWORD, '为'):
-                # 目前只支持单个别名，简化处理
-                # TODO: 支持每个符号单独别名
+            # 检查是否还有更多符号（空格分隔）
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                continue
+            
+            # 检查是否结束（句号）
+            if self._current() and self._current().type == TokenType.DOT:
                 break
             
+            # 如果不是标识符/关键字或句号，结束
             break
         
-        # 句号
-        self._consume(TokenType.DOT)
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
         
         return ImportStmt(module_name, symbols=symbols)
     
@@ -628,33 +722,61 @@ class DuanParser:
         return VarDecl(name, value)
     
     def _parse_export_stmt(self) -> ExportStmt:
-        """解析导出语句：导出《符号1》，《符号2》。"""
+        """解析导出语句
+        
+        语法：
+        1. 导出 符号一 符号二。
+        2. 导出《符号一》，《符号二》。
+        3. 导出 全部。
+        """
         # 导出
         self._consume(TokenType.KEYWORD, '导出')
         
         # 检查是否是"全部"
         if self._match(TokenType.IDENTIFIER, '全部'):
             self._consume(TokenType.IDENTIFIER, '全部')
-            self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
             return ExportStmt(['*'])  # 特殊标记：导出全部
         
-        # 《符号1》，《符号2》，...
+        # 符号列表（可以是书名号包裹或简单标识符）
         symbols = []
         while True:
-            self._consume(TokenType.LBOOK)
-            symbol_tok = self._consume(TokenType.IDENTIFIER)
-            symbols.append(symbol_tok.value)
-            self._consume(TokenType.RBOOK)
+            # 读取符号
+            if self._match(TokenType.LBOOK):
+                # 书名号语法：《符号》
+                self._consume(TokenType.LBOOK)
+                symbol_tok = self._consume(TokenType.IDENTIFIER)
+                symbols.append(symbol_tok.value)
+                self._consume(TokenType.RBOOK)
+            else:
+                # 简单语法：符号名
+                if self._current() and self._current().type == TokenType.IDENTIFIER:
+                    symbol_tok = self._consume(TokenType.IDENTIFIER)
+                    symbols.append(symbol_tok.value)
+                else:
+                    break
             
             # 检查是否有逗号（继续导出）
             if self._match(TokenType.COMMA):
                 self._consume(TokenType.COMMA)
                 continue
             
-            break
+            # 检查是否还有更多符号（空格分隔）
+            if self._current() and self._current().type == TokenType.IDENTIFIER:
+                continue
+            
+            # 检查是否结束（句号）
+            if self._current() and self._current().type == TokenType.DOT:
+                break
+            
+            # 如果不是标识符或句号，结束
+            if not self._match(TokenType.IDENTIFIER):
+                break
         
-        # 句号
-        self._consume(TokenType.DOT)
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
         
         return ExportStmt(symbols)
     
@@ -687,22 +809,36 @@ class DuanParser:
         return VarDecl(name, value)
     
     def _parse_if_stmt(self) -> IfStmt:
-        """解析条件语句"""
+        """解析条件语句
+        
+        语法：
+        1. 如果 条件。
+            语句。
+          结束。
+        2. 如果 条件 那么
+            语句。
+          结束。
+        3. 如果 条件 那么
+            语句。
+          否则
+            语句。
+          结束。
+        """
         # 如果
         self._consume(TokenType.KEYWORD, '如果')
         
         # 条件
         condition = self._parse_expr()
         
-        # 那么
-        self._consume(TokenType.KEYWORD, '那么')
+        # 那么（可选）
+        if self._match(TokenType.KEYWORD, '那么'):
+            self._consume(TokenType.KEYWORD, '那么')
         
-        # 冒号（可选）
-        has_colon = self._match(TokenType.COLON)
-        if has_colon:
-            self._consume(TokenType.COLON)
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
         
-        # 缩进块或单行语句
+        # then块
         then_body = self._parse_body()
         
         # 否则？
@@ -710,11 +846,17 @@ class DuanParser:
         if self._match(TokenType.KEYWORD, '否则'):
             self._consume(TokenType.KEYWORD, '否则')
             
-            # 冒号（可选）
-            if self._match(TokenType.COLON):
-                self._consume(TokenType.COLON)
+            # 句号（可选）
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
             
             else_body = self._parse_body()
+        
+        # 结束
+        if self._match(TokenType.KEYWORD, '结束'):
+            self._consume(TokenType.KEYWORD, '结束')
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
         
         return IfStmt(condition, then_body, else_body)
     
@@ -775,6 +917,106 @@ class DuanParser:
         self._consume(TokenType.DOT)
         
         return ReturnStmt(value)
+    
+    def _parse_parameter_stmt(self) -> ParameterList:
+        """解析参数声明语句
+        
+        语法：参数 参数名1 参数名2 ...。
+        """
+        # 参数
+        self._consume(TokenType.KEYWORD, '参数')
+        
+        # 收集参数名（支持多个参数）
+        params = []
+        while self._current() and self._current().type != TokenType.DOT:
+            tok = self._current()
+            if tok.type == TokenType.IDENTIFIER:
+                params.append(self._consume(TokenType.IDENTIFIER).value)
+            elif tok.type == TokenType.KEYWORD:
+                # 参数名可能是关键字
+                params.append(self._consume(TokenType.KEYWORD).value)
+            else:
+                break
+        
+        # 句号
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return ParameterList(params)
+    
+    def _parse_try_stmt(self) -> TryStmt:
+        """解析异常捕获语句
+        
+        语法：
+        尝试：
+          语句...
+        捕获 异常变量：
+          语句...
+        结束。
+        
+        或带最终块：
+        尝试：
+          语句...
+        捕获 异常变量：
+          语句...
+        最终：
+          语句...
+        结束。
+        """
+        # 尝试
+        self._consume(TokenType.KEYWORD, '尝试')
+        
+        # 冒号
+        self._consume(TokenType.COLON)
+        
+        # try块
+        try_body = self._parse_body()
+        
+        # 捕获（可选）
+        catch_var = None
+        catch_body = []
+        if self._match(TokenType.KEYWORD, '捕获'):
+            self._consume(TokenType.KEYWORD, '捕获')
+            
+            # 异常变量名（可选）
+            if self._current() and self._current().type == TokenType.IDENTIFIER:
+                catch_var = self._consume(TokenType.IDENTIFIER).value
+            
+            # 冒号
+            self._consume(TokenType.COLON)
+            
+            # catch块
+            catch_body = self._parse_body()
+        
+        # 最终（可选）
+        finally_body = []
+        if self._match(TokenType.KEYWORD, '最终'):
+            self._consume(TokenType.KEYWORD, '最终')
+            
+            # 冒号
+            self._consume(TokenType.COLON)
+            
+            # finally块
+            finally_body = self._parse_body()
+        
+        return TryStmt(try_body, catch_var, catch_body, finally_body)
+    
+    def _parse_throw_stmt(self) -> ThrowStmt:
+        """解析抛出异常语句
+        
+        语法：抛出 表达式。
+        """
+        # 抛出
+        self._consume(TokenType.KEYWORD, '抛出')
+        
+        # 异常值
+        value = self._parse_expr()
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return ThrowStmt(value)
     
     def _parse_paragraph(self) -> Paragraph:
         """解析段落定义：《段名》段"""
@@ -868,6 +1110,14 @@ class DuanParser:
         # 段落体
         body = self._parse_body()
         
+        # 消耗"结束"关键字（如果有）
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+        
+        # 消耗句号
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
         return Paragraph(name, params, None, body)
     
     def _parse_body(self) -> List[ASTNode]:
@@ -881,13 +1131,12 @@ class DuanParser:
         while self._current() and count < max_statements:
             tok = self._current()
 
-            # 结束标记
+            # 结束标记（但不消耗，让上层决定）
             if tok.type == TokenType.KEYWORD and tok.value in ('否则', '结束'):
-                # 消耗"结束"关键字
-                if tok.value == '结束':
-                    self._consume(TokenType.KEYWORD, '结束')
-                    if self._current() and self._current().type == TokenType.DOT:
-                        self._consume(TokenType.DOT)
+                break
+            
+            # 异常处理的特殊标记（捕获、最终）
+            if tok.type == TokenType.KEYWORD and tok.value in ('捕获', '最终'):
                 break
 
             # DEDENT标记（缩进结束）

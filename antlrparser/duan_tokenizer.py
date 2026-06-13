@@ -27,7 +27,7 @@ KEYWORDS = [
     # 条件判断（三字）
     '否则若', '大于等于', '小于等于',
     # 定义声明（二字）
-    '数据类型', '错误', '定义', '等于', '导入', '导出', '常量', '类型', '继承', '使用', '方法', '自我',
+    '数据类型', '错误', '定义', '等于', '导入', '导出', '常量', '类型', '继承', '使用', '方法', '自我', '段落', '实现', '构造',
     # 条件判断（二字）
     '如果', '那么', '否则', '结束',
     # 比较（二字）
@@ -41,7 +41,7 @@ KEYWORDS = [
     # 数据操作（二字）
     '打印', '输出', '输入',
     # 单字
-    '段', '从', '当', '父', '类', '接口', '新',
+    '段', '从', '当', '父', '类', '接口', '新', '己', '设', '为', '于',
     # 逻辑（单字）
     '且', '或', '非',
     # 算术（单字）
@@ -73,10 +73,41 @@ KEYWORD_TOKEN_MAP = {
     '定义': 'K_DEFINE',
     '等于': 'K_EQUAL',
     '段': 'K_SEGMENT',
+    '段落': 'K_SEGMENT',
+    '接收': 'K_RECEIVE',
     '类': 'K_CLASS',
     '接口': 'K_INTERFACE',
     '新': 'K_NEW',
+    '新建': 'K_NEW',
     '数据类型': 'K_DATA_TYPE',
+    '错误': 'K_ERROR_TYPE',
+    '常量': 'K_CONST',
+    '类型': 'K_TYPE',
+    '导出': 'K_EXPORT',
+    '导入': 'K_IMPORT',
+    '从': 'K_FROM',
+    '遍历': 'K_FOREACH',
+    '当': 'K_WHILE',
+    '跳出': 'K_BREAK',
+    '跳过': 'K_CONTINUE',
+    '尝试': 'K_TRY',
+    '捕获': 'K_CATCH',
+    '抛出': 'K_THROW',
+    '返回': 'K_RETURN',
+    '打印': 'K_PRINT',
+    '输出': 'K_OUTPUT',
+    '输入': 'K_INPUT',
+    '继承': 'K_INHERIT',
+    '实现': 'K_IMPLEMENTS',
+    '使用': 'K_USE',
+    '父': 'K_PARENT',
+    '己': 'K_SELF',
+    '方法': 'K_METHOD',
+    '属性': 'K_ATTRIBUTE',
+    '构造': 'K_CONSTRUCTOR',
+    '设': 'K_SET',
+    '为': 'K_AS',
+    '于': 'K_AT',
     '错误': 'K_ERROR_TYPE',
     '常量': 'K_CONST',
     '类型': 'K_TYPE',
@@ -147,9 +178,10 @@ SINGLE_CHAR_KEYWORDS = {kw for kw in KEYWORDS if len(kw) == 1}
 COMPOUND_SAFE_SINGLE_KEYWORDS = {
     '数', '列', '串', '典', '集',   # 类型
     '从',                             # 导入
-    '段',                             # 段落
+    '段', '段落',                        # 段落（统一语法）
     '空', '真', '假',                 # 特殊值（常见复合词如 空间、真实、假设）
     '父',                             # 作用域（常见复合词如 父类、父级）
+    '的',                             # 助词（常见复合词如 的确、的话）
 }
 
 # 符号 Token 映射
@@ -189,6 +221,7 @@ SINGLE_CHAR_SYMBOLS = {
     '<': 'LT',
     '!': 'NOT',
     '-': 'MINUS',
+    '=': 'EQ',  # 赋值/相等比较
 }
 
 
@@ -400,6 +433,7 @@ class DuanLangTokenizer:
                     # 不是关键字，则收集连续字符作为标识符（支持CJK/字母/数字混合）
                     start_line, start_col = line, col
                     text = ''
+                    has_alphanumeric = False  # 标记是否已经收集了字母或数字
 
                     while i < source_len:
                         c = source[i]
@@ -414,17 +448,24 @@ class DuanLangTokenizer:
                                         # （如"计数"中的"数"，"列表"中的"列"）
                                         if kw_len == 1 and kw_text in COMPOUND_SAFE_SINGLE_KEYWORDS:
                                             continue
-                                        keyword_found = True
-                                        break
+                                        # 只有当已经收集了字母/数字时，才让关键词阻断标识符收集
+                                        # 这样可以正确处理：
+                                        # - n减1 -> n 减 1（减是关键词，前面有字母）
+                                        # - 阶乘 -> 阶乘（乘是关键词，但前面没有字母/数字）
+                                        if has_alphanumeric:
+                                            keyword_found = True
+                                            break
                             if keyword_found:
                                 break
                             text += c
                             advance()
                         elif is_letter(c):
                             text += c
+                            has_alphanumeric = True
                             advance()
                         elif is_digit(c):
                             text += c
+                            has_alphanumeric = True
                             advance()
                         else:
                             break
@@ -461,8 +502,7 @@ class DuanLangTokenizer:
                 self.errors.append(f"行{line}, 列{col}: 无法识别的字符 '{ch}'")
                 advance()
 
-        # 添加 EOF
-        tokens.append(Token('EOF', '', line, col))
+        # 不再在这里添加 EOF，让 nextToken 方法处理
         return tokens
 
 
@@ -493,7 +533,16 @@ class DuanLangTokenSource(TokenSource):
     def nextToken(self):
         """获取下一个 Token"""
         if self.pos >= len(self.tokens):
-            return CommonToken(AntlrToken.EOF)
+            # 返回 EOF token
+            ct = CommonToken(
+                source=CommonToken.EMPTY_SOURCE,
+                type=AntlrToken.EOF,
+                channel=AntlrToken.DEFAULT_CHANNEL,
+            )
+            ct.line = 0
+            ct.column = 0
+            ct.text = ''
+            return ct
 
         token = self.tokens[self.pos]
         self.pos += 1

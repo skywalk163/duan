@@ -32,6 +32,46 @@ class DuanLangParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by DuanLangParser#classDef.
+    def visitClassDef(self, ctx:DuanLangParser.ClassDefContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#genericParams.
+    def visitGenericParams(self, ctx:DuanLangParser.GenericParamsContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#classMember.
+    def visitClassMember(self, ctx:DuanLangParser.ClassMemberContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#methodDef.
+    def visitMethodDef(self, ctx:DuanLangParser.MethodDefContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#constructorDef.
+    def visitConstructorDef(self, ctx:DuanLangParser.ConstructorDefContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#attributeDecl.
+    def visitAttributeDecl(self, ctx:DuanLangParser.AttributeDeclContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#interfaceDef.
+    def visitInterfaceDef(self, ctx:DuanLangParser.InterfaceDefContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#interfaceMember.
+    def visitInterfaceMember(self, ctx:DuanLangParser.InterfaceMemberContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by DuanLangParser#paramList.
     def visitParamList(self, ctx:DuanLangParser.ParamListContext):
         return self.visitChildren(ctx)
@@ -224,6 +264,16 @@ class DuanLangParserVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DuanLangParser#primary.
     def visitPrimary(self, ctx:DuanLangParser.PrimaryContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#dictLiteral.
+    def visitDictLiteral(self, ctx:DuanLangParser.DictLiteralContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#dictEntry.
+    def visitDictEntry(self, ctx:DuanLangParser.DictEntryContext):
         return self.visitChildren(ctx)
 
 

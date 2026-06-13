@@ -9,28 +9,19 @@ import os
 from typing import List, Optional, Union
 
 # 添加当前目录到路径，以便导入生成的解析器
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_parser_dir = os.path.join(_current_dir, 'duan_parser')
+sys.path.insert(0, _parser_dir)
 
 # ANTLR imports
 from antlr4 import *
 from antlr4.tree.Trees import Trees
 from antlr4.error.ErrorListener import ErrorListener
 
-# 导入 ANTLR 生成的解析器
-try:
-    from duan_parser.DuanLangLexer import DuanLangLexer
-    from duan_parser.DuanLangParser import DuanLangParser
-    from duan_parser.DuanLangParserVisitor import DuanLangParserVisitor
-except ImportError:
-    # 如果直接从生成目录导入
-    try:
-        from DuanLangLexer import DuanLangLexer
-        from DuanLangParser import DuanLangParser
-        from DuanLangParserVisitor import DuanLangParserVisitor
-    except ImportError as e:
-        print(f"[错误] 无法导入 ANTLR 生成的解析器: {e}")
-        print("[提示] 请先运行 scripts/generate.ps1 生成解析器代码")
-        sys.exit(1)
+# 导入 ANTLR 生成的解析器（从 duan_parser 目录）
+from DuanLangLexer import DuanLangLexer
+from DuanLangParser import DuanLangParser
+from DuanLangParserVisitor import DuanLangParserVisitor
 
 # 导入 AST 节点
 from duan_ast import (
@@ -43,7 +34,7 @@ from duan_ast import (
     Parameter, SegmentDefinition, DataTypeField, DataTypeDefinition,
     ErrorTypeDefinition, ImportStatement, ExportStatement, Module,
     ClassDefinition, InterfaceDefinition, MethodDefinition, ConstructorDefinition,
-    InterfaceMethod, InterfaceProperty,
+    InterfaceMethod, InterfaceProperty, SelfReference,
 )
 
 # 导入自定义分词器
@@ -82,6 +73,11 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
     def __init__(self):
         super().__init__()
         self.errors = []
+        self.warnings = []
+
+    def _add_warning(self, message: str, line: int, column: int):
+        """添加警告信息"""
+        self.warnings.append(f"警告 [行{line}:{column}]: {message}")
 
     # ----- 程序 -----
 
@@ -123,25 +119,26 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
 
     def visitParagraphDef(self, ctx: DuanLangParser.ParagraphDefContext):
         """段落定义"""
+        # 新语法：段落 名称 接收 参数列表:
         name = ctx.ID().getText()
         line = ctx.start.line
         col = ctx.start.column
-
+        
         # 参数列表
         params = []
         if ctx.paramList():
             params = self.visitParamList(ctx.paramList())
-
+        
         # 返回类型
         return_type = None
         if ctx.typeAnnotation():
             return_type = self.visitTypeAnnotation(ctx.typeAnnotation())
-
+        
         # 段落体
         body = []
         if ctx.block():
             body = self.visitBlock(ctx.block())
-
+        
         return SegmentDefinition(
             line=line, column=col,
             name=name,
@@ -190,8 +187,15 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
         constructor = None
 
         for member in ctx.classMember():
-            if member.varDecl():
-                fields.append(self.visitVarDecl(member.varDecl()))
+            if member.attributeDecl():
+                # 属性声明：属性 名字。
+                attr_ctx = member.attributeDecl()
+                field_name = attr_ctx.ID().getText()
+                field = DataTypeField(
+                    name=field_name,
+                    type_annotation=""
+                )
+                fields.append(field)
             elif member.methodDef():
                 method = self.visitMethodDef(member.methodDef())
                 # 如果方法名为"初始化"，则作为构造函数
@@ -247,7 +251,7 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
 
     def visitConstructorDef(self, ctx: DuanLangParser.ConstructorDefContext):
         """构造函数定义"""
-        name = ctx.ID().getText()
+        name = "构造"  # 构造函数名固定为"构造"
         line = ctx.start.line
         col = ctx.start.column
 
@@ -479,6 +483,12 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
             prop = ctx.ID().getText()
             return PropertyAccess(line=ctx.start.line, column=ctx.start.column,
                                    obj=expr, property_name=prop)
+        elif ctx.primary() and ctx.DOT():
+            # 属性访问作为赋值目标：primary . ID
+            expr = self.visitPrimary(ctx.primary())
+            prop = ctx.ID().getText()
+            return PropertyAccess(line=ctx.start.line, column=ctx.start.column,
+                                   obj=expr, property_name=prop)
         # 简单变量赋值
         return Identifier(line=ctx.start.line, column=ctx.start.column,
                           name=ctx.ID().getText())
@@ -603,15 +613,32 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
 
     def visitExpr(self, ctx: DuanLangParser.ExprContext):
         """表达式入口"""
-        return self.visit(ctx.getChild(0))
+        child = ctx.getChild(0)
+        if isinstance(child, DuanLangParser.PipelineExprContext):
+            return self.visitPipelineExpr(child)
+        elif isinstance(child, DuanLangParser.AndExprContext):
+            return self.visitAndExpr(child)
+        elif isinstance(child, DuanLangParser.OrExprContext):
+            return self.visitOrExpr(child)
+        elif isinstance(child, DuanLangParser.ComparisonExprContext):
+            return self.visitComparisonExpr(child)
+        elif isinstance(child, DuanLangParser.AdditiveExprContext):
+            return self.visitAdditiveExpr(child)
+        elif isinstance(child, DuanLangParser.MultiplicativeExprContext):
+            return self.visitMultiplicativeExpr(child)
+        elif isinstance(child, DuanLangParser.UnaryExprContext):
+            return self.visitUnaryExpr(child)
+        elif isinstance(child, DuanLangParser.PostfixExprContext):
+            return self.visitPostfixExpr(child)
+        elif isinstance(child, DuanLangParser.PrimaryContext):
+            return self.visitPrimary(child)
+        return self.visit(child)
 
     def visitPipelineExpr(self, ctx: DuanLangParser.PipelineExprContext):
         """管道表达式"""
-        exprs = []
-        for child in ctx.getChildren():
-            if isinstance(child, DuanLangParser.AndExprContext):
-                exprs.append(self.visitAndExpr(child))
-            # Skip operator tokens (PIPE, COMMA, K_AND_WORD)
+        # 使用 getTypedRuleContexts 获取 AndExpr 子节点
+        exprs = [self.visitAndExpr(c)
+                 for c in ctx.getTypedRuleContexts(DuanLangParser.AndExprContext)]
         if len(exprs) == 1:
             return exprs[0]
         line = ctx.start.line
@@ -705,6 +732,10 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
         """后缀表达式：处理索引访问、属性访问、函数调用"""
         base = self.visitPrimary(ctx.primary())
 
+        # 如果已经是 NewExpression，直接返回（避免被包装成 FunctionCall）
+        if isinstance(base, NewExpression):
+            return base
+
         # 顺序处理后缀操作（按子节点位置）
         child_idx = 1  # 0 是 primary
         while child_idx < ctx.getChildCount():
@@ -715,6 +746,14 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
 
                 # 属性访问：对象之属性
                 if ttype == DuanLangParser.K_OF:
+                    child_idx += 1
+                    prop_name = ctx.getChild(child_idx).getText()
+                    child_idx += 1
+                    base = PropertyAccess(line=base.line, column=base.column,
+                                          obj=base, property_name=prop_name)
+
+                # 属性访问：对象.属性
+                elif ttype == DuanLangParser.DOT:
                     child_idx += 1
                     prop_name = ctx.getChild(child_idx).getText()
                     child_idx += 1
@@ -760,6 +799,25 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
                     seg = SegmentName(line=base.line, column=base.column, name=seg_name)
                     base = FunctionCall(line=base.line, column=base.column,
                                         name=seg, arguments=args)
+                # ID(参数) - 直接调用（无书名号）
+                elif ttype == DuanLangParser.ID and child_idx + 1 < ctx.getChildCount():
+                    next_child = ctx.getChild(child_idx + 1)
+                    if isinstance(next_child, TerminalNode) and next_child.symbol.type == DuanLangParser.LPAREN:
+                        seg_name = child.getText()
+                        child_idx += 1  # 跳过 ID
+                        child_idx += 1  # 跳过 LPAREN
+                        args = []
+                        if (child_idx < ctx.getChildCount() and
+                                isinstance(ctx.getChild(child_idx),
+                                           DuanLangParser.ExprListContext)):
+                            args = self.visitExprList(ctx.getChild(child_idx))
+                            child_idx += 1
+                        child_idx += 1  # 跳过 RPAREN
+                        seg = SegmentName(line=base.line, column=base.column, name=seg_name)
+                        base = FunctionCall(line=base.line, column=base.column,
+                                            name=seg, arguments=args)
+                    else:
+                        child_idx += 1
                 else:
                     child_idx += 1
             else:
@@ -815,6 +873,12 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
             return BooleanLiteral(line=line, column=col, value=False)
         if ctx.K_NULL():
             return NullLiteral(line=line, column=col)
+        
+        # self引用：己（通过检查子节点）
+        for child in ctx.getChildren():
+            if hasattr(child, 'symbol') and hasattr(child.symbol, 'type'):
+                if child.symbol.type == DuanLangParser.K_SELF:
+                    return SelfReference(line=line, column=col)
 
         # 实例化表达式：新 类名() - 必须在 ID 检查之前
         if ctx.K_NEW():
@@ -824,11 +888,196 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
                 arguments = self.visitExprList(ctx.exprList())
             return NewExpression(line=line, column=col, class_name=class_name, arguments=arguments)
 
+        # 动词调用处理（基于Parser语法规则）
+        # 列表操作动词
+        if ctx.K_FIRST():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='首'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_LAST():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='末'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_REST():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='余'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_LENGTH():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='长'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_SORT():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='排序'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_REVERSE():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='反转'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_SUM():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='求和'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_MAX():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='求最大'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_MIN():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='求最小'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_UNIQUE():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='去重'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_FILTER():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='筛选'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1))])
+        if ctx.K_MAP():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='映射'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1))])
+        
+        # 字符串操作动词
+        if ctx.K_TO_INT():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='转整数'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_TO_FLOAT():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='转浮点'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_TO_STR():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='转字符串'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_STR_LEN():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='字符串长度'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_STR_SPLIT():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='分割字符串'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1))])
+        if ctx.K_STR_JOIN():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='连接字符串'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1))])
+        if ctx.K_STR_REPLACE():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='替换字符串'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1)), self.visitExpr(ctx.expr(2))])
+        if ctx.K_STR_TRIM():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='去除空白'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        
+        # 文件操作动词
+        if ctx.K_READ_FILE():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='读取文件'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_WRITE_FILE():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='写入文件'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1))])
+        if ctx.K_APPEND_FILE():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='追加文件'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1))])
+        if ctx.K_FILE_EXISTS():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='文件存在'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_DIR_EXISTS():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='目录存在'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_MAKE_DIR():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='创建目录'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_REMOVE_FILE():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='删除文件'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_REMOVE_DIR():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='删除目录'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        
+        # 系统操作动词
+        if ctx.K_ENV():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='环境变量'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_SET_ENV():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='设置环境变量'),
+                               arguments=[self.visitExpr(ctx.expr(0)), self.visitExpr(ctx.expr(1))])
+        if ctx.K_ARGS():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='参数列表'),
+                               arguments=[])
+        if ctx.K_EXIT():
+            args = []
+            if ctx.expr():
+                args = [self.visitExpr(ctx.expr(0))]
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='退出程序'),
+                               arguments=args)
+        if ctx.K_CWD():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='当前目录'),
+                               arguments=[])
+        if ctx.K_CD():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='切换目录'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        if ctx.K_EXEC():
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='执行命令'),
+                               arguments=[self.visitExpr(ctx.expr(0))])
+        
+        # I/O操作动词
+        if ctx.K_PRINT():
+            args = []
+            if ctx.exprList():
+                args = self.visitExprList(ctx.exprList())
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='打印'),
+                               arguments=args)
+        if ctx.K_OUTPUT():
+            args = []
+            if ctx.exprList():
+                args = self.visitExprList(ctx.exprList())
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='输出'),
+                               arguments=args)
+        if ctx.K_INPUT():
+            args = []
+            if ctx.expr():
+                args = [self.visitExpr(ctx.expr(0))]
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='输入'),
+                               arguments=args)
+        if ctx.K_READ():
+            args = []
+            if ctx.expr():
+                args = [self.visitExpr(ctx.expr(0))]
+            return FunctionCall(line=line, column=col,
+                               name=Identifier(line=line, column=col, name='读取'),
+                               arguments=args)
+
         if ctx.ID():
             return Identifier(line=line, column=col, name=ctx.ID().getText())
 
         if ctx.LPAREN():
-            return self.visitExpr(ctx.expr())
+            exprs = ctx.expr()
+            if exprs:
+                return self.visitExpr(exprs[0])
+            return None
 
         if ctx.LBRACKET():
             elements = []
@@ -889,16 +1138,15 @@ class DuanParser:
         self.errors = []
 
     def parse(self, source: str) -> Optional[Module]:
-        """解析源代码为 AST（使用自定义中文分词器）"""
-        # 创建 ANTLR lexer（仅用于 token 类型映射）
+        """解析源代码为 AST（使用标准ANTLR词法分析器）"""
+        # 创建 ANTLR lexer 和 parser
         input_stream = InputStream(source)
-        antlr_lexer = DuanLangLexer(input_stream)
-        error_listener = DuanLangErrorListener()
-
-        # 使用自定义分词器创建 token 流
-        token_stream = create_antlr_token_stream(source, antlr_lexer)
-
+        lexer = DuanLangLexer(input_stream)
+        token_stream = CommonTokenStream(lexer)
         parser = DuanLangParser(token_stream)
+        
+        # 设置错误监听器
+        error_listener = DuanLangErrorListener()
         parser.removeErrorListeners()
         parser.addErrorListener(error_listener)
 
@@ -911,7 +1159,7 @@ class DuanParser:
 
         # 构建 AST
         builder = DuanLangASTBuilder()
-        module = builder.visit(tree)
+        module = builder.visitProgram(tree)
         self.errors = builder.errors
         return module
 

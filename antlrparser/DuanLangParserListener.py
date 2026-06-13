@@ -1,17 +1,15 @@
-# Generated from DuanLang.g4 by ANTLR 4.13.2
+# Generated from DuanLangParser.g4 by ANTLR 4.13.2
 from antlr4 import *
 if "." in __name__:
     from .DuanLangParser import DuanLangParser
 else:
     from DuanLangParser import DuanLangParser
 
-import sys
-from antlr4 import *
 from typing import List, Optional, Tuple, Any, Union
 
 
 # This class defines a complete listener for a parse tree produced by DuanLangParser.
-class DuanLangListener(ParseTreeListener):
+class DuanLangParserListener(ParseTreeListener):
 
     # Enter a parse tree produced by DuanLangParser#program.
     def enterProgram(self, ctx:DuanLangParser.ProgramContext):
@@ -37,6 +35,15 @@ class DuanLangListener(ParseTreeListener):
 
     # Exit a parse tree produced by DuanLangParser#definition.
     def exitDefinition(self, ctx:DuanLangParser.DefinitionContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#paragraphDef.
+    def enterParagraphDef(self, ctx:DuanLangParser.ParagraphDefContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#paragraphDef.
+    def exitParagraphDef(self, ctx:DuanLangParser.ParagraphDefContext):
         pass
 
 
@@ -85,6 +92,15 @@ class DuanLangListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by DuanLangParser#attributeDecl.
+    def enterAttributeDecl(self, ctx:DuanLangParser.AttributeDeclContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#attributeDecl.
+    def exitAttributeDecl(self, ctx:DuanLangParser.AttributeDeclContext):
+        pass
+
+
     # Enter a parse tree produced by DuanLangParser#interfaceDef.
     def enterInterfaceDef(self, ctx:DuanLangParser.InterfaceDefContext):
         pass
@@ -100,33 +116,6 @@ class DuanLangListener(ParseTreeListener):
 
     # Exit a parse tree produced by DuanLangParser#interfaceMember.
     def exitInterfaceMember(self, ctx:DuanLangParser.InterfaceMemberContext):
-        pass
-
-
-    # Enter a parse tree produced by DuanLangParser#methodSignature.
-    def enterMethodSignature(self, ctx:DuanLangParser.MethodSignatureContext):
-        pass
-
-    # Exit a parse tree produced by DuanLangParser#methodSignature.
-    def exitMethodSignature(self, ctx:DuanLangParser.MethodSignatureContext):
-        pass
-
-
-    # Enter a parse tree produced by DuanLangParser#propertySignature.
-    def enterPropertySignature(self, ctx:DuanLangParser.PropertySignatureContext):
-        pass
-
-    # Exit a parse tree produced by DuanLangParser#propertySignature.
-    def exitPropertySignature(self, ctx:DuanLangParser.PropertySignatureContext):
-        pass
-
-
-    # Enter a parse tree produced by DuanLangParser#paragraphDef.
-    def enterParagraphDef(self, ctx:DuanLangParser.ParagraphDefContext):
-        pass
-
-    # Exit a parse tree produced by DuanLangParser#paragraphDef.
-    def exitParagraphDef(self, ctx:DuanLangParser.ParagraphDefContext):
         pass
 
 
@@ -505,15 +494,6 @@ class DuanLangListener(ParseTreeListener):
 
     # Exit a parse tree produced by DuanLangParser#typeAnnotation.
     def exitTypeAnnotation(self, ctx:DuanLangParser.TypeAnnotationContext):
-        pass
-
-
-    # Enter a parse tree produced by DuanLangParser#genericType.
-    def enterGenericType(self, ctx:DuanLangParser.GenericTypeContext):
-        pass
-
-    # Exit a parse tree produced by DuanLangParser#genericType.
-    def exitGenericType(self, ctx:DuanLangParser.GenericTypeContext):
         pass
 
 

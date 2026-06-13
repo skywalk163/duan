@@ -204,7 +204,7 @@ class ModuleResolver:
         # 提取导出符号
         exports = []
         for stmt in module_ast.statements:
-            if hasattr(stmt, 'symbols'):
+            if hasattr(stmt, 'symbols') and stmt.symbols:
                 if stmt.symbols == ['*']:
                     # 导出全部，需要收集所有函数名
                     for s in module_ast.statements:
