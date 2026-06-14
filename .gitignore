@@ -29,3 +29,21 @@ Thumbs.db
 # 临时文件
 *.tmp
 *.bak
+
+# 存档目录
+archived/
+
+# ANTLR 生成文件
+DuanLangLexer.*
+DuanLangParser.*
+*.interp
+*.tokens
+
+# ANTLR 工具
+antlr-*.jar
+
+# 编译输出
+*.exe
+*.ll
+*.o
+*.obj
