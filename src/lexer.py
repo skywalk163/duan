@@ -47,8 +47,10 @@ class Lexer:
         '十': 10, '百': 100, '千': 1000, '万': 10000,
     }
     
-    # 简单中文数字（一到十）
-    SIMPLE_CHINESE_NUMBERS = {'一', '二', '三', '四', '五', '六', '七', '八', '九', '十'}
+    # 简单中文数字（零到十）
+    SIMPLE_CHINESE_NUMBERS = {
+        '零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+    }
     
     def __init__(self):
         """初始化词法分析器"""
@@ -214,13 +216,10 @@ class Lexer:
                 i += consumed
                 continue
             
-            # 处理中文数字
-            if source[i] in self.SIMPLE_CHINESE_NUMBERS:
-                token, consumed = self._tokenize_chinese_number(source, i, line, col)
-                tokens.append(token)
-                col += consumed
-                i += consumed
-                continue
+            # 处理中文数字（不在此处拦截单个字符，而是交给 _tokenize_chinese_sequence 处理复合数字）
+            # 注释：SIMPLE_CHINESE_NUMBERS 单个字符拦截会破坏复合数字（如"零点一"、"一百"）
+            # 以及以数字开头的函数名（如"四舍五入"）的解析
+            # 所有汉字统一由 _tokenize_identifier_or_keyword → _tokenize_chinese_sequence 处理
             
             # 处理中文数字（注释：不在此处处理，而是在标识符处理中判断）
             # 因为 "甲加三" 中的 "三" 需要根据上下文判断
@@ -268,6 +267,108 @@ class Lexer:
             return ch2 == '_' or ch2.isalnum()
         
         return False
+    
+    def _try_parse_chinese_number(self, source: str, pos: int):
+        """
+        尝试从指定位置解析完整的中文数字
+        返回 (数值, 消耗长度) 或 (None, 0)
+        """
+        n = len(source)
+        start = pos
+        
+        # 收集连续的汉字
+        chars = []
+        while pos < n and self._is_han(source[pos]):
+            ch = source[pos]
+            # 只收集中文数字相关的字符
+            if ch in self.CHINESE_DIGITS or ch == '点':
+                chars.append(ch)
+                pos += 1
+            else:
+                break
+        
+        if not chars:
+            return None, 0
+        
+        text = ''.join(chars)
+        
+        # 尝试解析为中文数字
+        value = self._convert_chinese_number(text)
+        if value is not None:
+            return value, len(text)
+        
+        return None, 0
+
+    def _convert_chinese_number(self, text: str):
+        """
+        将中文数字字符串转换为数值
+        
+        支持格式：
+        - 整数：一、十二、三百二十一、一千零一
+        - 小数：三点一四一五九、零点一
+        """
+        if not text:
+            return None
+        
+        digits = self.CHINESE_DIGITS
+        
+        # 处理小数：X点Y
+        if '点' in text:
+            parts = text.split('点', 1)
+            if len(parts) != 2:
+                return None
+            # 整数部分
+            int_part = self._convert_chinese_integer(parts[0])
+            if int_part is None:
+                return None
+            # 小数部分
+            frac = 0
+            frac_len = 0
+            for ch in parts[1]:
+                if ch in digits and digits[ch] < 10:  # 只取0-9的数字
+                    frac = frac * 10 + digits[ch]
+                    frac_len += 1
+                else:
+                    return None
+            if frac_len == 0:
+                return float(int_part)
+            return float(int_part) + frac / (10 ** frac_len)
+        
+        # 处理整数
+        return self._convert_chinese_integer(text)
+
+    def _convert_chinese_integer(self, text: str):
+        """将中文整数转换为数值"""
+        if not text:
+            return None
+        
+        digits = self.CHINESE_DIGITS
+        
+        # 简单数字
+        if text in digits:
+            return digits[text]
+        
+        # 处理复合数字（如十六、一百零一、三百二十一）
+        result = 0
+        temp = 0
+        for ch in text:
+            if ch in digits:
+                d = digits[ch]
+                if d >= 10:  # 十、百、千、万是进位单位
+                    if temp == 0:
+                        temp = 1  # "十"在开头表示1*10
+                    temp *= d
+                    result += temp
+                    temp = 0
+                elif d == 0:  # 零表示空位
+                    temp = 0
+                else:  # 0-9的数字
+                    temp = d
+            else:
+                return None
+        
+        result += temp
+        return result
     
     def _match_keyword(self, text: str, pos: int) -> Tuple[Optional[str], int]:
         """
@@ -517,6 +618,16 @@ class Lexer:
                 j += 1
             
             full_identifier = source[pos:j]
+            
+            # 检查是否是中文数字（如三点一四一五九、一百零一）
+            if full_identifier:
+                num_value, num_len = self._try_parse_chinese_number(source, pos)
+                if num_value is not None and num_len == len(full_identifier):
+                    # 整个标识符是中文数字
+                    tokens.append(Token(TokenType.CHINESE_NUM, num_value, line, current_col))
+                    consumed += num_len
+                    current_col += num_len
+                    continue
             
             # 检查完整标识符是否在用户定义中
             if full_identifier in user_definitions:
