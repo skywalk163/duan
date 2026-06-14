@@ -1,27 +1,39 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import sys
-sys.path.insert(0, 'src')
+sys.path.insert(0, 'antlrparser')
 
-from duan_parser_v3 import DuanParser
-from code_generator import PythonCodeGenerator
+from antlr4 import *
+from DuanLangLexer import DuanLangLexer
+from DuanLangParser import DuanLangParser
+from duan_visitor import DuanLangASTBuilder
 
-code = '定义甲等于三。打印甲。'
+# 测试1：单行
+code1 = '设 甲 为 10。'
+print("=== 测试1：单行 ===")
+input_stream = InputStream(code1)
+lexer = DuanLangLexer(input_stream)
+tokens = CommonTokenStream(lexer)
+parser = DuanLangParser(tokens)
+tree = parser.program()
+print(f"Parse tree: {tree.toStringTree(recog=parser)[:100]}")
 
-print("测试段言编译和运行...")
-print("源代码:", code)
+# 测试2：多行（换行符）
+code2 = '''设 甲 为 10。
+打印 甲。'''
+print("\n=== 测试2：多行 ===")
+input_stream = InputStream(code2)
+lexer = DuanLangLexer(input_stream)
+tokens = CommonTokenStream(lexer)
+parser = DuanLangParser(tokens)
+tree = parser.program()
+print(f"Parse tree: {tree.toStringTree(recog=parser)[:100]}")
 
-parser = DuanParser()
-module = parser.parse(code)
-print("解析成功")
-
-generator = PythonCodeGenerator()
-python_code = generator.generate(module)
-print("生成Python代码成功")
-print("\nPython代码:")
-print(python_code)
-
-print("\n执行:")
-exec(python_code)
-
-print("\n测试完成")
+# 测试3：从parse_source
+print("\n=== 测试3：parse_source ===")
+from duan_visitor import parse_source
+module = parse_source(code2)
+if module:
+    print(f"成功，语句数: {len(module.statements)}")
+else:
+    print("失败")

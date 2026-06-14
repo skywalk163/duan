@@ -41,6 +41,7 @@ class UnifiedCodeGenerator:
         self.output_lines: List[str] = []
         self.type_inferencer = TypeInferencer()
         self.type_cache: Dict[int, 'Type'] = {}  # 存储推断的类型
+        self.user_functions = set()  # 用户定义的函数名
         
         # 运算符映射
         self.operator_map = {
@@ -405,6 +406,9 @@ class UnifiedCodeGenerator:
         """生成段落定义"""
         name = self._sanitize_name(segment.name)
         
+        # 记录用户定义的函数名
+        self.user_functions.add(name)
+        
         # 提取参数
         params = []
         if hasattr(segment, 'parameters'):
@@ -490,9 +494,11 @@ class UnifiedCodeGenerator:
         
         self.indent_level += 1
         
-        # 调用父类构造函数
-        self._add_line("super().__init__()")
+        # 不自动调用父类构造函数，让用户在构造函数体中显式处理
+        # 如果父类没有构造函数，这会导致问题，所以需要检查父类是否需要初始化
+        # 简化方案：不调用super().__init__()，由构造函数体中的语句决定
         
+
         # 生成构造函数体（用户自己写赋值语句）
         if hasattr(constructor, 'body') and constructor.body:
             for s in constructor.body:
@@ -593,8 +599,8 @@ class UnifiedCodeGenerator:
             else:
                 func_name = self._generate_expr(func_expr)
             
-            # 检查是否是内置函数
-            if func_name in self.builtin_map:
+            # 检查是否是内置函数（用户定义的函数优先）
+            if func_name not in self.user_functions and func_name in self.builtin_map:
                 func_name = self.builtin_map[func_name]
             
             args = [self._generate_expr(arg) for arg in expr.arguments]

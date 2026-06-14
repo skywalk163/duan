@@ -172,7 +172,7 @@ stmt
     ;
 
 varDecl
-    : K_SET ID K_AS expr PERIOD ( K_TYPE typeAnnotation )?    // 统一语法：设 甲 为 三
+    : K_SET target K_AS expr PERIOD ( K_TYPE typeAnnotation )?    // 统一语法：设 甲 为 三
     | K_DEFINE ID ( K_EQUAL expr PERIOD )?                    // 兼容旧语法
     ;
 
@@ -184,6 +184,7 @@ target
     : ID
     | expr K_OF ID
     | primary DOT ID                                          // 属性访问作为赋值目标
+    | K_SELF ID                                               // 己属性（特殊语法）
     ;
 
 ifStmt
@@ -322,9 +323,7 @@ primary
     | K_LENGTH LPAREN expr RPAREN                      // 长(列表)
     | K_SORT LPAREN expr RPAREN                        // 排序(列表)
     | K_REVERSE LPAREN expr RPAREN                     // 反转(列表)
-    | K_SUM LPAREN expr RPAREN                         // 求和(列表)
-    | K_MAX LPAREN expr RPAREN                         // 求最大(列表)
-    | K_MIN LPAREN expr RPAREN                         // 求最小(列表)
+    // K_SUM, K_MAX, K_MIN 移除，改为内置函数
     | K_UNIQUE LPAREN expr RPAREN                      // 去重(列表)
     | K_FILTER LPAREN expr COMMA expr RPAREN           // 筛选(列表, 条件)
     | K_MAP LPAREN expr COMMA expr RPAREN              // 映射(列表, 函数)
