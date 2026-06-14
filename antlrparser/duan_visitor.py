@@ -27,7 +27,7 @@ from DuanLangParserVisitor import DuanLangParserVisitor
 from duan_ast import (
     ASTNode, NumberLiteral, StringLiteral, BooleanLiteral, NullLiteral,
     Identifier, SegmentName, ModuleName, BinaryOp, UnaryOp, FunctionCall,
-    PipeExpression, PropertyAccess, IndexAccess, ListLiteral, NewExpression,
+    PipeExpression, PropertyAccess, IndexAccess, ListLiteral, DictLiteral, NewExpression,
     VariableDeclaration, Assignment, IfStatement, ForeachStatement,
     WhileStatement, BreakStatement, ContinueStatement, ReturnStatement,
     TryStatement, ThrowStatement, PrintStatement, ExpressionStatement,
@@ -457,13 +457,37 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
 
     def visitVarDecl(self, ctx: DuanLangParser.VarDeclContext):
         """变量声明"""
-        name = ctx.ID().getText()
         line = ctx.start.line
         col = ctx.start.column
 
+        # 支持target（可以是ID或己属性）
+        if ctx.target():
+            target = self.visitTarget(ctx.target())
+            value = None
+            if ctx.expr():
+                value = self.visitExpr(ctx.expr())
+            
+            # 如果target是PropertyAccess（己属性），返回Assignment
+            if isinstance(target, PropertyAccess):
+                return Assignment(line=line, column=col, target=target, value=value)
+            
+            # 否则返回VariableDeclaration
+            return VariableDeclaration(line=line, column=col, name=target.name, value=value)
+        
+        # 兼容旧的ID语法
+        name = ctx.ID().getText()
         value = None
         if ctx.expr():
             value = self.visitExpr(ctx.expr())
+
+        # 特殊处理：以"己"开头的变量名 -> 转换为属性赋值
+        if name.startswith('己'):
+            prop_name = name[1:]  # 去掉"己"前缀
+            if prop_name:  # 确保有属性名
+                target = PropertyAccess(line=line, column=col,
+                                        obj=SelfReference(line=line, column=col),
+                                        property_name=prop_name)
+                return Assignment(line=line, column=col, target=target, value=value)
 
         return VariableDeclaration(line=line, column=col, name=name, value=value)
 
@@ -489,9 +513,22 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
             prop = ctx.ID().getText()
             return PropertyAccess(line=ctx.start.line, column=ctx.start.column,
                                    obj=expr, property_name=prop)
-        # 简单变量赋值
-        return Identifier(line=ctx.start.line, column=ctx.start.column,
-                          name=ctx.ID().getText())
+        elif ctx.K_SELF():
+            # 己属性赋值：己属性名
+            prop = ctx.ID().getText()
+            return PropertyAccess(line=ctx.start.line, column=ctx.start.column,
+                                   obj=SelfReference(line=ctx.start.line, column=ctx.start.column),
+                                   property_name=prop)
+        # 简单变量赋值 - 但要检查是否以"己"开头
+        name = ctx.ID().getText()
+        if name.startswith('己'):
+            prop_name = name[1:]  # 去掉"己"前缀
+            if prop_name:  # 确保有属性名
+                return PropertyAccess(line=ctx.start.line, column=ctx.start.column,
+                                       obj=SelfReference(line=ctx.start.line, column=ctx.start.column),
+                                       property_name=prop_name)
+        
+        return Identifier(line=ctx.start.line, column=ctx.start.column, name=name)
 
     def visitIfStmt(self, ctx: DuanLangParser.IfStmtContext):
         """条件语句"""
@@ -535,12 +572,8 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
         line = ctx.start.line
         col = ctx.start.column
 
-        # 遍历变量
-        foreach_var_ctx = ctx.foreachVar()
-        if foreach_var_ctx.ID(0):
-            variable = foreach_var_ctx.ID(0).getText()
-        else:
-            variable = "当前项"
+        # 遍历变量（直接从foreachStmt获取）
+        variable = ctx.ID().getText() if ctx.ID() else "当前项"
 
         iterable = self.visitExpr(ctx.expr())
 
@@ -912,20 +945,9 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
                                arguments=[self.visitExpr(ctx.expr(0))])
         if ctx.K_REVERSE():
             return FunctionCall(line=line, column=col,
-                               name=Identifier(line=line, column=col, name='反转'),
-                               arguments=[self.visitExpr(ctx.expr(0))])
-        if ctx.K_SUM():
-            return FunctionCall(line=line, column=col,
-                               name=Identifier(line=line, column=col, name='求和'),
-                               arguments=[self.visitExpr(ctx.expr(0))])
-        if ctx.K_MAX():
-            return FunctionCall(line=line, column=col,
-                               name=Identifier(line=line, column=col, name='求最大'),
-                               arguments=[self.visitExpr(ctx.expr(0))])
-        if ctx.K_MIN():
-            return FunctionCall(line=line, column=col,
-                               name=Identifier(line=line, column=col, name='求最小'),
-                               arguments=[self.visitExpr(ctx.expr(0))])
+                                name=Identifier(line=line, column=col, name='反转'),
+                                arguments=[self.visitExpr(ctx.expr(0))])
+        # K_SUM, K_MAX, K_MIN 已移除
         if ctx.K_UNIQUE():
             return FunctionCall(line=line, column=col,
                                name=Identifier(line=line, column=col, name='去重'),
@@ -1071,7 +1093,16 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
                                arguments=args)
 
         if ctx.ID():
-            return Identifier(line=line, column=col, name=ctx.ID().getText())
+            name = ctx.ID().getText()
+            # 特殊处理：以"己"开头的标识符 -> 己.属性
+            if name.startswith('己'):
+                # 拆分为 self.属性
+                prop_name = name[1:]  # 去掉"己"前缀
+                if prop_name:  # 确保有属性名
+                    return PropertyAccess(line=line, column=col,
+                                          obj=SelfReference(line=line, column=col),
+                                          property_name=prop_name)
+            return Identifier(line=line, column=col, name=name)
 
         if ctx.LPAREN():
             exprs = ctx.expr()
@@ -1080,6 +1111,16 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
             return None
 
         if ctx.LBRACKET():
+            # 优先检查是否为字典字面量
+            if ctx.dictLiteral():
+                from duan_ast import DictEntry
+                entries = []
+                for entry_ctx in ctx.dictLiteral().dictEntry():
+                    key = self.visitExpr(entry_ctx.expr(0))
+                    value = self.visitExpr(entry_ctx.expr(1))
+                    entries.append(DictEntry(line=key.line, column=key.column, key=key, value=value))
+                return DictLiteral(line=line, column=col, entries=entries)
+            # 否则为列表字面量
             elements = []
             if ctx.exprList():
                 elements = self.visitExprList(ctx.exprList())

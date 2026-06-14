@@ -22,11 +22,15 @@ from keywords import (
 
 class LexerError(Exception):
     """词法分析错误"""
-    def __init__(self, message: str, line: int, col: int):
+    def __init__(self, message: str, line: int, col: int, source_context: str = None):
         self.message = message
         self.line = line
         self.col = col
-        super().__init__(f"词法错误 (行{line}, 列{col}): {message}")
+        self.source_context = source_context
+        msg = f"词法错误 (行{line}, 列{col}): {message}"
+        if source_context:
+            msg += f"\n  附近代码: ...{source_context}..."
+        super().__init__(msg)
 
 
 class Lexer:
@@ -74,6 +78,22 @@ class Lexer:
             self.all_keywords_by_length[length].add(kw)
             if length > self.all_max_keyword_len:
                 self.all_max_keyword_len = length
+        
+        # 预计算符号映射到 TokenType（优化符号匹配）
+        self._symbol_token_map: Dict[str, TokenType] = {
+            '.': TokenType.DOT,
+            ',': TokenType.COMMA,
+            ';': TokenType.SEMICOLON,
+            ':': TokenType.COLON,
+            '(': TokenType.LPAREN,
+            ')': TokenType.RPAREN,
+            '[': TokenType.LBRACKET,
+            ']': TokenType.RBRACKET,
+            '<': TokenType.LBOOK,
+            '>': TokenType.RBOOK,
+            '\\': TokenType.COMMA,
+            '=': TokenType.EQUALS,
+        }
     
     def tokenize(self, source: str) -> List[Token]:
         """将源码转为 Token 流"""
@@ -154,7 +174,7 @@ class Lexer:
                         j += 1
                     
                     if j >= n:
-                        raise LexerError("段落名未闭合", line, col)
+                        raise LexerError(f"书名号《》未闭合: 段落名 '{''.join(name_chars)}' 缺少右书名号》", line, col)
                     
                     # 添加左书名号
                     tokens.append(token)
@@ -214,7 +234,7 @@ class Lexer:
                 continue
             
             # 未知字符
-            raise LexerError(f"未知字符: {source[i]}", line, col)
+            raise LexerError(f"未知字符: '{source[i]}' (0x{ord(source[i]):04X})", line, col)
         
         # 文件结束，处理剩余的 DEDENT
         while len(indent_stack) > 1:
@@ -260,9 +280,10 @@ class Lexer:
         
         # 从最长到最短尝试匹配
         for length in range(max_possible, 0, -1):
-            if length in self.all_keywords_by_length:
+            candidates = self.all_keywords_by_length.get(length)
+            if candidates:
                 candidate = text[pos:pos+length]
-                if candidate in self.all_keywords_by_length[length]:
+                if candidate in candidates:
                     return candidate, length
         
         return None, 0
@@ -274,54 +295,16 @@ class Lexer:
         # 中文符号映射
         if ch in SYMBOL_MAP:
             mapped = SYMBOL_MAP[ch]
-            if mapped == '.':
-                return Token(TokenType.DOT, ch, line, col), 1
-            elif mapped == ',':
-                return Token(TokenType.COMMA, ch, line, col), 1
-            elif mapped == ';':
-                return Token(TokenType.SEMICOLON, ch, line, col), 1
-            elif mapped == ':':
-                return Token(TokenType.COLON, ch, line, col), 1
-            elif mapped == '(':
-                return Token(TokenType.LPAREN, ch, line, col), 1
-            elif mapped == ')':
-                return Token(TokenType.RPAREN, ch, line, col), 1
-            elif mapped == '[':
-                return Token(TokenType.LBRACKET, ch, line, col), 1
-            elif mapped == ']':
-                return Token(TokenType.RBRACKET, ch, line, col), 1
-            elif mapped == '<':
-                # 左书名号 《
-                return Token(TokenType.LBOOK, ch, line, col), 1
-            elif mapped == '>':
-                # 右书名号 》
-                return Token(TokenType.RBOOK, ch, line, col), 1
-            elif mapped == '\\':
-                # 顿号（参数分隔符）
-                return Token(TokenType.COMMA, ch, line, col), 1
-            else:
-                # 其他符号
-                return Token(TokenType.COMMA, ch, line, col), 1
+            token_type = self._symbol_token_map.get(mapped)
+            if token_type:
+                return Token(token_type, ch, line, col), 1
+            # 其他符号
+            return Token(TokenType.COMMA, ch, line, col), 1
         
         # 英文符号
-        if ch == '.':
-            return Token(TokenType.DOT, ch, line, col), 1
-        elif ch == ',':
-            return Token(TokenType.COMMA, ch, line, col), 1
-        elif ch == ';':
-            return Token(TokenType.SEMICOLON, ch, line, col), 1
-        elif ch == ':':
-            return Token(TokenType.COLON, ch, line, col), 1
-        elif ch == '(':
-            return Token(TokenType.LPAREN, ch, line, col), 1
-        elif ch == ')':
-            return Token(TokenType.RPAREN, ch, line, col), 1
-        elif ch == '[':
-            return Token(TokenType.LBRACKET, ch, line, col), 1
-        elif ch == ']':
-            return Token(TokenType.RBRACKET, ch, line, col), 1
-        elif ch == '=':
-            return Token(TokenType.EQUALS, ch, line, col), 1
+        token_type = self._symbol_token_map.get(ch)
+        if token_type:
+            return Token(token_type, ch, line, col), 1
         
         # 管道操作符 ->
         if ch == '-' and i + 1 < len(source) and source[i+1] == '>':
@@ -343,8 +326,6 @@ class Lexer:
         if quote_char in quote_map:
             # 中文引号
             close_quote = {'「': '」', '『': '』'}.get(quote_char)
-            if not close_quote:
-                raise LexerError(f"未闭合的引号: {quote_char}", line, col)
             
             j = i + 1
             chars = []
@@ -353,7 +334,7 @@ class Lexer:
                 j += 1
             
             if j >= len(source):
-                raise LexerError(f"字符串未闭合", line, start_col)
+                raise LexerError(f"字符串未闭合: 以 '{quote_char}' 开头的字符串缺少匹配的 '{close_quote}'", line, start_col)
             
             value = ''.join(chars)
             return Token(TokenType.STRING, value, line, start_col), j - i + 1
@@ -382,7 +363,7 @@ class Lexer:
                     j += 1
             
             if j >= len(source):
-                raise LexerError("字符串未闭合", line, start_col)
+                raise LexerError(f"字符串未闭合: 以 '{quote_char}' 开头的字符串缺少匹配的引号", line, start_col)
             
             value = ''.join(chars)
             return Token(TokenType.STRING, value, line, start_col), j - i + 1
@@ -471,8 +452,15 @@ class Lexer:
         n = len(source)
         consumed = 0
         current_col = col
+        
+        # 安全计数器，防止无限循环
+        _loop_safety = 0
 
         while i + consumed < n:
+            _loop_safety += 1
+            if _loop_safety > 100:
+                raise RuntimeError(f"词法分析内部错误: 汉字序列分词超出安全上限 ({_loop_safety}次迭代), 当前位置: {i + consumed}")
+
             pos = i + consumed
             ch = source[pos]
 
@@ -547,22 +535,87 @@ class Lexer:
                 keyword = None
 
             if keyword:
-                # 匹配到关键字
-                tokens.append(Token(TokenType.KEYWORD, keyword, line, current_col))
-                consumed += length
-                current_col += length
-            else:
-                # 未匹配到关键字，收集标识符
-                # 使用前面收集的完整标识符
-                if full_identifier:
-                    tokens.append(Token(TokenType.IDENTIFIER, full_identifier, line, current_col))
-                    consumed += len(full_identifier)
-                    current_col += len(full_identifier)
+                # 单字动词在词首且词长>1时不直接匹配，避免拆开复合词
+                # 例如"列表"(len=2)不应拆为 列(动词)+表
+                # 但独立出现的"加"(len=1)仍应匹配为关键字
+                if length == 1 and keyword in VERB_ARITY and len(full_identifier) > 1:
+                    # 单字动词在多字词词首，跳过主匹配，让嵌入式检测处理
+                    keyword = None
                 else:
-                    # 单个非关键字汉字
-                    tokens.append(Token(TokenType.IDENTIFIER, ch, line, current_col))
-                    consumed += 1
-                    current_col += 1
+                    # 匹配到关键字（非单字动词）
+                    tokens.append(Token(TokenType.KEYWORD, keyword, line, current_col))
+                    consumed += length
+                    current_col += length
+            
+            if not keyword:
+                # 未匹配到关键字（或单字动词被跳过），检查是否内嵌有关键字
+                # 例如"初始值加数值"中的"加"应该被识别为关键字
+                embedded_found = False
+                scan_pos = 0
+                while scan_pos < len(full_identifier):
+                    sub_kw, sub_len = self._match_keyword(source, i + consumed + scan_pos)
+                    if sub_kw and sub_kw not in user_definitions:
+                        # 单字动词在多字词词首(scan_pos=0)时跳过，避免拆开复合词
+                        if sub_len == 1 and sub_kw in VERB_ARITY and scan_pos == 0 and len(full_identifier) > 1:
+                            scan_pos += 1
+                            continue
+                        embedded_found = True
+                        break
+                    scan_pos += 1
+                
+                if embedded_found:
+                    # 有内嵌关键字，分段输出
+                    scan_pos = 0
+                    while scan_pos < len(full_identifier):
+                        # 使用 i + consumed 获取当前绝对位置（pos 是旧的）
+                        sub_kw, sub_len = self._match_keyword(source, i + consumed + scan_pos)
+                        if sub_kw and sub_kw not in user_definitions:
+                            # 单字动词在多字词词首(scan_pos=0)时跳过，避免拆开复合词
+                            if sub_len == 1 and sub_kw in VERB_ARITY and scan_pos == 0 and len(full_identifier) > 1:
+                                scan_pos += 1
+                                continue
+                            # 输出关键字前的标识符部分
+                            if scan_pos > 0:
+                                id_part = full_identifier[:scan_pos]
+                                tokens.append(Token(TokenType.IDENTIFIER, id_part, line, current_col))
+                                consumed += scan_pos
+                                current_col += scan_pos
+                                full_identifier = full_identifier[scan_pos:]
+                                scan_pos = 0
+                            # 输出关键字
+                            tokens.append(Token(TokenType.KEYWORD, sub_kw, line, current_col))
+                            consumed += sub_len
+                            current_col += sub_len
+                            full_identifier = full_identifier[sub_len:]
+                        else:
+                            scan_pos += 1
+                    # 输出剩余标识符部分
+                    if full_identifier:
+                        # 单个字符且是中文数字 → 输出为数字
+                        if len(full_identifier) == 1 and full_identifier[0] in self.SIMPLE_CHINESE_NUMBERS:
+                            value = self.CHINESE_DIGITS[full_identifier[0]]
+                            tokens.append(Token(TokenType.CHINESE_NUM, value, line, current_col))
+                            consumed += 1
+                            current_col += 1
+                        else:
+                            tokens.append(Token(TokenType.IDENTIFIER, full_identifier, line, current_col))
+                            consumed += len(full_identifier)
+                            current_col += len(full_identifier)
+                else:
+                    # 无嵌入关键字，使用前面收集的完整标识符
+                    if full_identifier:
+                        tokens.append(Token(TokenType.IDENTIFIER, full_identifier, line, current_col))
+                        consumed += len(full_identifier)
+                        current_col += len(full_identifier)
+                    else:
+                        # 单个非关键字汉字，检查是否为中文数字
+                        if ch in self.SIMPLE_CHINESE_NUMBERS:
+                            value = self.CHINESE_DIGITS[ch]
+                            tokens.append(Token(TokenType.CHINESE_NUM, value, line, current_col))
+                        else:
+                            tokens.append(Token(TokenType.IDENTIFIER, ch, line, current_col))
+                        consumed += 1
+                        current_col += 1
         
         return consumed
     
@@ -586,8 +639,8 @@ class Lexer:
                     k += 1
                 if k < n and k > j:
                     name = source[j:k]
-                    # 排除关键字
-                    if name not in ALL_KEYWORDS:
+                    # 排除关键字和动词
+                    if name not in ALL_KEYWORDS and name not in VERB_ARITY:
                         definitions.add(name)
                 i = k + 1
                 continue
@@ -604,8 +657,8 @@ class Lexer:
                     k += 1
                 if k > j:
                     segment_name = source[j:k]
-                    # 排除关键字
-                    if segment_name not in ALL_KEYWORDS:
+                    # 排除关键字和动词
+                    if segment_name not in ALL_KEYWORDS and segment_name not in VERB_ARITY:
                         definitions.add(segment_name)
                 
                 # 检查是否有 "参数" 关键字
@@ -624,8 +677,8 @@ class Lexer:
                             k += 1
                         if k > j:
                             param_name = source[j:k]
-                            # 排除关键字
-                            if param_name not in ALL_KEYWORDS:
+                            # 排除关键字和动词
+                            if param_name not in ALL_KEYWORDS and param_name not in VERB_ARITY:
                                 definitions.add(param_name)
                         j = k
                         # 跳过空白
@@ -646,32 +699,39 @@ class Lexer:
                 # 收集标识符（只收集到下一个关键字或符号）
                 k = j
                 while k < n and self._is_han(source[k]):
-                    # 检查是否遇到关键字
+                    # 检查是否遇到关键字或动词
                     next_kw, length = self._match_keyword(source, k)
-                    if next_kw and next_kw in ALL_KEYWORDS:
-                        # 遇到关键字，停止
+                    if next_kw and (next_kw in ALL_KEYWORDS or next_kw in VERB_ARITY):
+                        # 遇到关键字或动词，停止
                         break
                     k += 1
                 if k > j:
                     name = source[j:k]
-                    # 排除关键字
-                    if name not in ALL_KEYWORDS:
+                    # 排除关键字和动词
+                    if name not in ALL_KEYWORDS and name not in VERB_ARITY:
                         definitions.add(name)
                 i = k
             elif source[i] == '设':
                 j = i + 1
-                # 收集标识符（设甲为三）
-                while j < n and self._is_han(source[j]):
-                    # 检查是否遇到关键字
-                    if source[j:j+2] == '为':
-                        break
+                # 跳过空白
+                while j < n and source[j] in ' \t':
                     j += 1
-                if j > i + 1:
-                    name = source[i+1:j]
-                    # 排除关键字
-                    if name not in ALL_KEYWORDS:
+                # 收集标识符（设 甲 为 值）
+                k = j
+                while k < n and self._is_han(source[k]):
+                    # 检查是否遇到"为"关键字（跳过空格）
+                    lookahead = k
+                    while lookahead < n and source[lookahead] in ' \t':
+                        lookahead += 1
+                    if lookahead < n and source[lookahead] == '为':
+                        break
+                    k += 1
+                if k > j:
+                    name = source[j:k]
+                    # 排除关键字和动词
+                    if name not in ALL_KEYWORDS and name not in VERB_ARITY:
                         definitions.add(name)
-                i = j
+                i = k
             else:
                 i += 1
 

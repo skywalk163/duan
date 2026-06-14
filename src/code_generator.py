@@ -14,6 +14,21 @@ from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, Conti
 
 
 # =============================================================================
+# 代码生成错误
+# =============================================================================
+
+class CodeGenError(Exception):
+    """代码生成错误"""
+    def __init__(self, message: str, node_type: str = None):
+        self.message = message
+        self.node_type = node_type
+        msg = f"代码生成错误: {message}"
+        if node_type:
+            msg += f" (节点类型: {node_type})"
+        super().__init__(msg)
+
+
+# =============================================================================
 # Python代码生成器
 # =============================================================================
 
@@ -223,14 +238,22 @@ class PythonCodeGenerator:
             # 二元运算作为独立语句
             expr_code = self._generate_expr(stmt)
             self._add_line(expr_code)
+        elif isinstance(stmt, Pipeline):
+            # 管道操作作为独立语句
+            expr_code = self._generate_expr(stmt)
+            self._add_line(expr_code)
         elif hasattr(stmt, '__class__') and stmt.__class__.__name__ == 'SelfAssignment':
             # self赋值语句（新增）
             self._generate_self_assignment(stmt)
         elif hasattr(stmt, '__class__') and stmt.__class__.__name__ == 'ClassDefinition':
             # 类定义（新增）
             self._generate_class_definition(stmt)
+        elif isinstance(stmt, MemberAccess):
+            # 成员访问作为独立语句
+            expr_code = self._generate_expr(stmt)
+            self._add_line(expr_code)
         else:
-            raise ValueError(f"未知语句类型: {type(stmt).__name__}")
+            raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
     def _generate_var_decl(self, stmt: VarDecl):
         """生成变量声明"""
@@ -555,13 +578,22 @@ class PythonCodeGenerator:
                 # 属性访问
                 return f"{obj}.{member}"
         
+        elif isinstance(expr, ListLiteral):
+            # 列表字面量
+            elements = [self._generate_expr(e) for e in expr.elements]
+            return f"[{', '.join(elements)}]"
+        
         else:
-            raise ValueError(f"未知表达式类型: {type(expr).__name__}")
+            raise CodeGenError(f"未知表达式类型", type(expr).__name__)
     
     def _sanitize_name(self, name: str) -> str:
         """清理名称（转换为合法Python标识符）"""
         # 中文变量名在Python3中是合法的
         # 但为了更好的兼容性，可以选择转拼音或保留中文
+        
+        # 如果名称以数字开头，加前缀"_"
+        if name and name[0].isdigit():
+            return f"_{name}"
         
         # 简单方案：保留中文
         return name

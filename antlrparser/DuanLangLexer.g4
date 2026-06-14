@@ -78,21 +78,20 @@ K_OUTPUT   : '输出' ;
 K_INPUT    : '输入' ;
 K_READ     : '读取' ;
 
-// 列表操作动词
+// 列表操作动词（保留部分不常用的）
 K_FIRST    : '首' ;
 K_LAST     : '末' ;
 K_REST     : '余' ;
 K_LENGTH   : '长' ;
 K_SORT     : '排序' ;
 K_REVERSE  : '反转' ;
-K_SUM      : '求和' ;
-K_MAX      : '求最大' ;
-K_MIN      : '求最小' ;
+// K_SUM, K_MAX, K_MIN 移除，避免与用户函数名冲突
+// 改为内置函数，在语义层面识别
 K_UNIQUE   : '去重' ;
 K_FILTER   : '筛选' ;
 K_MAP      : '映射' ;
 
-// 字符串操作动词
+// 字符串操作动词（保留不常用的）
 K_TO_INT   : '转整数' ;
 K_TO_FLOAT : '转浮点' ;
 K_TO_STR   : '转字符串' ;
