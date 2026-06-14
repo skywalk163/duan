@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest
+        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+    - name: Run core tests (pytest)
+      run: |
+        python -m pytest tests/ -v --ignore=tests/test_suite.py --ignore=tests/test_suite_v2.py --ignore=tests/test_summary.py
+
+    - name: Run edge case tests
+      run: |
+        python -m pytest tests/test_edge_cases.py -v
+
+    - name: Run module system tests
+      run: |
+        python -m pytest tests/test_module_system.py -v

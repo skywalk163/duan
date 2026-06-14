@@ -40,6 +40,9 @@ class PythonCodeGenerator:
         self.indent_str = "    "  # 4空格缩进
         self.output_lines: List[str] = []
         
+        # 追踪导入的符号
+        self._imported_symbols: set = set()
+        
         # 中文数字映射
         self.chinese_numbers = {
             '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
@@ -159,30 +162,55 @@ class PythonCodeGenerator:
         self._add_line("")
         
         # 添加标准库导入
-        self._add_line("# 导入段言标准库")
         self._add_line("import sys")
-        self._add_line("import importlib.util")
+        self._add_line("import os")
+        self._add_line("")
         self._add_line("try:")
-        self._add_line("    # 尝试从src/stdlib导入")
-        self._add_line("    spec = importlib.util.spec_from_file_location('duan_builtins', 'src/stdlib/builtins.py')")
-        self._add_line("    _duan_builtin = importlib.util.module_from_spec(spec)")
-        self._add_line("    spec.loader.exec_module(_duan_builtin)")
-        self._add_line("except:")
-        self._add_line("    # 如果无法导入，使用内置函数占位")
+        self._add_line("    import importlib.util")
+        self._add_line("except ImportError:")
+        self._add_line("    importlib = None")
+        self._add_line("")
+        self._add_line("try:")
+        self._add_line("    _duan_stdlib = os.path.join(os.path.dirname(__file__), 'stdlib')")
+        self._add_line("except NameError:")
+        self._add_line("    _duan_stdlib = os.path.join(os.getcwd(), 'stdlib')")
+        self._add_line("    if not os.path.isdir(_duan_stdlib):")
+        self._add_line("        # 尝试父目录（当从子目录运行时）")
+        self._add_line("        parent_stdlib = os.path.normpath(os.path.join(os.getcwd(), '..', 'stdlib'))")
+        self._add_line("        if os.path.isdir(parent_stdlib):")
+        self._add_line("            _duan_stdlib = parent_stdlib")
+        self._add_line("")
+        self._add_line("if os.path.isdir(_duan_stdlib) and _duan_stdlib not in sys.path:")
+        self._add_line("    sys.path.insert(0, _duan_stdlib)")
+        self._add_line("")
+        self._add_line("if importlib:")
+        self._add_line("    try:")
+        self._add_line("        _duan_builtin_path = os.path.join(_duan_stdlib, 'builtins.py')")
+        self._add_line("        if os.path.isfile(_duan_builtin_path):")
+        self._add_line("            spec = importlib.util.spec_from_file_location('duan_builtins', _duan_builtin_path)")
+        self._add_line("            _duan_builtin = importlib.util.module_from_spec(spec)")
+        self._add_line("            spec.loader.exec_module(_duan_builtin)")
+        self._add_line("        else:")
+        self._add_line("            raise ImportError()")
+        self._add_line("    except:")
+        self._add_line("        import types")
+        self._add_line("        _duan_builtin = types.ModuleType('_duan_builtin')")
+        self._add_line("        _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
+        self._add_line("        _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content) or None")
+        self._add_line("        _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
+        self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
+        self._add_line("        _duan_builtin.打印 = print")
+        self._add_line("        _duan_builtin.列表创建 = list")
+        self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
+        self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
+        self._add_line("        _duan_builtin.字符串长度 = len")
+        self._add_line("        _duan_builtin.字典创建 = dict")
+        self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
+        self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
+        self._add_line("else:")
         self._add_line("    import types")
         self._add_line("    _duan_builtin = types.ModuleType('_duan_builtin')")
-        self._add_line("    _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
-        self._add_line("    _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content) or None")
-        self._add_line("    _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
-        self._add_line("    _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
         self._add_line("    _duan_builtin.打印 = print")
-        self._add_line("    _duan_builtin.列表创建 = list")
-        self._add_line("    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
-        self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
-        self._add_line("    _duan_builtin.字符串长度 = len")
-        self._add_line("    _duan_builtin.字典创建 = dict")
-        self._add_line("    _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
-        self._add_line("    _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
         self._add_line("")
         
         # 生成语句
@@ -507,6 +535,9 @@ class PythonCodeGenerator:
             # 检查是否是中文数字
             if expr.name in self.chinese_numbers:
                 return str(self.chinese_numbers[expr.name])
+            # 如果是导入的符号且无参数，生成为函数调用（0参数函数）
+            if expr.name in self._imported_symbols:
+                return f"{name}()"
             return name
         
         # 检查 ast_nodes 模块中的 Identifier（兼容两种定义）
@@ -591,8 +622,8 @@ class PythonCodeGenerator:
         # 中文变量名在Python3中是合法的
         # 但为了更好的兼容性，可以选择转拼音或保留中文
         
-        # 如果名称以数字开头，加前缀"_"
-        if name and name[0].isdigit():
+        # 如果名称以ASCII数字开头，加前缀"_"
+        if name and '0' <= name[0] <= '9':
             return f"_{name}"
         
         # 简单方案：保留中文
@@ -600,23 +631,23 @@ class PythonCodeGenerator:
     
     def _generate_import_stmt(self, stmt: ImportStmt):
         """生成导入语句"""
-        # 将中文模块名转换为Python模块名
-        # 例如："数学工具" → "stdlib.数学工具"
         module_name = stmt.module_name
-        if self._is_chinese(module_name):
-            # 如果是中文模块名，假设在stdlib目录下
-            module_name = f"stdlib.{module_name}"
         
         if stmt.symbols:
-            # 从...导入：from module import symbol1, symbol2
+            # 从...导入：from 数学 import 平方根, 幂
             symbols_str = ', '.join(stmt.symbols)
             self._add_line(f"from {module_name} import {symbols_str}")
+            # 追踪导入的符号
+            for symbol in stmt.symbols:
+                self._imported_symbols.add(symbol)
         else:
-            # 导入整个模块：import module
+            # 导入整个模块：import 数学
             if stmt.alias:
                 self._add_line(f"import {module_name} as {stmt.alias}")
+                self._imported_symbols.add(stmt.alias)
             else:
                 self._add_line(f"import {module_name}")
+                self._imported_symbols.add(module_name)
     
     def _is_chinese(self, text: str) -> bool:
         """判断字符串是否包含中文"""

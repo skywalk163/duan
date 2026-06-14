@@ -1,223 +1,218 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-段言模块系统测试
-
-测试导入、导出语句的解析和代码生成
+段言 - 模块系统和标准库综合测试
 """
-
 import sys
 import os
+import unittest
 
-# 添加 src 目录到路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from lexer import Lexer
-from duan_parser_v3 import DuanParser, ImportStmt, ExportStmt
+from duan_parser_v3 import DuanParser
 from code_generator import PythonCodeGenerator
+from semantic_analyzer import SemanticAnalyzer
 
 
-def test_import_basic():
-    """测试基本导入"""
-    code = '导入《数学库》。'
+class TestStdlib(unittest.TestCase):
+    """标准库模块测试"""
     
-    parser = DuanParser()
-    module = parser.parse(code)
+    def setUp(self):
+        self.lexer = Lexer()
+        self.parser = DuanParser()
+        self.analyzer = SemanticAnalyzer()
+        self.generator = PythonCodeGenerator()
     
-    assert len(module.statements) == 1
-    stmt = module.statements[0]
-    assert isinstance(stmt, ImportStmt)
-    assert stmt.module_name == '数学库'
-    assert stmt.symbols is None
-    assert stmt.alias is None
-    
-    print("[OK] 测试基本导入通过")
-
-
-def test_import_with_alias():
-    """测试带别名的导入"""
-    code = '导入《数学库》为数学。'
-    
-    parser = DuanParser()
-    module = parser.parse(code)
-    
-    assert len(module.statements) == 1
-    stmt = module.statements[0]
-    assert isinstance(stmt, ImportStmt)
-    assert stmt.module_name == '数学库'
-    assert stmt.alias == '数学'
-    
-    print("[OK] 测试带别名的导入通过")
-
-
-def test_from_import():
-    """测试从...导入"""
-    code = '从《数学库》导入《平方根》，《绝对值》。'
-    
-    parser = DuanParser()
-    module = parser.parse(code)
-    
-    assert len(module.statements) == 1
-    stmt = module.statements[0]
-    assert isinstance(stmt, ImportStmt)
-    assert stmt.module_name == '数学库'
-    assert stmt.symbols == ['平方根', '绝对值']
-    
-    print("[OK] 测试从...导入通过")
-
-
-def test_export():
-    """测试导出"""
-    code = '导出《平方》，《立方》。'
-    
-    parser = DuanParser()
-    module = parser.parse(code)
-    
-    assert len(module.statements) == 1
-    stmt = module.statements[0]
-    assert isinstance(stmt, ExportStmt)
-    assert stmt.symbols == ['平方', '立方']
-    
-    print("[OK] 测试导出通过")
-
-
-def test_export_all():
-    """测试导出全部"""
-    code = '导出全部。'
-    
-    parser = DuanParser()
-    module = parser.parse(code)
-    
-    assert len(module.statements) == 1
-    stmt = module.statements[0]
-    assert isinstance(stmt, ExportStmt)
-    assert stmt.symbols == ['*']
-    
-    print("[OK] 测试导出全部通过")
-
-
-def test_code_generation_import():
-    """测试导入语句的代码生成"""
-    code = '导入《数学库》。'
-    
-    parser = DuanParser()
-    generator = PythonCodeGenerator()
-    
-    module = parser.parse(code)
-    python_code = generator.generate(module)
-    
-    assert 'import 数学库' in python_code
-    print(f"生成的Python代码:\n{python_code}")
-    print("[OK] 测试导入代码生成通过")
-
-
-def test_code_generation_from_import():
-    """测试从...导入的代码生成"""
-    code = '从《数学库》导入《平方根》，《绝对值》。'
-    
-    parser = DuanParser()
-    generator = PythonCodeGenerator()
-    
-    module = parser.parse(code)
-    python_code = generator.generate(module)
-    
-    assert 'from 数学库 import 平方根, 绝对值' in python_code
-    print(f"生成的Python代码:\n{python_code}")
-    print("[OK] 测试从...导入代码生成通过")
-
-
-def test_code_generation_export():
-    """测试导出语句的代码生成"""
-    code = '导出《平方》，《立方》。'
-    
-    parser = DuanParser()
-    generator = PythonCodeGenerator()
-    
-    module = parser.parse(code)
-    python_code = generator.generate(module)
-    
-    assert "__all__ = ['平方', '立方']" in python_code
-    print(f"生成的Python代码:\n{python_code}")
-    print("[OK] 测试导出代码生成通过")
-
-
-def test_complete_module():
-    """测试完整模块示例"""
-    code = '''
-# 数学工具模块
-
-导出《平方》，《立方》。
-
-《平方》段(数)：
-  返回数乘数。
-
-《立方》段(数)：
-  返回数乘数乘数。
-'''
-    
-    parser = DuanParser()
-    generator = PythonCodeGenerator()
-    
-    module = parser.parse(code)
-    python_code = generator.generate(module)
-    
-    print(f"生成的Python代码:\n{python_code}")
-    
-    # 检查关键内容
-    assert '__all__' in python_code
-    assert 'def 平方' in python_code
-    assert 'def 立方' in python_code
-    
-    print("[OK] 测试完整模块通过")
-
-
-def test_module_usage():
-    """测试模块使用示例"""
-    code = '''
-从《math_utils》导入《平方》，《立方》。
-
-定义甲等于5。
-
-打印甲。
-'''
-    
-    parser = DuanParser()
-    generator = PythonCodeGenerator()
-    
-    try:
-        module = parser.parse(code)
-        python_code = generator.generate(module)
+    def compile_and_run(self, code: str, timeout: float = 5) -> str:
+        """编译并运行段言代码，返回标准输出"""
+        import io
+        import contextlib
         
-        print(f"生成的Python代码:\n{python_code}")
+        # 编译
+        module = self.parser.parse(code)
+        self.analyzer.analyze(module)
+        python_code = self.generator.generate(module)
         
-        # 检查关键内容
-        assert 'from math_utils import 平方, 立方' in python_code
-        assert '甲 = 5' in python_code
+        # 运行
+        output = io.StringIO()
+        _duan_builtin = None
         
-        print("[OK] 测试模块使用通过")
-    except Exception as e:
-        print(f"[WARN] 测试模块使用跳过: {e}")
+        try:
+            with contextlib.redirect_stdout(output):
+                exec_globals = {
+                    'sys': sys,
+                    'os': os,
+                }
+                exec(python_code, exec_globals)
+                _duan_builtin = exec_globals.get('_duan_builtin')
+        except Exception as e:
+            raise RuntimeError(
+                f"执行错误: {e}\n"
+                f"生成的Python代码:\n{python_code}"
+            ) from e
+        
+        return output.getvalue().strip()
+    
+    def test_import_math_abs(self):
+        """从《数学》导入《绝对值》"""
+        code = """
+从《数学》导入《绝对值》。
+设 甲 为 绝对值 -5。
+打印 甲。
+"""
+        output = self.compile_and_run(code)
+        self.assertEqual(output, '5')
+    
+    def test_import_math_sqrt(self):
+        """从《数学》导入《平方根》"""
+        code = """
+从《数学》导入《平方根》。
+设 甲 为 平方根 九。
+打印 甲。
+"""
+        output = self.compile_and_run(code)
+        self.assertEqual(output, '3.0')
+    
+    def test_import_math_pow(self):
+        """从《数学》导入《幂》"""
+        code = """
+从《数学》导入《幂》。
+设 甲 为 幂 二 十。
+打印 甲。
+"""
+        output = self.compile_and_run(code)
+        self.assertEqual(output, '1024')
+    
+    def test_import_math_random(self):
+        """从《数学》导入《随机整数》"""
+        code = """
+从《数学》导入《随机整数》。
+设 甲 为 随机整数 一 一百。
+打印 甲 大于 零 与 甲 小于 一百零一。
+"""
+        output = self.compile_and_run(code)
+        self.assertEqual(output, 'True')
+    
+    def test_import_math_round(self):
+        """从《数学》导入《四舍五入》"""
+        code = """
+从《数学》导入《四舍五入》。
+设 甲 为 四舍五入 三点一四一五九 二。
+打印 甲。
+"""
+        output = self.compile_and_run(code)
+        self.assertEqual(output, '3.14')
+    
+    def test_import_time_sleep(self):
+        """从《时间》导入《暂停》《计时开始》《计时结束》"""
+        code = """
+从《时间》导入《计时开始》，《计时结束》，《暂停》。
+设 开始 为 计时开始。
+暂停 零点一。
+设 耗时 为 计时结束 开始。
+打印 耗时 大于 零点零五。
+"""
+        output = self.compile_and_run(code)
+        self.assertEqual(output, 'True')
+    
+    def test_import_time_format(self):
+        """从《时间》导入《当前日期》"""
+        code = """
+从《时间》导入《当前日期》。
+设 日期 为 当前日期。
+打印 字符串长度 日期。
+"""
+        output = self.compile_and_run(code)
+        self.assertEqual(output, '10')  # YYYY-MM-DD
+    
+    def test_mixed_stdlib_builtins(self):
+        """混合使用内置函数和标准库"""
+        code = """
+从《数学》导入《平方根》，《幂》。
+设 甲 为 幂 三 四。
+设 乙 为 平方根 十六。
+打印 甲。
+打印 乙。
+"""
+        output = self.compile_and_run(code)
+        lines = output.split('\n')
+        self.assertEqual(lines[0], '81')
+        self.assertEqual(lines[1], '4.0')
+    
+    def test_import_with_multiple_symbols(self):
+        """从同一模块导入多个符号"""
+        code = """
+从《数学》导入《绝对值》，《最大值》，《最小值》。
+设 甲 为 绝对值 -10。
+设 乙 为 最大值 五 八。
+设 丙 为 最小值 三 七。
+打印 甲。
+打印 乙。
+打印 丙。
+"""
+        output = self.compile_and_run(code)
+        lines = output.split('\n')
+        self.assertEqual(lines[0], '10')
+        self.assertEqual(lines[1], '8')
+        self.assertEqual(lines[2], '3')
+    
+    def test_module_resolver_find(self):
+        """测试模块解析器能找到stdlib模块"""
+        from module_resolver import ModuleResolver, ModuleNotFoundError
+        
+        resolver = ModuleResolver()
+        
+        # 应该能找到 数学 模块
+        math_path = resolver.find_module('数学')
+        self.assertTrue(math_path.exists())
+        self.assertIn('数学', str(math_path))
+        
+        # 应该能找到 时间 模块
+        time_path = resolver.find_module('时间')
+        self.assertTrue(time_path.exists())
+        self.assertIn('时间', str(time_path))
+        
+        # 不存在模块应抛出异常
+        with self.assertRaises(ModuleNotFoundError):
+            resolver.find_module('不存在的模块')
+
+
+class TestModuleSystem(unittest.TestCase):
+    """模块系统解析器测试"""
+    
+    def test_resolver_basic(self):
+        """测试模块解析器基本功能"""
+        from module_resolver import ModuleResolver
+        
+        resolver = ModuleResolver()
+        
+        # 解析 数学 模块
+        math_info = resolver.parse_module(resolver.find_module('数学'))
+        self.assertEqual(math_info.name, '数学')
+        self.assertTrue(len(math_info.exports) > 0)
+    
+    def test_resolver_build_graph(self):
+        """测试依赖图构建"""
+        from module_resolver import ModuleResolver
+        
+        resolver = ModuleResolver()
+        resolver.parse_module(resolver.find_module('数学'))
+        
+        graph = resolver.build_dependency_graph('数学')
+        self.assertIn('数学', graph.nodes)
+    
+    def test_topological_sort(self):
+        """测试拓扑排序"""
+        from module_resolver import ModuleResolver
+        
+        resolver = ModuleResolver()
+        resolver.parse_module(resolver.find_module('数学'))
+        resolver.parse_module(resolver.find_module('时间'))
+        
+        # 独立模块，排序无顺序要求
+        graph = resolver.build_dependency_graph('数学')
+        order = resolver.topological_sort(graph)
+        self.assertIn('数学', order)
 
 
 if __name__ == '__main__':
-    print("=" * 60)
-    print("段言模块系统测试")
-    print("=" * 60)
-    print()
-    
-    # 运行所有测试
-    test_import_basic()
-    test_import_with_alias()
-    test_from_import()
-    test_export()
-    test_export_all()
-    test_code_generation_import()
-    test_code_generation_from_import()
-    test_code_generation_export()
-    test_complete_module()
-    test_module_usage()
-    
-    print()
-    print("=" * 60)
-    print("所有测试通过！")
-    print("=" * 60)
+    unittest.main(verbosity=2)

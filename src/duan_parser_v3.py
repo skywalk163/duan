@@ -404,6 +404,7 @@ class DuanParser:
     }
     ADD_OP_MAP = {'加': '+', '减': '-', '加上': '+', '减去': '-'}
     MUL_OP_MAP = {'乘': '*', '除': '/', '乘以': '*', '除以': '/'}
+    LOGICAL_OP_MAP = {'且': 'and', '与': 'and', '或': 'or'}
     
     def __init__(self):
         self.lexer = Lexer()
@@ -822,7 +823,7 @@ class DuanParser:
                 self._consume(TokenType.DOT)
             return ExportStmt(['*'])  # 特殊标记：导出全部
         
-        # 符号列表（可以是书名号包裹或简单标识符）
+        # 符号列表（可以是书名号包裹或简单标识符/关键字）
         symbols = []
         while True:
             # 读取符号
@@ -833,10 +834,11 @@ class DuanParser:
                 symbols.append(symbol_tok.value)
                 self._consume(TokenType.RBOOK)
             else:
-                # 简单语法：符号名
-                if self._current() and self._current().type == TokenType.IDENTIFIER:
-                    symbol_tok = self._consume(TokenType.IDENTIFIER)
-                    symbols.append(symbol_tok.value)
+                # 简单语法：符号名（支持IDENTIFIER和KEYWORD）
+                tok = self._current()
+                if tok and tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    self._consume()
+                    symbols.append(tok.value)
                 else:
                     break
             
@@ -846,15 +848,16 @@ class DuanParser:
                 continue
             
             # 检查是否还有更多符号（空格分隔）
-            if self._current() and self._current().type == TokenType.IDENTIFIER:
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 continue
             
             # 检查是否结束（句号）
             if self._current() and self._current().type == TokenType.DOT:
                 break
             
-            # 如果不是标识符或句号，结束
-            if not self._match(TokenType.IDENTIFIER):
+            # 如果不是标识符/关键字或句号，结束
+            tok = self._current()
+            if not tok or tok.type not in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 break
         
         # 句号（可选）
@@ -1297,8 +1300,8 @@ class DuanParser:
         return statements
     
     def _parse_expr(self) -> ASTNode:
-        """解析表达式（支持管道操作符）"""
-        left = self._parse_comparison()
+        """解析表达式（支持管道操作符和逻辑运算符）"""
+        left = self._parse_logical_expr()
         
         # 管道操作符
         stages = [left]
@@ -1309,11 +1312,26 @@ class DuanParser:
             else:
                 self._consume(TokenType.COMMA)
             
-            right = self._parse_comparison()
+            right = self._parse_logical_expr()
             stages.append(right)
         
         if len(stages) > 1:
             return Pipeline(stages)
+        
+        return left
+    
+    def _parse_logical_expr(self) -> ASTNode:
+        """解析逻辑表达式（且/与, 或）"""
+        left = self._parse_comparison()
+        
+        while self._current():
+            tok = self._current()
+            if tok.type == TokenType.KEYWORD and tok.value in self.LOGICAL_OP_MAP:
+                op = self._consume().value
+                right = self._parse_comparison()
+                left = BinaryOp(self.LOGICAL_OP_MAP[op], left, right)
+            else:
+                break
         
         return left
     
@@ -1482,17 +1500,17 @@ class DuanParser:
                         break
                     if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                         break
-                    # 收集单个primary参数（不进行段落调用检测）
-                    arg = self._collect_primary_arg()
+                    # 收集完整表达式（支持嵌套函数调用和运算符）
+                    arg = self._parse_comparison()
                     if arg:
                         args.append(arg)
                     else:
                         break
             else:
-                # 固定参数数量
+                # 固定参数数量（使用完整表达式解析，支持嵌套函数调用和比较运算符）
                 for _ in range(arity):
                     if self._current() and self._current().type not in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN):
-                        arg = self._collect_primary_arg()
+                        arg = self._parse_comparison()
                         if arg:
                             args.append(arg)
 
@@ -1544,17 +1562,90 @@ class DuanParser:
             self._consume()
             return StringLiteral(tok.value)
 
-        # 标识符（直接返回，不进行段落调用检测）
+        # 标识符（检查是否为函数调用，如"字符串长度 日期"）
         if tok.type == TokenType.IDENTIFIER:
             name = tok.value
             self._consume()
+            
+            # 检查下一个token是否是参数（嵌套函数调用模式）
+            next_tok = self._current()
+            if next_tok and next_tok.type in (TokenType.NUMBER, TokenType.CHINESE_NUM, TokenType.STRING,
+                                               TokenType.IDENTIFIER, TokenType.LBOOK):
+                # 可能是函数调用，尝试收集后续参数
+                args = []
+                while self._current():
+                    nt = self._current()
+                    # 停止条件
+                    if nt.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                        break
+                    # 遇到动词运算符停止（如加、减、大于等）
+                    if nt.type == TokenType.KEYWORD and nt.value in self.OPERATOR_VERBS:
+                        break
+                    # 遇到其他关键字停止
+                    if nt.type == TokenType.KEYWORD and nt.value in KEYWORDS_DOUBLE:
+                        break
+                    
+                    # 收集参数
+                    if nt.type == TokenType.NUMBER:
+                        args.append(NumberLiteral(self._consume().value))
+                    elif nt.type == TokenType.CHINESE_NUM:
+                        args.append(NumberLiteral(self._consume().value))
+                    elif nt.type == TokenType.STRING:
+                        args.append(StringLiteral(self._consume().value))
+                    elif nt.type == TokenType.IDENTIFIER:
+                        args.append(Identifier(self._consume().value))
+                    elif nt.type == TokenType.LBOOK:
+                        args.append(self._parse_paragraph_call())
+                    else:
+                        break
+                
+                if args:
+                    expr = ParagraphCall(name, args)
+                    return self._parse_postfix(expr)
+            
+            # 简单标识符
             expr = Identifier(name)
             return self._parse_postfix(expr)
 
-        # 关键字作为标识符
+        # 关键字作为标识符（检查是否为函数调用）
         if tok.type == TokenType.KEYWORD:
             name = tok.value
             self._consume()
+            
+            # 检查下一个token是否构成函数调用
+            next_tok = self._current()
+            if next_tok and next_tok.type in (TokenType.NUMBER, TokenType.CHINESE_NUM, TokenType.STRING,
+                                               TokenType.IDENTIFIER):
+                # 可能是函数调用，尝试收集后续参数
+                args = []
+                while self._current():
+                    nt = self._current()
+                    # 停止条件
+                    if nt.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                        break
+                    # 遇到动词运算符停止
+                    if nt.type == TokenType.KEYWORD and nt.value in self.OPERATOR_VERBS:
+                        break
+                    # 遇到其他关键字停止（双字关键字通常是语句结构）
+                    if nt.type == TokenType.KEYWORD and nt.value in KEYWORDS_DOUBLE:
+                        break
+                    
+                    if nt.type == TokenType.NUMBER:
+                        args.append(NumberLiteral(self._consume().value))
+                    elif nt.type == TokenType.CHINESE_NUM:
+                        args.append(NumberLiteral(self._consume().value))
+                    elif nt.type == TokenType.STRING:
+                        args.append(StringLiteral(self._consume().value))
+                    elif nt.type == TokenType.IDENTIFIER:
+                        args.append(Identifier(self._consume().value))
+                    else:
+                        break
+                
+                if args:
+                    expr = ParagraphCall(name, args)
+                    return self._parse_postfix(expr)
+            
+            # 简单标识符
             expr = Identifier(name)
             return self._parse_postfix(expr)
 
