@@ -23,8 +23,19 @@ import json
 from pathlib import Path
 from typing import Optional, List
 
-# 添加 src 目录到路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+# 添加 src 目录到路径 - 先尝试本地路径，再尝试已安装路径
+_local_src = os.path.join(os.path.dirname(__file__), '..', 'src')
+if os.path.isdir(_local_src):
+    sys.path.insert(0, _local_src)
+else:
+    # 已安装版本（pip install）
+    try:
+        import src as _src_pkg
+        _installed_src = os.path.dirname(_src_pkg.__file__)
+        if _installed_src not in sys.path and os.path.isdir(_installed_src):
+            sys.path.insert(0, _installed_src)
+    except ImportError:
+        pass
 
 from lexer import Lexer
 from duan_parser_v3 import DuanParser

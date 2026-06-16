@@ -6,7 +6,7 @@ import sys
 import importlib.util
 try:
     # 尝试从src/stdlib导入
-    spec = importlib.util.spec_from_file_location('duan_builtins', 'src/stdlib/builtins.py')
+    spec = importlib.util.spec_from_file_location('duan_builtins', 'stdlib/builtins.py')
     _duan_builtin = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(_duan_builtin)
 except:

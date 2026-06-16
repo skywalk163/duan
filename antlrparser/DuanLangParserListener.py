@@ -335,12 +335,66 @@ class DuanLangParserListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by DuanLangParser#matchStmt.
+    def enterMatchStmt(self, ctx:DuanLangParser.MatchStmtContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#matchStmt.
+    def exitMatchStmt(self, ctx:DuanLangParser.MatchStmtContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#matchCase.
+    def enterMatchCase(self, ctx:DuanLangParser.MatchCaseContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#matchCase.
+    def exitMatchCase(self, ctx:DuanLangParser.MatchCaseContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#matchPattern.
+    def enterMatchPattern(self, ctx:DuanLangParser.MatchPatternContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#matchPattern.
+    def exitMatchPattern(self, ctx:DuanLangParser.MatchPatternContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#matchPatternList.
+    def enterMatchPatternList(self, ctx:DuanLangParser.MatchPatternListContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#matchPatternList.
+    def exitMatchPatternList(self, ctx:DuanLangParser.MatchPatternListContext):
+        pass
+
+
     # Enter a parse tree produced by DuanLangParser#printStmt.
     def enterPrintStmt(self, ctx:DuanLangParser.PrintStmtContext):
         pass
 
     # Exit a parse tree produced by DuanLangParser#printStmt.
     def exitPrintStmt(self, ctx:DuanLangParser.PrintStmtContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#withStmt.
+    def enterWithStmt(self, ctx:DuanLangParser.WithStmtContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#withStmt.
+    def exitWithStmt(self, ctx:DuanLangParser.WithStmtContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#decoratorDef.
+    def enterDecoratorDef(self, ctx:DuanLangParser.DecoratorDefContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#decoratorDef.
+    def exitDecoratorDef(self, ctx:DuanLangParser.DecoratorDefContext):
         pass
 
 
@@ -470,6 +524,24 @@ class DuanLangParserListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by DuanLangParser#implicitCall.
+    def enterImplicitCall(self, ctx:DuanLangParser.ImplicitCallContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#implicitCall.
+    def exitImplicitCall(self, ctx:DuanLangParser.ImplicitCallContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#implicitArg.
+    def enterImplicitArg(self, ctx:DuanLangParser.ImplicitArgContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#implicitArg.
+    def exitImplicitArg(self, ctx:DuanLangParser.ImplicitArgContext):
+        pass
+
+
     # Enter a parse tree produced by DuanLangParser#dictLiteral.
     def enterDictLiteral(self, ctx:DuanLangParser.DictLiteralContext):
         pass
@@ -485,6 +557,51 @@ class DuanLangParserListener(ParseTreeListener):
 
     # Exit a parse tree produced by DuanLangParser#dictEntry.
     def exitDictEntry(self, ctx:DuanLangParser.DictEntryContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#listComprehension.
+    def enterListComprehension(self, ctx:DuanLangParser.ListComprehensionContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#listComprehension.
+    def exitListComprehension(self, ctx:DuanLangParser.ListComprehensionContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#identifier_like.
+    def enterIdentifier_like(self, ctx:DuanLangParser.Identifier_likeContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#identifier_like.
+    def exitIdentifier_like(self, ctx:DuanLangParser.Identifier_likeContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#typeAsIdentifier.
+    def enterTypeAsIdentifier(self, ctx:DuanLangParser.TypeAsIdentifierContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#typeAsIdentifier.
+    def exitTypeAsIdentifier(self, ctx:DuanLangParser.TypeAsIdentifierContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#lambdaExpr.
+    def enterLambdaExpr(self, ctx:DuanLangParser.LambdaExprContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#lambdaExpr.
+    def exitLambdaExpr(self, ctx:DuanLangParser.LambdaExprContext):
+        pass
+
+
+    # Enter a parse tree produced by DuanLangParser#dictComprehension.
+    def enterDictComprehension(self, ctx:DuanLangParser.DictComprehensionContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#dictComprehension.
+    def exitDictComprehension(self, ctx:DuanLangParser.DictComprehensionContext):
         pass
 
 

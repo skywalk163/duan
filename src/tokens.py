@@ -37,6 +37,7 @@ class TokenType(Enum):
     LBRACKET = auto()    # 左方括号 【
     RBRACKET = auto()    # 右方括号 】
     EQUALS = auto()      # 等于 =
+    AT = auto()          # @ 装饰器符号
     
     # 段落标记
     LBOOK = auto()       # 左书名号 《

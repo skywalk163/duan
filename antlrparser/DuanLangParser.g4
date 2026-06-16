@@ -39,12 +39,13 @@ definition
     | interfaceDef
     | dataTypeDef
     | errorTypeDef
+    | decoratorDef
     ;
 
 // ----- 段落定义（统一语法）-----
 
 paragraphDef
-    : K_SEGMENT ID ( K_RECEIVE paramList )? ( K_RETURN typeAnnotation )?
+    : K_SEGMENT ID ( K_RECEIVE paramList? )? ( K_RETURN typeAnnotation? )?
       COLON
       block
       K_END PERIOD?
@@ -73,7 +74,7 @@ classMember
     ;
 
 methodDef
-    : K_SEGMENT ID ( K_RECEIVE paramList )? ( K_RETURN typeAnnotation )?
+    : K_SEGMENT ID ( K_RECEIVE paramList? )? ( K_RETURN typeAnnotation? )?
       COLON block K_END PERIOD?
     ;
 
@@ -104,7 +105,7 @@ paramList
     ;
 
 param
-    : ID ( COLON typeAnnotation )? ( K_EQUAL expr )?
+    : identifier_like ( COLON typeAnnotation )? ( K_EQUAL expr )?
     ;
 
 block
@@ -167,24 +168,23 @@ stmt
     | continueStmt
     | tryStmt
     | throwStmt
+    | matchStmt
+    | withStmt
     | printStmt
     | exprStmt
     ;
 
 varDecl
-    : K_SET target K_AS expr PERIOD ( K_TYPE typeAnnotation )?    // 统一语法：设 甲 为 三
-    | K_DEFINE ID ( K_EQUAL expr PERIOD )?                    // 兼容旧语法
+    : K_SET identifier_like K_AS expr PERIOD ( K_TYPE typeAnnotation )?  // 设 甲 为 三
+    | K_SET K_SELF ID K_AS expr PERIOD                               // 设 己名称 为 值（属性赋值）
+    | K_SET LPAREN identifier_like ( COMMA identifier_like )* RPAREN K_AS expr PERIOD?  // 设（甲，乙）为 元组
+    | K_DEFINE ID ( K_EQUAL expr PERIOD )?                           // 兼容旧语法
     ;
 
 assignStmt
-    : target ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?            // 支持 =、等于、为 三种赋值
-    ;
-
-target
-    : ID
-    | expr K_OF ID
-    | primary DOT ID                                          // 属性访问作为赋值目标
-    | K_SELF ID                                               // 己属性（特殊语法）
+    : identifier_like ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?          // 甲 = 值 / 甲 等于 值 / 甲 为 值
+    | K_SELF ID ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?            // 己属性 = 值
+    | primary DOT ID ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?       // 对象.属性 = 值
     ;
 
 ifStmt
@@ -234,8 +234,46 @@ throwStmt
     : K_THROW expr PERIOD?
     ;
 
+matchStmt
+    : K_MATCH expr COLON
+      matchCase*
+      K_END PERIOD?
+    ;
+
+matchCase
+    : K_CASE matchPattern (K_IF expr)? COLON block
+    ;
+
+matchPattern
+    : NUMBER                                       // 数字匹配
+    | STRING                                       // 字符串匹配
+    | K_TRUE                                       // 真匹配
+    | K_FALSE                                      // 假匹配
+    | K_NULL                                       // 空匹配
+    | ID                                           // 变量绑定或枚举匹配
+    | LBRACKET matchPatternList? RBRACKET          // 列表模式
+    | ID K_OF matchPattern                         // 类型检查：类名 之 变量
+    | UNDERSCORE                                   // 通配符
+    ;
+
+matchPatternList
+    : matchPattern ( COMMA matchPattern )*
+    ;
+
 printStmt
     : ( K_PRINT | K_OUTPUT ) expr PERIOD?
+    ;
+
+// ----- 上下文管理器 -----
+
+withStmt
+    : K_WITH expr ( K_AS ID )? COLON block K_END PERIOD?
+    ;
+
+// ----- 装饰器 -----
+
+decoratorDef
+    : AT ID K_DECORATE paragraphDef    // @段落名 标注 段落 ...
     ;
 
 exprStmt
@@ -310,11 +348,14 @@ primary
     | K_FALSE
     | K_NULL
     | K_SELF                                              // 己（self引用）
-    | K_NEW ID LPAREN exprList? RPAREN                  // 新建 对象()
-    | ID
+    | conditionalExpr                                     // 三元条件表达式：如果 条件 那么 值1 否则 值2
+    | K_NEW ID ( LPAREN exprList? RPAREN | exprList )   // 新建 对象(参数) 或 新建 对象 参数
+    | listComprehension                                   // 列表推导：[表达式 遍历 变量 之 列表]
+    | lambdaExpr                                          // 匿名函数：接收 甲：返回 甲 乘 甲。
+    | ID implicitCall?                                    // 变量 或 隐式函数调用：函数名 参数1, 参数2
+    | typeAsIdentifier                                     // 类型关键字用作标识符（如变量名"数"）
     | LPAREN expr RPAREN
-    | LBRACKET dictLiteral RBRACKET
-    | LBRACKET exprList? RBRACKET
+    | LBRACKET bracketContent RBRACKET                               // 列表/字典字面量或推导
     | BOOK_L ID BOOK_R                                 // 《段落名》
     // 动词调用（支持动词白名单中的动词）
     | K_FIRST LPAREN expr RPAREN                       // 首(列表)
@@ -360,6 +401,14 @@ primary
     | K_READ LPAREN expr? RPAREN                       // 读取(提示)
     ;
 
+implicitCall
+    : implicitArg ( COMMA? implicitArg )*
+    ;
+
+implicitArg
+    : NUMBER | STRING | K_TRUE | K_FALSE | K_NULL | ID | K_SELF
+    ;
+
 dictLiteral
     : dictEntry ( COMMA dictEntry )*
     ;
@@ -367,6 +416,45 @@ dictLiteral
 dictEntry
     : expr COLON expr
     ;
+
+// ----- 列表推导 -----
+
+listComprehension
+    : LBRACKET expr K_FOREACH identifier_like ( K_OF | K_AT ) expr ( K_IF expr )? RBRACKET
+    ;
+
+identifier_like
+    : ID
+    | T_NUMBER | T_INT | T_FLOAT | T_STRING | T_LIST | T_DICT | T_SET | T_BOOL | T_ANY
+    | K_TRUE | K_FALSE | K_NULL
+    ;
+
+// 类型关键字用作标识符（如变量名"数"）
+typeAsIdentifier
+    : T_NUMBER | T_INT | T_FLOAT | T_STRING | T_LIST | T_DICT | T_SET | T_BOOL | T_ANY
+    ;
+
+// ----- 匿名函数 -----
+
+lambdaExpr
+    : K_RECEIVE paramList? COLON ( K_RETURN expr | expr ) PERIOD?
+    ;
+
+// ----- 字典推导 -----
+
+dictComprehension
+    : expr COLON expr K_FOREACH identifier_like ( K_OF | K_AT ) expr ( K_IF expr )?
+    ;
+
+// ----- 方括号内容（消除歧义）-----
+
+bracketContent
+    : dictComprehension                                               // 字典推导：键: 值 遍历 变量 之 列表
+    | dictLiteral                                                     // 字典字面量：键: 值, ...
+    | expr K_FOREACH identifier_like ( K_OF | K_AT ) expr ( K_IF expr )?  // 列表推导
+    | exprList                                                        // 列表字面量
+    ;
+
 
 typeAnnotation
     : builtinType
@@ -381,4 +469,10 @@ builtinType
 
 exprList
     : expr ( COMMA expr )*
+    ;
+
+// ----- 三元条件表达式 -----
+
+conditionalExpr
+    : K_IF expr K_THEN expr ( K_ELSE expr )?
     ;

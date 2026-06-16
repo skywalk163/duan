@@ -136,6 +136,19 @@ class ClassInstantiation(ASTNode):
     arguments: List[ASTNode]
 
 
+@dataclass
+class ConditionalExpression(ASTNode):
+    """三元条件表达式
+	
+    语法：如果 条件 那么 值1 否则 值2
+    
+    等价于 Python 的：值1 if 条件 else 值2
+    """
+    condition: ASTNode
+    then_expr: ASTNode
+    else_expr: Optional[ASTNode] = None
+
+
 # =============================================================================
 # 语句节点
 # =============================================================================
@@ -251,7 +264,7 @@ class ClassDefinition(ASTNode):
     name: str
     attributes: List[AttributeDeclaration]
     methods: List[MethodDefinition]
-    base_class: Optional[str] = None
+    base_classes: List[str] = None
 
 
 # =============================================================================

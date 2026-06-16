@@ -318,6 +318,14 @@ class SemanticAnalyzer:
             # 返回元素类型
             return '元素'
         
+        elif isinstance(expr, ConditionalExpression):
+            # 三元条件表达式
+            self._analyze_expr(expr.condition)
+            then_type = self._analyze_expr(expr.then_expr)
+            if expr.else_expr:
+                self._analyze_expr(expr.else_expr)
+            return then_type
+        
         else:
             return '未知'
 

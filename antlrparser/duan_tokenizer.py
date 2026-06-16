@@ -40,6 +40,10 @@ KEYWORDS = [
     '返回',
     # 数据操作（二字）
     '打印', '输出', '输入',
+    # 模式匹配（二字）
+    '匹配', '情况',
+    # 上下文管理器/装饰器（二字）
+    '标注',
     # 单字
     '段', '从', '当', '父', '类', '接口', '新', '己', '设', '为', '于',
     # 逻辑（单字）
@@ -99,7 +103,7 @@ KEYWORD_TOKEN_MAP = {
     '输入': 'K_INPUT',
     '继承': 'K_INHERIT',
     '实现': 'K_IMPLEMENTS',
-    '使用': 'K_USE',
+    '使用': 'K_WITH',
     '父': 'K_PARENT',
     '己': 'K_SELF',
     '方法': 'K_METHOD',
@@ -131,12 +135,13 @@ KEYWORD_TOKEN_MAP = {
     '输入': 'K_INPUT',
     # 作用域
     '继承': 'K_INHERIT',
-    '使用': 'K_USE',
+    '使用': 'K_WITH',
     '父': 'K_PARENT',
     '自我': 'K_SELF',
     '方法': 'K_METHOD',
     # 逻辑运算
     '且': 'K_AND',
+    '与': 'K_AND',
     '或': 'K_OR',
     '非': 'K_NOT',
     # 算术运算
@@ -164,6 +169,11 @@ KEYWORD_TOKEN_MAP = {
     '集': 'T_SET',
     '布尔': 'T_BOOL',
     '任意': 'T_ANY',
+    # 模式匹配
+    '匹配': 'K_MATCH',
+    '情况': 'K_CASE',
+    # 上下文管理器
+    '标注': 'K_DECORATE',
 }
 
 # 构建关键词集合（用于快速查找）
@@ -182,11 +192,12 @@ COMPOUND_SAFE_SINGLE_KEYWORDS = {
     '空', '真', '假',                 # 特殊值（常见复合词如 空间、真实、假设）
     '父',                             # 作用域（常见复合词如 父类、父级）
     '的',                             # 助词（常见复合词如 的确、的话）
+    '加', '减', '乘', '除', '模', '幂',  # 算术运算符（常见复合词如 加法、减法、乘法）
 }
 
 # 符号 Token 映射
 SYMBOL_TOKEN_MAP = {
-    '。': 'DOT', '.': 'DOT',
+    '。': 'PERIOD', '.': 'DOT',
     '，': 'COMMA', ',': 'COMMA',
     '：': 'COLON', ':': 'COLON',
     '；': 'SEMICOLON', ';': 'SEMICOLON',
@@ -198,6 +209,7 @@ SYMBOL_TOKEN_MAP = {
     '{': 'LBRACE', '}': 'RBRACE',
     '＼': 'PATH_SEP', '/': 'PATH_SEP',
     '^': 'POW', '%': 'MODULO',
+    '@': 'AT',
     '*': 'MULTIPLY', '×': 'MULTIPLY',
     '÷': 'DIVIDE',
     '+': 'PLUS',
@@ -351,6 +363,12 @@ class DuanLangTokenizer:
                         advance(sym_len)
                         break
             else:
+                # ---------- 单独下划线（模式匹配通配符）----------
+                if ch == '_' and (i + 1 >= source_len or not (is_letter(source[i+1]) or is_digit(source[i+1]))):
+                    tokens.append(Token('UNDERSCORE', '_', line, col))
+                    advance()
+                    continue
+                
                 # ---------- 单字符符号 ----------
                 if ch in SINGLE_CHAR_SYMBOLS:
                     token_type = SINGLE_CHAR_SYMBOLS[ch]

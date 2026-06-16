@@ -10,7 +10,7 @@ from keywords import VERB_ARITY
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature
 
 
 # =============================================================================
@@ -43,6 +43,9 @@ class PythonCodeGenerator:
         # 追踪导入的符号
         self._imported_symbols: set = set()
         
+        # 是否需要导入 ABC/abstractmethod
+        self._needs_abc = False
+        
         # 中文数字映射
         self.chinese_numbers = {
             '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
@@ -66,12 +69,19 @@ class PythonCodeGenerator:
             '减': '-',
             '乘': '*',
             '除': '/',
+            '模': '%',
+            '幂': '**',
+            '%': '%',
+            '^': '**',
             '大于': '>',
             '小于': '<',
             '等于': '==',
             '不等于': '!=',
             '大于等于': '>=',
             '小于等于': '<=',
+            '且': 'and',
+            '与': 'and',
+            '或': 'or',
         }
         
         # 内置函数映射
@@ -124,6 +134,7 @@ class PythonCodeGenerator:
             '去除空白': '_duan_builtin.去除空白',
             
             # 列表工具
+            '列': '_duan_builtin.列',
             '列表长度': '_duan_builtin.列表长度',
             '列表获取': '_duan_builtin.列表获取',
             '列表追加': '_duan_builtin.列表追加',
@@ -201,6 +212,7 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
         self._add_line("        _duan_builtin.打印 = print")
         self._add_line("        _duan_builtin.列表创建 = list")
+        self._add_line("        _duan_builtin.列 = lambda *args: list(args)")
         self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("        _duan_builtin.字符串长度 = len")
@@ -216,6 +228,21 @@ class PythonCodeGenerator:
         # 生成语句
         for stmt in module.statements:
             self._generate_statement(stmt)
+        
+        # 如果第一行没有 from abc import ABC, abstractmethod，在前面插入
+        # 查找第一个非空且非注释行的位置，在后面插入
+        if self._needs_abc:
+            abc_import = "from abc import ABC, abstractmethod"
+            # 插入在文件头之后，第一个语句之前
+            # 找到最后一个空行或注释后的位置
+            insert_pos = 0
+            for i, line in enumerate(self.output_lines):
+                if line.startswith("#") or line == "":
+                    insert_pos = i + 1
+                else:
+                    break
+            self.output_lines.insert(insert_pos, "")
+            self.output_lines.insert(insert_pos, abc_import)
         
         return '\n'.join(self.output_lines)
     
@@ -280,6 +307,23 @@ class PythonCodeGenerator:
             # 成员访问作为独立语句
             expr_code = self._generate_expr(stmt)
             self._add_line(expr_code)
+        elif isinstance(stmt, MatchStmt):
+            # 模式匹配语句
+            self._generate_match_stmt(stmt)
+        elif isinstance(stmt, DestructuringAssignment):
+            # 解构赋值：a, b = value
+            vars_str = ', '.join(self._sanitize_name(v) for v in stmt.variables)
+            value = self._generate_expr(stmt.value)
+            self._add_line(f"{vars_str} = {value}")
+        elif isinstance(stmt, WithStmt):
+            # 上下文管理器
+            self._generate_with_stmt(stmt)
+        elif isinstance(stmt, DecoratorDefinition):
+            # 装饰器定义
+            self._generate_decorator_definition(stmt)
+        elif isinstance(stmt, InterfaceDefinition):
+            # 接口定义
+            self._generate_interface_definition(stmt)
         else:
             raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
@@ -398,9 +442,17 @@ class PythonCodeGenerator:
         
         # except块
         if stmt.catch_body:
-            if stmt.catch_var:
+            if stmt.catch_type and stmt.catch_var:
+                # 捕获指定类型 + 变量：except 值错误 as 错误:
+                self._add_line(f"except {stmt.catch_type} as {stmt.catch_var}:")
+            elif stmt.catch_type:
+                # 捕获指定类型无变量：except 值错误:
+                self._add_line(f"except {stmt.catch_type}:")
+            elif stmt.catch_var:
+                # 无类型有变量（向后兼容）：except Exception as 错误:
                 self._add_line(f"except Exception as {stmt.catch_var}:")
             else:
+                # 无类型无变量：except Exception:
                 self._add_line("except Exception:")
             
             self.indent_level += 1
@@ -419,7 +471,9 @@ class PythonCodeGenerator:
     def _generate_throw_stmt(self, stmt: ThrowStmt):
         """生成抛出异常语句"""
         value = self._generate_expr(stmt.value)
-        self._add_line(f"raise {value}")
+        # 确保抛出的是合法异常对象（Python 3 不允许 raise 字符串）
+        self._add_line(f"_duan_exc = {value}")
+        self._add_line("raise _duan_exc if isinstance(_duan_exc, BaseException) else Exception(_duan_exc)")
     
     def _generate_self_assignment(self, stmt):
         """生成self赋值语句"""
@@ -432,9 +486,9 @@ class PythonCodeGenerator:
         class_name = self._sanitize_name(stmt.name)
         
         # 类定义行
-        if stmt.base_class:
-            base = self._sanitize_name(stmt.base_class)
-            self._add_line(f"class {class_name}({base}):")
+        if stmt.base_classes:
+            bases = ', '.join(self._sanitize_name(b) for b in stmt.base_classes)
+            self._add_line(f"class {class_name}({bases}):")
         else:
             self._add_line(f"class {class_name}:")
         
@@ -463,6 +517,154 @@ class PythonCodeGenerator:
         self.indent_level -= 1
         self._add_line("")
     
+    def _generate_interface_definition(self, stmt: InterfaceDefinition):
+        """生成接口定义"""
+        self._needs_abc = True
+        class_name = self._sanitize_name(stmt.name)
+        
+        # 基类
+        bases = ['ABC']
+        for sup in stmt.super_interfaces:
+            bases.append(self._sanitize_name(sup))
+        bases_str = ', '.join(bases)
+        
+        self._add_line(f"class {class_name}({bases_str}):")
+        self.indent_level += 1
+        
+        # 生成抽象方法
+        for method in stmt.methods:
+            self._generate_abstract_method(method)
+        
+        # 如果没有方法，添加 pass
+        if not stmt.methods:
+            self._add_line("pass")
+        
+        self.indent_level -= 1
+        self._add_line("")
+    
+    def _generate_abstract_method(self, method: MethodSignature):
+        """生成抽象方法"""
+        self._needs_abc = True
+        method_name = self._sanitize_name(method.name)
+        
+        # 参数列表
+        params = ['self']
+        for param in method.parameters:
+            param_name = self._sanitize_name(param.name)
+            params.append(param_name)
+        
+        params_str = ', '.join(params)
+        
+        self._add_line("@abstractmethod")
+        if method.return_type:
+            ret_type = self._sanitize_name(method.return_type)
+            self._add_line(f"def {method_name}({params_str}) -> {ret_type}:")
+        else:
+            self._add_line(f"def {method_name}({params_str}):")
+        self.indent_level += 1
+        self._add_line("pass")
+        self.indent_level -= 1
+    
+    def _generate_match_stmt(self, stmt: MatchStmt):
+        """生成模式匹配语句
+        
+        转换为 Python 3.10+ 的 match/case 语句，
+        如果不支持则降级为 if/elif/else 链
+        """
+        subject = self._generate_expr(stmt.subject)
+        self._add_line(f"match {subject}:")
+        
+        self.indent_level += 1
+        for case in stmt.cases:
+            self._generate_match_case(case)
+        self.indent_level -= 1
+        self._add_line("")
+    
+    def _generate_match_case(self, case: MatchCase):
+        """生成匹配分支"""
+        pattern = self._generate_match_pattern(case.pattern)
+        
+        guard_str = ""
+        if case.guard:
+            guard_str = f" if {self._generate_expr(case.guard)}"
+        
+        self._add_line(f"case {pattern}{guard_str}:")
+        
+        self.indent_level += 1
+        if case.body:
+            for stmt in case.body:
+                self._generate_statement(stmt)
+        else:
+            self._add_line("pass")
+        self.indent_level -= 1
+    
+    def _generate_match_pattern(self, pattern: MatchPattern) -> str:
+        """生成匹配模式"""
+        if pattern.kind == 'wildcard':
+            return '_'
+        elif pattern.kind == 'number':
+            return str(pattern.value)
+        elif pattern.kind == 'string':
+            escaped = pattern.value.replace('\\', '\\\\').replace('"', '\\"')
+            return f'"{escaped}"'
+        elif pattern.kind == 'bool':
+            return 'True' if pattern.value else 'False'
+        elif pattern.kind == 'null':
+            return 'None'
+        elif pattern.kind == 'variable':
+            return self._sanitize_name(pattern.binding)
+        elif pattern.kind == 'list':
+            elements = [self._generate_match_pattern(e) for e in pattern.elements]
+            return f"[{', '.join(elements)}]"
+        elif pattern.kind == 'type_check':
+            type_name = self._sanitize_name(pattern.type_name)
+            binding = self._sanitize_name(pattern.binding)
+            return f"{type_name}() as {binding}"
+        return '_'
+
+    def _generate_with_stmt(self, stmt: WithStmt):
+        """生成上下文管理语句"""
+        context_expr = self._generate_expr(stmt.context_expr)
+        if stmt.variable:
+            var_name = self._sanitize_name(stmt.variable)
+            self._add_line(f"with {context_expr} as {var_name}:")
+        else:
+            self._add_line(f"with {context_expr}:")
+        self.indent_level += 1
+        if stmt.body:
+            for s in stmt.body:
+                self._generate_statement(s)
+        else:
+            self._add_line("pass")
+        self.indent_level -= 1
+
+    def _generate_decorator_definition(self, stmt: DecoratorDefinition):
+        """生成装饰器定义"""
+        decorator_name = stmt.decorator_name
+        
+        # 内置装饰器映射
+        builtin_decorators = {
+            '静态方法': '@staticmethod',
+            '类方法': '@classmethod',
+            '特性': '@property',
+            '抽象': '@abstractmethod',
+        }
+        
+        if decorator_name in builtin_decorators:
+            self._add_line(builtin_decorators[decorator_name])
+            # 抽象装饰器需要导入 ABC
+            if decorator_name == '抽象':
+                self._needs_abc = True
+        else:
+            # 自定义装饰器
+            sanitized = self._sanitize_name(decorator_name)
+            self._add_line(f"@{sanitized}")
+        
+        if isinstance(stmt.paragraph, Paragraph):
+            self._generate_paragraph(stmt.paragraph)
+        else:
+            raise CodeGenError("装饰器后必须是段落定义", type(stmt.paragraph).__name__)
+
     def _generate_method(self, method):
         """生成方法定义"""
         method_name = method.name
@@ -470,6 +672,8 @@ class PythonCodeGenerator:
         # 构造函数特殊处理
         if method.is_constructor or method_name == '构造':
             method_name = '__init__'
+        elif getattr(method, 'is_private', False):
+            method_name = f"__{method_name}"
         
         # 参数列表（第一个参数是 self）
         params = ['self']
@@ -614,8 +818,70 @@ class PythonCodeGenerator:
             elements = [self._generate_expr(e) for e in expr.elements]
             return f"[{', '.join(elements)}]"
         
+        elif isinstance(expr, StringInterpolation):
+            # 字符串插值 -> f-string
+            parts = []
+            for part in expr.parts:
+                if isinstance(part, str):
+                    parts.append(part)
+                elif isinstance(part, ASTNode):
+                    # 生成表达式代码并放入花括号
+                    expr_code = self._generate_expr(part)
+                    parts.append('{' + expr_code + '}')
+            # 转义已有的花括号
+            fstr = ''.join(parts)
+            # 确保字符串内的引号转义
+            fstr = fstr.replace('\\', '\\\\')
+            return f'f"{fstr}"'
+        
+        elif isinstance(expr, ListComprehension):
+            # 列表推导 -> [expr for var in iterable if condition]
+            expression = self._generate_expr(expr.expression)
+            variable = self._sanitize_name(expr.variable)
+            iterable = self._generate_expr(expr.iterable)
+            result = f"[{expression} for {variable} in {iterable}"
+            if expr.condition:
+                condition = self._generate_expr(expr.condition)
+                result += f" if {condition}"
+            result += "]"
+            return result
+        
+        elif isinstance(expr, LambdaExpression):
+            # 匿名函数 -> lambda params: body
+            params = ', '.join(self._sanitize_name(p) for p in expr.params)
+            body = self._generate_expr(expr.body)
+            return f"lambda {params}: {body}"
+        
+        elif isinstance(expr, DictComprehension):
+            # 字典推导 -> {key: value for var in iterable if condition}
+            key = self._generate_expr(expr.key_expr)
+            val = self._generate_expr(expr.value_expr)
+            var_name = self._sanitize_name(expr.variable)
+            iterable = self._generate_expr(expr.iterable)
+            result = f"{{{key}: {val} for {var_name} in {iterable}"
+            if expr.condition:
+                condition = self._generate_expr(expr.condition)
+                result += f" if {condition}"
+            result += "}"
+            return result
+
+        elif isinstance(expr, DictLiteral):
+            # 字典字面量 -> {key: val, key2: val2, ...}
+            items = [f"{self._generate_expr(k)}: {self._generate_expr(v)}" for k, v in expr.entries]
+            return f"{{{', '.join(items)}}}"
+
+        elif isinstance(expr, ConditionalExpression):
+            # 三元条件表达式 -> 值1 if 条件 else 值2
+            condition = self._generate_expr(expr.condition)
+            then_expr = self._generate_expr(expr.then_expr)
+            if expr.else_expr:
+                else_expr = self._generate_expr(expr.else_expr)
+                return f"({then_expr} if {condition} else {else_expr})"
+            else:
+                return f"({then_expr} if {condition} else None)"
+
         else:
-            raise CodeGenError(f"未知表达式类型", type(expr).__name__)
+            raise CodeGenError(f"不支持的表达式类型", type(expr).__name__)
     
     def _sanitize_name(self, name: str) -> str:
         """清理名称（转换为合法Python标识符）"""
@@ -636,10 +902,14 @@ class PythonCodeGenerator:
         if stmt.symbols:
             # 从...导入：from 数学 import 平方根, 幂
             symbols_str = ', '.join(stmt.symbols)
-            self._add_line(f"from {module_name} import {symbols_str}")
-            # 追踪导入的符号
-            for symbol in stmt.symbols:
-                self._imported_symbols.add(symbol)
+            if stmt.alias:
+                self._add_line(f"from {module_name} import {symbols_str} as {stmt.alias}")
+                self._imported_symbols.add(stmt.alias)
+            else:
+                self._add_line(f"from {module_name} import {symbols_str}")
+                # 追踪导入的符号
+                for symbol in stmt.symbols:
+                    self._imported_symbols.add(symbol)
         else:
             # 导入整个模块：import 数学
             if stmt.alias:
