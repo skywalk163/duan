@@ -9,12 +9,12 @@ import sys
 import os
 import io
 
-# 设置UTF-8编码输出
-sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+# 设置UTF-8编码输出（使用reconfigure避免关闭底层buffer）
+sys.stdout.reconfigure(encoding='utf-8')
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from ast_nodes import (
+from duan_parser_v3 import (
     ClassDefinition, AttributeDeclaration, MethodDefinition,
     Parameter, Module, Identifier
 )
@@ -29,44 +29,34 @@ def test_class_definition_generation():
     
     # 创建一个简单的学生类AST
     student_class = ClassDefinition(
-        line=1,
-        column=1,
         name='学生',
         base_classes=None,
         attributes=[
             AttributeDeclaration(
-                line=2,
-                column=3,
                 name='姓名',
-                type_annotation='str',  # 使用Python类型
+                type_annotation='str',
                 default_value=None
             ),
             AttributeDeclaration(
-                line=3,
-                column=3,
                 name='年龄',
-                type_annotation='int',  # 使用Python类型
+                type_annotation='int',
                 default_value=None
             ),
         ],
         methods=[
             MethodDefinition(
-                line=5,
-                column=3,
                 name='构造',
                 parameters=[
-                    Parameter(line=5, column=6, name='姓名'),
-                    Parameter(line=5, column=9, name='年龄'),
+                    Parameter(name='姓名'),
+                    Parameter(name='年龄'),
                 ],
                 body=[
-                    ('var', 'self.姓名', Identifier(line=6, column=5, name='姓名')),
-                    ('var', 'self.年龄', Identifier(line=7, column=5, name='年龄')),
+                    ('var', 'self.姓名', Identifier('姓名')),
+                    ('var', 'self.年龄', Identifier('年龄')),
                 ],
                 is_constructor=True
             ),
             MethodDefinition(
-                line=9,
-                column=3,
                 name='介绍',
                 parameters=[],
                 body=[
@@ -79,12 +69,6 @@ def test_class_definition_generation():
     
     # 创建模块
     module = Module(
-        line=1,
-        column=1,
-        name=None,
-        imports=[],
-        exports=[],
-        segments=[],
         statements=[student_class]
     )
     

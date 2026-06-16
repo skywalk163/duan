@@ -26,16 +26,27 @@
 ```
 duan/tests/
 ├── conftest.py              # pytest 配置和 fixtures
-├── test_lexer.py            # 词法分析器测试 (268行)
-├── test_parser.py           # 语法解析器测试 (350行)
-├── test_semantic.py         # 语义分析器测试 (200行)
-├── test_codegen.py          # 代码生成器测试 (280行)
-├── test_advanced_semantic.py # 高级语义测试 (180行)
-├── test_e2e.py              # 端到端集成测试 (250行)
-├── verify.py                # 快速验证测试 (100行)
-├── run_tests.py             # 测试运行脚本 (150行)
-├── coverage_report.py       # 覆盖率报告 (200行)
-├── test_summary.py          # 测试摘要 (60行)
+├── test_lexer.py            # 词法分析器测试
+├── test_parser.py           # 语法解析器测试
+├── test_semantic.py         # 语义分析器测试
+├── test_codegen.py          # 代码生成器测试
+├── test_advanced_semantic.py # 高级语义测试（动词元数、语义识别）
+├── test_e2e.py              # 端到端集成测试
+├── test_edge_cases.py       # 边界测试（空值、负数、递归、继承等）
+├── test_module_system.py    # 模块系统测试（导入/导出/标准库）
+├── test_module_resolver.py  # 模块解析器测试
+├── test_executor.py         # 执行器测试
+├── test_exception.py        # 异常处理测试（try-catch-throw）
+├── test_class_definition.py # 类定义代码生成测试
+├── test_commands.py         # REPL 命令测试
+├── test_file_io.py          # 文件 IO 测试
+├── test_interface.py        # 接口定义测试
+├── test_modern_features.py  # 现代特性测试（字符串插值、列表推导、lambda、match）
+├── test_comprehensive.py    # ANTLR 后端综合测试
+├── verify.py                # 快速验证测试
+├── run_tests.py             # 测试运行脚本
+├── coverage_report.py       # 覆盖率报告
+├── test_summary.py          # 测试摘要
 └── README.md                # 测试文档
 ```
 
@@ -158,15 +169,19 @@ python tests/run_tests.py
 
 ## 测试统计
 
-| 模块 | 文件 | 代码行数 | 测试文件 | 测试用例数 |
-|------|------|---------|---------|----------|
-| 词法分析器 | lexer.py | 580 | test_lexer.py | 9 |
-| 语法解析器 | duan_parser_v3.py | 580 | test_parser.py | 8 |
-| 语义分析器 | semantic_analyzer.py | 270 | test_semantic.py | 5 |
-| 代码生成器 | code_generator.py | 250 | test_codegen.py | 7 |
-| 高级语义 | verb_info.py + arity_parser.py + semantic_identifier.py | 580 | test_advanced_semantic.py | 6 |
-| 集成测试 | - | - | test_e2e.py | 8 |
-| **总计** | **7 个核心文件** | **2260** | **6 个测试文件** | **43+** |
+| 模块 | 文件 | 测试文件 | 
+|------|------|---------|
+| 词法分析器 | lexer.py | test_lexer.py |
+| 语法解析器 | duan_parser_v3.py | test_parser.py |
+| 语义分析器 | semantic_analyzer.py | test_semantic.py |
+| 代码生成器 | code_generator.py | test_codegen.py |
+| 高级语义 | verb_info.py + arity_parser.py + semantic_identifier.py | test_advanced_semantic.py |
+| 端到端测试 | 完整编译流程 | test_e2e.py |
+| 边界测试 | lexer + parser + code_generator | test_edge_cases.py |
+| 模块系统 | module_resolver.py + stdlib | test_module_system.py |
+| 执行器 | repl/executor.py | test_executor.py |
+| 异常处理 | duan_parser_v3.py | test_exception.py |
+| **总计** | **10+ 核心模块** | **18 个测试文件（218 项用例）** |
 
 ## 测试覆盖的核心特性
 
@@ -277,6 +292,6 @@ G:\dumategithub\duan\tests\
 
 ---
 
-**版本：** v0.7.0  
-**更新时间：** 2026-06-10  
-**测试状态：** ✅ 全部通过
+**版本：** v0.8.0  
+**更新时间：** 2026-06-16  
+**测试状态：** ✅ 全部通过（218/218）

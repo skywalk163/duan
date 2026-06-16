@@ -23,7 +23,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "antlr4-python3-runtime>=4.13",
+    "antlr4-python3-runtime==4.13.2",
 ]
 
 [project.urls]

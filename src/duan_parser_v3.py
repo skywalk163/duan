@@ -1175,12 +1175,18 @@ class DuanParser:
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
         
-        # 冒号（可选）
+        # 冒号（可选）- 检查是否是块模式
+        has_colon = False
         if self._current() and self._current().type == TokenType.COLON:
             self._consume(TokenType.COLON)
+            has_colon = True
         
-        # then块
-        then_body = self._parse_body()
+        # then块：块模式下用 _parse_body，否则只解析单个语句
+        if has_colon:
+            then_body = self._parse_body()
+        else:
+            stmt = self._parse_statement()
+            then_body = [stmt] if stmt else []
         
         # 否则？
         else_body = None
@@ -1196,10 +1202,14 @@ class DuanParser:
             if self._current() and self._current().type == TokenType.COLON:
                 self._consume(TokenType.COLON)
             
-            else_body = self._parse_body()
+            if has_colon:
+                else_body = self._parse_body()
+            else:
+                stmt = self._parse_statement()
+                else_body = [stmt] if stmt else []
         
-        # 结束
-        if self._match(TokenType.KEYWORD, '结束'):
+        # 结束（仅块模式消耗）
+        if has_colon and self._match(TokenType.KEYWORD, '结束'):
             self._consume(TokenType.KEYWORD, '结束')
             if self._current() and self._current().type == TokenType.DOT:
                 self._consume(TokenType.DOT)
@@ -1448,6 +1458,10 @@ class DuanParser:
                     param_name = self._consume(TokenType.IDENTIFIER).value
                 elif tok and tok.type == TokenType.KEYWORD:
                     param_name = self._consume(TokenType.KEYWORD).value
+                elif tok and tok.type == TokenType.CHINESE_NUM:
+                    param_name = str(self._consume(TokenType.CHINESE_NUM).value)
+                elif tok and tok.type == TokenType.NUMBER:
+                    param_name = str(self._consume(TokenType.NUMBER).value)
                 else:
                     raise ParseError(f"期望参数名，但得到 {tok.type if tok else '输入结束'}（位置: L{tok.line if tok else '?'}:C{tok.col if tok else '?'}）")
                 
@@ -1471,11 +1485,29 @@ class DuanParser:
             self._consume(TokenType.ARROW)
             return_type = self._consume(TokenType.IDENTIFIER).value
         
-        # 冒号
-        self._consume(TokenType.COLON)
+        # 冒号（可选）
+        has_colon = False
+        if self._current() and self._current().type == TokenType.COLON:
+            self._consume(TokenType.COLON)
+            has_colon = True
         
         # 段落体
-        body = self._parse_body()
+        if has_colon:
+            body = self._parse_body()
+            
+            # 消耗"结束"关键字（块模式需要）
+            if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+                self._consume(TokenType.KEYWORD, '结束')
+                # 消耗可选的句号
+                if self._current() and self._current().type == TokenType.DOT:
+                    self._consume(TokenType.DOT)
+            else:
+                tok = self._current()
+                if tok:
+                    raise ParseError(f"块模式段落定义需要'结束'关键字，但得到 '{tok.value}'", tok.line, tok.col, tok.value)
+        else:
+            stmt = self._parse_statement()
+            body = [stmt] if stmt else []
         
         return Paragraph(name, params, return_type, body)
     

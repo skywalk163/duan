@@ -162,7 +162,7 @@ class TestLoopGeneration:
     
     def test_for_loop(self, parser, analyzer, generator):
         """测试for循环生成"""
-        code = '''遍历列表中的元素：
+        code = '''遍历元素之列表：
   打印元素。'''
         
         module = parser.parse(code)
@@ -190,7 +190,7 @@ class TestFunctionGeneration:
     
     def test_simple_function(self, parser, analyzer, generator):
         """测试简单函数生成"""
-        module = parser.parse('《计算》段返回甲加乙。')
+        module = parser.parse('《计算》段：返回甲加乙。')
         analyzer.analyze(module)
         
         python_code = generator.generate(module)
@@ -228,7 +228,7 @@ class TestFunctionCallGeneration:
     
     def test_simple_call(self, parser, analyzer, generator):
         """测试简单函数调用生成"""
-        module = parser.parse('《计算》参数甲乙。')
+        module = parser.parse('定义结果等于《计算》(甲，乙)。')
         analyzer.analyze(module)
         
         python_code = generator.generate(module)
@@ -239,7 +239,7 @@ class TestFunctionCallGeneration:
     
     def test_call_in_expression(self, parser, analyzer, generator):
         """测试表达式中的函数调用"""
-        module = parser.parse('定义结果等于《计算》参数甲乙。')
+        module = parser.parse('定义结果等于《计算》(甲，乙)。')
         analyzer.analyze(module)
         
         python_code = generator.generate(module)
@@ -266,9 +266,9 @@ class TestCompleteProgramGeneration:
         """测试阶乘程序生成"""
         code = '''《阶乘》段(数)：
   如果数小于等于1那么返回1。
-  返回数乘《阶乘》参数数减1。
+  返回数乘《阶乘》(数减1)。
 
-定义结果等于《阶乘》参数5。
+定义结果等于《阶乘》(5)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -286,9 +286,9 @@ class TestCompleteProgramGeneration:
         """测试斐波那契程序生成"""
         code = '''《斐波那契》段(数)：
   如果数小于等于2那么返回1。
-  返回《斐波那契》参数数减1加《斐波那契》参数数减2。
+  返回《斐波那契》(数减1)加《斐波那契》(数减2)。
 
-定义结果等于《斐波那契》参数10。
+定义结果等于《斐波那契》(10)。
 打印结果。'''
         
         module = parser.parse(code)
