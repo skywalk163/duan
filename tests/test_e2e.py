@@ -135,7 +135,7 @@ class TestEndToEndFunctions:
     
     def test_function_with_params(self, compile_pipeline):
         """测试带参数函数"""
-        duan_code = '《加法》段(甲, 乙)：返回甲加乙。'
+        duan_code = '《加法》段(甲, 乙)：返回甲加乙。结束。'
         
         python_code = compile_pipeline(duan_code)
         
@@ -145,8 +145,8 @@ class TestEndToEndFunctions:
     
     def test_function_call(self, compile_pipeline):
         """测试函数调用"""
-        duan_code = '''《加法》段(甲, 乙)：返回甲加乙。
-定义结果等于《加法》参数三和五。'''
+        duan_code = '''《加法》段(甲, 乙)：返回甲加乙。结束。
+定义结果等于《加法》(三, 五)。'''
         
         python_code = compile_pipeline(duan_code)
         
@@ -176,9 +176,10 @@ class TestEndToEndRecursion:
         """测试阶乘函数"""
         duan_code = '''《阶乘》段(数)：
   如果数小于等于1那么返回1。
-  返回数乘《阶乘》参数数减1。
+  返回数乘《阶乘》(数减1)。
+结束。
 
-定义结果等于《阶乘》参数5。
+定义结果等于《阶乘》(5)。
 打印结果。'''
         
         python_code = compile_pipeline(duan_code)
@@ -191,9 +192,10 @@ class TestEndToEndRecursion:
         """测试斐波那契函数"""
         duan_code = '''《斐波那契》段(数)：
   如果数小于等于2那么返回1。
-  返回《斐波那契》参数数减1加《斐波那契》参数数减2。
+  返回《斐波那契》(数减1)加《斐波那契》(数减2)。
+结束。
 
-定义结果等于《斐波那契》参数10。
+定义结果等于《斐波那契》(10)。
 打印结果。'''
         
         python_code = compile_pipeline(duan_code)
@@ -237,7 +239,8 @@ class TestEndToEndRealWorld:
   如果操作等于减那么返回甲减乙。
   如果操作等于乘那么返回甲乘乙。
   如果操作等于除那么返回甲除乙。
-  返回0。'''
+  返回0。
+结束。'''
         
         python_code = compile_pipeline(duan_code)
         
@@ -318,7 +321,9 @@ class TestEndToEndPerformance:
         duan_code = '''《外层》段(甲)：
   《内层》段(乙)：
     返回甲加乙。
-  返回《内层》参数甲加1。'''
+  结束。
+  返回《内层》(甲加1)。
+结束。'''
         
         python_code = compile_pipeline(duan_code)
         

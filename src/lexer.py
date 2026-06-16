@@ -52,8 +52,18 @@ class Lexer:
         '零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
     }
     
-    def __init__(self):
-        """初始化词法分析器"""
+    def __init__(self, source: str = None):
+        """初始化词法分析器
+        
+        支持两种调用方式：
+        - Lexer(source).tokenize()
+        - Lexer().tokenize(source)
+        
+        Args:
+            source: 可选的源码字符串
+        """
+        self._source = source
+        
         # 预计算关键字长度分组（优化匹配速度）
         self.keywords_by_length: Dict[int, Set[str]] = {}
         self.max_keyword_len = 0
@@ -98,8 +108,21 @@ class Lexer:
             '@': TokenType.AT,
         }
     
-    def tokenize(self, source: str) -> List[Token]:
-        """将源码转为 Token 流"""
+    def tokenize(self, source: str = None) -> List[Token]:
+        """将源码转为 Token 流
+        
+        支持两种调用方式：
+        - lexer.tokenize()  # 使用构造时传入的 source
+        - lexer.tokenize(source)  # 使用传入的 source
+        
+        Args:
+            source: 要分析的源码字符串（可选，默认使用构造时传入的）
+        """
+        if source is None:
+            source = self._source
+        if source is None:
+            raise LexerError("没有提供源码", 0, 0)
+        
         tokens = []
         i = 0
         line = 1

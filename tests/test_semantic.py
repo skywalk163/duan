@@ -75,8 +75,8 @@ class TestScopeManagement:
         
         assert success == True
         # 验证符号表
-        assert '甲' in analyzer.symbol_table or analyzer.current_scope.has('甲')
-        assert '乙' in analyzer.symbol_table or analyzer.current_scope.has('乙')
+        assert analyzer.symbol_table.is_defined('甲') or analyzer.current_scope.has('甲')
+        assert analyzer.symbol_table.is_defined('乙') or analyzer.current_scope.has('乙')
     
     def test_function_scope(self, parser, analyzer):
         """测试函数作用域"""
@@ -180,8 +180,9 @@ class TestSemanticAnalysisIntegration:
         """测试完整程序"""
         code = '''《计算平方》段(数)：
   返回数乘数。
+结束。
 
-定义结果等于《计算平方》参数5。
+定义结果等于《计算平方》(5)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -193,7 +194,8 @@ class TestSemanticAnalysisIntegration:
         """测试递归函数"""
         code = '''《阶乘》段(数)：
   如果数小于等于1那么返回1。
-  返回数乘《阶乘》参数数减1。'''
+  返回数乘《阶乘》(数减1)。
+结束。'''
         
         module = parser.parse(code)
         success = analyzer.analyze(module)

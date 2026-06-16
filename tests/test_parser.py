@@ -19,7 +19,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from duan_parser_v3 import DuanParser
-from ast_nodes import *
+from duan_parser_v3 import *
 
 
 class TestVariableDeclaration:
@@ -35,7 +35,7 @@ class TestVariableDeclaration:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, VariableDecl)
+        assert isinstance(stmt, VarDecl)
         assert stmt.name == '甲'
     
     def test_variable_with_expression(self, parser):
@@ -44,7 +44,7 @@ class TestVariableDeclaration:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, VariableDecl)
+        assert isinstance(stmt, VarDecl)
         assert stmt.name == '结果'
     
     def test_multiple_variables(self, parser):
@@ -53,7 +53,7 @@ class TestVariableDeclaration:
         
         assert len(module.statements) == 3
         for stmt in module.statements:
-            assert isinstance(stmt, VariableDecl)
+            assert isinstance(stmt, VarDecl)
 
 
 class TestExpressions:
@@ -69,8 +69,8 @@ class TestExpressions:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, VariableDecl)
-        assert stmt.initializer is not None
+        assert isinstance(stmt, VarDecl)
+        assert stmt.value is not None
     
     def test_nested_expression(self, parser):
         """测试嵌套表达式"""
@@ -78,7 +78,7 @@ class TestExpressions:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, VariableDecl)
+        assert isinstance(stmt, VarDecl)
     
     def test_comparison_expression(self, parser):
         """测试比较表达式"""
@@ -86,7 +86,7 @@ class TestExpressions:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, IfStatement)
+        assert isinstance(stmt, IfStmt)
 
 
 class TestConditionals:
@@ -102,7 +102,7 @@ class TestConditionals:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, IfStatement)
+        assert isinstance(stmt, IfStmt)
         assert stmt.condition is not None
     
     def test_if_else(self, parser):
@@ -111,8 +111,8 @@ class TestConditionals:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, IfStatement)
-        assert stmt.else_branch is not None
+        assert isinstance(stmt, IfStmt)
+        assert stmt.else_body is not None
 
 
 class TestLoops:
@@ -131,18 +131,18 @@ class TestLoops:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, WhileStatement)
+        assert isinstance(stmt, WhileStmt)
     
     def test_for_loop(self, parser):
         """测试for循环"""
-        code = '''遍历列表中的元素：
+        code = '''遍历元素之列表：
   打印元素。'''
         
         module = parser.parse(code)
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, ForStatement)
+        assert isinstance(stmt, ForeachStmt)
 
 
 class TestFunctionDefinition:
@@ -154,11 +154,11 @@ class TestFunctionDefinition:
     
     def test_simple_function(self, parser):
         """测试简单函数定义"""
-        module = parser.parse('《计算》段返回甲加乙。')
+        module = parser.parse('《计算》段：返回甲加乙。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, FunctionDef)
+        assert isinstance(stmt, Paragraph)
         assert stmt.name == '计算'
     
     def test_function_with_params(self, parser):
@@ -167,7 +167,7 @@ class TestFunctionDefinition:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, FunctionDef)
+        assert isinstance(stmt, Paragraph)
         assert len(stmt.params) == 2
     
     def test_function_with_body(self, parser):
@@ -180,7 +180,7 @@ class TestFunctionDefinition:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, FunctionDef)
+        assert isinstance(stmt, Paragraph)
         assert len(stmt.body) >= 1
 
 
@@ -215,17 +215,17 @@ class TestFunctionCall:
     
     def test_simple_call(self, parser):
         """测试简单函数调用"""
-        module = parser.parse('《计算》参数甲乙。')
+        module = parser.parse('定义结果等于《计算》(甲，乙)。')
         
         assert len(module.statements) >= 1
     
     def test_call_in_expression(self, parser):
         """测试表达式中的函数调用"""
-        module = parser.parse('定义结果等于《计算》参数甲乙。')
+        module = parser.parse('定义结果等于《计算》(甲，乙)。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, VariableDecl)
+        assert isinstance(stmt, VarDecl)
 
 
 class TestComplexPrograms:
@@ -239,9 +239,10 @@ class TestComplexPrograms:
         """测试阶乘程序"""
         code = '''《阶乘》段(数)：
   如果数小于等于1那么返回1。
-  返回数乘《阶乘》参数数减1。
+  返回数乘《阶乘》(数减1)。
+  结束。
 
-定义结果等于《阶乘》参数5。
+定义结果等于《阶乘》(5)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -252,9 +253,10 @@ class TestComplexPrograms:
         """测试斐波那契程序"""
         code = '''《斐波那契》段(数)：
   如果数小于等于2那么返回1。
-  返回《斐波那契》参数数减1加《斐波那契》参数数减2。
+  返回《斐波那契》(数减1)加《斐波那契》(数减2)。
+  结束。
 
-定义结果等于《斐波那契》参数10。
+定义结果等于《斐波那契》(10)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -302,7 +304,7 @@ class TestNoSpaceCode:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, VariableDecl)
+        assert isinstance(stmt, VarDecl)
     
     def test_no_space_condition(self, parser):
         """测试无空格条件语句"""
@@ -310,7 +312,7 @@ class TestNoSpaceCode:
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
-        assert isinstance(stmt, IfStatement)
+        assert isinstance(stmt, IfStmt)
 
 
 if __name__ == '__main__':

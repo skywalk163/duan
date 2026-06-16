@@ -297,11 +297,11 @@ class PythonCodeGenerator:
             # 管道操作作为独立语句
             expr_code = self._generate_expr(stmt)
             self._add_line(expr_code)
-        elif hasattr(stmt, '__class__') and stmt.__class__.__name__ == 'SelfAssignment':
-            # self赋值语句（新增）
+        elif isinstance(stmt, SelfAssignment):
+            # self赋值语句
             self._generate_self_assignment(stmt)
-        elif hasattr(stmt, '__class__') and stmt.__class__.__name__ == 'ClassDefinition':
-            # 类定义（新增）
+        elif isinstance(stmt, ClassDefinition):
+            # 类定义
             self._generate_class_definition(stmt)
         elif isinstance(stmt, MemberAccess):
             # 成员访问作为独立语句
@@ -324,6 +324,15 @@ class PythonCodeGenerator:
         elif isinstance(stmt, InterfaceDefinition):
             # 接口定义
             self._generate_interface_definition(stmt)
+        elif isinstance(stmt, Parameter):
+            # 参数声明（段落体内部）
+            param_name = self._sanitize_name(stmt.name)
+            # 忽略参数声明，参数已由段落定义处理
+            pass
+        elif isinstance(stmt, ParameterList):
+            # 参数列表声明（段落体内部）
+            # 忽略参数列表，参数已由段落定义处理
+            pass
         else:
             raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
