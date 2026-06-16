@@ -10,12 +10,46 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 
+authors = [
+    {name = "Dumate", email = "dumate@example.com"},
+]
+
+keywords = ["chinese", "programming-language", "cnlang", "中文编程"]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Natural Language :: Chinese (Simplified)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Compilers",
+    "Topic :: Software Development :: Interpreters",
+]
+
+dependencies = [
+    "antlr4-python3-runtime>=4.13",
+    "antlr4-tools>=0.2.0",
+]
+
 [project.urls]
 "Homepage" = "https://github.com/dumate/duan"
 "Repository" = "https://github.com/dumate/duan"
 
 [project.scripts]
-duan = "antlrparser.duan_cli:main"
+duan = "cli.duan_unified:main"
+duanc = "cli.duanc:main"
+
+[tool.setuptools.packages.find]
+include = ["src*", "cli*", "stdlib*", "antlrparser*"]
+
+[tool.setuptools.package-data]
+stdlib = ["*.duan"]
+antlrparser = ["*.duan"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "antlrparser/test"]

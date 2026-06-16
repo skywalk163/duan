@@ -1,6 +1,6 @@
-# Generated from DuanLangParser.g4 by ANTLR 4.13.1
+# Generated from antlrparser/DuanLangParser.g4 by ANTLR 4.9.2
 from antlr4 import *
-if "." in __name__:
+if __name__ is not None and "." in __name__:
     from .DuanLangParser import DuanLangParser
 else:
     from DuanLangParser import DuanLangParser
@@ -142,11 +142,6 @@ class DuanLangParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
-    # Visit a parse tree produced by DuanLangParser#target.
-    def visitTarget(self, ctx:DuanLangParser.TargetContext):
-        return self.visitChildren(ctx)
-
-
     # Visit a parse tree produced by DuanLangParser#ifStmt.
     def visitIfStmt(self, ctx:DuanLangParser.IfStmtContext):
         return self.visitChildren(ctx)
@@ -192,8 +187,38 @@ class DuanLangParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by DuanLangParser#matchStmt.
+    def visitMatchStmt(self, ctx:DuanLangParser.MatchStmtContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#matchCase.
+    def visitMatchCase(self, ctx:DuanLangParser.MatchCaseContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#matchPattern.
+    def visitMatchPattern(self, ctx:DuanLangParser.MatchPatternContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#matchPatternList.
+    def visitMatchPatternList(self, ctx:DuanLangParser.MatchPatternListContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by DuanLangParser#printStmt.
     def visitPrintStmt(self, ctx:DuanLangParser.PrintStmtContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#withStmt.
+    def visitWithStmt(self, ctx:DuanLangParser.WithStmtContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#decoratorDef.
+    def visitDecoratorDef(self, ctx:DuanLangParser.DecoratorDefContext):
         return self.visitChildren(ctx)
 
 
@@ -267,6 +292,16 @@ class DuanLangParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by DuanLangParser#implicitCall.
+    def visitImplicitCall(self, ctx:DuanLangParser.ImplicitCallContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#implicitArg.
+    def visitImplicitArg(self, ctx:DuanLangParser.ImplicitArgContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by DuanLangParser#dictLiteral.
     def visitDictLiteral(self, ctx:DuanLangParser.DictLiteralContext):
         return self.visitChildren(ctx)
@@ -274,6 +309,36 @@ class DuanLangParserVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DuanLangParser#dictEntry.
     def visitDictEntry(self, ctx:DuanLangParser.DictEntryContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#listComprehension.
+    def visitListComprehension(self, ctx:DuanLangParser.ListComprehensionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#identifier_like.
+    def visitIdentifier_like(self, ctx:DuanLangParser.Identifier_likeContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#typeAsIdentifier.
+    def visitTypeAsIdentifier(self, ctx:DuanLangParser.TypeAsIdentifierContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#lambdaExpr.
+    def visitLambdaExpr(self, ctx:DuanLangParser.LambdaExprContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#dictComprehension.
+    def visitDictComprehension(self, ctx:DuanLangParser.DictComprehensionContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#bracketContent.
+    def visitBracketContent(self, ctx:DuanLangParser.BracketContentContext):
         return self.visitChildren(ctx)
 
 
@@ -289,6 +354,11 @@ class DuanLangParserVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DuanLangParser#exprList.
     def visitExprList(self, ctx:DuanLangParser.ExprListContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#conditionalExpr.
+    def visitConditionalExpr(self, ctx:DuanLangParser.ConditionalExprContext):
         return self.visitChildren(ctx)
 
 

@@ -1,0 +1,8 @@
+# 段言标准库 - JSON/CSV 数据格式模块
+#
+# 用法：
+#   从《JSONCSV》导入《JSON解析》，《JSON生成》。
+
+导出 JSON解析 JSON生成。
+导出 CSV解析 CSV生成。
+导出 CSV解析到列表 CSV从列表生成。

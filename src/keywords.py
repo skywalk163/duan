@@ -38,11 +38,27 @@ KEYWORDS_EXCEPTION = {
 # 类与对象（新增）
 KEYWORDS_CLASS = {
     '类', '继承', '属性', '构造', '新建',
+    '接口', '实现',
 }
 
 # 模块系统（新增）
 KEYWORDS_MODULE = {
     '模块', '标准库',
+}
+
+# 模式匹配（新增）
+KEYWORDS_MATCH = {
+    '匹配', '情况',
+}
+
+# 上下文管理器与装饰器（新增）
+KEYWORDS_CONTEXT = {
+    '使用', '标注',
+}
+
+# 装饰器关键字（新增）
+KEYWORDS_DECORATOR = {
+    '抽象',  # @抽象 → @abstractmethod
 }
 
 # 所有双字关键字
@@ -53,7 +69,10 @@ KEYWORDS_DOUBLE = (
     KEYWORDS_FUNCTION |
     KEYWORDS_EXCEPTION |
     KEYWORDS_CLASS |
-    KEYWORDS_MODULE
+    KEYWORDS_MODULE |
+    KEYWORDS_MATCH |
+    KEYWORDS_CONTEXT |
+    KEYWORDS_DECORATOR
 )
 
 
@@ -77,6 +96,7 @@ KEYWORDS_RESERVED = {
     '之',  # 属性提取符
     '的',  # 定语标记
     '己',  # self 引用（类方法中）
+    '父',  # super() 调用
 }
 
 
@@ -104,6 +124,8 @@ VERB_ARITY = {
     '乘': 2,
     '除': 2,
     '取余': 2,
+    '模': 2,
+    '幂': 2,
     
     # 复合运算符（支持"乘以"、"减一"等口语化表达）
     '乘以': 2,
@@ -200,6 +222,37 @@ VERB_ARITY = {
     
     # 类实例化（可变参数）
     '新建': -1,  # 新建 类名 参数...
+
+    # 正则表达式函数（标准库）
+    '匹配': 2,
+    '搜索': 2,
+    '全部匹配': 2,
+    '替换': 3,
+    '分割': 2,
+    '匹配迭代': 2,
+    '是否匹配': 2,
+    '转义': 1,
+
+    # 编码函数（标准库）
+    'Base64编码': 1,
+    'Base64解码': 1,
+    'Hex编码': 1,
+    'Hex解码': 1,
+    'MD5哈希': 1,
+    'SHA1哈希': 1,
+    'SHA256哈希': 1,
+    'SHA512哈希': 1,
+
+    # 统计函数（标准库）
+    '线性回归': 2,
+
+    # 时间计算函数（标准库）
+    '日期转时间戳': 3,
+    '星期几': 0,
+    '星期名称': 0,
+    '是否工作日': 0,
+    '是否周末': 0,
+    '解析时间': 1,
 }
 
 # 动词修改模式（决策34）

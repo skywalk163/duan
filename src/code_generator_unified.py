@@ -49,6 +49,8 @@ class UnifiedCodeGenerator:
             '-': '-',
             '*': '*',
             '/': '/',
+            '%': '%',
+            '^': '**',
             '>': '>',
             '<': '<',
             '==': '==',
@@ -59,12 +61,17 @@ class UnifiedCodeGenerator:
             '减': '-',
             '乘': '*',
             '除': '/',
+            '模': '%',
+            '幂': '**',
             '大于': '>',
             '小于': '<',
             '等于': '==',
             '不等于': '!=',
             '大于等于': '>=',
             '小于等于': '<=',
+            '且': 'and',
+            '或': 'or',
+            '与': 'and',
         }
         
         # 内置函数映射
@@ -159,27 +166,60 @@ class UnifiedCodeGenerator:
         # 添加标准库导入
         self._add_line("# 导入段言标准库")
         self._add_line("import sys")
-        self._add_line("import importlib.util")
+        self._add_line("import os")
+        self._add_line("")
         self._add_line("try:")
-        self._add_line("    spec = importlib.util.spec_from_file_location('duan_builtins', 'src/stdlib/builtins.py')")
-        self._add_line("    _duan_builtin = importlib.util.module_from_spec(spec)")
-        self._add_line("    spec.loader.exec_module(_duan_builtin)")
-        self._add_line("except:")
+        self._add_line("    import importlib.util")
+        self._add_line("except ImportError:")
+        self._add_line("    importlib = None")
+        self._add_line("")
+        self._add_line("try:")
+        self._add_line("    _duan_stdlib = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'stdlib')")
+        self._add_line("except NameError:")
+        self._add_line("    _duan_stdlib = os.path.join(os.getcwd(), 'stdlib')")
+        self._add_line("    if not os.path.isdir(_duan_stdlib):")
+        self._add_line("        parent_stdlib = os.path.normpath(os.path.join(os.getcwd(), '..', 'stdlib'))")
+        self._add_line("        if os.path.isdir(parent_stdlib):")
+        self._add_line("            _duan_stdlib = parent_stdlib")
+        self._add_line("")
+        self._add_line("if os.path.isdir(_duan_stdlib) and _duan_stdlib not in sys.path:")
+        self._add_line("    sys.path.insert(0, _duan_stdlib)")
+        self._add_line("")
+        self._add_line("if importlib:")
+        self._add_line("    try:")
+        self._add_line("        _duan_builtin_path = os.path.join(_duan_stdlib, 'builtins.py')")
+        self._add_line("        if os.path.isfile(_duan_builtin_path):")
+        self._add_line("            spec = importlib.util.spec_from_file_location('duan_builtins', _duan_builtin_path)")
+        self._add_line("            _duan_builtin = importlib.util.module_from_spec(spec)")
+        self._add_line("            spec.loader.exec_module(_duan_builtin)")
+        self._add_line("        else:")
+        self._add_line("            raise ImportError()")
+        self._add_line("    except:")
+        self._add_line("        import types")
+        self._add_line("        _duan_builtin = types.ModuleType('_duan_builtin')")
+        self._add_line("        _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
+        self._add_line("        _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content) or None")
+        self._add_line("        _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
+        self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
+        self._add_line("        _duan_builtin.打印 = print")
+        self._add_line("        _duan_builtin.列表创建 = list")
+        self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
+        self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
+        self._add_line("        _duan_builtin.字符串长度 = len")
+        self._add_line("        _duan_builtin.字典创建 = dict")
+        self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
+        self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
+        self._add_line("else:")
         self._add_line("    import types")
         self._add_line("    _duan_builtin = types.ModuleType('_duan_builtin')")
-        self._add_line("    _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
-        self._add_line("    _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content) or None")
-        self._add_line("    _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
-        self._add_line("    _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
         self._add_line("    _duan_builtin.打印 = print")
-        self._add_line("    _duan_builtin.列表创建 = list")
-        self._add_line("    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
-        self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
-        self._add_line("    _duan_builtin.字符串长度 = len")
-        self._add_line("    _duan_builtin.字典创建 = dict")
-        self._add_line("    _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
-        self._add_line("    _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
         self._add_line("")
+        
+        # 生成导入语句
+        if hasattr(module, 'imports') and module.imports:
+            for imp in module.imports:
+                self._generate_import_stmt(imp)
+            self._add_line("")
         
         # 生成段落定义
         if hasattr(module, 'segments'):
@@ -270,6 +310,22 @@ class UnifiedCodeGenerator:
         elif is_instance(stmt, 'ThrowStatement'):
             value_code = self._generate_expr(stmt.value)
             self._add_line(f"raise {value_code}")
+        
+        # 模式匹配
+        elif is_instance(stmt, 'MatchStatement'):
+            self._generate_match_stmt(stmt)
+        
+        # 上下文管理器
+        elif is_instance(stmt, 'WithStatement'):
+            self._generate_with_stmt(stmt)
+        
+        # 解构赋值
+        elif is_instance(stmt, 'DestructuringAssignment'):
+            self._generate_destructuring(stmt)
+        
+        # 装饰器定义
+        elif is_instance(stmt, 'DecoratorDefinition'):
+            self._generate_decorator(stmt)
         
         # 导入语句
         elif is_instance(stmt, 'ImportStatement'):
@@ -392,6 +448,95 @@ class UnifiedCodeGenerator:
             for s in stmt.finally_body:
                 self._generate_statement(s)
             self.indent_level -= 1
+    
+    def _generate_match_stmt(self, stmt):
+        """生成模式匹配语句 — 匹配 值：情况 ... 结束。"""
+        subject = self._generate_expr(stmt.subject)
+        self._add_line(f"match {subject}:")
+        self.indent_level += 1
+        for case in stmt.cases:
+            pattern_code = self._generate_match_pattern(case.pattern)
+            guard_code = ""
+            if hasattr(case, 'guard') and case.guard:
+                guard_code = f" if {self._generate_expr(case.guard)}"
+            self._add_line(f"case {pattern_code}{guard_code}:")
+            self.indent_level += 1
+            for s in case.body:
+                self._generate_statement(s)
+            self.indent_level -= 1
+        # 如果没有任何case，添加pass
+        if not stmt.cases:
+            self._add_line("pass")
+        self.indent_level -= 1
+    
+    def _generate_match_pattern(self, pattern):
+        """生成匹配模式"""
+        if pattern is None:
+            return "_"
+        
+        kind = pattern.kind if hasattr(pattern, 'kind') else 'wildcard'
+        
+        if kind == 'number':
+            return self._generate_expr(pattern.value)
+        elif kind == 'string':
+            return self._generate_expr(pattern.value)
+        elif kind == 'bool':
+            return self._generate_expr(pattern.value)
+        elif kind == 'null':
+            return "None"
+        elif kind == 'wildcard':
+            return "_"
+        elif kind == 'variable':
+            binding = pattern.binding if hasattr(pattern, 'binding') else ''
+            return self._sanitize_name(binding)
+        elif kind == 'list':
+            elements = []
+            if hasattr(pattern, 'elements') and pattern.elements:
+                for e in pattern.elements:
+                    elements.append(self._generate_match_pattern(e))
+            return f"[{', '.join(elements)}]"
+        elif kind == 'type_check':
+            type_name = pattern.type_name if hasattr(pattern, 'type_name') else ''
+            binding = pattern.binding if hasattr(pattern, 'binding') else ''
+            type_name_py = self._sanitize_name(type_name)
+            if binding:
+                binding_py = self._sanitize_name(binding)
+                return f"{type_name_py}() as {binding_py}"
+            return f"{type_name_py}()"
+        
+        return "_"
+    
+    def _generate_with_stmt(self, stmt):
+        """生成上下文管理器语句：使用 表达式 作为 变量：...结束。"""
+        context_expr = self._generate_expr(stmt.context_expr)
+        if hasattr(stmt, 'variable') and stmt.variable:
+            var = self._sanitize_name(stmt.variable)
+            self._add_line(f"with {context_expr} as {var}:")
+        else:
+            self._add_line(f"with {context_expr}:")
+        
+        self.indent_level += 1
+        if hasattr(stmt, 'body') and stmt.body:
+            for s in stmt.body:
+                self._generate_statement(s)
+        else:
+            self._add_line("pass")
+        self.indent_level -= 1
+    
+    def _generate_destructuring(self, stmt):
+        """生成解构赋值：设 (甲, 乙) 为 元组"""
+        variables = ', '.join(self._sanitize_name(v) for v in stmt.variables)
+        value = self._generate_expr(stmt.value)
+        self._add_line(f"{variables} = {value}")
+    
+    def _generate_decorator(self, stmt):
+        """生成装饰器定义：@段落名 标注 段落 ..."""
+        decorator_name = self._sanitize_name(stmt.decorator_name)
+        # 先生成装饰器行
+        self._add_line(f"@{decorator_name}")
+        # 再生成被装饰的段落
+        if hasattr(stmt, 'paragraph') and stmt.paragraph:
+            self._generate_segment(stmt.paragraph)
     
     def _generate_import_stmt(self, stmt):
         """生成导入语句"""
@@ -661,6 +806,54 @@ class UnifiedCodeGenerator:
         # Self引用
         elif is_instance(expr, 'SelfReference'):
             return "self"
+        
+        # 字符串插值
+        elif is_instance(expr, 'StringInterpolation'):
+            # 生成 f"str_part{expr_part}str_part"
+            f_parts = []
+            for part in expr.parts:
+                if isinstance(part, str):
+                    f_parts.append(part.replace('{', '{{').replace('}', '}}'))
+                else:
+                    f_parts.append('{' + self._generate_expr(part) + '}')
+            return 'f' + repr(''.join(f_parts))
+        
+        # 列表推导
+        elif is_instance(expr, 'ListComprehension'):
+            output = self._generate_expr(expr.expression)
+            var = self._sanitize_name(expr.variable)
+            iterable = self._generate_expr(expr.iterable)
+            if expr.condition:
+                cond = self._generate_expr(expr.condition)
+                return f"[{output} for {var} in {iterable} if {cond}]"
+            return f"[{output} for {var} in {iterable}]"
+        
+        # 匿名函数
+        elif is_instance(expr, 'LambdaExpression'):
+            params = ', '.join(self._sanitize_name(p.name) for p in expr.parameters)
+            body = self._generate_expr(expr.body) if expr.body else "None"
+            return f"lambda {params}: {body}"
+        
+        # 三元条件表达式
+        elif is_instance(expr, 'ConditionalExpression'):
+            condition = self._generate_expr(expr.condition)
+            then_expr = self._generate_expr(expr.then_expr)
+            if expr.else_expr:
+                else_expr = self._generate_expr(expr.else_expr)
+                return f"({then_expr} if {condition} else {else_expr})"
+            else:
+                return f"({then_expr} if {condition} else None)"
+        
+        # 字典推导
+        elif is_instance(expr, 'DictComprehension'):
+            key = self._generate_expr(expr.key_expr)
+            val = self._generate_expr(expr.value_expr)
+            var = self._sanitize_name(expr.variable)
+            iterable = self._generate_expr(expr.iterable)
+            if expr.condition:
+                cond = self._generate_expr(expr.condition)
+                return f"{{{key}: {val} for {var} in {iterable} if {cond}}}"
+            return f"{{{key}: {val} for {var} in {iterable}}}"
         
         # 默认：尝试直接转换为字符串
         return str(expr)

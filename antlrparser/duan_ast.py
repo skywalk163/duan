@@ -5,6 +5,8 @@
 供 ANTLR 解析器生成 AST 使用
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import List, Optional, Union, Any
 
@@ -146,6 +148,93 @@ class NewExpression(ASTNode):
     """类实例化表达式（新类名()）"""
     class_name: str = ""
     arguments: List[ASTNode] = field(default_factory=list)
+
+
+@dataclass
+class ConditionalExpression(ASTNode):
+    """三元条件表达式：如果 条件 那么 值1 否则 值2"""
+    condition: ASTNode = None
+    then_expr: ASTNode = None
+    else_expr: Optional[ASTNode] = None
+
+
+@dataclass
+class StringInterpolation(ASTNode):
+    """字符串插值："你好，{名字}" -> f-string"""
+    parts: List[Union[str, ASTNode]] = field(default_factory=list)  # 交替的字符串和表达式
+
+
+@dataclass
+class ListComprehension(ASTNode):
+    """列表推导：[表达式 遍历 变量 之 列表]"""
+    expression: ASTNode = None          # 输出表达式
+    variable: str = ""                   # 遍历变量
+    iterable: ASTNode = None            # 可迭代对象
+    condition: Optional[ASTNode] = None # 可选过滤条件
+
+
+@dataclass
+class LambdaExpression(ASTNode):
+    """匿名函数：接收 甲：返回 甲 乘 甲。"""
+    parameters: List[Parameter] = field(default_factory=list)
+    body: ASTNode = None                # 表达式体
+
+
+@dataclass
+class MatchStatement(ASTNode):
+    """模式匹配：匹配 值：情况 ... 结束。"""
+    subject: ASTNode = None             # 被匹配的值
+    cases: List['MatchCase'] = field(default_factory=list)
+
+
+@dataclass
+class MatchCase(ASTNode):
+    """匹配分支"""
+    pattern: 'MatchPattern' = None      # 匹配模式
+    guard: Optional[ASTNode] = None     # 守卫条件（情况 模式 如果 条件）
+    body: List[ASTNode] = field(default_factory=list)
+
+
+@dataclass
+class MatchPattern(ASTNode):
+    """匹配模式"""
+    kind: str = ""                      # 'number', 'string', 'bool', 'null', 'variable', 'wildcard', 'list', 'type_check'
+    value: Optional[ASTNode] = None     # 字面量值或变量名
+    elements: List['MatchPattern'] = field(default_factory=list)  # 列表模式元素
+    type_name: str = ""                 # 类型检查模式中的类型名
+    binding: str = ""                   # 变量绑定名
+
+
+@dataclass
+class DictComprehension(ASTNode):
+    """字典推导：{键: 值 遍历 变量 之 列表}"""
+    key_expr: ASTNode = None            # 键表达式
+    value_expr: ASTNode = None          # 值表达式
+    variable: str = ""                   # 遍历变量
+    iterable: ASTNode = None            # 可迭代对象
+    condition: Optional[ASTNode] = None # 可选过滤条件
+
+
+@dataclass
+class DecoratorDefinition(ASTNode):
+    """装饰器定义：@段落名 标注 段落 ..."""
+    decorator_name: str = ""            # 装饰器段落名
+    paragraph: 'SegmentDefinition' = None  # 被装饰的段落
+
+
+@dataclass
+class DestructuringAssignment(ASTNode):
+    """解构赋值：设 (甲, 乙) 为 元组"""
+    variables: List[str] = field(default_factory=list)  # 解构变量列表
+    value: ASTNode = None               # 被解构的值
+
+
+@dataclass
+class WithStatement(ASTNode):
+    """上下文管理器：使用 表达式 作为 变量：...结束。"""
+    context_expr: ASTNode = None        # 上下文表达式
+    variable: Optional[str] = None      # 可选的 as 变量
+    body: List[ASTNode] = field(default_factory=list)
 
 
 # =============================================================================

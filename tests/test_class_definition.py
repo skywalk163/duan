@@ -32,7 +32,7 @@ def test_class_definition_generation():
         line=1,
         column=1,
         name='学生',
-        base_class=None,
+        base_classes=None,
         attributes=[
             AttributeDeclaration(
                 line=2,

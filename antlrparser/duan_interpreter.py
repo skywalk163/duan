@@ -23,7 +23,7 @@ from duan_ast import (
     Parameter, SegmentDefinition, DataTypeDefinition, ErrorTypeDefinition,
     ImportStatement, ExportStatement,
     ClassDefinition, InterfaceDefinition, MethodDefinition, ConstructorDefinition,
-    InterfaceMethod, InterfaceProperty,
+    InterfaceMethod, InterfaceProperty, SelfReference,
 )
 
 # 导入模块解析器
@@ -80,7 +80,7 @@ class DuanValue:
         if self.value is None:
             return '空'
         if isinstance(self.value, bool):
-            return '真' if self.value else '假'
+            return 'True' if self.value else 'False'
         if isinstance(self.value, dict):
             items = ', '.join(f'{k}: {v}' for k, v in self.value.items())
             return f'【{items}】'
@@ -355,8 +355,8 @@ class Interpreter:
     _OP_NE = ('不等于', 'NE', '!=')
     _OP_GE = ('大于等于', 'GE', '>=')
     _OP_LE = ('小于等于', 'LE', '<=')
-    _OP_AND = ('且', 'AND', '&&')
-    _OP_OR = ('或', 'OR', '||')
+    _OP_AND = ('且', 'and', 'AND', '&&')
+    _OP_OR = ('或', 'or', 'OR', '||')
     _OP_NOT = ('非', 'NOT', '!')
 
     def __init__(self, search_paths: List[str] = None):
@@ -1022,6 +1022,7 @@ class Interpreter:
         FunctionCall: '_eval_function_call',
         PipeExpression: '_eval_pipe',
         NewExpression: '_eval_new_expression',
+        SelfReference: '_eval_self_reference',
     }
 
     def _eval(self, node: ASTNode) -> DuanValue:
@@ -1331,7 +1332,11 @@ class Interpreter:
         # 创建实例
         instance = cls.new_instance(args)
         return DuanValue(instance, '实例')
-    
+
+    def _eval_self_reference(self, node: SelfReference) -> DuanValue:
+        """求值 self 引用（己）"""
+        return self.env.get('自我')
+
     def _call_method(self, bound_method: DuanBoundMethod, args: List[DuanValue]) -> DuanValue:
         """调用绑定到实例的方法"""
         method = bound_method.method

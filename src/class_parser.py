@@ -55,10 +55,10 @@ class ClassParser:
         class_name = self._expect_identifier()
         
         # 解析继承关系（可选）
-        base_class = None
+        base_classes = []
         if self._check_keyword('继承'):
             self.pos = self._next_pos()
-            base_class = self._expect_identifier()
+            base_classes = [self._expect_identifier()]
         
         # 消耗冒号
         if not self._check_punctuation('：'):
@@ -94,7 +94,7 @@ class ClassParser:
             line=line,
             column=column,
             name=class_name,
-            base_class=base_class,
+            base_classes=base_classes,
             attributes=attributes,
             methods=methods
         ), self.pos

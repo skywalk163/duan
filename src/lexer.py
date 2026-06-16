@@ -95,6 +95,7 @@ class Lexer:
             '>': TokenType.RBOOK,
             '\\': TokenType.COMMA,
             '=': TokenType.EQUALS,
+            '@': TokenType.AT,
         }
     
     def tokenize(self, source: str) -> List[Token]:
@@ -784,7 +785,7 @@ class Lexer:
                     # 收集参数名（可能多个参数）
                     while j < n:
                         k = j
-                        while k < n and self._is_han(source[k]) and source[k] not in '。':
+                        while k < n and self._is_han(source[k]) and source[k] not in '。：':
                             k += 1
                         if k > j:
                             param_name = source[j:k]
@@ -795,8 +796,8 @@ class Lexer:
                         # 跳过空白
                         while j < n and source[j] in ' \t':
                             j += 1
-                        # 检查是否结束
-                        if j >= n or source[j] == '。':
+                        # 检查是否结束（句号或冒号）
+                        if j >= n or source[j] in '。：':
                             break
                 i = j
                 continue
