@@ -86,6 +86,73 @@ def dim(text: str) -> str:
 
 
 # =============================================================================
+# 错误显示辅助函数
+# =============================================================================
+
+def _try_extract_error_info(e: Exception) -> dict:
+    """从异常中提取行号、列号等信息"""
+    info = {
+        'message': str(e),
+        'line': None,
+        'column': None,
+        'source': None,
+    }
+    # 检查异常对象本身是否携带位置信息
+    if hasattr(e, 'line') and e.line is not None:
+        info['line'] = e.line
+    if hasattr(e, 'column') and e.column is not None:
+        info['column'] = e.column
+    if hasattr(e, 'source') and e.source is not None:
+        info['source'] = e.source
+    return info
+
+
+def _print_runtime_error(e: Exception, source: str = "", filepath: str = ""):
+    """打印格式化的运行时错误"""
+    from duan_error_handler import format_error_context, suggest_fix
+
+    info = _try_extract_error_info(e)
+    message = info['message']
+    line = info['line']
+    column = info['column']
+    err_source = info['source'] or source
+
+    # 输出错误标题
+    label = str(type(e).__name__)
+    print(red(f"⚠ {label}"), file=sys.stderr)
+
+    # 尝试从错误消息中解析行号（格式：消息（第X行，第Y列））
+    if line is None and '（第' in message:
+        import re
+        m = re.search(r'（第(\d+)行，第(\d+)列）', message)
+        if m:
+            line = int(m.group(1))
+            column = int(m.group(2))
+            message = message[:m.start()]
+
+    if line is not None:
+        loc = f"  位置: 第{line}行"
+        loc += f"，第{column}列" if column is not None else ""
+        print(dim(loc), file=sys.stderr)
+
+    if filepath:
+        print(dim(f"  文件: {filepath}"), file=sys.stderr)
+
+    print(f"  信息: {yellow(message)}", file=sys.stderr)
+
+    # 显示源码上下文
+    if err_source and line is not None:
+        context = format_error_context(err_source, line, column or 0)
+        if context:
+            print(f"\n{dim(context)}", file=sys.stderr)
+
+    # 修复建议
+    suggestion = suggest_fix('unknown', message)
+    if suggestion:
+        print(f"  建议: {suggestion}", file=sys.stderr)
+
+
+# =============================================================================
 # 子命令：运行文件
 # =============================================================================
 
@@ -96,13 +163,21 @@ def cmd_run(filepath: str, args):
         print(red(f"错误: 文件不存在: {filepath}"), file=sys.stderr)
         sys.exit(1)
 
+    # 读取源码用于错误上下文显示
+    source = ""
+    try:
+        with open(abs_path, 'r', encoding='utf-8') as f:
+            source = f.read()
+    except Exception:
+        pass
+
     try:
         interp = run_file(abs_path)
         output = interp.get_output()
         if output and not args.quiet:
             print(output)
     except Exception as e:
-        print(red(f"运行时错误: {e}"), file=sys.stderr)
+        _print_runtime_error(e, source, filepath)
         if args.verbose:
             traceback.print_exc()
         sys.exit(1)
@@ -120,7 +195,7 @@ def cmd_exec(code: str, args):
         if output and not args.quiet:
             print(output)
     except Exception as e:
-        print(red(f"执行错误: {e}"), file=sys.stderr)
+        _print_runtime_error(e, code)
         if args.verbose:
             traceback.print_exc()
         sys.exit(1)

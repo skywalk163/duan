@@ -1,6 +1,15 @@
 """
 段言（Duan）编程语言 - 中文分词器
 
+【主解析器路线】此为当前主解析器路线：
+  1. duan_tokenizer.py  - 自定义中文分词器（无空格分词）
+  2. DuanLangParser.g4  - ANTLR 语法规则定义（生成 duan_parser/）
+  3. duan_visitor.py    - 语法树访问器（转换为 AST）
+  4. duan_interpreter.py | duan_compiler.py - 执行/编译
+
+手写解析器（src/lexer.py, src/duan_parser_v3.py）为参考实现，用于验证正确性。
+历史实验文件已归档至 bootstrap/archive/。
+
 实现决策29：无空格分词支持
 - 双字关键词优先匹配
 - 类型切换自动分词
@@ -28,6 +37,8 @@ KEYWORDS = [
     '否则若', '大于等于', '小于等于',
     # 定义声明（二字）
     '数据类型', '错误', '定义', '等于', '导入', '导出', '常量', '类型', '继承', '使用', '方法', '自我', '段落', '实现', '构造',
+    # 函数声明（二字）
+    '接收',
     # 条件判断（二字）
     '如果', '那么', '否则', '结束',
     # 比较（二字）
@@ -45,7 +56,7 @@ KEYWORDS = [
     # 上下文管理器/装饰器（二字）
     '标注',
     # 单字
-    '段', '从', '当', '父', '类', '接口', '新', '己', '设', '为', '于',
+    '段', '从', '当', '父', '类', '接口', '新', '己', '设', '为', '于', '数',
     # 逻辑（单字）
     '且', '或', '非',
     # 算术（单字）
@@ -56,7 +67,7 @@ KEYWORDS = [
     '真', '假', '空',
     # 内置类型（单字/二字）
     '整数', '浮数', '布尔', '任意',
-    '数', '列', '串', '典', '集',
+    '列', '串', '典', '集',
 ]
 
 # 关键词到其类型的映射
@@ -450,34 +461,24 @@ class DuanLangTokenizer:
 
                     # 不是关键字，则收集连续字符作为标识符（支持CJK/字母/数字混合）
                     start_line, start_col = line, col
+                    
+                    # 先收集完整的汉字序列（直到非汉字字符）
+                    cjk_run = ''
+                    while i < source_len and is_cjk_char(source[i]):
+                        cjk_run += source[i]
+                        advance()
+                    
+                    if cjk_run:
+                        # 在汉字序列中扫描嵌入式关键字（类似手写解析器的中文分词逻辑）
+                        self._tokenize_cjk_with_embedded_keywords(cjk_run, start_line, start_col, tokens)
+                        start_col = col  # update after CJK processing
+                    
+                    # 继续收集字母/数字序列
                     text = ''
-                    has_alphanumeric = False  # 标记是否已经收集了字母或数字
-
+                    has_alphanumeric = False
                     while i < source_len:
                         c = source[i]
-                        if is_cjk_char(c):
-                            # 检查是否是关键词的开头
-                            keyword_found = False
-                            for kw_len in range(KEYWORD_MAX_LEN, 0, -1):
-                                if i + kw_len <= source_len:
-                                    kw_text = source[i:i+kw_len]
-                                    if kw_text in KEYWORD_SET:
-                                        # 复合词安全关键词：永不阻断标识符收集
-                                        # （如"计数"中的"数"，"列表"中的"列"）
-                                        if kw_len == 1 and kw_text in COMPOUND_SAFE_SINGLE_KEYWORDS:
-                                            continue
-                                        # 只有当已经收集了字母/数字时，才让关键词阻断标识符收集
-                                        # 这样可以正确处理：
-                                        # - n减1 -> n 减 1（减是关键词，前面有字母）
-                                        # - 阶乘 -> 阶乘（乘是关键词，但前面没有字母/数字）
-                                        if has_alphanumeric:
-                                            keyword_found = True
-                                            break
-                            if keyword_found:
-                                break
-                            text += c
-                            advance()
-                        elif is_letter(c):
+                        if is_letter(c):
                             text += c
                             has_alphanumeric = True
                             advance()
@@ -485,15 +486,22 @@ class DuanLangTokenizer:
                             text += c
                             has_alphanumeric = True
                             advance()
+                        elif is_cjk_char(c):
+                            # 遇到新的CJK字符，先输出当前文本，再处理CJK序列
+                            break
                         else:
                             break
-
+                    
                     if text:
-                        # 检查是否是内置类型
-                        if text in KEYWORD_TOKEN_MAP:
-                            tokens.append(Token(KEYWORD_TOKEN_MAP[text], text, start_line, start_col))
+                        # 纯数字序列输出为 NUMBER，否则输出为 ID
+                        if text.isdigit():
+                            tokens.append(Token('NUMBER', text, start_line, start_col))
                         else:
                             tokens.append(Token('ID', text, start_line, start_col))
+                    
+                    # 如果还有未处理的CJK字符，递归处理
+                    if i < source_len and is_cjk_char(source[i]):
+                        continue  # 回到主循环处理下一个CJK序列
                     continue
 
                 # ---------- 数字 ----------
@@ -522,6 +530,89 @@ class DuanLangTokenizer:
 
         # 不再在这里添加 EOF，让 nextToken 方法处理
         return tokens
+
+    def _tokenize_cjk_with_embedded_keywords(
+        self, cjk_run: str, line: int, col: int, tokens: List[Token]
+    ):
+        """扫描汉字序列中的嵌入式关键字并分词
+
+        类似手写解析器(src/lexer.py)的 _tokenize_chinese_sequence 方法逻辑：
+        1. 从序列中按最长匹配查找关键字
+        2. 将关键字前后的文本作为标识符输出
+        3. 在序列起始位置处理复合词安全（避免拆分"列表"为"列"+"表"），
+           但在序列中间位置不跳过关键字（确保"甲加乙"中的"加"被识别）
+
+        Args:
+            cjk_run: 纯汉字序列（不含非汉字字符）
+            line: 起始行号
+            col: 起始列号
+            tokens: 输出 token 列表
+        """
+        pos = 0
+        run_len = len(cjk_run)
+        current_line = line
+        current_col = col
+
+        while pos < run_len:
+            # ---------- 尝试匹配最长关键字 ----------
+            matched_keyword = None
+            for kw_len in range(KEYWORD_MAX_LEN, 0, -1):
+                if pos + kw_len <= run_len:
+                    text = cjk_run[pos:pos + kw_len]
+                    if text in KEYWORD_SET:
+                        matched_keyword = text
+                        break
+
+            if matched_keyword:
+                # 复合词安全检查（仅限起始位置）：
+                # 单字关键词在后接CJK字符时跳过，避免拆分复合词
+                # 例如："列表"不应被拆分为"列"+"表"
+                # 但对于"甲加乙"，中间的"加"仍然要识别为关键字
+                if (pos == 0
+                    and len(matched_keyword) == 1
+                    and matched_keyword in COMPOUND_SAFE_SINGLE_KEYWORDS
+                    and pos + 1 < run_len):
+                    matched_keyword = None
+
+            if matched_keyword:
+                token_type = KEYWORD_TOKEN_MAP[matched_keyword]
+                tokens.append(Token(token_type, matched_keyword, current_line, current_col))
+                pos += len(matched_keyword)
+                current_col += len(matched_keyword)
+            else:
+                # ---------- 无关键字匹配，收集连续字符作为标识符 ----------
+                id_start = pos
+                id_col = current_col
+                while pos < run_len:
+                    # 检查当前位置是否能匹配到关键字
+                    found_kw = None
+                    for kw_len in range(KEYWORD_MAX_LEN, 0, -1):
+                        if pos + kw_len <= run_len:
+                            text = cjk_run[pos:pos + kw_len]
+                            if text in KEYWORD_SET:
+                                found_kw = text
+                                break
+
+                    if found_kw:
+                        # 仅当在起始位置且为复合词安全时才跳过
+                        # （"列表"的开头不拆），其余位置直接停止收集
+                        if (pos == id_start
+                            and len(found_kw) == 1
+                            and found_kw in COMPOUND_SAFE_SINGLE_KEYWORDS
+                            and pos + 1 < run_len):
+                            # 跳过这个单字，继续收集（避免拆分"列表"）
+                            pos += 1
+                            current_col += 1
+                            continue
+                        # 遇到关键字，停止收集
+                        break
+
+                    pos += 1
+                    current_col += 1
+
+                if pos > id_start:
+                    id_text = cjk_run[id_start:pos]
+                    tokens.append(Token('ID', id_text, current_line, id_col))
 
 
 # =============================================================================

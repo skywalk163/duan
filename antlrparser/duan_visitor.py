@@ -2220,12 +2220,25 @@ class DuanParser:
 # =============================================================================
 
 def parse_source(source: str) -> Module:
-    """解析段言源代码，返回 AST"""
+    """解析段言源代码，返回 AST（错误信息已包含中文翻译）"""
+    from duan_error_handler import format_error_context
+
     parser = DuanParser()
     module = parser.parse(source)
     if parser.errors:
+        # 尝试显示行号和源码上下文
+        import re
         for err in parser.errors:
             print(f"[语法错误] {err}", file=sys.stderr)
+            # 尝试从错误消息中提取行号并显示上下文
+            m = re.search(r'第(\d+)行', err)
+            if m:
+                line = int(m.group(1))
+                col_m = re.search(r'第(\d+)列', err)
+                column = int(col_m.group(1)) if col_m else 0
+                context = format_error_context(source, line, column)
+                if context:
+                    print(f"{context}\n", file=sys.stderr)
     return module
 
 
