@@ -1,64 +1,43 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "duan-lang"
-version = "1.0.0"
-description = "段言（Duan）- 中文编程语言"
+version = "0.2.0"
+description = "段言（Duan）编程语言 - 中文编程语言解释器"
 readme = "README.md"
 requires-python = ">=3.10"
-license = "MIT"
-
+license = {text = "MIT"}
 authors = [
-    {name = "Dumate", email = "dumate@example.com"},
+    {name = "Duan Language Contributors"},
 ]
-
 keywords = ["chinese", "programming-language", "cnlang", "中文编程"]
-
 classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Education",
-    "Natural Language :: Chinese (Simplified)",
-    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Compilers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Topic :: Software Development :: Interpreters",
+    "Natural Language :: Chinese (Simplified)",
 ]
 
 dependencies = [
     "antlr4-python3-runtime==4.13.2",
-    "antlr4-tools>=0.2.0",
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/dumate/duan"
-"Repository" = "https://github.com/dumate/duan"
+Homepage = "https://github.com/duan-lang/duan"
+Repository = "https://github.com/duan-lang/duan"
 
 [project.scripts]
-duan = "cli.duan_unified:main"
-duanc = "cli.duanc:main"
+duan = "antlrparser.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["src*", "cli*", "stdlib*", "antlrparser*"]
+include = ["antlrparser", "antlrparser.*"]
+exclude = ["antlrparser.test*", "antlrparser.self_hosted*", "antlrparser.duan_parser_new*", "antlrparser.duan_parser2*"]
 
 [tool.setuptools.package-data]
-stdlib = ["*.duan"]
-antlrparser = ["*.duan"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests", "antlrparser/test"]
-pythonpath = ["antlrparser", "src"]
-
-[tool.flake8]
-max-line-length = 120
-exclude = ["*.pyc", "__pycache__", "*.egg-info"]
-
-[tool.black]
-line-length = 120
-target-version = ["py310"]
+antlrparser = ["modules/*.duan"]

@@ -13,16 +13,8 @@ from dataclasses import dataclass, field
 import sys
 import os
 
-# 优先尝试导入ANTLR生成的AST（用于编译流程）
-try:
-    _current_dir = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, os.path.join(_current_dir, '..', 'antlrparser'))
-    from duan_ast import *
-    _USE_DUAN_AST = True
-except ImportError:
-    # 回退到统一AST（用于测试）
-    from ast_unified import *
-    _USE_DUAN_AST = False
+# 导入统一 AST 节点定义
+from ast_nodes import *
 
 
 # =============================================================================
