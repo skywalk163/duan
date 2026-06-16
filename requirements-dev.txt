@@ -1,7 +1,7 @@
 # 段言（Duan）开发依赖
 
 # 核心依赖
-antlr4-python3-runtime>=4.13.0
+antlr4-python3-runtime==4.13.2
 antlr4-tools>=0.2.0
 
 # 开发工具
