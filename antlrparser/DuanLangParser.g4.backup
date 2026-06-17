@@ -1,0 +1,347 @@
+/*
+ * 段言（Duan）编程语言 ANTLR4 语法定义
+ *
+ * 版本: v1.0
+ * 独立的 Parser 语法，配合 DuanLangLexer 使用
+ */
+
+parser grammar DuanLangParser;
+
+options { tokenVocab = DuanLangLexer; }
+
+// 显式声明这些 token 以避免隐式定义警告
+tokens {
+    PERIOD,
+    ASSIGN
+}
+
+@header {
+from typing import List, Optional, Tuple, Any, Union
+}
+
+
+// ================================================================
+// PARSER RULES
+// ================================================================
+
+// ----- 程序入口 -----
+
+program
+    : ( moduleDecl
+      | importStmt
+      | exportStmt
+      | definition
+      | stmt
+      )* EOF
+    ;
+
+moduleDecl
+    : LBRACKET ID RBRACKET
+    ;
+
+definition
+    : paragraphDef
+    | classDef
+    | interfaceDef
+    | dataTypeDef
+    | errorTypeDef
+    ;
+
+// ----- 段落定义（统一语法）-----
+
+paragraphDef
+    : K_SEGMENT ( BOOK_L ID BOOK_R | ID ) ( K_RECEIVE paramList )? ( K_RETURN typeAnnotation )?
+      COLON
+      block
+      K_END PERIOD?
+    ;
+
+// ----- 类定义（统一语法）-----
+
+classDef
+    : K_CLASS ID genericParams?
+      ( K_INHERIT typeAnnotation ( COMMA typeAnnotation )* )?
+      ( K_IMPLEMENTS typeAnnotation ( COMMA typeAnnotation )* )?
+      COLON
+      classMember*
+      K_END PERIOD?
+    ;
+
+genericParams
+    : LBRACKET ID ( COMMA ID )* RBRACKET
+    ;
+
+classMember
+    : methodDef
+    | constructorDef
+    | attributeDecl
+    | stmt
+    ;
+
+methodDef
+    : ( K_METHOD | K_SEGMENT ) ID ( LPAREN paramList? RPAREN | K_RECEIVE paramList )? ( K_RETURN typeAnnotation )?
+      COLON block K_END PERIOD?
+    ;
+
+constructorDef
+    : K_CONSTRUCTOR LPAREN paramList? RPAREN COLON block K_END PERIOD?
+    ;
+
+attributeDecl
+    : K_ATTRIBUTE ID ( COLON typeAnnotation )? ( K_EQUAL expr )? PERIOD?
+    ;
+
+// ----- 接口定义（统一语法）-----
+
+interfaceDef
+    : K_INTERFACE ID
+      ( K_INHERIT typeAnnotation ( COMMA typeAnnotation )* )?
+      COLON
+      interfaceMember*
+      K_END PERIOD?
+    ;
+
+interfaceMember
+    : K_METHOD ID LPAREN paramList? RPAREN ( K_RETURN typeAnnotation )? PERIOD?
+    ;
+
+paramList
+    : param ( COMMA param )*
+    ;
+
+param
+    : ID ( COLON typeAnnotation )? ( K_EQUAL expr )?
+    ;
+
+block
+    : stmt*
+    ;
+
+// ----- 类型定义 -----
+
+dataTypeDef
+    : BOOK_L ID BOOK_R K_DATA_TYPE COLON
+      dataTypeField+
+      K_END PERIOD?
+    ;
+
+dataTypeField
+    : ID COLON typeAnnotation PERIOD?
+    ;
+
+errorTypeDef
+    : BOOK_L ID BOOK_R K_ERROR_TYPE COLON
+      dataTypeField+
+      K_END PERIOD?
+    ;
+
+// ----- 导入/导出 -----
+
+importStmt
+    : K_FROM path K_IMPORT importList PERIOD?
+    | K_IMPORT importList PERIOD?
+    ;
+
+exportStmt
+    : K_EXPORT ( ID | BOOK_L ID BOOK_R ) PERIOD?
+    ;
+
+path
+    : ID ( PATH_SEP ID )*
+    | BOOK_L ID BOOK_R
+    ;
+
+importList
+    : importItem ( COMMA importItem )*
+    ;
+
+importItem
+    : BOOK_L ID BOOK_R
+    | ID
+    ;
+
+// ----- 语句 -----
+
+stmt
+    : varDecl
+    | assignStmt
+    | ifStmt
+    | foreachStmt
+    | whileStmt
+    | returnStmt
+    | breakStmt
+    | continueStmt
+    | tryStmt
+    | throwStmt
+    | printStmt
+    | exprStmt
+    ;
+
+varDecl
+    : K_SET ID K_AS expr PERIOD ( K_TYPE typeAnnotation )?    // 统一语法：设 甲 为 三
+    | K_DEFINE ID ( K_EQUAL expr PERIOD )?                    // 兼容旧语法
+    ;
+
+assignStmt
+    : target ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?            // 支持 =、等于、为 三种赋值
+    ;
+
+target
+    : ID
+    | expr K_OF ID
+    | primary DOT ID                                          // 属性访问作为赋值目标
+    ;
+
+ifStmt
+    : K_IF expr COLON block
+      ( K_ELSE_IF expr COLON block )*
+      ( K_ELSE COLON block )?
+      K_END PERIOD?
+    ;
+
+foreachStmt
+    : K_FOREACH ID ( K_OF | K_AT ) expr
+      COLON block
+      K_END PERIOD?
+    ;
+
+foreachVar
+    : ID
+    | ID K_OF ID
+    | ID K_OF ID COMMA ID
+    ;
+
+whileStmt
+    : K_WHILE expr
+      ( COLON block )?
+      K_END PERIOD?
+    ;
+
+returnStmt
+    : K_RETURN expr? PERIOD?
+    ;
+
+breakStmt
+    : K_BREAK PERIOD?
+    ;
+
+continueStmt
+    : K_CONTINUE PERIOD?
+    ;
+
+tryStmt
+    : K_TRY COLON block
+      K_CATCH ID COLON block
+      K_END PERIOD?
+    ;
+
+throwStmt
+    : K_THROW expr PERIOD?
+    ;
+
+printStmt
+    : ( K_PRINT | K_OUTPUT ) expr PERIOD?
+    ;
+
+exprStmt
+    : expr PERIOD
+    ;
+
+// ----- 表达式 -----
+
+expr
+    : pipelineExpr
+    ;
+
+pipelineExpr
+    : andExpr ( ( PIPE | K_AND_WORD ) andExpr )*
+    ;
+
+andExpr
+    : orExpr ( K_AND orExpr )*
+    ;
+
+orExpr
+    : comparisonExpr ( K_OR comparisonExpr )*
+    ;
+
+comparisonExpr
+    : additiveExpr ( compOp additiveExpr )*
+    ;
+
+compOp
+    : K_GE | K_LE | K_GT | K_LT | K_NE | K_EQUAL
+    | GE | LE | GT | LT | NE | EQ
+    ;
+
+additiveExpr
+    : multiplicativeExpr ( addOp multiplicativeExpr )*
+    ;
+
+addOp
+    : K_PLUS | K_MINUS
+    | PLUS | MINUS
+    ;
+
+multiplicativeExpr
+    : unaryExpr ( multOp unaryExpr )*
+    ;
+
+multOp
+    : K_MULTIPLY | K_DIVIDE | K_MOD | K_POW
+    | MULTIPLY | DIVIDE | MODULO | POW
+    ;
+
+unaryExpr
+    : ( K_NOT | NOT ) unaryExpr
+    | ( MINUS | K_MINUS ) unaryExpr
+    | postfixExpr
+    ;
+
+postfixExpr
+    : primary
+      ( BOOK_L ID BOOK_R LPAREN exprList? RPAREN     // 《段名》(参数)
+      | LPAREN exprList? RPAREN                        // (参数)
+      | DOT ID                                         // 属性访问: 对象.属性
+      | K_OF ID                                        // 之字结构: 对象之属性
+      | LBRACKET expr RBRACKET                         // 索引: 对象[索引]
+      )*
+    ;
+
+primary
+    : NUMBER
+    | STRING
+    | K_TRUE
+    | K_FALSE
+    | K_NULL
+    | K_SELF                                              // 己（self引用）
+    | K_NEW ID LPAREN exprList? RPAREN                  // 新建 对象()
+    | ID
+    | LPAREN expr RPAREN
+    | LBRACKET dictLiteral RBRACKET
+    | LBRACKET exprList? RBRACKET
+    | BOOK_L ID BOOK_R                                 // 《段落名》
+    ;
+
+dictLiteral
+    : dictEntry ( COMMA dictEntry )*
+    ;
+
+dictEntry
+    : expr COLON expr
+    ;
+
+typeAnnotation
+    : builtinType
+    | ID
+    ;
+
+builtinType
+    : T_NUMBER | T_INT | T_FLOAT
+    | T_STRING | T_LIST | T_DICT | T_SET
+    | T_BOOL | K_NULL | T_ANY
+    ;
+
+exprList
+    : expr ( COMMA expr )*
+    ;
