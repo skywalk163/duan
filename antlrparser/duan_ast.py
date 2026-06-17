@@ -336,6 +336,30 @@ class Parameter(ASTNode):
     default_value: Optional[ASTNode] = None
 
 
+# =============================================================================
+# 异步/并发节点
+# =============================================================================
+
+@dataclass
+class AwaitExpression(ASTNode):
+    """等待表达式（等待 异步操作）"""
+    expression: ASTNode = None
+
+
+@dataclass
+class DeferStatement(ASTNode):
+    """推迟语句（推迟 语句 — 在作用域退出时执行）"""
+    body: List[ASTNode] = field(default_factory=list)
+
+
+@dataclass
+class AsyncScope(ASTNode):
+    """并行作用域（结构化并发）：并行 { 任务1 任务2 }"""
+    tasks: List[ASTNode] = field(default_factory=list)
+    result_vars: List[str] = field(default_factory=list)
+    timeout: Optional[ASTNode] = None
+
+
 @dataclass
 class SegmentDefinition(ASTNode):
     """段落定义"""

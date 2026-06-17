@@ -200,10 +200,17 @@ COMPOUND_SAFE_SINGLE_KEYWORDS = {
     '数', '列', '串', '典', '集',   # 类型
     '从',                             # 导入
     '段', '段落',                        # 段落（统一语法）
+    '当',                             # 循环（常见复合词如 当前、当时）
     '空', '真', '假',                 # 特殊值（常见复合词如 空间、真实、假设）
     '父',                             # 作用域（常见复合词如 父类、父级）
     '的',                             # 助词（常见复合词如 的确、的话）
     '加', '减', '乘', '除', '模', '幂',  # 算术运算符（常见复合词如 加法、减法、乘法）
+}
+
+# 复合词安全二字关键词：这些二字关键词在复合词中作为后缀很常见，
+# 当标识符已收集字符时，应跳过允许继续收集
+COMPOUND_SAFE_MULTI_KEYWORDS = {
+    '整数', '浮数', '布尔', '任意',   # 类型名
 }
 
 # 符号 Token 映射
@@ -501,6 +508,35 @@ class DuanLangTokenizer:
                     
                     # 如果还有未处理的CJK字符，递归处理
                     if i < source_len and is_cjk_char(source[i]):
+                        # 检查ASCII前缀后的CJK序列是否含有关键字
+                        # 如果不含关键字，则应与前面的ASCII ID合并为一个标识符
+                        # 例如 "__async_异步任务" 不应被拆分为两个token
+                        cjk_rest = ''
+                        lookahead = i
+                        while lookahead < source_len and is_cjk_char(source[lookahead]):
+                            cjk_rest += source[lookahead]
+                            lookahead += 1
+                        
+                        if cjk_rest and text:
+                            # 检查CJK部分是否含有关键字
+                            has_keyword = False
+                            for kw_len in range(KEYWORD_MAX_LEN, 0, -1):
+                                for start_pos in range(len(cjk_rest) - kw_len + 1):
+                                    if cjk_rest[start_pos:start_pos + kw_len] in KEYWORD_SET:
+                                        has_keyword = True
+                                        break
+                                if has_keyword:
+                                    break
+                            
+                            if not has_keyword:
+                                # CJK部分不含关键字，合并为单一标识符
+                                combined = text + cjk_rest
+                                # 替换最后一个token
+                                tokens[-1] = Token('ID', combined, start_line, start_col)
+                                # 跳过CJK字符
+                                for _ in range(len(cjk_rest)):
+                                    advance()
+                                continue
                         continue  # 回到主循环处理下一个CJK序列
                     continue
 
@@ -594,15 +630,22 @@ class DuanLangTokenizer:
                                 break
 
                     if found_kw:
-                        # 仅当在起始位置且为复合词安全时才跳过
-                        # （"列表"的开头不拆），其余位置直接停止收集
-                        if (pos == id_start
-                            and len(found_kw) == 1
-                            and found_kw in COMPOUND_SAFE_SINGLE_KEYWORDS
-                            and pos + 1 < run_len):
-                            # 跳过这个单字，继续收集（避免拆分"列表"）
+                        # 复合词安全：单字类型关键词（数/列/串/典/集等）在复合词中出现时不拆分
+                        # 例如"列表""整数""字符串""随机整数"中的"列""数""串"不应视为单独关键词
+                        if (len(found_kw) == 1
+                            and found_kw in COMPOUND_SAFE_SINGLE_KEYWORDS):
+                            # 跳过这个单字，继续收集（避免拆分"列表""整数"等）
                             pos += 1
                             current_col += 1
+                            continue
+                        # 复合词安全：二字类型关键词（整数/浮数/布尔等）在复合词末尾不拆分
+                        # 例如"随机整数""和数据"中的"整数""布尔"等
+                        if (len(found_kw) > 1
+                            and found_kw in COMPOUND_SAFE_MULTI_KEYWORDS
+                            and pos > id_start):
+                            # 跳过这个关键词，继续收集
+                            pos += len(found_kw)
+                            current_col += len(found_kw)
                             continue
                         # 遇到关键字，停止收集
                         break

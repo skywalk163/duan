@@ -9,7 +9,11 @@ from typing import List, Optional, Dict
 from dataclasses import dataclass, field
 
 # 导入类型推断器
-from type_inferencer import TypeInferencer, StringType, NumberType
+from type_inferencer import (
+    TypeInferencer, StringType, NumberType, ListType, DictType,
+    BooleanType, NullType, FunctionType, EnumType, TraitType,
+    OptionalTypeWrapper, GenericTypeInstance, FutureType,
+)
 
 
 # =============================================================================
@@ -167,6 +171,7 @@ class UnifiedCodeGenerator:
         self._add_line("# 导入段言标准库")
         self._add_line("import sys")
         self._add_line("import os")
+        self._add_line("import asyncio")  # 用于 async/await 支持
         self._add_line("")
         self._add_line("try:")
         self._add_line("    import importlib.util")
@@ -220,6 +225,21 @@ class UnifiedCodeGenerator:
             for imp in module.imports:
                 self._generate_import_stmt(imp)
             self._add_line("")
+        
+        # 生成枚举定义（ADT）
+        if hasattr(module, 'enums'):
+            for enum_def in module.enums:
+                self._generate_enum(enum_def)
+        
+        # 生成 trait 定义
+        if hasattr(module, 'trait_defs'):
+            for trait_def in module.trait_defs:
+                self._generate_trait_def(trait_def)
+        
+        # 生成 trait 实现
+        if hasattr(module, 'trait_impls'):
+            for trait_impl in module.trait_impls:
+                self._generate_trait_impl(trait_impl)
         
         # 生成段落定义
         if hasattr(module, 'segments'):
@@ -352,6 +372,14 @@ class UnifiedCodeGenerator:
         # 类定义
         elif is_instance(stmt, 'ClassDefinition'):
             self._generate_class(stmt)
+        
+        # 推迟语句（defer）
+        elif is_instance(stmt, 'DeferStatement'):
+            self._generate_defer_stmt(stmt)
+        
+        # 并行作用域（结构化并发）
+        elif is_instance(stmt, 'AsyncScope'):
+            self._generate_async_scope(stmt)
         
         # 未知类型
         else:
@@ -528,6 +556,45 @@ class UnifiedCodeGenerator:
         variables = ', '.join(self._sanitize_name(v) for v in stmt.variables)
         value = self._generate_expr(stmt.value)
         self._add_line(f"{variables} = {value}")
+
+    def _generate_defer_stmt(self, stmt):
+        """生成推迟语句（用 try/finally 模拟 defer）"""
+        # 使用 try/finally 包裹 defer 体
+        self._add_line("try:")
+        self.indent_level += 1
+        # 暂存 defer 体中的语句（需要在 finally 中执行）
+        defer_body = list(stmt.body)
+        # 在 try 块中生成一个占位语句，实际逻辑在 finally 中
+        self._add_line("pass")
+        self.indent_level -= 1
+        
+        self._add_line("finally:")
+        self.indent_level += 1
+        for s in defer_body:
+            self._generate_statement(s)
+        self.indent_level -= 1
+
+    def _generate_async_scope(self, stmt):
+        """生成并行作用域（结构化并发，使用 asyncio.gather 实现）"""
+        # 并行 { 任务1 任务2 }
+        # 转换为：result1, result2 = await asyncio.gather(task1(), task2())
+        task_codes = []
+        result_vars = getattr(stmt, 'result_vars', [])
+        tasks = getattr(stmt, 'tasks', [])
+        
+        for task in tasks:
+            task_code = self._generate_expr(task)
+            task_codes.append(task_code)
+        
+        if task_codes:
+            tasks_str = ', '.join(task_codes)
+            if result_vars:
+                vars_str = ', '.join(self._sanitize_name(v) for v in result_vars)
+                self._add_line(f"{vars_str} = await asyncio.gather({tasks_str})")
+            else:
+                self._add_line(f"await asyncio.gather({tasks_str})")
+        else:
+            self._add_line("pass")
     
     def _generate_decorator(self, stmt):
         """生成装饰器定义：@段落名 标注 段落 ..."""
@@ -568,8 +635,12 @@ class UnifiedCodeGenerator:
         
         params_str = ', '.join(params) if params else ''
         
+        # 检查是否为异步函数
+        is_async = '异步' in getattr(segment, 'modifiers', [])
+        def_keyword = 'async def' if is_async else 'def'
+        
         # 函数定义
-        self._add_line(f"def {name}({params_str}):")
+        self._add_line(f"{def_keyword} {name}({params_str}):")
         
         self.indent_level += 1
         if hasattr(segment, 'body') and segment.body:
@@ -581,6 +652,97 @@ class UnifiedCodeGenerator:
         
         self._add_line("")
     
+    def _generate_enum(self, enum_def):
+        """生成枚举/ADT 定义（Python 中转换为继承自 object 的类）"""
+        name = self._sanitize_name(enum_def.name)
+        
+        # 使用类模拟枚举
+        self._add_line(f"class {name}:")
+        self.indent_level += 1
+        
+        # 生成变体作为类属性，每个变体是一个简单命名元组
+        for variant in enum_def.variants:
+            variant_name = self._sanitize_name(variant.name)
+            if variant.fields:
+                # 带字段的变体用 __init__ 初始化
+                field_names = [f.name for f in variant.fields]
+                field_str = ', '.join(f"self.{f} = {f}" for f in field_names)
+                self._add_line(f"def __init__(self, {', '.join(field_names)}):")
+                self.indent_level += 1
+                self._add_line(f"self._variant = '{variant_name}'")
+                for f in field_names:
+                    self._add_line(f"self.{f} = {f}")
+                self.indent_level -= 1
+            else:
+                # 无字段的变体用类属性
+                self._add_line(f"pass")
+        
+        self._add_line("")
+        self._add_line("@classmethod")
+        self._add_line("def _variants(cls):")
+        self.indent_level += 1
+        variant_names = [v.name for v in enum_def.variants]
+        names_str = ", ".join(f"'{n}'" for n in variant_names)
+        self._add_line(f"return [{names_str}]")
+        self.indent_level -= 1
+        
+        self.indent_level -= 1
+        self._add_line("")
+
+    def _generate_trait_def(self, trait_def):
+        """生成 trait 定义（Python 中转换为抽象基类）"""
+        name = self._sanitize_name(trait_def.name)
+        
+        self._add_line(f"class {name}(ABC):")
+        self.indent_level += 1
+        
+        for method in trait_def.methods:
+            params = ['self']
+            for p in method.parameters:
+                params.append(self._sanitize_name(p.name))
+            params_str = ', '.join(params)
+            
+            if method.has_default:
+                # 有默认实现的方法
+                self._add_line(f"def {method.name}({params_str}):")
+                self.indent_level += 1
+                self._add_line(f"raise NotImplementedError")
+                self.indent_level -= 1
+            else:
+                # 无默认实现的抽象方法
+                self._add_line("@abstractmethod")
+                self._add_line(f"def {method.name}({params_str}):")
+                self.indent_level += 1
+                self._add_line(f"pass")
+                self.indent_level -= 1
+        
+        self.indent_level -= 1
+        self._add_line("")
+        self._needs_abc = True
+
+    def _generate_trait_impl(self, trait_impl):
+        """生成 trait 实现（Python 中混入继承或注册）"""
+        type_name = self._sanitize_name(trait_impl.type_name)
+        trait_name = self._sanitize_name(trait_impl.trait_name)
+        
+        # 将 trait 的方法添加到类型上（作为独立函数）
+        for method in trait_impl.methods:
+            params = ['self']
+            for p in method.parameters:
+                params.append(self._sanitize_name(p.name))
+            params_str = ', '.join(params)
+            
+            self._add_line(f"def {method.name}({params_str}):")
+            self.indent_level += 1
+            for stmt in method.body:
+                self._generate_statement(stmt)
+            self.indent_level -= 1
+            self._add_line("")
+        
+        # 注册实现关系
+        self._add_line(f"# {type_name} implements {trait_name}")
+        self._add_line("")
+
     def _generate_class(self, cls):
         """生成类定义"""
         name = self._sanitize_name(cls.name)
@@ -854,6 +1016,11 @@ class UnifiedCodeGenerator:
                 cond = self._generate_expr(expr.condition)
                 return f"{{{key}: {val} for {var} in {iterable} if {cond}}}"
             return f"{{{key}: {val} for {var} in {iterable}}}"
+        
+        # 异步等待表达式
+        elif is_instance(expr, 'AwaitExpression'):
+            inner_code = self._generate_expr(expr.expression)
+            return f"await {inner_code}"
         
         # 默认：尝试直接转换为字符串
         return str(expr)

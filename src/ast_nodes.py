@@ -336,6 +336,30 @@ class Parameter(ASTNode):
     default_value: Optional[ASTNode] = None
 
 
+# =============================================================================
+# 异步/并发节点
+# =============================================================================
+
+@dataclass
+class AwaitExpression(ASTNode):
+    """等待表达式（等待 异步操作）"""
+    expression: ASTNode = None
+
+
+@dataclass
+class DeferStatement(ASTNode):
+    """推迟语句（推迟 语句 — 在作用域退出时执行）"""
+    body: List[ASTNode] = field(default_factory=list)
+
+
+@dataclass
+class AsyncScope(ASTNode):
+    """并行作用域（结构化并发）：并行 { 任务1 任务2 }"""
+    tasks: List[ASTNode] = field(default_factory=list)
+    result_vars: List[str] = field(default_factory=list)  # 可选的返回结果变量
+    timeout: Optional[ASTNode] = None  # 可选超时
+
+
 @dataclass
 class SegmentDefinition(ASTNode):
     """段落定义"""
@@ -443,9 +467,89 @@ class InterfaceDefinition(ASTNode):
 
 @dataclass
 class GenericType(ASTNode):
-    """泛型类型"""
+    """泛型类型（如 列表[数]、字典[串, 数]）"""
     base_type: str = ""
     type_arguments: List[str] = field(default_factory=list)
+
+
+@dataclass
+class GenericParameterDecl(ASTNode):
+    """泛型参数声明"""
+    name: str = ""
+    constraint: Optional[str] = None  # 可选的上界约束
+
+
+# =============================================================================
+# 枚举/代数数据类型（ADT）
+# =============================================================================
+
+@dataclass
+class EnumVariant(ASTNode):
+    """枚举变体"""
+    name: str = ""
+    fields: List[DataTypeField] = field(default_factory=list)  # 携带的数据字段
+
+
+@dataclass
+class EnumDefinition(ASTNode):
+    """枚举/代数数据类型定义"""
+    name: str = ""
+    generic_params: List[str] = field(default_factory=list)
+    variants: List[EnumVariant] = field(default_factory=list)
+    derives: List[str] = field(default_factory=list)  # 派生 trait（如 相等, 比较）
+
+
+# =============================================================================
+# Trait/接口系统增强
+# =============================================================================
+
+@dataclass
+class TraitMethodSignature(ASTNode):
+    """Trait 方法签名"""
+    name: str = ""
+    parameters: List[Parameter] = field(default_factory=list)
+    return_type: str = ""
+    has_default: bool = False  # 是否有默认实现
+
+
+@dataclass
+class TraitDefinition(ASTNode):
+    """Trait 定义"""
+    name: str = ""
+    generic_params: List[str] = field(default_factory=list)
+    methods: List[TraitMethodSignature] = field(default_factory=list)
+    super_traits: List[str] = field(default_factory=list)
+
+
+@dataclass
+class TraitImplementation(ASTNode):
+    """Trait 实现"""
+    trait_name: str = ""
+    type_name: str = ""
+    methods: List[MethodDefinition] = field(default_factory=list)
+    generic_args: List[str] = field(default_factory=list)  # 泛型实参
+
+
+# =============================================================================
+# 空安全类型
+# =============================================================================
+
+@dataclass
+class OptionalType(ASTNode):
+    """可空类型（如 数|空）"""
+    inner_type: str = ""
+
+
+# =============================================================================
+# 类型别名
+# =============================================================================
+
+@dataclass
+class TypeAlias(ASTNode):
+    """类型别名定义"""
+    name: str = ""
+    target_type: str = ""
+    generic_params: List[str] = field(default_factory=list)
 
 
 # =============================================================================
@@ -477,6 +581,11 @@ class Module(ASTNode):
     data_types: List[DataTypeDefinition] = field(default_factory=list)
     error_types: List[ErrorTypeDefinition] = field(default_factory=list)
     statements: List[ASTNode] = field(default_factory=list)
+    # 新类型定义
+    enums: List[EnumDefinition] = field(default_factory=list)
+    trait_defs: List[TraitDefinition] = field(default_factory=list)
+    trait_impls: List[TraitImplementation] = field(default_factory=list)
+    type_aliases: List[TypeAlias] = field(default_factory=list)
 
 
 # =============================================================================
