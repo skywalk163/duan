@@ -24,6 +24,8 @@ from duan_ast import (
     ImportStatement, ExportStatement,
     ClassDefinition, InterfaceDefinition, MethodDefinition, ConstructorDefinition,
     InterfaceMethod, InterfaceProperty, SelfReference,
+    AwaitExpression, DeferStatement, AsyncScope,
+    StringInterpolation,
 )
 
 # 导入模块解析器
@@ -389,6 +391,9 @@ class Interpreter:
     def _register_builtins(self):
         """注册内置函数"""
         builtins = [
+            # I/O操作
+            DuanBuiltinFunction('打印', self._builtin_print, min_args=1),
+            DuanBuiltinFunction('输出', self._builtin_print, min_args=1),
             # 典操作
             DuanBuiltinFunction('_典', self._builtin_dict, min_args=0),
             # 类型转换
@@ -450,12 +455,74 @@ class Interpreter:
             # 调试函数
             DuanBuiltinFunction('printDebug', self._builtin_print_debug, min_args=2, max_args=2),
             DuanBuiltinFunction('assert', self._builtin_assert, min_args=2, max_args=2),
+            # 新数学函数
+            DuanBuiltinFunction('随机整数', self._builtin_random_int, min_args=2, max_args=2),
+            DuanBuiltinFunction('randomInt', self._builtin_random_int, min_args=2, max_args=2),
+            DuanBuiltinFunction('随机浮点', self._builtin_random_float, min_args=0, max_args=0),
+            DuanBuiltinFunction('randomFloat', self._builtin_random_float, min_args=0, max_args=0),
+            DuanBuiltinFunction('阶乘', self._builtin_factorial, min_args=1, max_args=1),
+            DuanBuiltinFunction('factorial', self._builtin_factorial, min_args=1, max_args=1),
+            DuanBuiltinFunction('平均数', self._builtin_mean, min_args=1, max_args=1),
+            DuanBuiltinFunction('mean', self._builtin_mean, min_args=1, max_args=1),
+            DuanBuiltinFunction('中位数', self._builtin_median, min_args=1, max_args=1),
+            DuanBuiltinFunction('median', self._builtin_median, min_args=1, max_args=1),
+            DuanBuiltinFunction('求和', self._builtin_sum, min_args=1, max_args=1),
+            DuanBuiltinFunction('sum', self._builtin_sum, min_args=1, max_args=1),
+            DuanBuiltinFunction('圆周率', self._builtin_pi, min_args=0, max_args=0),
+            DuanBuiltinFunction('pi', self._builtin_pi, min_args=0, max_args=0),
+            DuanBuiltinFunction('自然常数', self._builtin_e, min_args=0, max_args=0),
+            DuanBuiltinFunction('e', self._builtin_e, min_args=0, max_args=0),
+            # JSON 函数
+            DuanBuiltinFunction('解析JSON', self._builtin_parse_json, min_args=1, max_args=1),
+            DuanBuiltinFunction('解析字典', self._builtin_parse_json, min_args=1, max_args=1),
+            DuanBuiltinFunction('parseJSON', self._builtin_parse_json, min_args=1, max_args=1),
+            DuanBuiltinFunction('序列化JSON', self._builtin_stringify_json, min_args=1, max_args=2),
+            DuanBuiltinFunction('序列化字典', self._builtin_stringify_json, min_args=1, max_args=2),
+            DuanBuiltinFunction('stringifyJSON', self._builtin_stringify_json, min_args=1, max_args=2),
+            # 日期时间函数
+            DuanBuiltinFunction('当前时间', self._builtin_current_time, min_args=0, max_args=1),
+            DuanBuiltinFunction('formatTime', self._builtin_current_time, min_args=0, max_args=1),
+            DuanBuiltinFunction('当前日期', self._builtin_current_date, min_args=0, max_args=1),
+            DuanBuiltinFunction('formatDate', self._builtin_current_date, min_args=0, max_args=1),
+            DuanBuiltinFunction('时间戳', self._builtin_timestamp, min_args=0, max_args=0),
+            DuanBuiltinFunction('timestamp', self._builtin_timestamp, min_args=0, max_args=0),
+            DuanBuiltinFunction('格式化时间', self._builtin_format_time, min_args=2, max_args=2),
+            DuanBuiltinFunction('formatTime', self._builtin_format_time, min_args=2, max_args=2),
+            DuanBuiltinFunction('日期差', self._builtin_date_diff, min_args=2, max_args=2),
+            DuanBuiltinFunction('dateDiff', self._builtin_date_diff, min_args=2, max_args=2),
+            # 哈希函数
+            DuanBuiltinFunction('MD5', self._builtin_md5, min_args=1, max_args=1),
+            DuanBuiltinFunction('md5', self._builtin_md5, min_args=1, max_args=1),
+            DuanBuiltinFunction('SHA256', self._builtin_sha256, min_args=1, max_args=1),
+            DuanBuiltinFunction('sha256', self._builtin_sha256, min_args=1, max_args=1),
+            DuanBuiltinFunction('Base64编码', self._builtin_base64_encode, min_args=1, max_args=1),
+            DuanBuiltinFunction('base64Encode', self._builtin_base64_encode, min_args=1, max_args=1),
+            DuanBuiltinFunction('Base64解码', self._builtin_base64_decode, min_args=1, max_args=1),
+            DuanBuiltinFunction('base64Decode', self._builtin_base64_decode, min_args=1, max_args=1),
+            # 正则表达式函数
+            DuanBuiltinFunction('匹配', self._builtin_regex_match, min_args=2, max_args=2),
+            DuanBuiltinFunction('regexMatch', self._builtin_regex_match, min_args=2, max_args=2),
+            DuanBuiltinFunction('搜索', self._builtin_regex_search, min_args=2, max_args=2),
+            DuanBuiltinFunction('regexSearch', self._builtin_regex_search, min_args=2, max_args=2),
+            DuanBuiltinFunction('查找所有', self._builtin_regex_find_all, min_args=2, max_args=2),
+            DuanBuiltinFunction('regexFindAll', self._builtin_regex_find_all, min_args=2, max_args=2),
+            DuanBuiltinFunction('替换', self._builtin_regex_replace, min_args=3, max_args=3),
+            DuanBuiltinFunction('regexReplace', self._builtin_regex_replace, min_args=3, max_args=3),
+            DuanBuiltinFunction('分割', self._builtin_regex_split, min_args=2, max_args=2),
+            DuanBuiltinFunction('regexSplit', self._builtin_regex_split, min_args=2, max_args=2),
         ]
         for b in builtins:
             self.global_env.define(b.name, DuanValue(b, '内置段'))
     
     # ----- 内置函数实现 -----
-    
+
+    def _builtin_print(self, args: List[DuanValue]) -> DuanValue:
+        """打印输出"""
+        text = ' '.join(str(a) for a in args)
+        self.output_lines.append(text)
+        print(text)
+        return DuanValue(None, '空')
+
     def _builtin_dict(self, args: List[DuanValue]) -> DuanValue:
         """创建典：_典(键1, 值1, 键2, 值2, ...)"""
         result = {}
@@ -939,6 +1006,231 @@ class Interpreter:
             raise RuntimeError(f"断言失败: {msg}")
         return DuanValue(None, '空')
     
+    # ----- 新数学函数 -----
+    
+    def _builtin_random_int(self, args: List[DuanValue]) -> DuanValue:
+        """随机整数"""
+        import random
+        lo = int(args[0].value)
+        hi = int(args[1].value)
+        return DuanValue(random.randint(lo, hi), '数')
+    
+    def _builtin_random_float(self, args: List[DuanValue]) -> DuanValue:
+        """随机浮点 [0,1)"""
+        import random
+        return DuanValue(random.random(), '数')
+    
+    def _builtin_factorial(self, args: List[DuanValue]) -> DuanValue:
+        """阶乘"""
+        n = int(args[0].value)
+        if n < 0:
+            raise RuntimeError("阶乘参数不能为负数")
+        import math
+        return DuanValue(math.factorial(n), '数')
+    
+    def _builtin_mean(self, args: List[DuanValue]) -> DuanValue:
+        """平均数"""
+        data = args[0].value
+        if not isinstance(data, list) or len(data) == 0:
+            raise RuntimeError("数据列表为空")
+        import statistics
+        values = [x.value if isinstance(x, DuanValue) else x for x in data]
+        return DuanValue(statistics.mean(values), '数')
+    
+    def _builtin_median(self, args: List[DuanValue]) -> DuanValue:
+        """中位数"""
+        data = args[0].value
+        if not isinstance(data, list) or len(data) == 0:
+            raise RuntimeError("数据列表为空")
+        import statistics
+        values = [x.value if isinstance(x, DuanValue) else x for x in data]
+        return DuanValue(statistics.median(values), '数')
+    
+    def _builtin_sum(self, args: List[DuanValue]) -> DuanValue:
+        """求和"""
+        data = args[0].value
+        if not isinstance(data, list):
+            raise RuntimeError("参数必须是列表")
+        values = [x.value if isinstance(x, DuanValue) else x for x in data]
+        return DuanValue(sum(values), '数')
+    
+    def _builtin_pi(self, args: List[DuanValue]) -> DuanValue:
+        """圆周率"""
+        import math
+        return DuanValue(math.pi, '数')
+    
+    def _builtin_e(self, args: List[DuanValue]) -> DuanValue:
+        """自然常数"""
+        import math
+        return DuanValue(math.e, '数')
+    
+    # ----- JSON 函数 -----
+    
+    def _builtin_parse_json(self, args: List[DuanValue]) -> DuanValue:
+        """解析JSON字符串"""
+        import json
+        text = str(args[0].value)
+        try:
+            result = json.loads(text)
+            if isinstance(result, dict):
+                return DuanValue(result, '典')
+            elif isinstance(result, list):
+                return DuanValue(result, '列')
+            elif isinstance(result, str):
+                return DuanValue(result, '串')
+            elif isinstance(result, bool):
+                return DuanValue(result, '布尔')
+            elif isinstance(result, (int, float)):
+                return DuanValue(result, '数')
+            elif result is None:
+                return DuanValue(None, '空')
+            return DuanValue(result)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"JSON解析失败: {e}")
+    
+    def _builtin_stringify_json(self, args: List[DuanValue]) -> DuanValue:
+        """序列化为JSON字符串"""
+        import json
+        val = args[0].value
+        indent = None
+        if len(args) >= 2 and args[1].value is not None:
+            indent = int(args[1].value)
+        try:
+            result = json.dumps(val, ensure_ascii=False, indent=indent)
+            return DuanValue(result, '串')
+        except (TypeError, ValueError) as e:
+            raise RuntimeError(f"JSON序列化失败: {e}")
+    
+    # ----- 日期时间函数 -----
+    
+    def _builtin_current_time(self, args: List[DuanValue]) -> DuanValue:
+        """当前时间字符串"""
+        from datetime import datetime
+        fmt = '%Y-%m-%d %H:%M:%S'
+        if args:
+            fmt = str(args[0].value)
+        return DuanValue(datetime.now().strftime(fmt), '串')
+    
+    def _builtin_current_date(self, args: List[DuanValue]) -> DuanValue:
+        """当前日期字符串"""
+        from datetime import date
+        fmt = '%Y-%m-%d'
+        if args:
+            fmt = str(args[0].value)
+        return DuanValue(date.today().strftime(fmt), '串')
+    
+    def _builtin_timestamp(self, args: List[DuanValue]) -> DuanValue:
+        """当前时间戳"""
+        import time
+        return DuanValue(time.time(), '数')
+    
+    def _builtin_format_time(self, args: List[DuanValue]) -> DuanValue:
+        """格式化时间"""
+        from datetime import datetime
+        time_str = str(args[0].value)
+        fmt = str(args[1].value)
+        try:
+            dt = datetime.strptime(time_str, '%Y-%m-%d %H:%M:%S')
+            return DuanValue(dt.strftime(fmt), '串')
+        except ValueError:
+            try:
+                dt = datetime.strptime(time_str, '%Y-%m-%d')
+                return DuanValue(dt.strftime(fmt), '串')
+            except ValueError:
+                raise RuntimeError(f"无法解析时间: '{time_str}'")
+    
+    def _builtin_date_diff(self, args: List[DuanValue]) -> DuanValue:
+        """日期差"""
+        from datetime import datetime
+        d1 = str(args[0].value)
+        d2 = str(args[1].value)
+        try:
+            dt1 = datetime.strptime(d1, '%Y-%m-%d')
+            dt2 = datetime.strptime(d2, '%Y-%m-%d')
+            diff = (dt2 - dt1).days
+            return DuanValue(diff, '数')
+        except ValueError as e:
+            raise RuntimeError(f"日期格式无效: {e}")
+    
+    # ----- 哈希函数 -----
+    
+    def _builtin_md5(self, args: List[DuanValue]) -> DuanValue:
+        """MD5哈希"""
+        import hashlib
+        text = str(args[0].value)
+        return DuanValue(hashlib.md5(text.encode('utf-8')).hexdigest(), '串')
+    
+    def _builtin_sha256(self, args: List[DuanValue]) -> DuanValue:
+        """SHA256哈希"""
+        import hashlib
+        text = str(args[0].value)
+        return DuanValue(hashlib.sha256(text.encode('utf-8')).hexdigest(), '串')
+    
+    def _builtin_base64_encode(self, args: List[DuanValue]) -> DuanValue:
+        """Base64编码"""
+        import base64
+        text = str(args[0].value)
+        return DuanValue(base64.b64encode(text.encode('utf-8')).decode('ascii'), '串')
+    
+    def _builtin_base64_decode(self, args: List[DuanValue]) -> DuanValue:
+        """Base64解码"""
+        import base64
+        text = str(args[0].value)
+        try:
+            return DuanValue(base64.b64decode(text).decode('utf-8'), '串')
+        except Exception as e:
+            raise RuntimeError(f"Base64解码失败: {e}")
+    
+    # ----- 正则表达式函数 -----
+    
+    def _builtin_regex_match(self, args: List[DuanValue]) -> DuanValue:
+        """正则匹配（开头匹配）"""
+        import re
+        pattern = str(args[0].value)
+        text = str(args[1].value)
+        m = re.match(pattern, text)
+        if m:
+            return DuanValue(m.group(0), '串')
+        return DuanValue(None, '空')
+    
+    def _builtin_regex_search(self, args: List[DuanValue]) -> DuanValue:
+        """正则搜索（第一个匹配）"""
+        import re
+        pattern = str(args[0].value)
+        text = str(args[1].value)
+        m = re.search(pattern, text)
+        if m:
+            return DuanValue(m.group(0), '串')
+        return DuanValue(None, '空')
+    
+    def _builtin_regex_find_all(self, args: List[DuanValue]) -> DuanValue:
+        """查找所有正则匹配"""
+        import re
+        pattern = str(args[0].value)
+        text = str(args[1].value)
+        result = re.findall(pattern, text)
+        return DuanValue(result, '列')
+    
+    def _builtin_regex_replace(self, args: List[DuanValue]) -> DuanValue:
+        """正则替换"""
+        import re
+        pattern = str(args[0].value)
+        repl = str(args[1].value)
+        text = str(args[2].value)
+        try:
+            result = re.sub(pattern, repl, text)
+            return DuanValue(result, '串')
+        except re.error as e:
+            raise RuntimeError(f"正则替换失败: {e}")
+    
+    def _builtin_regex_split(self, args: List[DuanValue]) -> DuanValue:
+        """正则分割"""
+        import re
+        pattern = str(args[0].value)
+        text = str(args[1].value)
+        result = re.split(pattern, text)
+        return DuanValue(result, '列')
+    
     # ----- 顶层接口 -----
     
     def interpret(self, node: ASTNode) -> Optional[DuanValue]:
@@ -1023,6 +1315,7 @@ class Interpreter:
         PipeExpression: '_eval_pipe',
         NewExpression: '_eval_new_expression',
         SelfReference: '_eval_self_reference',
+        AwaitExpression: '_eval_await',
     }
 
     def _eval(self, node: ASTNode) -> DuanValue:
@@ -1043,6 +1336,15 @@ class Interpreter:
             return DuanValue(None, '空')
         if isinstance(node, Identifier):
             return self.env.get(node.name)
+        if isinstance(node, StringInterpolation):
+            parts = []
+            for part in node.parts:
+                if isinstance(part, str):
+                    parts.append(part)
+                else:
+                    val = self._eval(part)
+                    parts.append(str(val.value))
+            return DuanValue(''.join(parts), '串')
         
         raise RuntimeError(f"不支持的表达式类型: {type(node).__name__}")
     
@@ -1337,6 +1639,26 @@ class Interpreter:
         """求值 self 引用（己）"""
         return self.env.get('自我')
 
+    def _eval_await(self, node: AwaitExpression) -> DuanValue:
+        """求值等待表达式
+
+        在同步解释器中，直接求值内部表达式。
+        如果表达式返回协程/coroutine，则运行它直到完成。
+        """
+        result = self._eval(node.expression)
+        # 如果结果是协程（异步函数调用返回），执行它
+        if hasattr(result.value, '__await__') or hasattr(result.value, '__aenter__'):
+            try:
+                import asyncio
+                loop = asyncio.new_event_loop()
+                try:
+                    result = DuanValue(loop.run_until_complete(result.value), '数')
+                finally:
+                    loop.close()
+            except (ImportError, RuntimeError, TypeError):
+                pass  # 同步模式下直接返回
+        return result
+
     def _call_method(self, bound_method: DuanBoundMethod, args: List[DuanValue]) -> DuanValue:
         """调用绑定到实例的方法"""
         method = bound_method.method
@@ -1377,6 +1699,8 @@ class Interpreter:
             for field_name in instance.fields.keys():
                 if call_env.has(field_name):
                     instance.fields[field_name] = call_env.get(field_name)
+            # 执行推迟栈
+            self._run_defer_stack()
             self.env = old_env
     
     def _call_function(self, func: DuanFunction, args: List[DuanValue]) -> DuanValue:
@@ -1423,6 +1747,8 @@ class Interpreter:
                     break
             return result
         finally:
+            # 执行推迟栈（后进先出）
+            self._run_defer_stack()
             self.env = old_env
 
     def call_function(self, func_val: DuanValue, args: List[DuanValue]) -> Optional[DuanValue]:
@@ -1476,6 +1802,11 @@ class Interpreter:
         if isinstance(node, ExportStatement):
             # 导出语句在模块加载时已被处理，此处忽略
             return None
+        # 异步/并发语句
+        if isinstance(node, DeferStatement):
+            return self._exec_defer(node)
+        if isinstance(node, AsyncScope):
+            return self._exec_async_scope(node)
         # 跳过类型定义等
         return None
     
@@ -1593,6 +1924,64 @@ class Interpreter:
             catch_var = node.catch_var
             self.env.define(catch_var, e.value)
             self._execute_block(node.catch_body)
+
+    def _exec_defer(self, node: DeferStatement):
+        """执行推迟语句
+
+        将推迟的语句保存到当前环境的延迟执行栈中，
+        在作用域/段落退出时执行。
+        """
+        if not hasattr(self.env, '_defer_stack'):
+            self.env._defer_stack = []
+        # 将推迟语句体压栈（后进先出）
+        self.env._defer_stack.append(node.body)
+
+    def _run_defer_stack(self):
+        """运行当前环境的推迟栈（后进先出）"""
+        if hasattr(self.env, '_defer_stack') and self.env._defer_stack:
+            while self.env._defer_stack:
+                deferred_body = self.env._defer_stack.pop()
+                try:
+                    self._execute_block(deferred_body)
+                except Exception as e:
+                    # 推迟语句执行出错，打印错误但继续执行其余推迟
+                    print(f"[推迟执行错误] {e}", file=sys.stderr)
+
+    def _exec_async_scope(self, node: AsyncScope):
+        """执行并行作用域（结构化并发）
+
+        在同步解释器中，顺序执行所有任务。
+        如果启用了 asyncio，使用 asyncio.gather 并发执行。
+        """
+        tasks = node.tasks
+        if not tasks:
+            return DuanValue(None, '空')
+
+        try:
+            import asyncio
+
+            async def run_task(task_stmt):
+                """执行单个异步任务"""
+                if isinstance(task_stmt, ExpressionStatement) and isinstance(task_stmt.expression, AwaitExpression):
+                    val = self._eval(task_stmt.expression)
+                    return val
+                return self._execute(task_stmt)
+
+            async def run_all():
+                results = await asyncio.gather(*[run_task(t) for t in tasks])
+                return results
+
+            loop = asyncio.new_event_loop()
+            try:
+                loop.run_until_complete(run_all())
+            finally:
+                loop.close()
+        except (ImportError, RuntimeError, TypeError):
+            # 没有 asyncio 时顺序执行
+            for task_stmt in tasks:
+                self._execute(task_stmt)
+
+        return DuanValue(None, '空')
 
     def _exec_import(self, node: ImportStatement):
         """执行导入语句"""

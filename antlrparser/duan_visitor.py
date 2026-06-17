@@ -39,6 +39,7 @@ from duan_ast import (
     ErrorTypeDefinition, ImportStatement, ExportStatement, Module,
     ClassDefinition, InterfaceDefinition, MethodDefinition, ConstructorDefinition,
     InterfaceMethod, InterfaceProperty, SelfReference,
+    AwaitExpression, DeferStatement, AsyncScope,
 )
 
 # 导入自定义分词器
@@ -309,9 +310,17 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
     def visitParagraphDef(self, ctx: DuanLangParser.ParagraphDefContext):
         """段落定义"""
         # 新语法：段落 名称 接收 参数列表:
-        name = ctx.ID().getText()
+        raw_name = ctx.ID().getText()
         line = ctx.start.line
         col = ctx.start.column
+        
+        # 检测是否为异步段落（名称以 __async_ 为前缀）
+        modifiers = []
+        if raw_name.startswith('__async_'):
+            name = raw_name[len('__async_'):]
+            modifiers.append('异步')
+        else:
+            name = raw_name
         
         # 参数列表
         params = []
@@ -334,7 +343,7 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
             parameters=params,
             body=body,
             return_type=return_type,
-            modifiers=[],
+            modifiers=modifiers,
         )
 
     def visitClassDef(self, ctx: DuanLangParser.ClassDefContext):
@@ -1694,6 +1703,11 @@ class DuanLangASTBuilder(DuanLangParserVisitor):
     def _parse_string_interpolation(self, raw: str, line: int, col: int):
         """检测字符串中是否包含 {表达式} 插值，若有则返回StringInterpolation节点"""
         import re
+        
+        # 快速检测：如果字符串以 { 或 [ 开头，很可能是 JSON，跳过插值检测
+        if raw and raw[0] in ('{', '['):
+            return None
+        
         # 匹配 {expr} 模式（非转义的 { }）
         # 先检查是否有未转义的 {
         has_interpolation = False
@@ -1854,7 +1868,8 @@ class DuanParser:
     def parse(self, source: str) -> Optional[Module]:
         """解析源代码为 AST（使用自定义中文分词器 + ANTLR 解析器）"""
         # ANTLR Parser 已原生支持列表推导、匿名函数、模式匹配
-        # 不再需要预处理转换
+        # 仅对异步/等待/推迟/并行 语法进行预处理转换
+        source = self._preprocess_async(source)
 
         # 使用自定义中文分词器
         token_stream = create_antlr_token_stream(source, DuanLangLexer)
@@ -1877,6 +1892,10 @@ class DuanParser:
         module = builder.visitProgram(tree)
         self.errors = builder.errors
 
+        # 后处理：将预处理标记还原为真实AST节点
+        if module is not None:
+            module = self._postprocess_ast(module)
+
         return module
 
     def _preprocess_source(self, source: str) -> str:
@@ -1897,6 +1916,52 @@ class DuanParser:
 
         # 3. 处理匿名函数
         source = self._preprocess_lambda(source)
+
+        # 4. 处理异步/等待/推迟/并行
+        source = self._preprocess_async(source)
+
+        return source
+
+    def _preprocess_async(self, source: str) -> str:
+        """预处理异步/并发语法
+
+        转换规则：
+        1. 异步段 名称 → 段 __async_名称（前缀标记，由 visitor 检测并还原）
+        2. 等待(表达式) → __await__(表达式)
+        3. 等待 表达式 → __await__(表达式) （表达式为简单标识符时）
+        4. 推迟：语句。 → __defer__ 语句。（推迟语句标记）
+        5. 并行：...结束。 → __parallel__(...)（并行作用域标记）
+        """
+        import re
+
+        # 1. "异步 段 名称" → "段 __async_名称"（也支持无空格的"异步段落"）
+        source = re.sub(r'异步\s*(段(?:落)?)\s+', r'\1 __async_', source)
+
+        # 2. "等待(" → "__await__("
+        source = re.sub(r'等待\s*\(', '__await__(', source)
+
+        # 3. 处理行尾的 "等待 表达式" → "__await__(表达式)"
+        source = re.sub(
+            r'等待\s+([a-zA-Z\u4e00-\u9fff_][a-zA-Z\u4e00-\u9fff_0-9]*)',
+            r'__await__(\1)',
+            source
+        )
+
+        # 4. 处理推迟语句：推迟：语句。 → __defer__(语句)。
+        source = re.sub(
+            r'推迟\s*[：:]\s*(.*?)[。.]',
+            r'__defer__(\1)。',
+            source
+        )
+
+        # 5. 处理并行作用域：并行：...结束。 → __parallel__(...)
+        # 匹配"并行："到"结束。"的多行内容
+        source = re.sub(
+            r'并行\s*[：:]\s*\n(.*?)结束\s*[。.]',
+            r'__parallel__(\1)',
+            source,
+            flags=re.DOTALL
+        )
 
         return source
 
@@ -2036,11 +2101,32 @@ class DuanParser:
 
     def _transform_stmt(self, stmt):
         """转换单个语句中的预处理标记"""
-        # 处理表达式语句中的函数调用
+        # 处理表达式语句中的 __defer__ / __parallel__ 函数调用
         if isinstance(stmt, ExpressionStatement):
-            expr = self._transform_expr(stmt.expression)
-            if expr is not None:
-                stmt.expression = expr
+            expr = stmt.expression
+            # 检测 __defer__(...) 函数调用 → DeferStatement
+            if isinstance(expr, FunctionCall) and isinstance(expr.name, Identifier) and expr.name.name == '__defer__':
+                body_stmts = []
+                for arg in expr.arguments:
+                    body_stmts.append(ExpressionStatement(expression=arg))
+                return DeferStatement(
+                    line=stmt.line, column=stmt.column,
+                    body=body_stmts
+                )
+            # 检测 __parallel__(...) 函数调用 → AsyncScope
+            if isinstance(expr, FunctionCall) and isinstance(expr.name, Identifier) and expr.name.name == '__parallel__':
+                tasks = []
+                for arg in expr.arguments:
+                    tasks.append(ExpressionStatement(expression=arg))
+                return AsyncScope(
+                    line=stmt.line, column=stmt.column,
+                    tasks=tasks
+                )
+
+            # 普通表达式处理
+            result = self._transform_expr(stmt.expression)
+            if result is not None:
+                stmt.expression = result
                 return stmt
 
         # 处理变量声明
@@ -2124,6 +2210,17 @@ class DuanParser:
 
             elif func_name == '__匿名函数__':
                 return self._build_lambda(expr)
+
+            elif func_name == '__await__':
+                # 等待(表达式) → AwaitExpression(表达式)
+                if len(expr.arguments) >= 1:
+                    arg_expr = expr.arguments[0]
+                    # 递归转换参数
+                    transformed_arg = self._transform_expr(arg_expr) or arg_expr
+                    return AwaitExpression(
+                        line=expr.line, column=expr.column,
+                        expression=transformed_arg
+                    )
 
             # 递归处理函数参数
             new_args = []

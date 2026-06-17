@@ -6,6 +6,9 @@
 
 import os
 import sys
+import math
+import random
+import statistics
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -440,6 +443,226 @@ def 是空(值) -> bool:
 
 
 # =============================================================================
+# 数学/统计/随机函数
+# =============================================================================
+
+def 随机整数(最小: int, 最大: int) -> int:
+    """
+    生成范围内的随机整数
+    
+    参数:
+        最小: 最小值（包含）
+        最大: 最大值（包含）
+    
+    返回:
+        随机整数
+    """
+    return random.randint(最小, 最大)
+
+
+def 随机浮点() -> float:
+    """
+    生成 [0.0, 1.0) 范围内的随机浮点数
+    
+    返回:
+        随机浮点数
+    """
+    return random.random()
+
+
+def 随机选择(列表) -> Optional[object]:
+    """
+    从列表中随机选择一个元素
+    
+    参数:
+        列表: 源列表
+    
+    返回:
+        随机选中的元素，列表为空返回空
+    """
+    if not 列表:
+        return None
+    return random.choice(列表)
+
+
+def 阶乘(n: int) -> int:
+    """
+    计算 n 的阶乘
+    
+    参数:
+        n: 非负整数
+    
+    返回:
+        n!
+    """
+    if n < 0:
+        raise RuntimeError("阶乘参数不能为负数")
+    return math.factorial(n)
+
+
+def 平均数(数据: list) -> float:
+    """
+    计算列表的平均值
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        平均值
+    """
+    if not 数据:
+        raise RuntimeError("数据列表为空")
+    return statistics.mean(数据)
+
+
+def 中位数(数据: list) -> float:
+    """
+    计算列表的中位数
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        中位数
+    """
+    if not 数据:
+        raise RuntimeError("数据列表为空")
+    return statistics.median(数据)
+
+
+def 众数(数据: list):
+    """
+    计算列表的众数（出现次数最多的值）
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        众数
+    """
+    if not 数据:
+        raise RuntimeError("数据列表为空")
+    try:
+        return statistics.mode(数据)
+    except statistics.StatisticsError:
+        raise RuntimeError("无法确定众数（多个值出现次数相同）")
+
+
+def 方差(数据: list) -> float:
+    """
+    计算总体方差
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        方差
+    """
+    if len(数据) < 2:
+        raise RuntimeError("数据点太少（至少需要2个）")
+    return statistics.pvariance(数据)
+
+
+def 标准差(数据: list) -> float:
+    """
+    计算总体标准差
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        标准差
+    """
+    if len(数据) < 2:
+        raise RuntimeError("数据点太少（至少需要2个）")
+    return statistics.pstdev(数据)
+
+
+def 样本方差(数据: list) -> float:
+    """
+    计算样本方差（分母 n-1）
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        样本方差
+    """
+    if len(数据) < 2:
+        raise RuntimeError("数据点太少（至少需要2个）")
+    return statistics.variance(数据)
+
+
+def 样本标准差(数据: list) -> float:
+    """
+    计算样本标准差（分母 n-1）
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        样本标准差
+    """
+    if len(数据) < 2:
+        raise RuntimeError("数据点太少（至少需要2个）")
+    return statistics.stdev(数据)
+
+
+def 求和(数据: list) -> float:
+    """
+    计算列表中所有数值的和
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        总和
+    """
+    return sum(数据)
+
+
+def 累积和(数据: list) -> list:
+    """
+    计算列表的累积和
+    
+    参数:
+        数据: 数值列表
+    
+    返回:
+        累积和列表
+    
+    示例:
+        累积和([1, 2, 3, 4])  # [1, 3, 6, 10]
+    """
+    result = []
+    total = 0
+    for v in 数据:
+        total += v
+        result.append(total)
+    return result
+
+
+def 圆周率() -> float:
+    """返回圆周率 π 的近似值"""
+    return math.pi
+
+
+def 自然常数() -> float:
+    """返回自然常数 e 的近似值"""
+    return math.e
+
+
+def 角度转弧度(角度: float) -> float:
+    """角度转弧度"""
+    return math.radians(角度)
+
+
+def 弧度转角度(弧度: float) -> float:
+    """弧度转角度"""
+    return math.degrees(弧度)
+
+
+# =============================================================================
 # 导出所有函数
 # =============================================================================
 
@@ -475,4 +698,12 @@ __all__ = [
     # 类型检查
     '是整数', '是浮点', '是字符串',
     '是列表', '是字典', '是空',
+    
+    # 数学/统计/随机
+    '随机整数', '随机浮点', '随机选择',
+    '阶乘', '平均数', '中位数', '众数',
+    '方差', '标准差', '样本方差', '样本标准差',
+    '求和', '累积和',
+    '圆周率', '自然常数',
+    '角度转弧度', '弧度转角度',
 ]
