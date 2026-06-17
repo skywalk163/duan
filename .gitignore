@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+*.egg-info/
+
+# ANTLR temp files
+*.interp
+*.tokens
+.antlr/
+
+# LLVM / compiled outputs
+*.ll
+*.exe
+*.out
+*.o
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ANTLR jar
+*.jar
+
+# Archives / competition files
+trae_competition.zip
+trae_competition.html
+
+# Build output
+dist/
+
+# Test/backup
+*.bak
+*.backup
