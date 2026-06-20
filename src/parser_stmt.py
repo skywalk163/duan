@@ -602,15 +602,12 @@ class ParserStmtMixin:
         语法：
         1. 如果 条件。
             语句。
-          结束。
         2. 如果 条件 那么
             语句。
-          结束。
         3. 如果 条件 那么
             语句。
           否则
             语句。
-          结束。
         """
         # 如果 / 若
         if self._match(TokenType.KEYWORD, '若'):
@@ -773,21 +770,18 @@ class ParserStmtMixin:
           语句...
         捕获 异常变量：
           语句...
-        结束。
         
         或带类型过滤：
         尝试：
           语句...
         捕获 值错误：
           语句...
-        结束。
         
         或带类型和变量：
         尝试：
           语句...
         捕获 值错误 异常变量：
           语句...
-        结束。
         
         或带最终块：
         尝试：
@@ -796,7 +790,6 @@ class ParserStmtMixin:
           语句...
         最终：
           语句...
-        结束。
         """
         # 尝试
         self._consume(TokenType.KEYWORD, '尝试')
@@ -1145,7 +1138,6 @@ class ParserStmtMixin:
             定义 结果 等于 0。
             《加》方法(x):
                 结果 等于 结果 加 x。
-            结束。
         """
         # 《
         self._consume(TokenType.LBOOK)
@@ -1297,17 +1289,13 @@ class ParserStmtMixin:
 
           构造 参数 参数名 参数名。
             己属性名 为 参数名。
-          结束。
 
           段落 方法名 参数 参数名。
             方法体。
-          结束。
-        结束。
 
         或带继承：
         类 类名 继承 父类名。
           ...
-        结束。
         """
         # 类
         self._consume(TokenType.KEYWORD, '类')
@@ -1442,12 +1430,10 @@ class ParserStmtMixin:
         语法：
         构造 接收 参数名 参数名：
           方法体。
-        结束。
 
         或：
         段落 方法名 接收 参数名 参数名：
           方法体。
-        结束。
         """
         method_name = None
 
@@ -1532,12 +1518,10 @@ class ParserStmtMixin:
         接口 名称：
           段落 方法名 参数 参数名 返回 类型。
           段落 方法名(参数) 返回 类型。
-        结束。
 
         或带继承：
         接口 名称 继承 父接口1, 父接口2：
           ...
-        结束。
         """
         # 接口
         self._consume(TokenType.KEYWORD, '接口')
@@ -1686,7 +1670,6 @@ class ParserStmtMixin:
             语句。
           情况 _：
             语句。
-        结束。
         """
         # 匹配
         self._consume(TokenType.KEYWORD, '匹配')
