@@ -87,6 +87,11 @@ class ParserExprMixin:
                 op = self._consume().value
                 right = self._parse_mul_expr()
                 left = BinaryOp(self.ADD_OP_MAP[op], left, right)
+            elif tok.type == TokenType.PLUS:
+                # 处理 + 符号（字符串连接等）
+                self._consume()
+                right = self._parse_mul_expr()
+                left = BinaryOp('+', left, right)
             else:
                 break
         
@@ -212,19 +217,31 @@ class ParserExprMixin:
                 if not class_name:
                     raise ParseError("期望类名")
                 
-                # 收集参数（直到遇到阻断符）
+                # 收集参数（支持括号式和无括号式）
                 args = []
-                while self._current():
-                    next_tok = self._current()
-                    if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
-                        break
-                    if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
-                        break
-                    arg = self._collect_primary_arg()
-                    if arg:
-                        args.append(arg)
-                    else:
-                        break
+                if self._current() and self._current().type == TokenType.LPAREN:
+                    # 括号式参数：新建 类名(参数1, 参数2)
+                    self._consume(TokenType.LPAREN)
+                    while not self._match(TokenType.RPAREN):
+                        arg = self._parse_comparison()
+                        if arg is not None:
+                            args.append(arg)
+                        if self._match(TokenType.COMMA):
+                            self._consume(TokenType.COMMA)
+                    self._consume(TokenType.RPAREN)
+                else:
+                    # 无括号参数
+                    while self._current():
+                        next_tok = self._current()
+                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            break
+                        if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                            break
+                        arg = self._collect_primary_arg()
+                        if arg:
+                            args.append(arg)
+                        else:
+                            break
                 
                 expr = ClassInstantiation(class_name, args)
                 return self._parse_postfix(expr)
@@ -252,11 +269,35 @@ class ParserExprMixin:
                         break
             else:
                 # 固定参数数量（使用完整表达式解析，支持嵌套函数调用和比较运算符）
-                for _ in range(arity):
-                    if self._current() and self._current().type not in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN):
+                # 检查是否使用了括号语法：动词(参数1, 参数2)
+                if self._current() and self._current().type == TokenType.LPAREN:
+                    # 括号式参数：列表追加(成绩, 分数)
+                    self._consume(TokenType.LPAREN)
+                    collected = 0
+                    while not self._match(TokenType.RPAREN) and collected < arity:
+                        if self._current() and self._current().type == TokenType.COMMA:
+                            self._consume(TokenType.COMMA)
+                            continue
                         arg = self._parse_comparison()
                         if arg:
                             args.append(arg)
+                            collected += 1
+                        else:
+                            break
+                        if self._match(TokenType.COMMA):
+                            self._consume(TokenType.COMMA)
+                    # 跳过剩余的 token 直到右括号
+                    while self._current() and self._current().type != TokenType.RPAREN:
+                        self._consume()
+                    if self._current() and self._current().type == TokenType.RPAREN:
+                        self._consume(TokenType.RPAREN)
+                else:
+                    # 无括号式：列表追加 成绩 分数
+                    for _ in range(arity):
+                        if self._current() and self._current().type not in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN):
+                            arg = self._parse_comparison()
+                            if arg:
+                                args.append(arg)
 
             expr = ParagraphCall(verb_name, args)
             return self._parse_postfix(expr)
@@ -897,9 +938,15 @@ class ParserExprMixin:
         return ListLiteral(elements)
 
     def _parse_postfix(self, expr: ASTNode) -> ASTNode:
-        """解析后缀表达式（索引访问、成员访问、函数调用）"""
+        """解析后缀表达式（索引访问、成员访问、函数调用、解包）"""
         while self._current():
             tok = self._current()
+
+            # 解包操作：值! 或 值！
+            if tok.type == TokenType.BANG:
+                self._consume(TokenType.BANG)
+                expr = UnwrapExpression(value=expr)
+                continue
 
             # 函数调用：(参数1, 参数2, ...)
             # 例如：累计(数值 减 1)  或  三倍(甲)
@@ -941,8 +988,8 @@ class ParserExprMixin:
                     is_dot_access = True
                 # 中文句号(。)是语句结束符，不进行成员访问
 
-            # 「的」作为属性访问运算符
-            if not is_dot_access and tok.type == TokenType.KEYWORD and tok.value == '的':
+            # 「的」或「之」作为属性访问运算符
+            if not is_dot_access and tok.type == TokenType.KEYWORD and tok.value in ('的', '之'):
                 is_dot_access = True
 
             if is_dot_access:
@@ -1025,7 +1072,9 @@ class ParserExprMixin:
 
             args = []
             while not self._match(TokenType.RPAREN):
-                arg = self._parse_expr()
+                # 使用 _parse_comparison 而非 _parse_expr，
+                # 避免逗号被误识别为管道操作符
+                arg = self._parse_comparison()
                 args.append(arg)
 
                 # 逗号分隔

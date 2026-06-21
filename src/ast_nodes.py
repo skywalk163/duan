@@ -102,6 +102,7 @@ class FunctionCall(ASTNode):
     """函数/段落调用"""
     name: Union[SegmentName, Identifier] = None
     arguments: List[ASTNode] = field(default_factory=list)
+    type_args: List[str] = field(default_factory=list)  # 显式类型参数（如 映射[数](...)）
 
 
 @dataclass
@@ -148,6 +149,7 @@ class NewExpression(ASTNode):
     """类实例化表达式（新类名()）"""
     class_name: str = ""
     arguments: List[ASTNode] = field(default_factory=list)
+    type_args: List[str] = field(default_factory=list)  # 显式类型参数（如 数组[数](3)）
 
 
 @dataclass
@@ -246,6 +248,9 @@ class VariableDeclaration(ASTNode):
     """变量声明"""
     name: str = ""
     value: ASTNode = None
+    type_annotation: Optional[str] = None
+    is_mutable: bool = False
+    destructure_names: List[str] = field(default_factory=list)  # 解构赋值变量名列表
 
 
 @dataclass
@@ -376,6 +381,7 @@ class SegmentDefinition(ASTNode):
     body: List[ASTNode] = field(default_factory=list)
     return_type: Optional[str] = None
     modifiers: List[str] = field(default_factory=list)
+    generic_params: List[str] = field(default_factory=list)  # 泛型参数列表（如 ["T", "U"]）
 
 
 # =============================================================================
@@ -541,6 +547,12 @@ class TraitImplementation(ASTNode):
 # =============================================================================
 # 空安全类型
 # =============================================================================
+
+@dataclass
+class UnwrapExpression(ASTNode):
+    """解包表达式（值! 或 unwrap(值)）"""
+    value: Any = None
+
 
 @dataclass
 class OptionalType(ASTNode):

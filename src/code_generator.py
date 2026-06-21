@@ -10,7 +10,7 @@ from keywords import VERB_ARITY
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment
 
 
 # =============================================================================
@@ -52,6 +52,12 @@ class PythonCodeGenerator:
             '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
             '十': 10, '百': 100, '千': 1000, '万': 10000
         }
+        
+        # 类属性追踪（用于方法内自动添加 self. 前缀）
+        self._class_attr_names: set = set()
+        # 类方法名追踪（用于方法内自动添加 self. 前缀调用其他方法）
+        self._class_method_names: set = set()
+        self._in_class_method: bool = False
         
         # 运算符映射
         self.operator_map = {
@@ -145,6 +151,7 @@ class PythonCodeGenerator:
             '列表创建': '_duan_builtin.列表创建',
             
             # 字典工具
+            '字典': '_duan_builtin.字典创建',
             '字典创建': '_duan_builtin.字典创建',
             '字典设置': '_duan_builtin.字典设置',
             '字典删除': '_duan_builtin.字典删除',
@@ -211,7 +218,9 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
         self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
         self._add_line("        _duan_builtin.打印 = print")
+        self._add_line("        _duan_builtin.转字符串 = str")
         self._add_line("        _duan_builtin.列表创建 = list")
+        self._add_line("        _duan_builtin.列表长度 = len")
         self._add_line("        _duan_builtin.列 = lambda *args: list(args)")
         self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
@@ -219,12 +228,33 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.字典创建 = dict")
         self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
+        self._add_line("        _duan_builtin.字典键列表 = lambda d: list(d.keys())")
+        self._add_line("        _duan_builtin.字典包含键 = lambda d, k: k in d")
         self._add_line("else:")
         self._add_line("    import types")
         self._add_line("    _duan_builtin = types.ModuleType('_duan_builtin')")
         self._add_line("    _duan_builtin.打印 = print")
+        self._add_line("    _duan_builtin.转字符串 = str")
+        self._add_line("    _duan_builtin.列表创建 = list")
+        self._add_line("    _duan_builtin.列表长度 = len")
+        self._add_line("    _duan_builtin.列 = lambda *args: list(args)")
+        self._add_line("    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
+        self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
+        self._add_line("    _duan_builtin.字符串长度 = len")
+        self._add_line("    _duan_builtin.字典创建 = dict")
+        self._add_line("    _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
+        self._add_line("    _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
+        self._add_line("    _duan_builtin.字典键列表 = lambda d: list(d.keys())")
+        self._add_line("    _duan_builtin.字典包含键 = lambda d, k: k in d")
         self._add_line("")
-        
+
+        # 可空类型解包辅助函数：_duan_unwrap(x) = assert x is not None; return x
+        self._add_line("# 可空类型解包辅助函数")
+        self._add_line("def _duan_unwrap(_x):")
+        self._add_line("    assert _x is not None, \"尝试解包空值\"")
+        self._add_line("    return _x")
+        self._add_line("")
+
         # 生成语句
         for stmt in module.statements:
             self._generate_statement(stmt)
@@ -303,6 +333,9 @@ class PythonCodeGenerator:
         elif isinstance(stmt, CompoundAssignment):
             # 复合赋值语句：甲 加上 1 → 甲 += 1
             self._generate_compound_assignment(stmt)
+        elif isinstance(stmt, IndexedAssignment):
+            # 索引赋值语句：甲[丁] = 值
+            self._generate_indexed_assignment(stmt)
         elif isinstance(stmt, ClassDefinition):
             # 类定义
             self._generate_class_definition(stmt)
@@ -343,7 +376,11 @@ class PythonCodeGenerator:
         """生成变量声明"""
         name = self._sanitize_name(stmt.name)
         value = self._generate_expr(stmt.value)
-        self._add_line(f"{name} = {value}")
+        # 类方法中，如果变量是类属性，使用 self. 前缀
+        if self._in_class_method and stmt.name in self._class_attr_names:
+            self._add_line(f"self.{name} = {value}")
+        else:
+            self._add_line(f"{name} = {value}")
     
     def _generate_if_stmt(self, stmt: IfStmt):
         """生成条件语句"""
@@ -508,7 +545,14 @@ class PythonCodeGenerator:
         py_op = py_ops.get(stmt.operator, '+=')
         value = self._generate_expr(stmt.value)
         self._add_line(f"{target} {py_op} {value}")
-    
+
+    def _generate_indexed_assignment(self, stmt):
+        """生成索引赋值语句：甲[丁] = 值"""
+        target = self._sanitize_name(stmt.target)
+        index = self._generate_expr(stmt.index)
+        value = self._generate_expr(stmt.value)
+        self._add_line(f"{target}[{index}] = {value}")
+
     def _generate_class_definition(self, stmt):
         """生成类定义"""
         class_name = self._sanitize_name(stmt.name)
@@ -522,25 +566,63 @@ class PythonCodeGenerator:
         
         self.indent_level += 1
         
-        # 生成属性（使用类型注解）
+        # 收集类属性名
+        self._class_attr_names = set()
         if hasattr(stmt, 'attributes') and stmt.attributes:
             for attr in stmt.attributes:
+                self._class_attr_names.add(self._sanitize_name(attr.name))
+        
+        # 收集类方法名
+        self._class_method_names = set()
+        if hasattr(stmt, 'methods') and stmt.methods:
+            for method in stmt.methods:
+                method_name = method.name if hasattr(method, 'name') else ''
+                self._class_method_names.add(method_name)
+        
+        # 检查是否有用户定义的构造函数
+        has_constructor = False
+        if hasattr(stmt, 'methods') and stmt.methods:
+            for method in stmt.methods:
+                method_name = method.name if hasattr(method, 'name') else ''
+                is_ctor = getattr(method, 'is_constructor', False) or method_name in ('构造', '初始化')
+                if is_ctor or method_name == '__init__':
+                    has_constructor = True
+                    break
+        
+        # 生成 __init__ 方法初始化属性（仅在无用户构造函数时）
+        if self._class_attr_names and not has_constructor:
+            self._add_line("def __init__(self):")
+            self.indent_level += 1
+            for attr in stmt.attributes:
                 attr_name = self._sanitize_name(attr.name)
-                if attr.type_annotation:
-                    attr_type = self._sanitize_name(attr.type_annotation)
-                    self._add_line(f"{attr_name}: {attr_type}")
                 if attr.default_value:
                     default = self._generate_expr(attr.default_value)
-                    self._add_line(f"{attr_name} = {default}")
+                    self._add_line(f"self.{attr_name} = {default}")
+                else:
+                    self._add_line(f"self.{attr_name} = None")
+            self.indent_level -= 1
         
         # 生成方法
         if hasattr(stmt, 'methods') and stmt.methods:
             for method in stmt.methods:
-                self._generate_method(method)
+                # 如果有构造函数和类属性，将属性初始化合并到构造函数中
+                if has_constructor and self._class_attr_names:
+                    method_name = method.name if hasattr(method, 'name') else ''
+                    is_ctor = getattr(method, 'is_constructor', False) or method_name in ('构造', '初始化')
+                    if is_ctor:
+                        self._generate_method(method, stmt.attributes)
+                    else:
+                        self._generate_method(method)
+                else:
+                    self._generate_method(method)
         
         # 如果类体为空，添加 pass
-        if not (hasattr(stmt, 'attributes') and stmt.attributes) and not (hasattr(stmt, 'methods') and stmt.methods):
+        if not self._class_attr_names and not (hasattr(stmt, 'methods') and stmt.methods):
             self._add_line("pass")
+        
+        # 清理类属性追踪
+        self._class_attr_names = set()
+        self._class_method_names = set()
         
         self.indent_level -= 1
         self._add_line("")
@@ -693,7 +775,7 @@ class PythonCodeGenerator:
         else:
             raise CodeGenError("装饰器后必须是段落定义", type(stmt.paragraph).__name__)
 
-    def _generate_method(self, method):
+    def _generate_method(self, method, class_attributes=None):
         """生成方法定义"""
         method_name = method.name
         
@@ -717,6 +799,36 @@ class PythonCodeGenerator:
         
         self.indent_level += 1
         
+        # 设置类方法上下文，用于自动添加 self. 前缀
+        self._in_class_method = True
+        
+        # 如果是构造函数且有类属性，先添加属性初始化语句（未在构造函数中初始化的属性）
+        attr_init_lines = []
+        if method_name == '__init__' and class_attributes:
+            # 收集已在构造函数中初始化的属性名
+            initialized_attrs = set()
+            if hasattr(method, 'body') and method.body:
+                for stmt in method.body:
+                    if isinstance(stmt, tuple):
+                        if stmt[0] == 'var':
+                            initialized_attrs.add(self._sanitize_name(stmt[1]))
+                    elif isinstance(stmt, VarDecl):
+                        initialized_attrs.add(self._sanitize_name(stmt.name))
+            # 为未初始化的类属性生成初始化语句
+            for attr in class_attributes:
+                attr_name = self._sanitize_name(attr.name)
+                if attr_name not in initialized_attrs:
+                    if attr.default_value:
+                        default = self._generate_expr(attr.default_value)
+                        attr_init_lines.append(f"self.{attr_name} = {default}")
+                    else:
+                        attr_init_lines.append(f"self.{attr_name} = None")
+        
+        # 先输出属性初始化语句，再生成方法体
+        if attr_init_lines:
+            for line in attr_init_lines:
+                self._add_line(line)
+        
         # 生成方法体
         if hasattr(method, 'body') and method.body:
             for stmt in method.body:
@@ -737,6 +849,9 @@ class PythonCodeGenerator:
         
         self.indent_level -= 1
         self._add_line("")
+        
+        # 重置类方法上下文
+        self._in_class_method = False
     
     def _generate_expr(self, expr: ASTNode) -> str:
         """生成表达式"""
@@ -750,6 +865,12 @@ class PythonCodeGenerator:
         if isinstance(expr, (int, float)):
             # 数字字面量
             return str(expr)
+        
+        # 解包表达式：值! 或 unwrap(值)
+        # 翻译成 (lambda _x: (_duan_assert_not_none(_x), _x)[1])(inner_expr)
+        if type(expr).__name__ == 'UnwrapExpression':
+            inner = self._generate_expr(expr.value)
+            return f"(_duan_unwrap({inner}))"
         
         if isinstance(expr, NumberLiteral):
             # 检查是否是中文数字
@@ -770,6 +891,9 @@ class PythonCodeGenerator:
             # 如果是导入的符号且无参数，生成为函数调用（0参数函数）
             if expr.name in self._imported_symbols:
                 return f"{name}()"
+            # 类方法中，如果标识符是类属性，添加 self. 前缀
+            if self._in_class_method and expr.name in self._class_attr_names:
+                return f"self.{name}"
             return name
         
         # 检查 ast_nodes 模块中的 Identifier（兼容两种定义）
@@ -791,6 +915,9 @@ class PythonCodeGenerator:
                 py_name = self.builtin_map[expr.name]
             else:
                 py_name = name
+                # 类方法中，如果调用的是同类其他方法，添加 self. 前缀
+                if self._in_class_method and expr.name in self._class_method_names:
+                    py_name = f"self.{name}"
             
             # 参数
             args = [self._generate_expr(arg) for arg in expr.args]

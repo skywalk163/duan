@@ -181,14 +181,15 @@ def cmd_compile(args):
         else:
             # ANTLR 后端：使用 code_generator_unified 生成 Python
             from duan_visitor import DuanParser
-            from code_generator_unified import generate_python
+            from code_generator_unified import UnifiedCodeGenerator
 
             parser = DuanParser()
             module = parser.parse(source)
             if module is None:
                 errors = '\n'.join(parser.errors)
                 raise RuntimeError(f"解析失败:\n{errors}")
-            py_code = generate_python(module)
+            generator = UnifiedCodeGenerator()
+            py_code = generator.generate(module)
 
     except Exception as e:
         print(f"编译错误: {e}", file=sys.stderr)

@@ -1,0 +1,455 @@
+# codegen.duan - Python code generator for bootstrap compiler
+# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+#
+# Takes AST from parser, produces Python source code
+# All identifiers use English to avoid ANTLR keyword conflicts
+
+导入 《duan_ast》。
+导入 《token》。
+
+导出 generate, init_generator, get_output。
+
+# =============================================================================
+# Generator state
+# =============================================================================
+# Global state for code generation
+段 init_generator：
+  定义 state 等于 《字典创建》()。
+  《字典设置》(state, "lines", 《列表创建》())。
+  《字典设置》(state, "indent", 0)。
+  《字典设置》(state, "indent_str", "    ")。
+  返回 state。
+结束。
+
+段 add_line 接收 state, line：
+  定义 lines 等于 《字典获取》(state, "lines")。
+  定义 indent 等于 《字典获取》(state, "indent")。
+  定义 indent_str 等于 《字典获取》(state, "indent_str")。
+  定义 prefix 等于 ""。
+  定义 i 等于 0。
+  当 i 小于 indent：
+    设 prefix 为 prefix 加 indent_str。
+    i 加上 1。
+  结束。
+  《列表追加》(lines, prefix 加 line)。
+结束。
+
+段 indent_push 接收 state：
+  定义 indent 等于 《字典获取》(state, "indent")。
+  《字典设置》(state, "indent", indent 加 1)。
+结束。
+
+段 indent_pop 接收 state：
+  定义 indent 等于 《字典获取》(state, "indent")。
+  如果 indent 大于 0：
+    《字典设置》(state, "indent", indent 减 1)。
+  结束。
+结束。
+
+段 get_output 接收 state：
+  定义 lines 等于 《字典获取》(state, "lines")。
+  定义 result 等于 ""。
+  定义 i 等于 0。
+  当 i 小于 《列表长度》(lines)：
+    如果 i 大于 0：
+      设 result 为 result 加 "\n"。
+    结束。
+    设 result 为 result 加 《列表获取》(lines, i)。
+    i 加上 1。
+  结束。
+  返回 result。
+结束。
+
+# =============================================================================
+# Builtin function name mapping
+# =============================================================================
+段 map_builtin 接收 name：
+  # Standard library functions mapped to _duan_builtin
+  如果 name 等于 "打印"：
+    返回 "_duan_builtin.打印"。
+  结束。
+  如果 name 等于 "输出"：
+    返回 "_duan_builtin.打印"。
+  结束。
+  如果 name 等于 "输入" 或 name 等于 "读取"：
+    返回 "_duan_builtin.读取"。
+  结束。
+  如果 name 等于 "转字符串"：
+    返回 "_duan_builtin.转字符串"。
+  结束。
+  如果 name 等于 "转整数"：
+    返回 "_duan_builtin.转整数"。
+  结束。
+  如果 name 等于 "转浮点"：
+    返回 "_duan_builtin.转浮点"。
+  结束。
+  如果 name 等于 "列表创建" 或 name 等于 "列"：
+    返回 "_duan_builtin.列表创建"。
+  结束。
+  如果 name 等于 "列表长度"：
+    返回 "_duan_builtin.列表长度"。
+  结束。
+  如果 name 等于 "列表获取"：
+    返回 "_duan_builtin.列表获取"。
+  结束。
+  如果 name 等于 "列表追加"：
+    返回 "_duan_builtin.列表追加"。
+  结束。
+  如果 name 等于 "列表弹出"：
+    返回 "_duan_builtin.列表弹出"。
+  结束。
+  如果 name 等于 "列表包含"：
+    返回 "_duan_builtin.列表包含"。
+  结束。
+  如果 name 等于 "字典创建" 或 name 等于 "字典"：
+    返回 "_duan_builtin.字典创建"。
+  结束。
+  如果 name 等于 "字典设置"：
+    返回 "_duan_builtin.字典设置"。
+  结束。
+  如果 name 等于 "字典获取"：
+    返回 "_duan_builtin.字典获取"。
+  结束。
+  如果 name 等于 "字典包含键"：
+    返回 "_duan_builtin.字典包含键"。
+  结束。
+  如果 name 等于 "字典键列表"：
+    返回 "_duan_builtin.字典键列表"。
+  结束。
+  如果 name 等于 "字符串长度"：
+    返回 "_duan_builtin.字符串长度"。
+  结束。
+  如果 name 等于 "字符串获取"：
+    返回 "_duan_builtin.字符串获取"。
+  结束。
+  如果 name 等于 "截取"：
+    返回 "_duan_builtin.截取"。
+  结束。
+  如果 name 等于 "创建令牌"：
+    返回 "创建令牌"。
+  结束。
+  如果 name 等于 "_读文件":
+    返回 "_duan_builtin._读文件"。
+  结束。
+  如果 name 等于 "参数列表":
+    返回 "sys.argv"。
+  结束。
+  # Default: use Chinese name directly
+  返回 name。
+结束。
+
+# =============================================================================
+# Expression code generation
+# =============================================================================
+段 gen_expr 接收 state, node：
+  定义 node_type 等于 《列表获取》(node, 0)。
+
+  # Number: ["number", value]
+  如果 node_type 等于 "number"：
+    返回 《列表获取》(node, 1)。
+  结束。
+
+  # String: ["string", value]
+  如果 node_type 等于 "string"：
+    返回 "\"" 加 《列表获取》(node, 1) 加 "\""。
+  结束。
+
+  # Boolean: ["boolean", value]
+  如果 node_type 等于 "boolean"：
+    定义 val 等于 《列表获取》(node, 1)。
+    如果 val 等于 "真"：
+      返回 "True"。
+    结束。
+    返回 "False"。
+  结束。
+
+  # Null: ["null"]
+  如果 node_type 等于 "null"：
+    返回 "None"。
+  结束。
+
+  # Identifier: ["identifier", name]
+  如果 node_type 等于 "identifier"：
+    返回 《列表获取》(node, 1)。
+  结束。
+
+  # Function call: ["func_call", name, args]
+  如果 node_type 等于 "func_call"：
+    定义 name 等于 《列表获取》(node, 1)。
+    定义 mapped 等于 《map_builtin》(name)。
+    定义 args 等于 《列表获取》(node, 2)。
+    定义 result 等于 mapped 加 "("。
+    定义 i 等于 0。
+    当 i 小于 《列表长度》(args)：
+      如果 i 大于 0：
+        设 result 为 result 加 ", "。
+      结束。
+      定义 arg_node 等于 《列表获取》(args, i)。
+      定义 arg_code 等于 《gen_expr》(state, arg_node)。
+      设 result 为 result 加 arg_code。
+      i 加上 1。
+    结束。
+    设 result 为 result 加 ")"。
+    返回 result。
+  结束。
+
+  # Binary op: ["binary_op", op, left, right]
+  如果 node_type 等于 "binary_op"：
+    定义 op 等于 《列表获取》(node, 1)。
+    定义 left 等于 《gen_expr》(state, 《列表获取》(node, 2))。
+    定义 right 等于 《gen_expr》(state, 《列表获取》(node, 3))。
+    定义 py_op 等于 op。
+    如果 op 等于 "加" 或 op 等于 "+"：
+      设 py_op 为 "+"。
+    否则 如果 op 等于 "减" 或 op 等于 "-"：
+      设 py_op 为 "-"。
+    否则 如果 op 等于 "乘" 或 op 等于 "*"：
+      设 py_op 为 "*"。
+    否则 如果 op 等于 "除" 或 op 等于 "/"：
+      设 py_op 为 "/"。
+    否则 如果 op 等于 "模" 或 op 等于 "%"：
+      设 py_op 为 "%"。
+    否则 如果 op 等于 "幂" 或 op 等于 "^"：
+      设 py_op 为 "**"。
+    否则 如果 op 等于 "大于"：
+      设 py_op 为 ">"。
+    否则 如果 op 等于 "小于"：
+      设 py_op 为 "<"。
+    否则 如果 op 等于 "等于" 或 op 等于 "=="：
+      设 py_op 为 "=="。
+    否则 如果 op 等于 "不等于"：
+      设 py_op 为 "!="。
+    否则 如果 op 等于 "大于等于"：
+      设 py_op 为 ">="。
+    否则 如果 op 等于 "小于等于"：
+      设 py_op 为 "<="。
+    否则 如果 op 等于 "且" 或 op 等于 "与"：
+      设 py_op 为 "and"。
+    否则 如果 op 等于 "或"：
+      设 py_op 为 "or"。
+    结束。
+    返回 "(" 加 left 加 " " 加 py_op 加 " " 加 right 加 ")"。
+  结束。
+
+  # Unary op
+  如果 node_type 等于 "unary_op"：
+    定义 op 等于 《列表获取》(node, 1)。
+    定义 operand 等于 《gen_expr》(state, 《列表获取》(node, 2))。
+    如果 op 等于 "非" 或 op 等于 "!"：
+      返回 "not " 加 operand。
+    结束。
+    返回 op 加 operand。
+  结束。
+
+  # Member access: ["member_access", object, prop]
+  如果 node_type 等于 "member_access"：
+    定义 obj 等于 《gen_expr》(state, 《列表获取》(node, 1))。
+    定义 prop 等于 《列表获取》(node, 2)。
+    返回 obj 加 "." 加 prop。
+  结束。
+
+  # Default
+  返回 "None"。
+结束。
+
+# =============================================================================
+# Statement code generation
+# =============================================================================
+段 gen_stmt 接收 state, node：
+  定义 node_type 等于 《列表获取》(node, 0)。
+
+  # Variable declaration: ["var_decl", name, value]
+  如果 node_type 等于 "var_decl"：
+    定义 name 等于 《列表获取》(node, 1)。
+    定义 value 等于 《gen_expr》(state, 《列表获取》(node, 2))。
+    《add_line》(state, name 加 " = " 加 value)。
+    返回。
+  结束。
+
+  # Assignment: ["assign", name, value]
+  如果 node_type 等于 "assign"：
+    定义 name 等于 《列表获取》(node, 1)。
+    定义 value 等于 《gen_expr》(state, 《列表获取》(node, 2))。
+    《add_line》(state, name 加 " = " 加 value)。
+    返回。
+  结束。
+
+  # Compound assignment: ["compound_assign", name, op, value]
+  如果 node_type 等于 "compound_assign"：
+    定义 name 等于 《列表获取》(node, 1)。
+    定义 op 等于 《列表获取》(node, 2)。
+    定义 value 等于 《gen_expr》(state, 《列表获取》(node, 3))。
+    # Map Chinese operator to Python
+    定义 py_op 等于 ""。
+    如果 op 等于 "加上"：
+      设 py_op 为 "+"。
+    否则 如果 op 等于 "减去"：
+      设 py_op 为 "-"。
+    否则 如果 op 等于 "乘以"：
+      设 py_op 为 "*"。
+    否则 如果 op 等于 "除以"：
+      设 py_op 为 "/"。
+    否则：
+      设 py_op 为 op。
+    结束。
+    《add_line》(state, name 加 " " 加 py_op 加 "= " 加 value)。
+    返回。
+  结束。
+
+  # Return statement: ["return", value]
+  如果 node_type 等于 "return"：
+    定义 value 等于 《列表获取》(node, 1)。
+    如果 value 等于 空：
+      《add_line》(state, "return")。
+    否则：
+      《add_line》(state, "return " 加 《gen_expr》(state, value))。
+    结束。
+    返回。
+  结束。
+
+  # If statement: ["if_stmt", cond, body, elif_branches, else_body]
+  如果 node_type 等于 "if_stmt"：
+    定义 cond 等于 《gen_expr》(state, 《列表获取》(node, 1))。
+    定义 body 等于 《列表获取》(node, 2)。
+    定义 elif_branches 等于 《列表获取》(node, 3)。
+    定义 else_body 等于 《列表获取》(node, 4)。
+    《add_line》(state, "if " 加 cond 加 ":")。
+    《indent_push》(state)。
+    定义 i 等于 0。
+    当 i 小于 《列表长度》(body)：
+      《gen_stmt》(state, 《列表获取》(body, i))。
+      i 加上 1。
+    结束。
+    《indent_pop》(state)。
+    # Elif branches
+    定义 j 等于 0。
+    当 j 小于 《列表长度》(elif_branches)：
+      定义 branch 等于 《列表获取》(elif_branches, j)。
+      定义 elif_cond 等于 《gen_expr》(state, 《列表获取》(branch, 0))。
+      定义 elif_body 等于 《列表获取》(branch, 1)。
+      《add_line》(state, "elif " 加 elif_cond 加 ":")。
+      《indent_push》(state)。
+      定义 k 等于 0。
+      当 k 小于 《列表长度》(elif_body)：
+        《gen_stmt》(state, 《列表获取》(elif_body, k))。
+        k 加上 1。
+      结束。
+      《indent_pop》(state)。
+      j 加上 1。
+    结束。
+    # Else body
+    如果 else_body 不等于 空：
+      《add_line》(state, "else:")。
+      《indent_push》(state)。
+      定义 m 等于 0。
+      当 m 小于 《列表长度》(else_body)：
+        《gen_stmt》(state, 《列表获取》(else_body, m))。
+        m 加上 1。
+      结束。
+      《indent_pop》(state)。
+    结束。
+    返回。
+  结束。
+
+  # While loop: ["while_loop", cond, body]
+  如果 node_type 等于 "while_loop"：
+    定义 cond 等于 《gen_expr》(state, 《列表获取》(node, 1))。
+    定义 body 等于 《列表获取》(node, 2)。
+    《add_line》(state, "while " 加 cond 加 ":")。
+    《indent_push》(state)。
+    定义 i 等于 0。
+    当 i 小于 《列表长度》(body)：
+      《gen_stmt》(state, 《列表获取》(body, i))。
+      i 加上 1。
+    结束。
+    《indent_pop》(state)。
+    返回。
+  结束。
+
+  # Paragraph (function) definition: ["paragraph_def", name, params, body]
+  如果 node_type 等于 "paragraph_def"：
+    定义 name 等于 《列表获取》(node, 1)。
+    定义 params 等于 《列表获取》(node, 2)。
+    定义 body 等于 《列表获取》(node, 3)。
+    定义 param_str 等于 ""。
+    定义 i 等于 0。
+    当 i 小于 《列表长度》(params)：
+      如果 i 大于 0：
+        设 param_str 为 param_str 加 ", "。
+      结束。
+      设 param_str 为 param_str 加 《列表获取》(params, i)。
+      i 加上 1。
+    结束。
+    《add_line》(state, "def " 加 name 加 "(" 加 param_str 加 "):")。
+    《indent_push》(state)。
+    定义 j 等于 0。
+    当 j 小于 《列表长度》(body)：
+      《gen_stmt》(state, 《列表获取》(body, j))。
+      j 加上 1。
+    结束。
+    《indent_pop》(state)。
+    《add_line》(state, "")。
+    返回。
+  结束。
+
+  # Expression statement: ["expr_stmt", expr]
+  如果 node_type 等于 "expr_stmt"：
+    定义 expr 等于 《列表获取》(node, 1)。
+    定义 code 等于 《gen_expr》(state, expr)。
+    《add_line》(state, code)。
+    返回。
+  结束。
+
+  # Default: skip unknown nodes
+  返回。
+结束。
+
+# =============================================================================
+# Import/Export header generation
+# =============================================================================
+段 gen_header 接收 state：
+  《add_line》(state, "# Generated by Duan bootstrap compiler")。
+  《add_line》(state, "import sys")。
+  《add_line》(state, "import types")。
+  《add_line》(state, "_duan_builtin = types.ModuleType('_duan_builtin')")。
+  《add_line》(state, "_duan_builtin.打印 = print")。
+  《add_line》(state, "_duan_builtin.转字符串 = str")。
+  《add_line》(state, "_duan_builtin.转整数 = int")。
+  《add_line》(state, "_duan_builtin.列表创建 = list")。
+  《add_line》(state, "_duan_builtin.列表长度 = len")。
+  《add_line》(state, "_duan_builtin.列表获取 = lambda lst, i: lst[i]")。
+  《add_line》(state, "_duan_builtin.列表追加 = lambda lst, item: lst.append(item)")。
+  《add_line》(state, "_duan_builtin.列表弹出 = lambda lst: lst.pop()")。
+  《add_line》(state, "_duan_builtin.列表包含 = lambda lst, item: item in lst")。
+  《add_line》(state, "_duan_builtin.字典创建 = dict")。
+  《add_line》(state, "_duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")。
+  《add_line》(state, "_duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")。
+  《add_line》(state, "_duan_builtin.字典包含键 = lambda d, k: k in d")。
+  《add_line》(state, "_duan_builtin.字典键列表 = lambda d: list(d.keys())")。
+  《add_line》(state, "_duan_builtin.字符串长度 = len")。
+  《add_line》(state, "_duan_builtin.字符串获取 = lambda s, i: s[i]")。
+  《add_line》(state, "_duan_builtin.截取 = lambda s, start, end: s[start:end]")。
+  《add_line》(state, "_duan_builtin._读文件 = lambda path: open(path, 'r', encoding='utf-8').read()")。
+  《add_line》(state, "")。
+结束。
+
+# =============================================================================
+# Main generate entry point
+# =============================================================================
+段 generate 接收 ast_node：
+  定义 state 等于 《init_generator》()。
+  《gen_header》(state)。
+
+  # Get program statements
+  定义 node_type 等于 《列表获取》(ast_node, 0)。
+  如果 node_type 等于 "program"：
+    定义 stmts 等于 《列表获取》(ast_node, 1)。
+    定义 i 等于 0。
+    当 i 小于 《列表长度》(stmts)：
+      《gen_stmt》(state, 《列表获取》(stmts, i))。
+      i 加上 1。
+    结束。
+  结束。
+
+  返回 《get_output》(state)。
+结束。

@@ -38,6 +38,8 @@ class TokenType(Enum):
     RBRACKET = auto()    # 右方括号 】
     EQUALS = auto()      # 等于 =
     AT = auto()          # @ 装饰器符号
+    PLUS = auto()        # + 加号（字符串连接等）
+    BANG = auto()        # 感叹号 ! 或 ！（可空解包）
     
     # 段落标记
     LBOOK = auto()       # 左书名号 《
