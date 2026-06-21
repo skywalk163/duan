@@ -19,8 +19,11 @@ import os
 import unittest
 from pathlib import Path
 
-# 添加 src 目录到 Python 路径
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# 添加项目根目录和 src 目录到 Python 路径
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_src_dir = os.path.join(_project_root, 'src')
+sys.path.insert(0, _project_root)
+sys.path.insert(0, _src_dir)
 
 # ======================================================================
 # 类型系统基础测试

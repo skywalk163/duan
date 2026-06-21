@@ -13,8 +13,11 @@
 import os
 import sys
 
-# 确保 src 目录在 sys.path 中
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# 确保项目根目录和 src 目录在 sys.path 中
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_src_dir = os.path.join(_project_root, 'src')
+sys.path.insert(0, _project_root)
+sys.path.insert(0, _src_dir)
 
 from type_system import (
     Type, NumberType, StringType, BooleanType, NullType,

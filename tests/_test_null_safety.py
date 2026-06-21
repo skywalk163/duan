@@ -17,10 +17,11 @@ import os
 import sys
 
 # 确保从 src 目录导入
-src_path = os.path.join(os.path.dirname(__file__), 'src')
-if src_path not in sys.path:
-    sys.path.insert(0, src_path)
-os.chdir(src_path)
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_src_dir = os.path.join(_project_root, 'src')
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+    sys.path.insert(0, _project_root)
 
 import unittest
 from compiler import DuanCompiler
@@ -76,11 +77,10 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
     def test_func_non_nullable_param_with_nullable_arg(self):
         """测试点 4：形参非可空，传入可空实参 → 应报错"""
         src = (
-            '段落打印数(数)：'
-            '    打印数。'
-            '结束。'
-            '定义值等于空。'
-            '打印数(值)。'
+            '段落打印数(数)：\n'
+            '    打印数。\n'
+            '定义值等于空。\n'
+            '打印数(值)。\n'
         )
         c = compile_source(src)
         # 应有与可空相关的错误
@@ -93,11 +93,10 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
     def test_func_non_nullable_param_with_unwrapped_arg(self):
         """形参非可空，传入 unwrap 后的值 → 不应有可空错误"""
         src = (
-            '段落打印数(数)：'
-            '    打印数。'
-            '结束。'
-            '定义值等于42。'
-            '打印数(值!)。'
+            '段落打印数(数)：\n'
+            '    打印数。\n'
+            '定义值等于42。\n'
+            '打印数(值!)。\n'
         )
         c = compile_source(src)
         # 不应有可空错误
@@ -107,11 +106,10 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
     def test_func_nullable_param_with_nullable_arg(self):
         """测试点 5：形参可空，传入可空实参 → 正常"""
         src = (
-            '段落打印值(值)：'
-            '    打印值。'
-            '结束。'
-            '定义空值等于空。'
-            '打印值(空值)。'
+            '段落打印值(值)：\n'
+            '    打印值。\n'
+            '定义空值等于空。\n'
+            '打印值(空值)。\n'
         )
         c = compile_source(src)
         # 注意：如果形参未声明类型，默认 type_inferencer 会用 TypeVar/Unknown
@@ -237,10 +235,9 @@ class TestBackwardsCompatibility(unittest.TestCase):
 
     def test_paragraph_call(self):
         src = (
-            '段落相加(甲, 乙)：'
-            '    返回甲加乙。'
-            '结束。'
-            '打印相加(1, 2)。'
+            '段落相加(甲, 乙)：\n'
+            '    返回甲加乙。\n'
+            '打印相加(1, 2)。\n'
         )
         c = compile_source(src)
         # 允许有语法/类型错误，但不能有「可空」之外的崩溃

@@ -1,362 +1,446 @@
-# 段言（Duan）API 参考
+# 段言（Duan）API 参考 v1.0
 
 ## 目录
 
-1. [解析器 API](#解析器-api)
-2. [解释器 API](#解释器-api)
-3. [编译器 API](#编译器-api)
-4. [AST 节点](#ast-节点)
-5. [内置函数](#内置函数)
-6. [类型推断系统](#类型推断系统)
-7. [类型推断测试](#类型推断测试)
-8. [示例代码](#示例代码)
+1. [快速开始](#快速开始)
+2. [编译器 API](#编译器-api)
+3. [解析器 API](#解析器-api)
+4. [类型系统 API](#类型系统-api)
+5. [类型推断 API](#类型推断-api)
+6. [代码生成 API](#代码生成-api)
+7. [模块解析 API](#模块解析-api)
+8. [包管理 API](#包管理-api)
+9. [标准库](#标准库)
+10. [AST 节点](#ast-节点)
 
 ---
 
-## 解析器 API
+## 快速开始
 
-### 模块: `duan_visitor`
+### 编译并运行段言代码
 
-#### `parse_source(source: str) -> Module`
-
-解析段言源代码为 AST 模块。
-
-**参数:**
-- `source`: 段言源代码字符串
-
-**返回:**
-- `Module`: AST 模块节点
-
-**示例:**
 ```python
-from antlrparser.duan_visitor import parse_source
+import sys
+sys.path.insert(0, 'src')
 
-source = "定义 x 等于 10。"
-module = parse_source(source)
+from compiler import DuanCompiler
+
+compiler = DuanCompiler()
+result = compiler.compile("""
+    定义 消息 等于 "你好，段言！"。
+    显示 消息。
+""")
+
+if result.success:
+    print("生成的 Python 代码:")
+    print(result.python_code)
+else:
+    print("编译错误:", result.errors)
 ```
 
-#### `parse_file(filepath: str) -> Module`
+### 使用解析器
 
-从文件读取并解析段言源代码。
-
-**参数:**
-- `filepath`: 源文件路径
-
-**返回:**
-- `Module`: AST 模块节点
-
-#### `DuanParser` 类
-
-**方法:**
-- `__init__()`: 初始化解析器
-- `parse(source: str) -> Module`: 解析源代码
-
----
-
-## 解释器 API
-
-### 模块: `duan_interpreter`
-
-#### `run_source(source: str, filepath: str = None, search_paths: List[str] = None) -> Interpreter`
-
-解析并执行段言源代码。
-
-**参数:**
-- `source`: 段言源代码
-- `filepath`: 源文件路径（用于模块导入）
-- `search_paths`: 模块搜索路径
-
-**返回:**
-- `Interpreter`: 执行后的解释器实例
-
-**示例:**
 ```python
-from antlrparser.duan_interpreter import run_source
+from duan_parser_v3 import DuanParser
 
-interpreter = run_source("打印(\"你好世界\")。")
-print(interpreter.get_output())  # 输出: 你好世界
+parser = DuanParser()
+module = parser.parse("定义 x 等于 10。")
+print("AST 节点数:", len(module.statements))
 ```
-
-#### `run_file(filepath: str, search_paths: List[str] = None) -> Interpreter`
-
-从文件读取并执行段言源代码。
-
-**参数:**
-- `filepath`: 源文件路径
-- `search_paths`: 模块搜索路径
-
-**返回:**
-- `Interpreter`: 执行后的解释器实例
-
-#### `Interpreter` 类
-
-**属性:**
-- `global_env`: 全局变量环境
-- `output_lines`: 输出行列表
-
-**方法:**
-- `interpret(node: ASTNode)`: 解释执行 AST 节点
-- `interpret_module(module: Module)`: 解释执行模块
-- `reset()`: 重置解释器状态
-- `get_output()`: 获取所有输出
 
 ---
 
 ## 编译器 API
 
-### 模块: `duan_llvm`
+### 模块: `compiler`
 
-#### `compile_duan(source_code: str, output_name: str = "output.exe") -> bool`
+#### `DuanCompiler` 类
 
-编译段言源码为可执行文件。
-
-**参数:**
-- `source_code`: 段言源代码
-- `output_name`: 输出文件名
-
-**返回:**
-- `bool`: 是否编译成功
-
-**示例:**
-```python
-from antlrparser.duan_llvm import compile_duan
-
-source = "打印(42)。"
-success = compile_duan(source, "test.exe")
-if success:
-    os.system("test.exe")  # 输出: 42
-```
-
-#### `LLVMCodeGen` 类
+段言主编译器，提供完整的编译流水线。
 
 **方法:**
-- `generate(module: Module) -> str`: 生成 LLVM IR 字符串
-- `_generate_segment(seg)`: 生成段落代码
-- `_generate_class(cls)`: 生成类代码
+
+- `__init__(config: Optional[Dict[str, Any]] = None)`: 初始化编译器
+- `compile(source: str, filepath: Optional[str] = None) -> CompileResult`: 编译源代码
+- `compile_file(filepath: str) -> CompileResult`: 从文件编译
+- `compile_project(project_root: str, entry: str = None) -> CompileResult`: 编译项目
+
+**属性:**
+
+- `parser`: DuanParser 实例
+- `semantic_analyzer`: SemanticAnalyzer 实例
+- `type_inferencer`: TypeInferencer 实例
+- `code_generator`: PythonCodeGenerator 实例
+
+---
+
+#### `CompileResult` (dataclass)
+
+编译结果对象。
+
+**属性:**
+
+- `success: bool`: 是否编译成功
+- `python_code: str`: 生成的 Python 代码
+- `errors: List[str]`: 错误列表
+- `warnings: List[str]`: 警告列表
+- `ast_raw`: 原始 AST (ast_nodes_v3.Module)
+- `ast`: 转换后的 AST (ast_nodes.Module)
+- `type_env: Optional[Dict[str, Type]]`: 类型推断结果
+- `metadata: Dict[str, Any]`: 附加信息
+
+---
+
+## 解析器 API
+
+### 模块: `duan_parser_v3`
+
+#### `DuanParser` 类
+
+段言手写解析器，基于 Pratt 风格的表达式解析 + 递归下降语句解析。
+
+**方法:**
+
+- `__init__()`: 创建解析器实例
+- `parse(source: str) -> ast_nodes_v3.Module`: 解析完整源代码
+
+**示例:**
+
+```python
+from duan_parser_v3 import DuanParser
+
+parser = DuanParser()
+module = parser.parse("""
+    定义 x 等于 10。
+    定义 y 等于 20。
+    如果 x 小于 y：
+        显示 "x 较小"。
+""")
+
+for stmt in module.statements:
+    print(type(stmt).__name__)
+```
+
+### 模块: `lexer`
+
+#### `Lexer` 类
+
+词法分析器，将段言源代码转换为 token 流。
+
+**方法:**
+
+- `__init__(source: str)`
+- `tokenize() -> List[Token]`: 返回 token 列表
+
+### 模块: `tokens`
+
+#### `TokenType` 枚举
+
+token 类型：`NUMBER`, `STRING`, `KEYWORD`, `IDENTIFIER`, `OPERATOR`, `DOT`, `COLON`, `COMMA`, `LPAREN`, `RPAREN`, `INDENT`, `DEDENT`, `NEWLINE`, `EOF`
+
+---
+
+## 类型系统 API
+
+### 模块: `type_system`
+
+#### 类型层次
+
+```
+Type (基类, 带类型 ID)
+├── AnyType
+├── UnknownType
+├── NullType
+├── NumberType
+├── StringType
+├── BooleanType
+├── ListType (包含 element_type)
+├── DictType (包含 key_type, value_type)
+├── FunctionType (包含 param_types, return_type)
+├── ClassType (包含 class_name, methods, fields)
+└── TypeVar (泛型变量)
+```
+
+#### 可空类型检查
+
+```python
+from type_system import NullType, NumberType, TypeUnion, is_nullable_type
+
+num_type = NumberType()
+nullable = TypeUnion(NumberType(), NullType())
+
+# 是否可空类型
+print(is_nullable_type(nullable))  # True
+print(is_nullable_type(num_type))  # False
+```
+
+#### 类型合一 (Unification)
+
+```python
+from type_system import TypeVar, NumberType, unify
+
+a = TypeVar('a')
+result = unify(a, NumberType())
+print(result)  # a 被合一为 NumberType
+```
+
+---
+
+## 类型推断 API
+
+### 模块: `type_inferencer`
+
+#### `TypeInferencer` 类
+
+基于 Hindley-Milner 的全局类型推断器。
+
+**方法:**
+
+- `__init__()`
+- `infer_module(module: Module) -> Dict[str, Type]`: 推断整个模块的类型
+- `infer_segment(segment: Paragraph) -> Type`: 推断段落类型
+- `get_type(expr) -> Type`: 获取表达式类型
+
+**两阶段推断:**
+1. 预扫描：收集所有段落签名
+2. 推断：基于 HM 算法推断每个表达式类型
+
+---
+
+## 代码生成 API
+
+### 模块: `code_generator`
+
+#### `PythonCodeGenerator` 类
+
+将段言 AST 编译为 Python 代码。
+
+**方法:**
+
+- `__init__()`
+- `generate(module) -> str`: 生成 Python 代码字符串
+
+**示例:**
+
+```python
+from duan_parser_v3 import DuanParser
+from code_generator import PythonCodeGenerator
+
+parser = DuanParser()
+generator = PythonCodeGenerator()
+
+ast = parser.parse("定义 消息 等于 '你好'。")
+code = generator.generate(ast)
+
+# 执行生成的代码
+exec(code)
+```
+
+---
+
+## 模块解析 API
+
+### 模块: `module_resolver`
+
+#### `ModuleResolver` 类
+
+负责解析模块依赖、检测循环依赖，并以拓扑顺序编译。
+
+**方法:**
+
+- `__init__(search_paths: List[str])`
+- `resolve_module(module_name: str) -> ResolvedModule`: 查找并编译模块
+- `detect_circular_dependency(dep_graph: Dict) -> bool`: 检测循环依赖
+- `topological_sort(dep_graph: Dict) -> List[str]`: 模块拓扑排序
+
+**示例:**
+
+```python
+from module_resolver import ModuleResolver
+
+resolver = ModuleResolver(search_paths=["./modules", "./stdlib"])
+resolved = resolver.resolve_module("我的模块")
+```
+
+---
+
+## 包管理 API
+
+### 模块: `package_manager`
+
+#### `PackageManager` 类
+
+基于 TOML 配置的项目级包管理器。
+
+**方法:**
+
+- `__init__(project_root: str)`
+- `load_config() -> PackageConfig`: 加载 package.toml
+- `init_project(name: str) -> bool`: 在当前目录初始化新项目
+- `build_project(entry: str = None) -> BuildResult`: 构建整个项目
+- `get_search_paths() -> List[str]`: 获取模块搜索路径
+
+#### `PackageConfig` (dataclass)
+
+项目配置对象。
+
+**字段:**
+
+- `name: str`: 项目名称
+- `version: str`: 版本号
+- `description: str`: 项目描述
+- `authors: List[str]`: 作者列表
+- `entry_point: str`: 入口文件
+- `dependencies: List[str]`: 依赖列表
+- `source_dirs: List[str]`: 源文件目录
+- `test_dirs: List[str]`: 测试目录
+
+---
+
+## 标准库
+
+段言提供以下标准库模块（位于 `stdlib/` 目录）:
+
+| 模块 | 功能 |
+|------|------|
+| 数学.duan | 基本数学运算：加、减、乘、除、平方开方 |
+| 字符串处理.duan | 字符串操作 |
+| 时间.duan | 当前时间、日期格式化 |
+| 文件系统.duan | 文件读/写操作 |
+| JSON.duan | JSON 数据处理 |
+| 正则.duan | 正则表达式 |
+| 哈希.duan | MD5、SHA 等哈希运算 |
+| 编码.duan | 字符编码转换 |
+| 集合操作.duan | 列表/集合高级操作 |
+
+**使用示例:**
+
+```
+导入 数学。
+显示 数学.加(1, 2)。
+```
 
 ---
 
 ## AST 节点
 
-### 基础节点
+### 模块: `ast_nodes_v3`
 
-#### `ASTNode`
-所有 AST 节点的基类。
+#### 语句节点
 
-**属性:**
-- `line`: 行号
-- `column`: 列号
+- `Module`: 模块根节点，包含多个语句
+- `VarDecl`: 变量声明（定义/设）
+- `Paragraph`: 段落定义（函数）
+- `IfStmt`: 条件语句（如果/若）
+- `ForEachStmt`: 遍历语句
+- `WhileStmt`: 当循环
+- `ReturnStmt`: 返回语句
+- `BreakStmt`: 跳出循环
+- `ContinueStmt`: 跳过当前迭代
+- `PrintStmt`: 显示/打印语句
+- `ImportStmt`: 导入语句
+- `ClassInstantiation`: 类实例化
 
-### 字面量节点
+#### 表达式节点
 
-#### `NumberLiteral`
-数字字面量。
+- `NumberLiteral`: 数字字面量
+- `StringLiteral`: 字符串字面量
+- `BooleanLiteral`: 布尔字面量
+- `NullLiteral`: 空字面量
+- `Variable`: 变量引用
+- `BinaryOperation`: 二元运算（加/减/乘/除/等于/小于...）
+- `FunctionCall`: 段落/函数调用
+- `ListLiteral`: 列表字面量 `[...]`
+- `IndexAccess`: 下标访问 `列表[索引]`
+- `MemberAccess`: 成员访问 `对象.属性`
+- `UnwrapExpression`: 可空解包 `值!`
+- `StringInterpolation`: 字符串插值
+- `LambdaExpression`: Lambda 表达式
+- `ListComprehension`: 列表推导式
+- `DictComprehension`: 字典推导式
 
-**属性:**
-- `value`: 数值（int 或 float）
+#### 面向对象节点
 
-#### `StringLiteral`
-字符串字面量。
-
-**属性:**
-- `value`: 字符串值
-
-#### `BooleanLiteral`
-布尔字面量。
-
-**属性:**
-- `value`: 布尔值
-
-#### `NullLiteral`
-空值字面量。
-
-### 表达式节点
-
-#### `BinaryOp`
-二元运算表达式。
-
-**属性:**
-- `left`: 左操作数
-- `operator`: 运算符
-- `right`: 右操作数
-
-#### `UnaryOp`
-一元运算表达式。
-
-**属性:**
-- `operator`: 运算符
-- `operand`: 操作数
-
-#### `FunctionCall`
-函数调用表达式。
-
-**属性:**
-- `name`: 函数名（Identifier 或 SegmentName）
-- `arguments`: 参数列表
-
-#### `ListLiteral`
-列表字面量。
-
-**属性:**
-- `elements`: 元素列表
-
-#### `DictLiteral`
-字典字面量。
-
-**属性:**
-- `entries`: 键值对列表
-
-### 语句节点
-
-#### `VariableDeclaration`
-变量声明。
-
-**属性:**
-- `name`: 变量名
-- `value`: 初始值
-
-#### `Assignment`
-赋值语句。
-
-**属性:**
-- `target`: 目标（Identifier 或 PropertyAccess）
-- `value`: 值
-
-#### `IfStatement`
-条件语句。
-
-**属性:**
-- `condition`: 条件表达式
-- `then_body`: 真分支
-- `else_body`: 假分支
-- `elseif_conditions`: elif 条件列表
-- `elseif_bodies`: elif 分支列表
-
-#### `WhileStatement`
-当循环。
-
-**属性:**
-- `condition`: 条件表达式
-- `body`: 循环体
-
-#### `ForeachStatement`
-遍历循环。
-
-**属性:**
-- `variable`: 循环变量名
-- `iterable`: 可迭代对象
-- `body`: 循环体
-
-#### `ReturnStatement`
-返回语句。
-
-**属性:**
-- `value`: 返回值
-
-#### `PrintStatement`
-打印语句。
-
-**属性:**
-- `value`: 要打印的值
-
-### 定义节点
-
-#### `SegmentDefinition`
-段落定义（函数）。
-
-**属性:**
-- `name`: 段落名
-- `parameters`: 参数列表
-- `body`: 函数体
-- `return_type`: 返回类型
-
-#### `ClassDefinition`
-类定义。
-
-**属性:**
-- `name`: 类名
-- `superclasses`: 父类列表
-- `interfaces`: 实现的接口列表
-- `fields`: 字段列表
-- `methods`: 方法列表
-- `constructor`: 构造函数
-
-#### `InterfaceDefinition`
-接口定义。
-
-**属性:**
-- `name`: 接口名
-- `superinterfaces`: 父接口列表
-- `methods`: 方法签名列表
-- `properties`: 属性签名列表
+- `ClassDefinition`: 类定义
+- `InterfaceDefinition`: 接口定义
+- `MethodSignature`: 方法签名
 
 ---
 
-## 内置函数
+## CLI 命令行工具
 
-### 数学函数
-
-| 函数名 | 说明 | 参数 | 返回值 |
-|--------|------|------|--------|
-| `abs` | 绝对值 | `(x: 数)` | 数 |
-| `max` | 最大值 | `(x: 数, y: 数, ...)` | 数 |
-| `min` | 最小值 | `(x: 数, y: 数, ...)` | 数 |
-| `sqrt` | 平方根 | `(x: 数)` | 数 |
-| `pow` | 幂运算 | `(base: 数, exp: 数)` | 数 |
-| `round` | 四舍五入 | `(x: 数)` | 数 |
-
-### 字符串函数
-
-| 函数名 | 说明 | 参数 | 返回值 |
-|--------|------|------|--------|
-| `len` | 长度 | `(s: 串)` | 数 |
-| `trim` | 去除空白 | `(s: 串)` | 串 |
-| `substring` | 子串 | `(s: 串, start: 数, end: 数)` | 串 |
-
-### 列表函数
-
-| 函数名 | 说明 | 参数 | 返回值 |
-|--------|------|------|--------|
-| `listLen` | 列表长度 | `(list: 列)` | 数 |
-| `listAppend` | 追加元素 | `(list: 列, item)` | 空 |
-| `listReverse` | 反转列表 | `(list: 列)` | 空 |
-| `listIndexOf` | 查找索引 | `(list: 列, item)` | 数 |
-| `listContains` | 包含检查 | `(list: 列, item)` | 布尔 |
-| `listSlice` | 切片 | `(list: 列, start: 数, end: 数)` | 列 |
-| `listConcat` | 拼接 | `(list1: 列, list2: 列)` | 列 |
-
-### 类型转换
-
-| 函数名 | 说明 | 参数 | 返回值 |
-|--------|------|------|--------|
-| `_串化` | 转字符串 | `(x)` | 串 |
-| `_数化` | 转数字 | `(x)` | 数 |
-
-### 文件操作
-
-| 函数名 | 说明 | 参数 | 返回值 |
-|--------|------|------|--------|
-| `_读文件` | 读取文件 | `(path: 串)` | 串 |
-| `_写文件` | 写入文件 | `(path: 串, content: 串)` | 空 |
-
-### 调试函数
-
-| 函数名 | 说明 | 参数 | 返回值 |
-|--------|------|------|--------|
-| `printDebug` | 调试打印 | `(msg: 串, value)` | 空 |
-| `assert` | 断言 | `(condition: 布尔, msg: 串)` | 空 |
-
----
-
-## 命令行接口
-
-### `duan_cli.py`
+### `duan` 命令 (REPL/运行)
 
 ```bash
-duan compile <source> -o <output>    # 编译为可执行文件
-duan run <source>                     # 解释执行
-duan parse <source>                   # 解析并显示 AST
+# 交互式 REPL
+python -m cli.duan
+
+# 运行单个文件
+python -m cli.duan examples/hello.duan
+
+# 执行代码片段
+python -m cli.duan -c '显示 "你好"。'
 ```
 
-**选项:**
-- `-o, --output`: 指定输出文件名（仅 compile）
+### `duanc` 命令 (编译器)
+
+```bash
+# 编译文件为 Python
+python -m cli.duanc examples/hello.duan
+
+# 编译并运行
+python -m cli.duanc examples/hello.duan --run
+
+# 指定输出文件
+python -m cli.duanc examples/hello.duan -o hello.py
+```
+
+### 项目管理
+
+```bash
+# 初始化新项目
+python -m cli.duanc init my_project
+
+# 构建项目
+python -m cli.duanc build
+
+# 运行项目
+python -m cli.duanc run
+```
+
+---
+
+## package.toml 配置
+
+```toml
+name = "我的项目"
+version = "1.0.0"
+description = "段言示例项目"
+authors = ["作者名"]
+
+[compiler]
+entry_point = "main.duan"
+source_dirs = ["src", "modules"]
+test_dirs = ["tests"]
+target = "python"
+
+[dependencies]
+# 其他段言包
+```
+
+---
+
+## 版本信息
+
+当前版本可通过以下方式查询:
+
+```python
+from compiler import DuanCompiler
+
+c = DuanCompiler()
+print(c.version())  # 1.0.0
+```
+
+---
+
+*本文件随段言 v1.0 同步更新*

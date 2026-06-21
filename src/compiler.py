@@ -544,6 +544,9 @@ class DuanCompiler:
         result = compiler.compile_project('/path/to/project')
     """
 
+    # 段言编译器版本号
+    VERSION = "1.0.0"
+
     def __init__(self, project_root: Optional[str] = None):
         self._lexer = Lexer()
         self._parser = DuanParser()
@@ -554,6 +557,13 @@ class DuanCompiler:
         self.project_root: Optional[Path] = Path(project_root) if project_root else None
         # 跨模块符号缓存：module_name -> { symbol_name: symbol_info }
         self.global_module_symbols: Dict[str, Dict[str, Any]] = {}
+
+    # ------------------------------------------------------------------
+    # 版本信息
+    # ------------------------------------------------------------------
+    def version(self) -> str:
+        """返回段言编译器版本号"""
+        return self.VERSION
 
     # ------------------------------------------------------------------
     # 核心入口

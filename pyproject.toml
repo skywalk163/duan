@@ -4,29 +4,30 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "duan"
-version = "0.1.0"
+version = "1.0.0"
 description = "段言（Duan）— 中文自然语言编程语言"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
     {name = "Duan Contributors"},
 ]
-keywords = ["programming-language", "chinese", "nlp", "compiler"]
+keywords = ["programming-language", "chinese", "nlp", "compiler", "hm-inference", "null-safety", "module-system"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
+    "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Compilers",
     "Topic :: Text Processing :: Linguistic",
+    "Topic :: Education",
 ]
 requires-python = ">=3.10"
-dependencies = [
-    "antlr4-python3-runtime==4.13.2",
-]
+dependencies = []
 
 [project.optional-dependencies]
 dev = [
@@ -50,12 +51,20 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-org/duan"
-Source = "https://github.com/your-org/duan"
-BugTracker = "https://github.com/your-org/duan/issues"
+Homepage = "https://github.com/skywalk163/duan"
+Source = "https://github.com/skywalk163/duan"
+BugTracker = "https://github.com/skywalk163/duan/issues"
+Documentation = "https://github.com/skywalk163/duan/tree/main/docs"
+
+[project.scripts]
+duan = "cli.duan:main"
+duanc = "cli.duanc:main"
 
 [tool.setuptools.packages.find]
-include = ["src*", "antlrparser*", "cli*", "stdlib*"]
+include = ["src*", "cli*", "stdlib*", "antlrparser*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.duan"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
