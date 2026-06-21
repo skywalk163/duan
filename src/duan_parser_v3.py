@@ -27,7 +27,7 @@ from ast_nodes_v3 import (
     LambdaExpression, ListLiteral, MatchStmt, MatchCase, MatchPattern,
     DictComprehension, DestructuringAssignment, ConditionalExpression,
     WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition,
-    MethodSignature,
+    MethodSignature, IndexedAssignment,
 )
 
 
@@ -49,7 +49,7 @@ __all__ = [
     'LambdaExpression', 'ListLiteral', 'MatchStmt', 'MatchCase', 'MatchPattern',
     'DictComprehension', 'DestructuringAssignment', 'ConditionalExpression',
     'WithStmt', 'DecoratorDefinition', 'DictLiteral', 'InterfaceDefinition',
-    'MethodSignature',
+    'MethodSignature', 'IndexedAssignment',
 ]
 
 

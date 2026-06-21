@@ -1,0 +1,19 @@
+# main.duan - Bootstrap compiler CLI entry point
+# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+#
+# Entry point for the bootstrap compiler.
+# Can be invoked from run_compiler.py or directly from ANTLR interpreter.
+#
+# Usage (via run_compiler.py):
+#   python run_compiler.py <source.duan> [output.py]
+
+导入 《compiler》。
+
+导出 main。
+
+# main: invoked from Python wrapper (run_compiler.py)
+# Takes a filepath and optionally an output path
+段落 main 接收 filepath：
+  定义 py_code 等于 《compile_file》(filepath)。
+  《打印》(py_code)。
+结束。

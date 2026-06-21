@@ -1,0 +1,29 @@
+# compiler.duan - Bootstrap compiler main entry point
+# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+#
+# Orchestrates lexer -> parser -> codegen pipeline
+# All identifiers use English to avoid ANTLR keyword conflicts
+
+导入 《lexer》。
+导入 《parser》。
+导入 《codegen》。
+
+导出 compile_source, compile_file。
+
+# =============================================================================
+# Compilation pipeline
+# =============================================================================
+
+# compile_source: takes Duan source string, returns Python code string
+段落 compile_source 接收 source：
+  定义 tokens 等于 《词法分析》(source)。
+  定义 ast 等于 《parse》(tokens)。
+  定义 py_code 等于 《generate》(ast)。
+  返回 py_code。
+结束。
+
+# compile_file: reads a .duan file and compiles it to Python
+段落 compile_file 接收 filepath：
+  定义 content 等于 《_读文件》(filepath)。
+  返回 compile_source(content)。
+结束。

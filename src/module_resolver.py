@@ -10,7 +10,7 @@
 
 import os
 from pathlib import Path
-from typing import List, Dict, Set, Optional, Tuple
+from typing import List, Dict, Set, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
 # 添加父目录到路径
@@ -404,6 +404,225 @@ class ModuleResolver:
         modules = [graph.nodes[name] for name in order]
         
         return modules, graph
+
+
+# =============================================================================
+# ModuleDependencyResolver —— 从入口模块递归解析依赖 + 拓扑排序
+# =============================================================================
+
+@dataclass
+class ResolvedModule:
+    """已解析模块（用于 compile_project 跨模块链接）"""
+    name: str
+    path: Path
+    imports: List[str] = field(default_factory=list)
+    source: str = ""
+    ast: Any = None  # duan_parser_v3.Module
+    exports: List[str] = field(default_factory=list)  # 可外部可见的符号名
+
+
+class CircularDependencyError(Exception):
+    """循环依赖错误（与上方重名但可共存，此处保持清晰）"""
+
+    def __init__(self, cycle: List[str]):
+        self.cycle = list(cycle)
+        super().__init__("检测到循环依赖: " + " -> ".join(self.cycle))
+
+
+class ModuleDependencyResolver:
+    """递归解析入口模块及所有 import 依赖，进行循环检测与拓扑排序。
+
+    与模块中的 ImportStmt（`导入 模块`、`从 模块 导入 符号`）协同工作。
+    """
+
+    def __init__(self, search_paths: List[Path]):
+        # 规范化搜索路径
+        self.search_paths: List[Path] = [Path(p) for p in search_paths]
+        self.modules: Dict[str, ResolvedModule] = {}
+
+    # ------------------------------------------------------------------
+    # 公共接口
+    # ------------------------------------------------------------------
+    def resolve_all(self, entry_module_name: str, source: str
+                     ) -> Dict[str, ResolvedModule]:
+        """从入口模块出发，递归解析所有导入的模块。"""
+        visited: Set[str] = set()
+        stack: List[str] = []
+        try:
+            self._resolve_recursive(entry_module_name, source, visited, stack)
+        except CircularDependencyError:
+            raise
+        return self.modules
+
+    def topological_order(self) -> List[str]:
+        """返回模块拓扑排序结果（被依赖的在前）。"""
+        order: List[str] = []
+        visited: Set[str] = set()
+        temp: Set[str] = set()
+
+        def visit(name: str) -> None:
+            if name in visited:
+                return
+            if name in temp:
+                cycle = list(temp) + [name]
+                raise CircularDependencyError(cycle)
+            temp.add(name)
+            if name in self.modules:
+                for imp in self.modules[name].imports:
+                    visit(imp)
+            temp.discard(name)
+            visited.add(name)
+            order.append(name)
+
+        # 先处理入口，再处理其余
+        entry_candidates = list(self.modules.keys())
+        for name in entry_candidates:
+            visit(name)
+        return order
+
+    # ------------------------------------------------------------------
+    # 内部实现
+    # ------------------------------------------------------------------
+    def _resolve_recursive(self, module_name: str, source: str,
+                           visited: Set[str], stack: List[str]) -> None:
+        if module_name in visited:
+            return
+        if module_name in stack:
+            idx = stack.index(module_name)
+            cycle = stack[idx:] + [module_name]
+            raise CircularDependencyError(cycle)
+
+        # 解析 AST
+        try:
+            from duan_parser_v3 import DuanParser  # type: ignore
+            parser = DuanParser()
+            ast_node = parser.parse(source)
+        except Exception:
+            # 解析失败，跳过（由 compiler 报告错误）
+            ast_node = None
+
+        imports = self._extract_imports(ast_node)
+        exports = self._extract_exports(ast_node)
+
+        # 记录已解析模块
+        default_path = self._find_module_path(module_name) or \
+            Path(f"{module_name}.duan")
+        self.modules[module_name] = ResolvedModule(
+            name=module_name,
+            path=default_path,
+            imports=list(imports),
+            source=source,
+            ast=ast_node,
+            exports=exports,
+        )
+        # 注意：此时 *不* 将 module_name 加入 visited，
+        # 否则循环依赖检测失效。依赖处理结束后再标记 visited。
+
+        # 递归解析导入
+        new_stack = stack + [module_name]
+        for imp in imports:
+            if imp in visited:
+                continue
+            if imp in new_stack:
+                raise CircularDependencyError(new_stack + [imp])
+            module_path = self._find_module_path(imp)
+            if module_path is None:
+                # 找不到文件的模块，使用占位空模块（由 compiler 做警告）
+                self.modules[imp] = ResolvedModule(
+                    name=imp,
+                    path=Path(f"{imp}.duan"),
+                    imports=[],
+                    source="",
+                    ast=None,
+                    exports=[],
+                )
+                visited.add(imp)
+                continue
+            try:
+                sub_source = module_path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            self._resolve_recursive(imp, sub_source, visited, new_stack)
+
+        # 所有依赖处理完毕，再标记 visited
+        visited.add(module_name)
+
+    def _extract_imports(self, ast_node: Any) -> List[str]:
+        """从 AST 中提取所有导入的模块名（支持 导入 / 使用 两种语法）。"""
+        imports: List[str] = []
+        if ast_node is None:
+            return imports
+        statements = getattr(ast_node, "statements", None) or []
+        for stmt in statements:
+            type_name = type(stmt).__name__
+            if type_name == "ImportStmt":
+                # `导入 模块` 或 `从 模块 导入 符号`
+                mod_name = getattr(stmt, "module_name", None)
+                if mod_name:
+                    imports.append(mod_name)
+            elif type_name == "UseStmt" or (hasattr(stmt, "module_name") and
+                                              hasattr(stmt, "is_use")):
+                # `使用 模块`（扩展形式）
+                imports.append(stmt.module_name)
+        return imports
+
+    def _extract_exports(self, ast_node: Any) -> List[str]:
+        """提取模块中可对外暴露的符号（段落/类 名）。
+
+        - 若模块含显式 `导出 符号...` 语句，则只导出这些符号
+        - 否则导出所有 `段 名(...)` 与 `类 名(...)`
+        - 可选地支持公开的 / pub 标注前缀
+        """
+        names: List[str] = []
+        if ast_node is None:
+            return names
+        statements = getattr(ast_node, "statements", None) or []
+
+        explicit_exports: List[str] = []
+        for stmt in statements:
+            type_name = type(stmt).__name__
+            if type_name == "ExportStmt":
+                syms = getattr(stmt, "symbols", None) or []
+                explicit_exports.extend(str(s) for s in syms)
+
+        if explicit_exports:
+            return list(dict.fromkeys(explicit_exports))
+
+        # 隐式导出：收集所有段落与类定义
+        for stmt in statements:
+            type_name = type(stmt).__name__
+            if type_name in ("Paragraph", "ParagraphDef", "FunctionDef",
+                             "段定义"):
+                name = getattr(stmt, "name", None)
+                if name:
+                    names.append(str(name))
+            elif type_name in ("ClassDefinition", "ClassDef", "类定义"):
+                name = getattr(stmt, "name", None)
+                if name:
+                    names.append(str(name))
+        return list(dict.fromkeys(names))
+
+    def _find_module_path(self, module_name: str) -> Optional[Path]:
+        """根据模块名在搜索路径中寻找 .duan 文件。"""
+        if not module_name:
+            return None
+        candidates = [
+            f"{module_name}.duan",
+            module_name.replace(".", os.sep) + ".duan",
+            module_name.replace("/", os.sep) + ".duan",
+        ]
+        seen: Set[str] = set()
+        for base in self.search_paths:
+            if not base.exists():
+                continue
+            for cand in candidates:
+                if cand in seen:
+                    continue
+                seen.add(cand)
+                path = base / cand
+                if path.is_file():
+                    return path
+        return None
 
 
 # =============================================================================

@@ -37,13 +37,16 @@ class ParameterList(ASTNode):
 
 
 class VarDecl(ASTNode):
-    __slots__ = ('name', 'value')
+    __slots__ = ('name', 'value', 'type_annotation')
     """变量声明"""
-    def __init__(self, name: str, value: ASTNode):
+    def __init__(self, name: str, value: ASTNode, type_annotation: Optional[str] = None):
         self.name = name
         self.value = value
+        self.type_annotation = type_annotation
     
     def __repr__(self):
+        if self.type_annotation:
+            return f"VarDecl({self.name}: {self.type_annotation} = {self.value})"
         return f"VarDecl({self.name} = {self.value})"
 
 
@@ -299,6 +302,18 @@ class CompoundAssignment(ASTNode):
         return f"CompoundAssignment({self.target} {self.operator}= {self.value})"
 
 
+class IndexedAssignment(ASTNode):
+    __slots__ = ('target', 'index', 'value')
+    """索引赋值（甲[丁] 为 值 → 甲[丁] = 值）"""
+    def __init__(self, target: str, index: ASTNode, value: ASTNode):
+        self.target = target
+        self.index = index
+        self.value = value
+    
+    def __repr__(self):
+        return f"IndexedAssignment({self.target}[{self.index}] = {self.value})"
+
+
 class SelfAssignment(ASTNode):
     __slots__ = ('attr_name', 'value')
     """self赋值语句"""
@@ -535,3 +550,13 @@ class DictLiteral(ASTNode):
     def __repr__(self):
         items = [f"{k}: {v}" for k, v in self.entries]
         return f"DictLiteral({{{', '.join(items)}}})"
+
+
+class UnwrapExpression(ASTNode):
+    __slots__ = ('value',)
+    """解包表达式（值! 或 unwrap(值)）"""
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return f"UnwrapExpression({self.value})"

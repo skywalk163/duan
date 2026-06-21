@@ -294,6 +294,11 @@ def 字符串长度(text: str) -> int:
     return len(text)
 
 
+def 字符串获取(text: str, index: int) -> str:
+    """获取字符串中指定位置的字符"""
+    return text[index]
+
+
 def 分割字符串(text: str, separator: str = None) -> List[str]:
     """分割字符串"""
     return text.split(separator)
@@ -683,7 +688,7 @@ __all__ = [
     
     # 字符串工具
     '转整数', '转浮点', '转字符串',
-    '字符串长度', '分割字符串', '连接字符串',
+    '字符串长度', '字符串获取', '分割字符串', '连接字符串',
     '替换字符串', '去除空白',
     
     # 列表工具
