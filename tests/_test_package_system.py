@@ -11,8 +11,10 @@ import unittest
 from pathlib import Path
 
 # 确保 src 可用
-SRC_DIR = Path(__file__).resolve().parent / "src"
-sys.path.insert(0, str(SRC_DIR))
+_project_root = Path(__file__).resolve().parent.parent
+_src_dir = _project_root / "src"
+sys.path.insert(0, str(_project_root))
+sys.path.insert(0, str(_src_dir))
 
 
 def _make_temp_project_dir():
