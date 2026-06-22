@@ -7,6 +7,7 @@
 from typing import List, Optional
 from duan_parser_v3 import *
 from keywords import VERB_ARITY
+import ast_nodes as ast_nodes_module
 
 
 # 需要导入新的AST节点类型
@@ -58,6 +59,29 @@ class PythonCodeGenerator:
         # 类方法名追踪（用于方法内自动添加 self. 前缀调用其他方法）
         self._class_method_names: set = set()
         self._in_class_method: bool = False
+        
+        # 方法名映射（中文到英文）
+        self.method_name_map = {
+            '追加': 'append',
+            '添加': 'append',
+            '长度': '__len__',
+            '取长度': '__len__',
+            '插入': 'insert',
+            '删除': 'remove',
+            '弹出': 'pop',
+            '清空': 'clear',
+            '反转': 'reverse',
+            '排序': 'sort',
+            '包含': '__contains__',
+            '获取': '__getitem__',
+            '设置': '__setitem__',
+        }
+        
+        # 模块名映射（中文到Python模块）
+        self.module_name_map = {
+            'JSON': 'json',
+            '日期时间': 'datetime',
+        }
         
         # 运算符映射
         self.operator_map = {
@@ -128,12 +152,34 @@ class PythonCodeGenerator:
             '当前目录': '_duan_builtin.当前目录',
             '切换目录': '_duan_builtin.切换目录',
             '执行命令': '_duan_builtin.执行命令',
-            
+
+            # 标准输入输出
+            '读取行': '_duan_builtin.读取行',
+            '读取N字节': '_duan_builtin.读取N字节',
+            '写入输出': '_duan_builtin.写入输出',
+            '打印输出': '_duan_builtin.打印输出',
+            '刷新输出': '_duan_builtin.刷新输出',
+            '写入错误': '_duan_builtin.写入错误',
+            '打印错误': '_duan_builtin.打印错误',
+
+            # JSON 处理
+            '解析JSON': '_duan_builtin.解析JSON',
+            '序列化JSON': '_duan_builtin.序列化JSON',
+            '美化JSON': '_duan_builtin.美化JSON',
+
             # 字符串工具
             '转整数': '_duan_builtin.转整数',
             '转浮点': '_duan_builtin.转浮点',
             '转字符串': '_duan_builtin.转字符串',
+            '到字符串': '_duan_builtin.转字符串',
+            '转换字符串': '_duan_builtin.转字符串',
+            '到数字': '_duan_builtin.转浮点',
+            '转数字': '_duan_builtin.转浮点',
             '字符串长度': '_duan_builtin.字符串长度',
+            '字符串获取': '_duan_builtin.字符串获取',
+            '字符串包含': '_duan_builtin.字符串包含',
+            '字符串替换': '_duan_builtin.字符串替换',
+            '字符串分割': '_duan_builtin.字符串分割',
             '分割字符串': '_duan_builtin.分割字符串',
             '连接字符串': '_duan_builtin.连接字符串',
             '替换字符串': '_duan_builtin.替换字符串',
@@ -168,6 +214,10 @@ class PythonCodeGenerator:
             '是列表': '_duan_builtin.是列表',
             '是字典': '_duan_builtin.是字典',
             '是空': '_duan_builtin.是空',
+            
+            # 日期时间
+            '时间戳': '_duan_builtin.时间戳',
+            '格式化时间': '_duan_builtin.格式化时间',
         }
     
     def generate(self, module: Module) -> str:
@@ -188,17 +238,23 @@ class PythonCodeGenerator:
         self._add_line("except ImportError:")
         self._add_line("    importlib = None")
         self._add_line("")
+        self._add_line("# 解析 stdlib 路径（依次尝试多种可能）")
+        self._add_line("_duan_stdlib = None")
         self._add_line("try:")
-        self._add_line("    _duan_stdlib = os.path.join(os.path.dirname(__file__), 'stdlib')")
+        self._add_line("    _duan_file_dir = os.path.dirname(os.path.abspath(__file__))")
         self._add_line("except NameError:")
-        self._add_line("    _duan_stdlib = os.path.join(os.getcwd(), 'stdlib')")
-        self._add_line("    if not os.path.isdir(_duan_stdlib):")
-        self._add_line("        # 尝试父目录（当从子目录运行时）")
-        self._add_line("        parent_stdlib = os.path.normpath(os.path.join(os.getcwd(), '..', 'stdlib'))")
-        self._add_line("        if os.path.isdir(parent_stdlib):")
-        self._add_line("            _duan_stdlib = parent_stdlib")
+        self._add_line("    _duan_file_dir = None")
+        self._add_line("for _try_path in [")
+        self._add_line("    os.path.join(_duan_file_dir, 'stdlib') if _duan_file_dir else None,")
+        self._add_line("    os.path.join(_duan_file_dir, '..', 'stdlib') if _duan_file_dir else None,")
+        self._add_line("    os.path.join(os.getcwd(), 'stdlib'),")
+        self._add_line("    os.path.normpath(os.path.join(_duan_file_dir, '..', '..', 'stdlib')) if _duan_file_dir else None,")
+        self._add_line("]:")
+        self._add_line("    if _try_path and os.path.isdir(_try_path):")
+        self._add_line("        _duan_stdlib = _try_path")
+        self._add_line("        break")
         self._add_line("")
-        self._add_line("if os.path.isdir(_duan_stdlib) and _duan_stdlib not in sys.path:")
+        self._add_line("if _duan_stdlib and _duan_stdlib not in sys.path:")
         self._add_line("    sys.path.insert(0, _duan_stdlib)")
         self._add_line("")
         self._add_line("if importlib:")
@@ -218,6 +274,16 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
         self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
         self._add_line("        _duan_builtin.打印 = print")
+        self._add_line("        _duan_builtin.读取行 = lambda: sys.stdin.readline().rstrip('\\r\\n')")
+        self._add_line("        _duan_builtin.读取N字节 = lambda n: sys.stdin.read(n)")
+        self._add_line("        _duan_builtin.写入输出 = lambda t: (sys.stdout.write(t), sys.stdout.flush()) and None")
+        self._add_line("        _duan_builtin.打印输出 = lambda t: print(t, flush=True)")
+        self._add_line("        _duan_builtin.刷新输出 = lambda: sys.stdout.flush()")
+        self._add_line("        _duan_builtin.写入错误 = lambda t: (sys.stderr.write(t), sys.stderr.flush()) and None")
+        self._add_line("        _duan_builtin.打印错误 = lambda t: print(t, file=sys.stderr, flush=True)")
+        self._add_line("        _duan_builtin.解析JSON = lambda t: __import__('json').loads(t)")
+        self._add_line("        _duan_builtin.序列化JSON = lambda v, i=None: (__import__('json').dumps(v, ensure_ascii=False, indent=i) if i is not None else __import__('json').dumps(v, ensure_ascii=False))")
+        self._add_line("        _duan_builtin.美化JSON = lambda v: __import__('json').dumps(v, ensure_ascii=False, indent=2)")
         self._add_line("        _duan_builtin.转字符串 = str")
         self._add_line("        _duan_builtin.列表创建 = list")
         self._add_line("        _duan_builtin.列表长度 = len")
@@ -230,10 +296,22 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
         self._add_line("        _duan_builtin.字典键列表 = lambda d: list(d.keys())")
         self._add_line("        _duan_builtin.字典包含键 = lambda d, k: k in d")
+        self._add_line("        _duan_builtin.时间戳 = lambda: __import__('time').time()")
+        self._add_line("        _duan_builtin.格式化时间 = lambda t, f='%Y-%m-%d %H:%M:%S': __import__('datetime').datetime.fromtimestamp(t).strftime(f) if isinstance(t, (int, float)) else __import__('datetime').datetime.strptime(t, '%Y-%m-%d %H:%M:%S').strftime(f)")
         self._add_line("else:")
         self._add_line("    import types")
         self._add_line("    _duan_builtin = types.ModuleType('_duan_builtin')")
         self._add_line("    _duan_builtin.打印 = print")
+        self._add_line("    _duan_builtin.读取行 = lambda: sys.stdin.readline().rstrip('\\n')")
+        self._add_line("    _duan_builtin.读取N字节 = lambda n: sys.stdin.read(n)")
+        self._add_line("    _duan_builtin.写入输出 = lambda t: (sys.stdout.write(t), sys.stdout.flush()) and None")
+        self._add_line("    _duan_builtin.打印输出 = lambda t: print(t, flush=True)")
+        self._add_line("    _duan_builtin.刷新输出 = lambda: sys.stdout.flush()")
+        self._add_line("    _duan_builtin.写入错误 = lambda t: (sys.stderr.write(t), sys.stderr.flush()) and None")
+        self._add_line("    _duan_builtin.打印错误 = lambda t: print(t, file=sys.stderr, flush=True)")
+        self._add_line("    _duan_builtin.解析JSON = lambda t: __import__('json').loads(t)")
+        self._add_line("    _duan_builtin.序列化JSON = lambda v, i=None: (__import__('json').dumps(v, ensure_ascii=False, indent=i) if i is not None else __import__('json').dumps(v, ensure_ascii=False))")
+        self._add_line("    _duan_builtin.美化JSON = lambda v: __import__('json').dumps(v, ensure_ascii=False, indent=2)")
         self._add_line("    _duan_builtin.转字符串 = str")
         self._add_line("    _duan_builtin.列表创建 = list")
         self._add_line("    _duan_builtin.列表长度 = len")
@@ -246,6 +324,8 @@ class PythonCodeGenerator:
         self._add_line("    _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
         self._add_line("    _duan_builtin.字典键列表 = lambda d: list(d.keys())")
         self._add_line("    _duan_builtin.字典包含键 = lambda d, k: k in d")
+        self._add_line("    _duan_builtin.时间戳 = lambda: __import__('time').time()")
+        self._add_line("    _duan_builtin.格式化时间 = lambda t, f='%Y-%m-%d %H:%M:%S': __import__('datetime').datetime.fromtimestamp(t).strftime(f) if isinstance(t, (int, float)) else __import__('datetime').datetime.strptime(t, '%Y-%m-%d %H:%M:%S').strftime(f)")
         self._add_line("")
 
         # 可空类型解包辅助函数：_duan_unwrap(x) = assert x is not None; return x
@@ -299,6 +379,9 @@ class PythonCodeGenerator:
             self._generate_return_stmt(stmt)
         elif isinstance(stmt, ImportStmt):
             self._generate_import_stmt(stmt)
+        elif isinstance(stmt, ast_nodes_module.ImportStatement):
+            # 支持 ast_nodes.py 的 ImportStatement
+            self._generate_import_statement(stmt)
         elif isinstance(stmt, ExportStmt):
             # 导出语句在Python中不需要生成代码
             # Python通过 __all__ 或直接定义来实现导出
@@ -879,21 +962,22 @@ class PythonCodeGenerator:
             return str(expr.value)
         
         elif isinstance(expr, StringLiteral):
-            # 转义引号
-            escaped = expr.value.replace('\\', '\\\\').replace('"', '\\"')
-            return f'"{escaped}"'
+            # 转义引号和不可见字符
+            value = expr.value
+            # 先处理反斜杠（必须是第一步）
+            value = value.replace('\\', '\\\\')
+            # 再处理不可见字符
+            value = value.replace('\r', '\\r').replace('\n', '\\n').replace('\t', '\\t').replace('"', '\\"')
+            return f'"{value}"'
         
         elif isinstance(expr, Identifier):
             name = self._sanitize_name(expr.name)
             # 检查是否是中文数字
             if expr.name in self.chinese_numbers:
                 return str(self.chinese_numbers[expr.name])
-            # 如果是导入的符号且无参数，生成为函数调用（0参数函数）
-            if expr.name in self._imported_symbols:
-                return f"{name}()"
-            # 类方法中，如果标识符是类属性，添加 self. 前缀
-            if self._in_class_method and expr.name in self._class_attr_names:
-                return f"self.{name}"
+            # 如果是导入的符号且无参数，但不在 MemberAccess 中时，生成为函数调用（0参数函数）
+            # 注意：模块导入（如 JSON）不应添加括号，只有真正的函数调用才需要
+            # 模块应该直接作为对象使用
             return name
         
         # 检查 ast_nodes 模块中的 Identifier（兼容两种定义）
@@ -959,14 +1043,25 @@ class PythonCodeGenerator:
             obj = self._generate_expr(expr.obj)
             member = self._sanitize_name(expr.member)
             
+            # 检查方法名是否需要映射转换
+            mapped_member = self.method_name_map.get(expr.member, member)
+            
             if expr.is_method_call:
                 # 方法调用
                 args = [self._generate_expr(arg) for arg in expr.args]
                 args_str = ', '.join(args)
-                return f"{obj}.{member}({args_str})"
+                
+                # 特殊处理：长度方法 -> len(obj)
+                if expr.member == '长度':
+                    return f"len({obj})"
+                # 特殊处理：包含方法 -> item in obj
+                elif expr.member == '包含':
+                    return f"{args_str} in {obj}"
+                
+                return f"{obj}.{mapped_member}({args_str})"
             else:
                 # 属性访问
-                return f"{obj}.{member}"
+                return f"{obj}.{mapped_member}"
         
         elif isinstance(expr, ListLiteral):
             # 列表字面量
@@ -1054,25 +1149,46 @@ class PythonCodeGenerator:
         """生成导入语句"""
         module_name = stmt.module_name
         
+        # 使用模块名映射转换中文模块名
+        mapped_module = self.module_name_map.get(module_name, module_name)
+        
         if stmt.symbols:
             # 从...导入：from 数学 import 平方根, 幂
             symbols_str = ', '.join(stmt.symbols)
             if stmt.alias:
-                self._add_line(f"from {module_name} import {symbols_str} as {stmt.alias}")
+                self._add_line(f"from {mapped_module} import {symbols_str} as {stmt.alias}")
                 self._imported_symbols.add(stmt.alias)
             else:
-                self._add_line(f"from {module_name} import {symbols_str}")
+                self._add_line(f"from {mapped_module} import {symbols_str}")
                 # 追踪导入的符号
                 for symbol in stmt.symbols:
                     self._imported_symbols.add(symbol)
         else:
             # 导入整个模块：import 数学
             if stmt.alias:
-                self._add_line(f"import {module_name} as {stmt.alias}")
+                self._add_line(f"import {mapped_module} as {stmt.alias}")
                 self._imported_symbols.add(stmt.alias)
             else:
-                self._add_line(f"import {module_name}")
+                self._add_line(f"import {mapped_module}")
                 self._imported_symbols.add(module_name)
+    
+    def _generate_import_statement(self, stmt):
+        """生成 ast_nodes.py 的 ImportStatement"""
+        module_name = stmt.module
+        
+        # 使用模块名映射转换中文模块名
+        mapped_module = self.module_name_map.get(module_name, module_name)
+        
+        if stmt.names:
+            # from module import names
+            names_str = ', '.join(stmt.names)
+            self._add_line(f"from {mapped_module} import {names_str}")
+            for name in stmt.names:
+                self._imported_symbols.add(name)
+        else:
+            # import module
+            self._add_line(f"import {mapped_module}")
+            self._imported_symbols.add(module_name)
     
     def _is_chinese(self, text: str) -> bool:
         """判断字符串是否包含中文"""

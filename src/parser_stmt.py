@@ -30,6 +30,25 @@ class ParserStmtMixin:
         statements = []
         
         while self._current():
+            tok = self._current()
+            
+            # 跳过"结束"关键字（语法中不再需要）
+            if tok.type == TokenType.KEYWORD and tok.value == '结束':
+                self._consume(TokenType.KEYWORD, '结束')
+                # 可能还有句号
+                if self._current() and self._current().type == TokenType.DOT:
+                    self._consume(TokenType.DOT)
+                continue
+            
+            # 跳过外层的DEDENT（level=0）
+            if tok.type == TokenType.DEDENT:
+                dedent_level = getattr(tok, 'value', None)
+                # 如果level是None或level == 0，表示这是外层结构的结束
+                # 消耗这个DEDENT并继续
+                if dedent_level is None or dedent_level == 0:
+                    self._consume(TokenType.DEDENT)
+                    continue
+            
             stmt = self._parse_statement()
             if stmt:
                 statements.append(stmt)
@@ -640,7 +659,17 @@ class ParserStmtMixin:
         
         # then块：块模式下用 _parse_body，否则只解析单个语句
         if has_colon:
+            # 消耗 NEWLINE 和 INDENT
+            if self._current() and self._current().type == TokenType.NEWLINE:
+                self._consume(TokenType.NEWLINE)
+            if self._current() and self._current().type == TokenType.INDENT:
+                self._consume(TokenType.INDENT)
+            
             then_body = self._parse_body()
+            
+            # 消耗 DEDENT（then块结束）
+            if self._current() and self._current().type == TokenType.DEDENT:
+                self._consume(TokenType.DEDENT)
         else:
             stmt = self._parse_statement()
             then_body = [stmt] if stmt else []
@@ -651,6 +680,127 @@ class ParserStmtMixin:
         if self._match(TokenType.KEYWORD, '否则'):
             self._consume(TokenType.KEYWORD, '否则')
             
+            # 检查是否是"否则如果"
+            if self._match(TokenType.KEYWORD, '如果'):
+                self._consume(TokenType.KEYWORD, '如果')
+                # 递归解析"否则如果"分支
+                condition2 = self._parse_expr()
+                
+                # 那么 / 则（可选）
+                if self._match(TokenType.KEYWORD, '则'):
+                    self._consume(TokenType.KEYWORD, '则')
+                elif self._match(TokenType.KEYWORD, '那么'):
+                    self._consume(TokenType.KEYWORD, '那么')
+                
+                # 冒号（可选）
+                if self._current() and self._current().type == TokenType.COLON:
+                    self._consume(TokenType.COLON)
+                
+                if has_colon:
+                    # 消耗 NEWLINE 和 INDENT
+                    if self._current() and self._current().type == TokenType.NEWLINE:
+                        self._consume(TokenType.NEWLINE)
+                    if self._current() and self._current().type == TokenType.INDENT:
+                        self._consume(TokenType.INDENT)
+                    
+                    elif_body = self._parse_body()
+                    
+                    # 消耗 DEDENT
+                    if self._current() and self._current().type == TokenType.DEDENT:
+                        self._consume(TokenType.DEDENT)
+                else:
+                    stmt = self._parse_statement()
+                    elif_body = [stmt] if stmt else []
+                
+                # 递归处理后续的"否则如果"或"否则"分支
+                # 检查是否还有"否则"
+                nested_else_body = None
+                if self._current() and self._match(TokenType.KEYWORD, '否则'):
+                    self._consume(TokenType.KEYWORD, '否则')
+                    
+                    if self._match(TokenType.KEYWORD, '如果'):
+                        self._consume(TokenType.KEYWORD, '如果')
+                        condition3 = self._parse_expr()
+                        
+                        if self._match(TokenType.KEYWORD, '则'):
+                            self._consume(TokenType.KEYWORD, '则')
+                        elif self._match(TokenType.KEYWORD, '那么'):
+                            self._consume(TokenType.KEYWORD, '那么')
+                        
+                        if self._current() and self._current().type == TokenType.COLON:
+                            self._consume(TokenType.COLON)
+                        
+                        if has_colon:
+                            if self._current() and self._current().type == TokenType.NEWLINE:
+                                self._consume(TokenType.NEWLINE)
+                            if self._current() and self._current().type == TokenType.INDENT:
+                                self._consume(TokenType.INDENT)
+                            
+                            elif_body2 = self._parse_body()
+                            
+                            if self._current() and self._current().type == TokenType.DEDENT:
+                                self._consume(TokenType.DEDENT)
+                        else:
+                            stmt = self._parse_statement()
+                            elif_body2 = [stmt] if stmt else []
+                        
+                        # 继续递归检查
+                        # 简化处理：最多三层嵌套
+                        inner_else_body = None
+                        if self._current() and self._match(TokenType.KEYWORD, '否则'):
+                            self._consume(TokenType.KEYWORD, '否则')
+                            
+                            if self._match(TokenType.KEYWORD, '如果'):
+                                # 更多嵌套，简化处理：返回None
+                                pass
+                            else:
+                                if self._current() and self._current().type == TokenType.DOT:
+                                    self._consume(TokenType.DOT)
+                                if self._current() and self._current().type == TokenType.COLON:
+                                    self._consume(TokenType.COLON)
+                                
+                                if has_colon:
+                                    if self._current() and self._current().type == TokenType.NEWLINE:
+                                        self._consume(TokenType.NEWLINE)
+                                    if self._current() and self._current().type == TokenType.INDENT:
+                                        self._consume(TokenType.INDENT)
+                                    
+                                    inner_else_body = self._parse_body()
+                                    
+                                    if self._current() and self._current().type == TokenType.DEDENT:
+                                        self._consume(TokenType.DEDENT)
+                                else:
+                                    stmt = self._parse_statement()
+                                    inner_else_body = [stmt] if stmt else []
+                        
+                        # 返回多层嵌套的IfStmt
+                        return IfStmt(condition, then_body, 
+                                     IfStmt(condition2, elif_body, 
+                                            IfStmt(condition3, elif_body2, inner_else_body)))
+                    else:
+                        # 纯否则分支
+                        if self._current() and self._current().type == TokenType.DOT:
+                            self._consume(TokenType.DOT)
+                        if self._current() and self._current().type == TokenType.COLON:
+                            self._consume(TokenType.COLON)
+                        
+                        if has_colon:
+                            if self._current() and self._current().type == TokenType.NEWLINE:
+                                self._consume(TokenType.NEWLINE)
+                            if self._current() and self._current().type == TokenType.INDENT:
+                                self._consume(TokenType.INDENT)
+                            
+                            nested_else_body = self._parse_body()
+                            
+                            if self._current() and self._current().type == TokenType.DEDENT:
+                                self._consume(TokenType.DEDENT)
+                        else:
+                            stmt = self._parse_statement()
+                            nested_else_body = [stmt] if stmt else []
+                
+                # 返回嵌套的IfStmt
+                return IfStmt(condition, then_body, IfStmt(condition2, elif_body, nested_else_body))
+            
             # 句号（可选）
             if self._current() and self._current().type == TokenType.DOT:
                 self._consume(TokenType.DOT)
@@ -660,15 +810,37 @@ class ParserStmtMixin:
                 self._consume(TokenType.COLON)
             
             if has_colon:
+                # 消耗 NEWLINE 和 INDENT
+                if self._current() and self._current().type == TokenType.NEWLINE:
+                    self._consume(TokenType.NEWLINE)
+                if self._current() and self._current().type == TokenType.INDENT:
+                    self._consume(TokenType.INDENT)
+                
                 else_body = self._parse_body()
+                
+                # 消耗 DEDENT（else块结束）
+                if self._current() and self._current().type == TokenType.DEDENT:
+                    self._consume(TokenType.DEDENT)
             else:
                 stmt = self._parse_statement()
                 else_body = [stmt] if stmt else []
+        
+        # 消耗"结束"关键字（块模式下）
+        if has_colon:
+            if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+                self._consume(TokenType.KEYWORD, '结束')
+            # 消耗句号
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
         
         return IfStmt(condition, then_body, else_body)
     
     def _parse_foreach_stmt(self) -> ForeachStmt:
         """解析遍历循环"""
+        # 跳过 NEWLINE
+        if self._current() and self._current().type == TokenType.NEWLINE:
+            self._consume(TokenType.NEWLINE)
+        
         # 遍历 / 对
         if self._match(TokenType.KEYWORD, '对'):
             self._consume(TokenType.KEYWORD, '对')
@@ -696,8 +868,24 @@ class ParserStmtMixin:
         # 冒号
         self._consume(TokenType.COLON)
         
+        # 消耗 NEWLINE 和 INDENT
+        if self._current() and self._current().type == TokenType.NEWLINE:
+            self._consume(TokenType.NEWLINE)
+        if self._current() and self._current().type == TokenType.INDENT:
+            self._consume(TokenType.INDENT)
+        
         # 循环体
         body = self._parse_body()
+        
+        # 消耗 DEDENT（循环体结束）
+        if self._current() and self._current().type == TokenType.DEDENT:
+            self._consume(TokenType.DEDENT)
+        
+        # 消耗"结束"关键字和句号（如果存在）
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
         
         return ForeachStmt(variable, iterable, body)
     
@@ -716,8 +904,33 @@ class ParserStmtMixin:
         # 冒号
         self._consume(TokenType.COLON)
         
-        # 循环体
+        # 消耗 NEWLINE 和 INDENT
+        if self._current() and self._current().type == TokenType.NEWLINE:
+            self._consume(TokenType.NEWLINE)
+        if self._current() and self._current().type == TokenType.INDENT:
+            self._consume(TokenType.INDENT)
+        
+        # 循环体 - 使用_parse_body
         body = self._parse_body()
+        
+        # 消耗 DEDENT（循环体结束）
+        # 当循环开始时的缩进级别是2，所以当遇到level<=2的DEDENT时，表示当循环结束
+        # 需要消耗所有嵌套结构的DEDENT（level > 2），直到遇到level<=2的DEDENT
+        while self._current() and self._current().type == TokenType.DEDENT:
+            dedent_tok = self._current()
+            dedent_level = getattr(dedent_tok, 'value', None)
+            # 如果level小于等于2，表示这是当循环或外层结构的DEDENT，停止消耗
+            if dedent_level is not None and dedent_level <= 2:
+                # 不消耗，让外层结构处理
+                break
+            # 如果level是None或level > 2，继续消耗
+            self._consume(TokenType.DEDENT)
+        
+        # 消耗当循环结束后的"结束"关键字和句号
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
         
         return WhileStmt(condition, body)
     
@@ -933,8 +1146,33 @@ class ParserStmtMixin:
         
         # 段落体
         if has_colon:
+            # 消耗 NEWLINE 和 INDENT
+            if self._current() and self._current().type == TokenType.NEWLINE:
+                self._consume(TokenType.NEWLINE)
+            if self._current() and self._current().type == TokenType.INDENT:
+                self._consume(TokenType.INDENT)
+            
             body = self._parse_body()
-            # 依赖缩进（DEDENT）结束代码块，不再需要 '结束' 关键字
+            
+            # 消耗 DEDENT（段落体结束）
+            if self._current() and self._current().type == TokenType.DEDENT:
+                self._consume(TokenType.DEDENT)
+            
+            # 如果DEDENT的level不是0，还需要继续消耗缩进
+            # 直到遇到level=0的DEDENT或非DEDENT token
+            while self._current() and self._current().type == TokenType.DEDENT:
+                dedent_tok = self._current()
+                # 检查DEDENT的level
+                if hasattr(dedent_tok, 'value') and dedent_tok.value == 0:
+                    # level=0表示回到0级缩进，段落定义结束
+                    # 消耗这个DEDENT
+                    self._consume(TokenType.DEDENT)
+                    break
+                # 否则继续消耗
+                self._consume(TokenType.DEDENT)
+            
+            # 注意：不消耗"结束"关键字和DOT，让外层结构处理（_parse_module）
+            
         else:
             stmt = self._parse_statement()
             body = [stmt] if stmt else []
@@ -1078,6 +1316,10 @@ class ParserStmtMixin:
         # 段落体
         body = self._parse_body()
         
+        # 消耗"结束"关键字（可选，但推荐使用）
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+        
         # 消耗句号
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
@@ -1085,7 +1327,7 @@ class ParserStmtMixin:
         return Paragraph(name, params, return_type, body)
     
     def _parse_body(self) -> List[ASTNode]:
-        """解析代码块（简化版：不处理缩进）"""
+        """解析代码块"""
         statements = []
 
         # 简化处理：最多解析100条语句
@@ -1095,17 +1337,53 @@ class ParserStmtMixin:
         while self._current() and count < max_statements:
             tok = self._current()
 
-            # 结束标记（依赖 DEDENT，不再检查 '结束' 关键字）
-            if tok.type == TokenType.KEYWORD and tok.value in ('否则',):
+            # 跳过 NEWLINE token
+            if tok.type == TokenType.NEWLINE:
+                self._consume(TokenType.NEWLINE)
+                continue
+
+            # 否则标记（if语句的else分支）- 在块模式下，_parse_body遇到"否则"应该停止
+            # 让调用者（如_parse_if_stmt）来处理
+            if tok.type == TokenType.KEYWORD and tok.value == '否则':
                 break
+
+            # DEDENT标记（缩进结束）
+            if tok.type == TokenType.DEDENT:
+                dedent_level = getattr(tok, 'value', None)
+                # 如果level是None，表示这是当前级别的结束，停止解析
+                if dedent_level is None:
+                    break
+                # 如果level > 0，表示这是嵌套结构的结束，继续消耗并解析
+                # 如果level == 0，表示这是最外层结构的结束，停止解析
+                if dedent_level == 0:
+                    break
+                # 否则（level > 0），消耗这个DEDENT并继续解析
+                self._consume(TokenType.DEDENT)
+                continue
             
             # 异常处理的特殊标记（捕获、最终）
             if tok.type == TokenType.KEYWORD and tok.value in ('捕获', '最终'):
                 break
 
-            # DEDENT标记（缩进结束）
-            if tok.type == TokenType.DEDENT:
+            # 类/接口定义（在body中遇到的，作为嵌套处理）
+            if tok.type == TokenType.KEYWORD and tok.value in ('段落', '函数', '段', '类', '接口'):
+                # 当前定义结束，下一个定义是外部的
+                # 检查是否是新的顶级定义（不是嵌套的）
+                # 简化处理：直接break，让外部模块级解析器处理
                 break
+
+            # 段落定义：《段名》段(...) - 嵌套段落定义也结束当前body
+            if tok.type == TokenType.LBOOK:
+                # 检查是否是段落定义
+                # 《段名》段(...) 格式
+                next_tok = self._peek(1)
+                if next_tok and next_tok.type == TokenType.IDENTIFIER:
+                    third_tok = self._peek(2)
+                    fourth_tok = self._peek(3)
+                    if (third_tok and third_tok.type == TokenType.RBOOK and 
+                        fourth_tok and fourth_tok.type == TokenType.KEYWORD and fourth_tok.value == '段'):
+                        # 这是嵌套段落定义，break让外部处理
+                        break
 
             # 解析语句
             stmt = self._parse_statement()

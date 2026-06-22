@@ -383,8 +383,8 @@ class AstAdapter:
 
     def _convert_import_stmt(self, node) -> ast.ImportStatement:
         return ast.ImportStatement(
-            module_name=node.module_name,
-            members=getattr(node, 'symbols', []) or [],
+            module=node.module_name,
+            names=getattr(node, 'symbols', []) or [],
         )
 
     def _convert_export_stmt(self, node) -> ast.ExportStatement:

@@ -1,42 +1,65 @@
 # Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-.venv/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# ANTLR temp files
-*.interp
-*.tokens
-.antlr/
+# 测试和调试
+test_*.py
+debug_*.py
+tests/debug_*.py
+*.log
+.vscode-test*
 
-# LLVM / compiled outputs
-*.ll
+# 编译产物
+*.o
+*.s
+*.bin
 *.exe
 *.out
-*.o
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
+
+# 数据文件
+*.json
+!project/*.json
+
+# 临时文件
+*.tmp
+*.bak
+*.orig
 
 # OS
 .DS_Store
 Thumbs.db
 
-# ANTLR jar
-*.jar
-
-# Archives / competition files
-trae_competition.zip
-trae_competition.html
-
-# Build output
+# 特定项目
+build/
 dist/
-
-# Test/backup
-*.bak
-*.backup
+*.spec
+compile_*.py
+project/记账.py
+project/记账_简化版.duan
+test_output.bin

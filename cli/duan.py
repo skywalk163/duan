@@ -82,8 +82,10 @@ def _compile_src(source: str) -> str:
     return generator.generate(module)
 
 
-def _run_src(source: str) -> str:
+def _run_src(source: str, file_path: str | None = None) -> str:
     """用 src 后端执行，返回输出"""
+    import os
+
     py_code = _compile_src(source)
     output_lines = []
 
@@ -91,7 +93,9 @@ def _run_src(source: str) -> str:
         line = ' '.join(str(a) for a in args)
         output_lines.append(line)
 
-    namespace = {'print': _capture_print}
+    namespace = {'print': _capture_print, '__name__': '__main__'}
+    if file_path:
+        namespace['__file__'] = os.path.abspath(file_path)
     exec(py_code, namespace)
     return '\n'.join(output_lines)
 
@@ -156,7 +160,7 @@ def cmd_run(args):
 
     try:
         if args.backend == 'src':
-            output = _run_src(source)
+            output = _run_src(source, file_path=args.file)
             if output:
                 print(output)
         else:

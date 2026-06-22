@@ -251,22 +251,45 @@ class ParserExprMixin:
             args = []
 
             if arity == 0:
-                # 无参数函数
-                pass
+                # 无参数函数：支持 "刷新输出" 或 "刷新输出()"
+                if self._current() and self._current().type == TokenType.LPAREN:
+                    self._consume(TokenType.LPAREN)
+                    # 跳过可选的空格/内容直到右括号
+                    while self._current() and self._current().type != TokenType.RPAREN:
+                        self._consume()
+                    if self._current() and self._current().type == TokenType.RPAREN:
+                        self._consume(TokenType.RPAREN)
             elif arity == -1:
                 # 可变参数：收集到阻断符为止
-                while self._current():
-                    next_tok = self._current()
-                    if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
-                        break
-                    if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
-                        break
-                    # 收集完整表达式（支持嵌套函数调用和运算符）
-                    arg = self._parse_comparison()
-                    if arg:
-                        args.append(arg)
-                    else:
-                        break
+                # 检查是否使用了括号语法
+                if self._current() and self._current().type == TokenType.LPAREN:
+                    # 括号式参数：列(参数1, 参数2, 参数3)
+                    self._consume(TokenType.LPAREN)
+                    while not self._match(TokenType.RPAREN):
+                        if self._current() and self._current().type == TokenType.COMMA:
+                            self._consume(TokenType.COMMA)
+                            continue
+                        arg = self._parse_comparison()
+                        if arg:
+                            args.append(arg)
+                        else:
+                            break
+                    if self._current() and self._current().type == TokenType.RPAREN:
+                        self._consume(TokenType.RPAREN)
+                else:
+                    # 无括号式：列 参数1 参数2 参数3
+                    while self._current():
+                        next_tok = self._current()
+                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            break
+                        if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                            break
+                        # 收集完整表达式（支持嵌套函数调用和运算符）
+                        arg = self._parse_comparison()
+                        if arg:
+                            args.append(arg)
+                        else:
+                            break
             else:
                 # 固定参数数量（使用完整表达式解析，支持嵌套函数调用和比较运算符）
                 # 检查是否使用了括号语法：动词(参数1, 参数2)
@@ -310,6 +333,17 @@ class ParserExprMixin:
         if tok.type == TokenType.KEYWORD and tok.value in self.OPERATOR_VERBS:
             name = tok.value
             next_tok = self._peek(1)
+            # 检测：如果后面是块关键字（那么、否则、结束、当）或标点（。，）
+            # 且没有括号，则将此运算符关键字作为标识符（变量名）处理
+            if not next_tok or next_tok.type == TokenType.LPAREN:
+                pass  # 下面的正常分支处理括号
+            elif (next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE) or \
+                 next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN,
+                                    TokenType.RBRACKET, TokenType.COLON, TokenType.EOF):
+                if next_tok.type != TokenType.LPAREN:
+                    # 当作变量名处理，如 "如果操作等于加那么..." 中的 "加"
+                    self._consume()
+                    return self._parse_postfix(Identifier(name))
             if next_tok and next_tok.type == TokenType.LPAREN:
                 # 函数调用 with parentheses
                 self._consume()
@@ -542,6 +576,10 @@ class ParserExprMixin:
         if tok.type == TokenType.IDENTIFIER:
             name = tok.value
             self._consume()
+            
+            # 合并连续的 IDENTIFIER 令牌（用于处理 tokenizer 将 "字典创建" 拆分为两个 IDENTIFIER 的情况）
+            while self._current() and self._current().type == TokenType.IDENTIFIER:
+                name += self._consume().value
             
             # 运算符动词（不应收集为参数）
             

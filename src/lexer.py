@@ -19,6 +19,23 @@ from keywords import (
     VERB_ARITY, BUILTIN_TYPES, SYMBOL_MAP, BLOCKING_SYMBOLS
 )
 
+# 运算符动词集合（用于分词时识别运算符）
+OPERATOR_VERBS = frozenset({
+    '加', '减', '乘', '除', '加上', '减去', '乘以', '除以', 
+    '大于', '小于', '等于', '不等于', '大于等于', '小于等于',
+    '模', '幂'
+})
+
+# 常见复合词保护列表（这些词包含运算符动词，但应该作为整体识别）
+COMMON_COMPOUND_WORDS = frozenset({
+    '追加', '加入', '减少', '减去', '乘法', '除法', '模式', '幂次',
+    '当前', '当然', '应当', '当选', '当家',
+    '加入', '加快', '加强', '加减',
+    '减少', '减弱', '减速',
+    '乘法', '乘积', '乘客', '乘除',
+    '除法', '除非', '去除',
+})
+
 
 class LexerError(Exception):
     """词法分析错误"""
@@ -93,8 +110,8 @@ class Lexer:
         
         # 复合词安全：这些单字关键字在复合词中常见（如"对象"中的"对"），
         # 当后接CJK字符时应跳过，避免拆分复合词
-        # 注意：算术运算符（加、减、乘、除、模、幂）和循环关键字"当"不在此列，
-        # 因为它们在任何上下文中都应作为关键字被识别
+        # 注意：算术运算符（加、减、乘、除、模、幂）和循环关键字"当"现在在此列，
+        # 因为它们经常出现在复合词中（如"当前"、"追加"）
         self.compound_safe_single_keywords: Set[str] = {
             '数', '列', '串', '典', '集',   # 类型
             '从',                             # 导入
@@ -429,9 +446,17 @@ class Lexer:
         """
         最长匹配关键字
         
+        注意：compound_safe_single 中的单字关键字（如"典"）不应在独立上下文中匹配，
+        仅当它们是更长关键字的组成部分时才使用。
+        递归调用 _skip_compound_safe_and_match 处理这种情况。
+        
         Returns:
             (匹配到的关键字, 匹配长度) 或 (None, 0)
         """
+        return self._skip_compound_safe_and_match(text, pos)
+    
+    def _skip_compound_safe_and_match(self, text: str, pos: int) -> Tuple[Optional[str], int]:
+        """尝试匹配关键字，遇到 compound_safe 关键字时跳过并继续匹配后续内容"""
         max_possible = min(self.all_max_keyword_len, len(text) - pos)
         
         # 从最长到最短尝试匹配
@@ -440,6 +465,15 @@ class Lexer:
             if candidates:
                 candidate = text[pos:pos+length]
                 if candidate in candidates:
+                    # 检查是否是 compound_safe_single 中的单字关键字
+                    if (length == 1 and candidate in self.compound_safe_single_keywords
+                            and pos + length < len(text)):
+                        # 单字 compound_safe 关键字（如"典"），后面还有内容，
+                        # 跳过它，尝试匹配后续内容
+                        kw, l = self._skip_compound_safe_and_match(text, pos + 1)
+                        if kw:
+                            return kw, l
+                        # 后续无法形成关键字，继续使用当前关键字
                     return candidate, length
         
         return None, 0
@@ -710,6 +744,14 @@ class Lexer:
                     current_col += num_len
                     continue
             
+            # 检查完整标识符是否是常见复合词
+            if full_identifier in COMMON_COMPOUND_WORDS:
+                # 常见复合词，作为整体标识符，不拆分
+                tokens.append(Token(TokenType.IDENTIFIER, full_identifier, line, current_col))
+                consumed += len(full_identifier)
+                current_col += len(full_identifier)
+                continue
+            
             # 检查完整标识符是否在用户定义中
             if full_identifier in user_definitions:
                 # 完整标识符在用户定义中，优先作为标识符，不拆分
@@ -746,24 +788,52 @@ class Lexer:
                 # 例如"列表"(len=2)不应拆为 列(动词)+表
                 # 但独立出现的"加"(len=1)仍应匹配为关键字
                 # 例外：后续字符是中文数字（如"加五"），应拆分为 加(动词)+五(数字)
+                # 另外：只有当关键字在词首位置时才跳过，词中出现的运算符应正常识别
                 skip_verb = False
                 if length == 1 and keyword in self.compound_safe_single_keywords and len(full_identifier) > 1:
-                    # 检查后续字符是否构成中文数字
-                    remaining = full_identifier[1:]
-                    is_chinese_num = False
-                    if len(remaining) == 1 and remaining[0] in self.SIMPLE_CHINESE_NUMBERS:
-                        is_chinese_num = True
-                    else:
-                        num_val, num_len = self._try_parse_chinese_number(remaining, 0)
-                        if num_val is not None and num_len >= len(remaining):
+                    # 检查是否在词首位置（相对于 full_identifier）
+                    in_word_start = (pos == i + consumed)  # 当前位置是当前处理的起始位置
+                    if in_word_start:
+                        # 检查后续字符是否构成中文数字
+                        remaining = full_identifier[1:]
+                        is_chinese_num = False
+                        if len(remaining) == 1 and remaining[0] in self.SIMPLE_CHINESE_NUMBERS:
                             is_chinese_num = True
-                    if not is_chinese_num:
-                        skip_verb = True
+                        else:
+                            num_val, num_len = self._try_parse_chinese_number(remaining, 0)
+                            if num_val is not None and num_len >= len(remaining):
+                                is_chinese_num = True
+                        if not is_chinese_num:
+                            skip_verb = True
+                
+                # 特殊处理："当"关键字只在后面跟着冒号或在标识符开头时才作为关键字
+                # 否则作为复合词的一部分（如"当前时间戳"中的"当"）
+                if length == 1 and keyword == '当':
+                    # 检查整个汉字序列后面的字符
+                    word_end_pos = i + consumed + len(full_identifier)
+                    if word_end_pos < len(source):
+                        word_next_char = source[word_end_pos]
+                        # 如果整个汉字序列后面是冒号，"当"作为关键字
+                        if word_next_char == ':':
+                            # 作为关键字处理，不跳过
+                            pass
+                        else:
+                            # 检查"当"后面是否紧跟非汉字字符（如空格、符号等）
+                            next_pos = pos + length
+                            if next_pos < len(source):
+                                next_char = source[next_pos]
+                                # 如果"当"后面是冒号或空格，作为关键字
+                                if next_char == ':' or next_char.isspace():
+                                    pass
+                                else:
+                                    # 否则作为复合词的一部分
+                                    skip_verb = True
+                
                 if skip_verb:
                     # 单字动词在多字词词首，跳过主匹配，让嵌入式检测处理
                     keyword = None
                 else:
-                    # 匹配到关键字（非单字动词）
+                    # 匹配到关键字（非单字动词或不在词首）
                     tokens.append(Token(TokenType.KEYWORD, keyword, line, current_col))
                     consumed += length
                     current_col += length
@@ -776,23 +846,6 @@ class Lexer:
                 while scan_pos < len(full_identifier):
                     sub_kw, sub_len = self._match_keyword(source, i + consumed + scan_pos)
                     if sub_kw and sub_kw not in user_definitions:
-                        # 单字动词在多字词词首(scan_pos=0)时跳过，避免拆开复合词
-                        # 例外：后续字符是中文数字（如"加五"），不要跳过
-                        skip_sub_verb = False
-                        if sub_len == 1 and sub_kw in self.compound_safe_single_keywords and scan_pos == 0 and len(full_identifier) > 1:
-                            remaining = full_identifier[scan_pos + sub_len:]
-                            is_chinese_num = False
-                            if len(remaining) == 1 and remaining[0] in self.SIMPLE_CHINESE_NUMBERS:
-                                is_chinese_num = True
-                            else:
-                                num_val, num_len = self._try_parse_chinese_number(remaining, 0)
-                                if num_val is not None and num_len >= len(remaining):
-                                    is_chinese_num = True
-                            if not is_chinese_num:
-                                skip_sub_verb = True
-                        if skip_sub_verb:
-                            scan_pos += 1
-                            continue
                         embedded_found = True
                         break
                     scan_pos += 1
@@ -801,17 +854,42 @@ class Lexer:
                     # 有内嵌关键字，分段输出
                     scan_pos = 0
                     while scan_pos < len(full_identifier):
-                        # 使用 i + consumed 获取当前绝对位置（pos 是旧的）
-                        sub_kw, sub_len = self._match_keyword(source, i + consumed + scan_pos)
+                        abs_pos = i + consumed + scan_pos
+                        sub_kw, sub_len = self._match_keyword(source, abs_pos)
                         if sub_kw and sub_kw not in user_definitions:
-                            # 单字动词在多字词词首(scan_pos=0)时跳过，避免拆开复合词
-                            if sub_len == 1 and sub_kw in self.compound_safe_single_keywords and scan_pos == 0 and len(full_identifier) > 1:
-                                scan_pos += 1
-                                continue
+                            # 跳过 compound_safe_single 的单字关键字（如"典"），继续扫描
+                            # 这允许"字典创建"中的"典"被跳过，从而识别"创建"为关键字
+                            # 对于运算符动词（加、减、乘、除、模、幂）：
+                            # - 如果后面跟着普通汉字，作为复合词的一部分，跳过
+                            # - 如果后面跟着数字或符号，作为运算符识别
+                            # 特殊处理："当"关键字只在后面跟着冒号时才作为关键字
+                            if sub_len == 1 and sub_kw == '当':
+                                # 检查后面是否是冒号
+                                next_pos = abs_pos + sub_len
+                                if next_pos < len(source):
+                                    next_char = source[next_pos]
+                                    # 只有当后面是冒号或空格时，才作为关键字
+                                    if next_char != ':' and not next_char.isspace():
+                                        scan_pos += sub_len
+                                        continue
+                            elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
+                                # 检查是否是运算符动词
+                                if sub_kw in OPERATOR_VERBS:
+                                    # 检查后面是否是普通汉字（不是数字或符号）
+                                    next_pos = abs_pos + sub_len
+                                    if next_pos < len(source):
+                                        next_char = source[next_pos]
+                                        # 如果后面是普通汉字，作为复合词一部分，跳过
+                                        if self._is_han(next_char) and next_char not in self.SIMPLE_CHINESE_NUMBERS:
+                                            scan_pos += sub_len
+                                            continue
+                                    # 否则作为运算符识别，不跳过
+                                else:
+                                    scan_pos += sub_len
+                                    continue
                             # 输出关键字前的标识符部分
                             if scan_pos > 0:
                                 id_part = full_identifier[:scan_pos]
-                                # 检查是否为中文数字（如"九十"中的"九十"）
                                 num_value = self._convert_chinese_number(id_part)
                                 if num_value is not None:
                                     tokens.append(Token(TokenType.CHINESE_NUM, num_value, line, current_col))
@@ -821,16 +899,23 @@ class Lexer:
                                 current_col += scan_pos
                                 full_identifier = full_identifier[scan_pos:]
                                 scan_pos = 0
+                                abs_pos = i + consumed
+                                sub_kw, sub_len = self._match_keyword(source, abs_pos)
+                                if not (sub_kw and sub_kw not in user_definitions):
+                                    break
+                                if sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
+                                    scan_pos += sub_len
+                                    continue
                             # 输出关键字
                             tokens.append(Token(TokenType.KEYWORD, sub_kw, line, current_col))
                             consumed += sub_len
                             current_col += sub_len
                             full_identifier = full_identifier[sub_len:]
+                            scan_pos = 0
                         else:
                             scan_pos += 1
                     # 输出剩余标识符部分
                     if full_identifier:
-                        # 尝试解析为中文数字（支持多位如"四十二"、"一百"）
                         num_value, num_len = self._try_parse_chinese_number(source, i + consumed)
                         if num_value is not None and num_len == len(full_identifier):
                             tokens.append(Token(TokenType.CHINESE_NUM, num_value, line, current_col))
