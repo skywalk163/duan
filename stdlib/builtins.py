@@ -9,6 +9,8 @@ import sys
 import math
 import random
 import statistics
+import time as _time_module
+from datetime import datetime as _datetime_class
 from pathlib import Path
 from typing import List, Optional, Union
 
@@ -265,6 +267,101 @@ def 执行命令(command: str) -> int:
 
 
 # =============================================================================
+# 标准输入输出（stdio）
+# =============================================================================
+
+def 读取行() -> str:
+    """
+    从标准输入读取一行
+
+    返回:
+        读取的字符串（不含换行符）
+    """
+    # 注意：Windows subprocess 在 text 模式下会将 \r\n 转换为 \r\r\n
+    # 因此需要同时去除 \r 和 \n
+    return sys.stdin.readline().rstrip('\r\n')
+
+
+def 读取N字节(字节数: int) -> str:
+    """
+    从标准输入读取指定数量的字节
+    
+    参数:
+        字节数: 要读取的字节数
+    
+    返回:
+        读取的字符串
+    """
+    return sys.stdin.read(字节数)
+
+
+def 写入输出(text: str) -> None:
+    """
+    向标准输出写入文本（不含换行）
+    
+    参数:
+        text: 要写入的文本
+    """
+    sys.stdout.write(text)
+    sys.stdout.flush()
+
+
+def 打印输出(text: str) -> None:
+    """
+    向标准输出打印文本并换行
+    
+    参数:
+        text: 要打印的文本
+    """
+    print(text, flush=True)
+
+
+def 刷新输出() -> None:
+    """强制刷新标准输出缓冲区"""
+    sys.stdout.flush()
+
+
+def 写入错误(text: str) -> None:
+    """向标准错误写入文本"""
+    sys.stderr.write(text)
+    sys.stderr.flush()
+
+
+def 打印错误(text: str) -> None:
+    """向标准错误打印文本并换行"""
+    print(text, file=sys.stderr, flush=True)
+
+
+# =============================================================================
+# JSON 处理
+# =============================================================================
+
+import json as _duan_json_module
+
+def 解析JSON(text: str) -> object:
+    """解析 JSON 字符串为段言值"""
+    try:
+        return _duan_json_module.loads(text)
+    except _duan_json_module.JSONDecodeError as e:
+        raise RuntimeError(f"JSON 解析失败: {e}")
+
+
+def 序列化JSON(value: object, 缩进: Optional[int] = None) -> str:
+    """将段言值序列化为 JSON 字符串"""
+    try:
+        if 缩进 is not None:
+            return _duan_json_module.dumps(value, ensure_ascii=False, indent=缩进)
+        return _duan_json_module.dumps(value, ensure_ascii=False)
+    except Exception as e:
+        raise RuntimeError(f"JSON 序列化失败: {e}")
+
+
+def 美化JSON(value: object) -> str:
+    """美化 JSON 输出（带缩进）"""
+    return 序列化JSON(value, 缩进=2)
+
+
+# =============================================================================
 # 字符串工具函数
 # =============================================================================
 
@@ -445,6 +542,52 @@ def 是字典(值) -> bool:
 def 是空(值) -> bool:
     """检查是否为空值"""
     return 值 is None
+
+
+# =============================================================================
+# 日期时间函数
+# =============================================================================
+
+def 时间戳() -> float:
+    """
+    获取当前 Unix 时间戳（秒）
+    
+    返回:
+        浮点数时间戳
+    """
+    return _time_module.time()
+
+
+def 格式化时间(时间对象: Union[str, float], 格式: str = '%Y-%m-%d %H:%M:%S') -> str:
+    """
+    将时间戳或时间字符串格式化为指定格式
+    
+    参数:
+        时间对象: Unix 时间戳（浮点数）或 'YYYY-MM-DD HH:MM:SS' 格式字符串
+        格式: 目标格式模板
+    
+    返回:
+        格式化后的时间字符串
+    """
+    if isinstance(时间对象, (int, float)):
+        dt = _datetime_class.fromtimestamp(时间对象)
+    else:
+        # 尝试多种格式解析
+        for fmt in [
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d',
+            '%Y/%m/%d %H:%M:%S',
+            '%Y/%m/%d',
+        ]:
+            try:
+                dt = _datetime_class.strptime(时间对象, fmt)
+                break
+            except ValueError:
+                continue
+        else:
+            raise RuntimeError(f"无法解析时间字符串: '{时间对象}'")
+    
+    return dt.strftime(格式)
 
 
 # =============================================================================
@@ -685,7 +828,16 @@ __all__ = [
     # 系统函数
     '环境变量', '设置环境变量', '参数列表',
     '退出程序', '当前目录', '切换目录', '执行命令',
-    
+
+    # 标准输入输出
+    '读取行', '读取N字节', '写入输出',
+    '打印输出', '刷新输出', '写入错误', '打印错误',
+
+    # JSON 处理
+    '解析JSON', '序列化JSON', '美化JSON',
+
+    # 字符串工具
+
     # 字符串工具
     '转整数', '转浮点', '转字符串',
     '字符串长度', '字符串获取', '分割字符串', '连接字符串',

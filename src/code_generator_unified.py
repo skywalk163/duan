@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 # 导入类型推断器
 from type_inferencer import (
     TypeInferencer, StringType, NumberType, ListType, DictType,
-    BooleanType, NullType, FunctionType, EnumType, TraitType,
+    BooleanType, NullType, FunctionType, EnumType,
     OptionalTypeWrapper, GenericTypeInstance, FutureType,
 )
 

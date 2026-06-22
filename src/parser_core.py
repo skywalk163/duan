@@ -70,8 +70,8 @@ class DuanParserCore:
         # 词法分析
         tokens = self.lexer.tokenize(source)
         
-        # 过滤掉 NEWLINE/INDENT/DEDENT（简化版）
-        self.tokens = [t for t in tokens if t.type not in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT, TokenType.EOF)]
+        # 过滤掉 NEWLINE 和 EOF，保留 INDENT/DEDENT 用于块结构解析
+        self.tokens = [t for t in tokens if t.type not in (TokenType.NEWLINE, TokenType.EOF)]
         self.pos = 0
         
         # 解析模块
