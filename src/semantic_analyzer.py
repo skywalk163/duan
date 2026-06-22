@@ -1,451 +1,363 @@
 """
 段言（Duan）编程语言 - 语义分析器
 
-实现：
-- 类型检查（利用类型注解）
-- 作用域分析
-- 类型兼容性检查
+负责：
+1. 符号表构建和管理
+2. 类型检查和推断
+3. 作用域分析
+4. 错误检测
 """
 
-from typing import Dict, List, Set, Optional, Any
-from duan_parser_v3 import *
-from keywords import VERB_ARITY, VERB_MODE
-
-
-# 需要导入新的AST节点类型
-from duan_parser_v3 import IndexAccess, BreakStmt, ContinueStmt, ExportStmt, ImportStmt
-
-
-# =============================================================================
-# 类型兼容性映射
-# =============================================================================
-
-TYPE_COMPATIBILITY = {
-    # (注解类型, 表达式类型) → 是否兼容
-    '数': {'数', '整数', '浮点'},
-    '串': {'串', '字符串'},
-    '布尔': {'布尔'},
-    '列表': {'列表', '列表[]'},
-    '字典': {'字典'},
-    '空': {'空', 'None'},
-}
-
-
-# =============================================================================
-# 符号表
-# =============================================================================
-
-class Symbol:
-    """符号表条目"""
-    def __init__(self, name: str, symbol_type: str, scope_level: int):
-        self.name = name
-        self.symbol_type = symbol_type  # 'variable', 'paragraph', 'parameter'
-        self.scope_level = scope_level
-        self.data_type = None  # 数据类型（如 '数', '串', '列表'）
-    
-    def __repr__(self):
-        return f"Symbol({self.name}: {self.symbol_type})"
-
-
-class SymbolTable:
-    """符号表（支持作用域）"""
-    
-    def __init__(self):
-        self.scopes: List[Dict[str, Symbol]] = [{}]  # 作用域栈
-        self.current_level = 0
-    
-    def enter_scope(self):
-        """进入新作用域"""
-        self.scopes.append({})
-        self.current_level += 1
-    
-    def exit_scope(self):
-        """退出作用域"""
-        if self.current_level > 0:
-            self.scopes.pop()
-            self.current_level -= 1
-    
-    def define(self, name: str, symbol_type: str, data_type: str = None) -> bool:
-        """定义符号"""
-        if name in self.scopes[self.current_level]:
-            return False  # 重定义
-        
-        symbol = Symbol(name, symbol_type, self.current_level)
-        symbol.data_type = data_type
-        self.scopes[self.current_level][name] = symbol
-        return True
-    
-    def lookup(self, name: str) -> Optional[Symbol]:
-        """查找符号（从当前作用域向外查找）"""
-        for level in range(self.current_level, -1, -1):
-            if name in self.scopes[level]:
-                return self.scopes[level][name]
-        return None
-    
-    def is_defined(self, name: str) -> bool:
-        """检查符号是否已定义"""
-        return self.lookup(name) is not None
-
-
-# =============================================================================
-# 语义错误
-# =============================================================================
+from typing import Dict, List, Optional, Any, Set
+from ast_unified import *
 
 class SemanticError(Exception):
-    """语义错误"""
-    def __init__(self, message: str, node: ASTNode = None):
-        self.message = message
-        self.node = node
-        super().__init__(f"语义错误: {message}")
+    """语义错误异常"""
+    def __init__(self, message: str, line: int = 0, column: int = 0):
+        super().__init__(message)
+        self.line = line
+        self.column = column
 
-
-# =============================================================================
-# 语义分析器
-# =============================================================================
-
-class SemanticAnalyzer:
-    """段言语义分析器（增强版：支持类型注解检查）"""
+class SemanticAnalyzer(ASTVisitor):
+    """语义分析器"""
     
-    def __init__(self):
-        self.symbol_table = SymbolTable()
+    def __init__(self, module: Module):
+        self.module = module
+        self.current_scope_id = 0
         self.errors: List[SemanticError] = []
         
-        # 内置类型
-        self.builtin_types = {'数', '串', '列表', '字典', '布尔', '空', '整数', '浮点', '字符串'}
+        # 创建全局作用域
+        self.module.add_scope()
         
-        # 当前段落返回类型（用于返回语句检查）
-        self._current_return_type: Optional[str] = None
-        self._current_paragraph_name: Optional[str] = None
+    def add_error(self, message: str, node: ASTNode):
+        """添加错误"""
+        self.errors.append(SemanticError(message, node.line, node.column))
+    
+    def enter_scope(self) -> int:
+        """进入新作用域"""
+        self.current_scope_id = self.module.add_scope()
+        return self.current_scope_id
+    
+    def exit_scope(self):
+        """退出当前作用域（简单实现）"""
+        if self.current_scope_id > 0:
+            self.current_scope_id -= 1
+    
+    def declare_symbol(self, name: str, type: Type, node: ASTNode, is_mutable: bool = False, is_global: bool = False):
+        """声明符号"""
+        symbol = Symbol(
+            name=name,
+            type=type,
+            scope_id=self.current_scope_id,
+            is_mutable=is_mutable,
+            is_global=is_global
+        )
         
-        # 内置函数（从keywords.py导入）
-        self.builtin_functions = {}
-        for func_name in VERB_ARITY.keys():
-            self.builtin_functions[func_name] = {
-                'arity': VERB_ARITY[func_name],
-                'mode': VERB_MODE.get(func_name, 'functional')
+        # 检查符号是否已存在于当前作用域
+        existing = self.module.lookup_symbol(self.current_scope_id, name)
+        if existing:
+            if existing.scope_id == self.current_scope_id:
+                self.add_error(f"符号 '{name}' 已在当前作用域定义", node)
+                return None
+        
+        self.module.add_symbol(self.current_scope_id, name, symbol)
+        return symbol
+    
+    def resolve_symbol(self, name: str, node: ASTNode) -> Optional[Symbol]:
+        """解析符号引用"""
+        symbol = self.module.lookup_symbol(self.current_scope_id, name)
+        if not symbol:
+            self.add_error(f"未定义的符号 '{name}'", node)
+        return symbol
+    
+    def check_types(self, expected: Type, actual: Type, node: ASTNode, context: str = ""):
+        """检查类型兼容性"""
+        if expected != actual:
+            self.add_error(f"类型不匹配{context}：期望 {expected}，得到 {actual}", node)
+    
+    def visit_Module(self, node: Module):
+        """访问模块"""
+        # 首先处理结构体定义
+        for struct in node.structs:
+            self.visit(struct)
+        
+        # 然后处理全局变量
+        for global_var in node.globals:
+            self.visit(global_var)
+        
+        # 最后处理函数
+        for func in node.functions:
+            self.visit(func)
+    
+    def visit_StructDefinition(self, node: StructDefinition):
+        """访问结构体定义"""
+        # 计算结构体大小和字段偏移
+        offset = 0
+        field_offsets = {}
+        
+        for field_name, field_type in node.fields:
+            # 简单对齐：按8字节对齐
+            if offset % 8 != 0:
+                offset = ((offset // 8) + 1) * 8
+            field_offsets[field_name] = offset
+            
+            # 计算字段大小
+            field_size = self.get_type_size(field_type)
+            offset += field_size
+        
+        node.size = offset
+        node.field_offsets = field_offsets
+    
+    def get_type_size(self, type: Type) -> int:
+        """获取类型大小（字节）"""
+        if isinstance(type, PrimitiveType):
+            sizes = {
+                'void': 0,
+                'bool': 1,
+                'char': 1,
+                'int': 8,
+                'float': 8,
+                'string': 8  # 字符串是指针
             }
+            return sizes.get(type.kind, 8)
+        elif isinstance(type, PointerType):
+            return 8
+        elif isinstance(type, ArrayType):
+            elem_size = self.get_type_size(type.element_type)
+            if type.size is not None:
+                return elem_size * type.size
+            return 8  # 动态数组是指针
+        elif isinstance(type, StructType):
+            # 查找结构体定义
+            for struct in self.module.structs:
+                if struct.name == type.name:
+                    return struct.size
+            return 0
+        elif isinstance(type, FunctionType):
+            return 8  # 函数指针
+        return 8
     
-    def analyze(self, module: Module) -> bool:
-        """分析模块"""
-        try:
-            self._analyze_module(module)
-            return len(self.errors) == 0
-        except Exception as e:
-            self.errors.append(SemanticError(str(e)))
-            return False
+    def visit_GlobalVariable(self, node: GlobalVariable):
+        """访问全局变量"""
+        # 声明全局符号
+        symbol = self.declare_symbol(node.name, node.type, node, is_global=True)
+        node.symbol = symbol
+        
+        # 检查初始化器类型
+        if node.initializer:
+            self.visit(node.initializer)
+            if node.initializer.inferred_type:
+                self.check_types(node.type, node.initializer.inferred_type, node, "（全局变量初始化）")
     
-    def _analyze_module(self, module: Module):
-        """分析模块"""
-        for stmt in module.statements:
-            self._analyze_statement(stmt)
+    def visit_FunctionDefinition(self, node: FunctionDefinition):
+        """访问函数定义"""
+        # 声明函数符号
+        func_type = FunctionType(return_type=node.return_type, param_types=[p.type for p in node.parameters])
+        symbol = self.declare_symbol(node.name, func_type, node, is_global=True)
+        node.symbol = symbol
+        
+        # 进入函数作用域
+        self.enter_scope()
+        
+        # 声明参数
+        param_offset = 16  # RBP + 16 开始（跳过返回地址和RBP）
+        for param in node.parameters:
+            param_symbol = self.declare_symbol(param.name, param.type, param)
+            param.symbol = param_symbol
+            param_symbol.offset = param_offset
+            param_offset += self.get_type_size(param.type)
+        
+        # 访问函数体
+        if node.body:
+            self.visit(node.body)
+        
+        # 退出函数作用域
+        self.exit_scope()
     
-    def _is_type_compatible(self, annotated_type: str, actual_type: str) -> bool:
-        """检查类型是否兼容"""
-        if not annotated_type or not actual_type:
-            return True  # 未知类型总是兼容
-        if actual_type == '未知':
-            return True  # 无法推断的类型视为兼容
-        if annotated_type == actual_type:
-            return True
-        # 检查兼容性映射
-        compatible_set = TYPE_COMPATIBILITY.get(annotated_type, set())
-        if actual_type in compatible_set:
-            return True
-        # 数字兼容性（整数和浮点互相兼容）
-        if annotated_type in ('数', '整数', '浮点') and actual_type in ('数', '整数', '浮点'):
-            return True
-        return False
+    def visit_Block(self, node: Block):
+        """访问代码块"""
+        # 进入块作用域
+        self.enter_scope()
+        node.scope_id = self.current_scope_id
+        
+        # 访问所有语句
+        for stmt in node.statements:
+            self.visit(stmt)
+        
+        # 退出块作用域
+        self.exit_scope()
     
-    def _check_type_compatible(self, annotated_type: str, actual_type: str, context: str = ""):
-        """检查类型兼容性，不兼容时添加错误"""
-        if not self._is_type_compatible(annotated_type, actual_type):
-            msg = f"类型不匹配"
-            if context:
-                msg += f" {context}"
-            msg += f": 期望 '{annotated_type}'，实际为 '{actual_type}'"
-            self.errors.append(SemanticError(msg))
+    def visit_VariableDeclaration(self, node: VariableDeclaration):
+        """访问变量声明"""
+        # 如果没有显式类型，从初始化器推断
+        if node.type is None and node.initializer:
+            self.visit(node.initializer)
+            node.type = node.initializer.inferred_type
+        elif node.type is None:
+            self.add_error("变量声明需要类型注解或初始化器", node)
+            node.type = TYPE_INT  # 默认类型
+        
+        # 声明符号
+        symbol = self.declare_symbol(node.name, node.type, node, is_mutable=node.is_mutable)
+        node.symbol = symbol
+        
+        # 检查初始化器类型
+        if node.initializer:
+            if node.initializer.inferred_type:
+                self.check_types(node.type, node.initializer.inferred_type, node, "（变量初始化）")
     
-    def _analyze_statement(self, stmt: ASTNode):
-        """分析语句"""
-        if isinstance(stmt, VarDecl):
-            self._analyze_var_decl(stmt)
-        elif isinstance(stmt, IfStmt):
-            self._analyze_if_stmt(stmt)
-        elif isinstance(stmt, ForeachStmt):
-            self._analyze_foreach_stmt(stmt)
-        elif isinstance(stmt, WhileStmt):
-            self._analyze_while_stmt(stmt)
-        elif isinstance(stmt, Paragraph):
-            self._analyze_paragraph(stmt)
-        elif isinstance(stmt, ReturnStmt):
-            self._analyze_return_stmt(stmt)
-        elif isinstance(stmt, BreakStmt):
-            pass
-        elif isinstance(stmt, ContinueStmt):
-            pass
-        elif isinstance(stmt, ExportStmt):
-            pass
-        elif isinstance(stmt, ImportStmt):
-            pass
-        elif isinstance(stmt, ParagraphCall):
-            self._analyze_expr(stmt)
-        else:
-            raise SemanticError(f"未知语句类型: {type(stmt).__name__}")
+    def visit_Identifier(self, node: Identifier):
+        """访问标识符"""
+        # 解析符号
+        symbol = self.resolve_symbol(node.name, node)
+        node.symbol_ref = symbol
+        
+        # 设置推断类型
+        if symbol:
+            node.inferred_type = symbol.type
     
-    def _analyze_var_decl(self, stmt: VarDecl):
-        """分析变量声明"""
-        # 检查变量名是否已定义
-        if self.symbol_table.is_defined(stmt.name):
-            existing = self.symbol_table.lookup(stmt.name)
-            if existing.scope_level == self.symbol_table.current_level:
-                self.errors.append(SemanticError(
-                    f"变量 '{stmt.name}' 重复定义", stmt
-                ))
-        
-        # 分析表达式
-        expr_type = self._analyze_expr(stmt.value)
-        
-        # 类型注解优先（如果存在）
-        data_type = stmt.type_annotation or expr_type
-        
-        # 如果类型注解存在，检查类型兼容性
-        if stmt.type_annotation and expr_type != '未知':
-            self._check_type_compatible(
-                stmt.type_annotation, expr_type,
-                f"变量 '{stmt.name}' 赋值"
-            )
-        
-        # 定义变量
-        self.symbol_table.define(stmt.name, 'variable', data_type)
+    def visit_NumberLiteral(self, node: NumberLiteral):
+        """访问数字字面量"""
+        # 类型已经在__post_init__中设置
+        pass
     
-    def _analyze_if_stmt(self, stmt: IfStmt):
-        """分析条件语句"""
-        cond_type = self._analyze_expr(stmt.condition)
-        
-        self.symbol_table.enter_scope()
-        for s in stmt.then_body:
-            self._analyze_statement(s)
-        self.symbol_table.exit_scope()
-        
-        if stmt.else_body:
-            self.symbol_table.enter_scope()
-            for s in stmt.else_body:
-                self._analyze_statement(s)
-            self.symbol_table.exit_scope()
+    def visit_StringLiteral(self, node: StringLiteral):
+        """访问字符串字面量"""
+        # 类型已经在__post_init__中设置
+        pass
     
-    def _analyze_foreach_stmt(self, stmt: ForeachStmt):
-        """分析遍历循环"""
-        iter_type = self._analyze_expr(stmt.iterable)
-        
-        self.symbol_table.enter_scope()
-        self.symbol_table.define(stmt.variable, 'variable', '元素')
-        
-        for s in stmt.body:
-            self._analyze_statement(s)
-        
-        self.symbol_table.exit_scope()
+    def visit_BooleanLiteral(self, node: BooleanLiteral):
+        """访问布尔字面量"""
+        # 类型已经在__post_init__中设置
+        pass
     
-    def _analyze_while_stmt(self, stmt: WhileStmt):
-        """分析当循环"""
-        cond_type = self._analyze_expr(stmt.condition)
+    def visit_BinaryOp(self, node: BinaryOp):
+        """访问二元运算"""
+        self.visit(node.left)
+        self.visit(node.right)
         
-        self.symbol_table.enter_scope()
-        for s in stmt.body:
-            self._analyze_statement(s)
-        self.symbol_table.exit_scope()
+        left_type = node.left.inferred_type
+        right_type = node.right.inferred_type
+        
+        if not left_type or not right_type:
+            return
+        
+        # 检查操作数类型
+        if left_type != right_type:
+            self.add_error(f"二元运算操作数类型不匹配：{left_type} 和 {right_type}", node)
+            return
+        
+        # 设置结果类型
+        node.inferred_type = left_type
     
-    def _analyze_paragraph(self, stmt: Paragraph):
-        """分析段落定义"""
-        # 检查段落名是否已定义
-        if self.symbol_table.is_defined(stmt.name):
-            self.errors.append(SemanticError(
-                f"段落 '{stmt.name}' 重复定义", stmt
-            ))
+    def visit_UnaryOp(self, node: UnaryOp):
+        """访问一元运算"""
+        self.visit(node.operand)
         
-        # 定义段落
-        self.symbol_table.define(stmt.name, 'paragraph')
+        operand_type = node.operand.inferred_type
+        if not operand_type:
+            return
         
-        # 记录当前段落返回类型
-        old_return_type = self._current_return_type
-        old_paragraph_name = self._current_paragraph_name
-        self._current_return_type = stmt.return_type
-        self._current_paragraph_name = stmt.name
-        
-        # 进入段落作用域
-        self.symbol_table.enter_scope()
-        
-        # 定义参数（带类型信息）
-        for param in stmt.params:
-            self.symbol_table.define(
-                param['name'], 
-                'parameter', 
-                param.get('type')
-            )
-        
-        # 分析段落体
-        for s in stmt.body:
-            self._analyze_statement(s)
-        
-        # 退出作用域
-        self.symbol_table.exit_scope()
-        
-        # 恢复返回类型
-        self._current_return_type = old_return_type
-        self._current_paragraph_name = old_paragraph_name
-    
-    def _analyze_return_stmt(self, stmt: ReturnStmt):
-        """分析返回语句"""
-        if stmt.value:
-            return_type = self._analyze_expr(stmt.value)
-            
-            # 检查返回类型是否与段落声明匹配
-            if self._current_return_type and return_type != '未知':
-                self._check_type_compatible(
-                    self._current_return_type, return_type,
-                    f"段落 '{self._current_paragraph_name}' 的返回语句"
-                )
-    
-    def _analyze_expr(self, expr: ASTNode) -> str:
-        """分析表达式，返回类型"""
-        if isinstance(expr, NumberLiteral):
-            return '数'
-        
-        elif isinstance(expr, StringLiteral):
-            return '串'
-        
-        elif isinstance(expr, Identifier):
-            symbol = self.symbol_table.lookup(expr.name)
-            if not symbol:
-                # 内置值：True, False, None
-                if expr.name in ('True', 'False', 'None'):
-                    return '布尔' if expr.name in ('True', 'False') else '空'
-                return '未知'
-            return symbol.data_type or '未知'
-        
-        elif isinstance(expr, BinaryOp):
-            left_type = self._analyze_expr(expr.left)
-            right_type = self._analyze_expr(expr.right)
-            
-            # 算术运算
-            if expr.operator in ('加', '减', '乘', '除', '模', '幂',
-                                  '+', '-', '*', '/', '%', '**'):
-                return '数'
-            
-            # 比较运算
-            elif expr.operator in ('大于', '小于', '等于', '不等于', 
-                                    '大于等于', '小于等于',
-                                    '>', '<', '==', '!=', '>=', '<='):
-                return '布尔'
-            
-            elif expr.operator in ('且', '与', '或', 'and', 'or'):
-                return '布尔'
-            
-            return '数'
-        
-        elif isinstance(expr, ParagraphCall):
-            # 检查段落是否已定义
-            symbol = self.symbol_table.lookup(expr.name)
-            if not symbol:
-                if expr.name in self.builtin_functions:
-                    return '未知'
-                self.errors.append(SemanticError(
-                    f"段落 '{expr.name}' 未定义", expr
-                ))
-            
-            # 分析参数
-            arg_types = []
-            for arg in expr.args:
-                arg_type = self._analyze_expr(arg)
-                arg_types.append(arg_type)
-            
-            return '未知'
-        
-        elif isinstance(expr, Pipeline):
-            for stage in expr.stages:
-                self._analyze_expr(stage)
-            return '未知'
-        
-        elif isinstance(expr, IndexAccess):
-            obj_type = self._analyze_expr(expr.obj)
-            index_type = self._analyze_expr(expr.index)
-            return '元素'
-        
-        elif isinstance(expr, ConditionalExpression):
-            self._analyze_expr(expr.condition)
-            then_type = self._analyze_expr(expr.then_expr)
-            if expr.else_expr:
-                self._analyze_expr(expr.else_expr)
-            return then_type
-        
-        elif isinstance(expr, ListLiteral):
-            for elem in expr.elements:
-                self._analyze_expr(elem)
-            return '列表'
-        
-        elif isinstance(expr, DictLiteral):
-            for entry in expr.entries:
-                if isinstance(entry, (list, tuple)) and len(entry) == 2:
-                    self._analyze_expr(entry[0])
-                    self._analyze_expr(entry[1])
-            return '字典'
-        
-        else:
-            return '未知'
-
-
-# =============================================================================
-# 测试
-# =============================================================================
-
-if __name__ == '__main__':
-    from duan_parser_v3 import DuanParser
-    
-    print("=" * 60)
-    print("段言语义分析器测试（增强版）")
-    print("=" * 60)
-    
-    # 测试类型注解
-    test_cases = [
-        ("变量类型注解", '''
-设 甲: 数 = 三。
-设 乙: 串 = "你好"。
-设 丙 = 五。
-'''),
-        ("段落类型注解", '''
-段落 加法 接收 甲: 数, 乙: 数 返回 数:
-  返回 甲 加 乙。
-结束。
-'''),
-        ("类型不匹配", '''
-设 甲: 数 = "这不是数字"。
-'''),
-    ]
-    
-    for name, code in test_cases:
-        print(f"\n--- {name} ---")
-        print(f"代码: {code.strip()[:50]}...")
-        
-        parser = DuanParser()
-        try:
-            module = parser.parse(code)
-            analyzer = SemanticAnalyzer()
-            success = analyzer.analyze(module)
-            
-            if analyzer.errors:
-                print(f"[类型错误]")
-                for err in analyzer.errors:
-                    print(f"  - {err.message}")
+        # 设置结果类型
+        if node.operator == '!' and operand_type == TYPE_BOOL:
+            node.inferred_type = TYPE_BOOL
+        elif node.operator in ('+', '-'):
+            node.inferred_type = operand_type
+        elif node.operator == '&':
+            node.inferred_type = PointerType(operand_type)
+        elif node.operator == '*':
+            if isinstance(operand_type, PointerType):
+                node.inferred_type = operand_type.pointee
             else:
-                print(f"[OK] 语义分析通过")
-                
-            print("\n符号表:")
-            for scope in analyzer.symbol_table.scopes:
-                for name, symbol in scope.items():
-                    print(f"  {name}: {symbol.symbol_type} (类型: {symbol.data_type})")
-                    
-        except Exception as e:
-            print(f"[解析错误] {e}")
+                self.add_error("解引用操作需要指针类型", node)
     
-    print("\n" + "=" * 60)
-    print("测试完成")
-    print("=" * 60)
+    def visit_FunctionCall(self, node: FunctionCall):
+        """访问函数调用"""
+        self.visit(node.callee)
+        
+        # 检查参数类型
+        for i, arg in enumerate(node.arguments):
+            self.visit(arg)
+        
+        # 如果是标识符调用，检查函数签名
+        if isinstance(node.callee, Identifier) and node.callee.symbol_ref:
+            func_symbol = node.callee.symbol_ref
+            if isinstance(func_symbol.type, FunctionType):
+                func_type = func_symbol.type
+                
+                # 检查参数数量
+                if len(node.arguments) != len(func_type.param_types):
+                    self.add_error(
+                        f"参数数量不匹配：期望 {len(func_type.param_types)} 个参数，得到 {len(node.arguments)} 个",
+                        node
+                    )
+                    return
+                
+                # 检查参数类型
+                for i, (arg, expected_type) in enumerate(zip(node.arguments, func_type.param_types)):
+                    if arg.inferred_type:
+                        self.check_types(expected_type, arg.inferred_type, arg, f"（参数 {i+1}）")
+                
+                # 设置返回类型
+                node.inferred_type = func_type.return_type
+                node.function_type = func_type
+    
+    def visit_Assignment(self, node: Assignment):
+        """访问赋值语句"""
+        self.visit(node.target)
+        self.visit(node.value)
+        
+        target_type = node.target.inferred_type
+        value_type = node.value.inferred_type
+        
+        if target_type and value_type:
+            self.check_types(target_type, value_type, node, "（赋值）")
+        
+        # 检查赋值目标是否可写
+        if isinstance(node.target, Identifier) and node.target.symbol_ref:
+            if not node.target.symbol_ref.is_mutable:
+                self.add_error(f"无法赋值给不可变变量 '{node.target.name}'", node)
+    
+    def visit_IfStatement(self, node: IfStatement):
+        """访问条件语句"""
+        self.visit(node.condition)
+        
+        # 检查条件类型
+        if node.condition.inferred_type and node.condition.inferred_type != TYPE_BOOL:
+            self.add_error("if条件必须是布尔类型", node)
+        
+        self.visit(node.then_block)
+        if node.else_block:
+            self.visit(node.else_block)
+    
+    def visit_WhileStatement(self, node: WhileStatement):
+        """访问while循环"""
+        self.visit(node.condition)
+        
+        # 检查条件类型
+        if node.condition.inferred_type and node.condition.inferred_type != TYPE_BOOL:
+            self.add_error("while条件必须是布尔类型", node)
+        
+        self.visit(node.body)
+    
+    def visit_ForStatement(self, node: ForStatement):
+        """访问for循环"""
+        if node.init:
+            self.visit(node.init)
+        if node.condition:
+            self.visit(node.condition)
+            if node.condition.inferred_type and node.condition.inferred_type != TYPE_BOOL:
+                self.add_error("for条件必须是布尔类型", node)
+        if node.update:
+            self.visit(node.update)
+        self.visit(node.body)
+    
+    def visit_ReturnStatement(self, node: ReturnStatement):
+        """访问return语句"""
+        if node.value:
+            self.visit(node.value)
+    
+    def analyze(self) -> List[SemanticError]:
+        """执行语义分析"""
+        self.visit(self.module)
+        return self.errors
