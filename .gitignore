@@ -22,7 +22,7 @@ wheels/
 MANIFEST
 
 # 测试和调试
-test_*.py
+/test_*.py
 debug_*.py
 tests/debug_*.py
 *.log

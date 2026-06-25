@@ -141,6 +141,7 @@ class AstAdapter:
         interfaces = []
         statements = []
 
+        other_stmts = []
         for stmt in node.statements or []:
             converted = self.convert(stmt)
             if isinstance(converted, ast.SegmentDefinition):
@@ -150,8 +151,9 @@ class AstAdapter:
             elif isinstance(converted, ast.InterfaceDefinition):
                 interfaces.append(converted)
             else:
-                # 直接加入语句列表，不再额外包装
-                statements.append(converted)
+                other_stmts.append(stmt)
+
+        statements = self._to_list_stmts(other_stmts)
 
         return ast.Module(
             name=None,
@@ -342,7 +344,16 @@ class AstAdapter:
     def _convert_list_literal(self, node) -> ast.ListLiteral:
         return ast.ListLiteral(elements=self._convert_list(node.elements))
 
-    def _convert_member_access(self, node) -> ast.PropertyAccess:
+    def _convert_member_access(self, node):
+        if getattr(node, 'is_method_call', False) and getattr(node, 'args', None) is not None:
+            return ast.FunctionCall(
+                name=ast.PropertyAccess(
+                    obj=self.convert(node.obj),
+                    property_name=node.member,
+                ),
+                arguments=self._convert_list(node.args),
+                type_args=[],
+            )
         return ast.PropertyAccess(
             obj=self.convert(node.obj),
             property_name=node.member,
@@ -363,7 +374,7 @@ class AstAdapter:
 
     def _convert_self_assignment(self, node) -> ast.Assignment:
         return ast.Assignment(
-            target=ast.Identifier(name=f"本.{node.attr_name}"),
+            target=ast.Identifier(name=f"self.{node.attr_name}"),
             value=self.convert(node.value),
         )
 
@@ -388,7 +399,15 @@ class AstAdapter:
         )
 
     def _convert_export_stmt(self, node) -> ast.ExportStatement:
-        return ast.ExportStatement(names=[])
+        symbols = getattr(node, 'symbols', []) or []
+        first_name = symbols[0] if symbols else ''
+        if isinstance(first_name, str):
+            name = first_name
+        elif hasattr(first_name, 'name'):
+            name = first_name.name
+        else:
+            name = str(first_name) if first_name else ''
+        return ast.ExportStatement(name=name)
 
     def _convert_conditional_expression(self, node) -> ast.ConditionalExpression:
         return ast.ConditionalExpression(
@@ -906,6 +925,26 @@ class DuanCompiler:
         for stmt in module.statements:
             out.append(f"{prefix}语句: {type(stmt).__name__}")
         return '\n'.join(out)
+
+    def generate_llvm_ir(self, module: ast.Module) -> str:
+        """生成 LLVM IR 代码
+        
+        使用 antlrparser/llvm_codegen.py 中的 LLVMCodeGen 生成 LLVM IR。
+        需要确保 antlrparser 目录在 sys.path 中。
+        """
+        import sys
+        import os
+        antlrparser_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'antlrparser')
+        if antlrparser_path not in sys.path:
+            sys.path.insert(0, antlrparser_path)
+        
+        try:
+            from llvm_codegen import LLVMCodeGen
+            codegen = LLVMCodeGen()
+            return codegen.generate(module)
+        except ImportError as e:
+            self.errors.append(f"无法导入 LLVM 代码生成器: {e}")
+            raise
 
 
 # =============================================================================
