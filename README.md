@@ -5,9 +5,9 @@
 ## 特性
 
 - **中文关键字**：使用中文关键字如`遍历`、`如果`、`那么`等
-- **双后端架构**：支持 ANTLR 解析器（兼容旧语法）和手写递归下降解析器（3.x 纯缩进语法）
-- **原生编译**：通过 LLVM IR 生成跨平台原生可执行文件
-- **自举编译器**：段言语言使用自身实现编译器（bootstrap/）
+- **纯缩进语法**：v3.x 中文关键字，类似 Python 的缩进风格
+- **统一编译器**：手写递归下降解析器 + Python 代码生成
+- **标准库**：11 个中文命名模块（日志、表格、CSV 等）
 
 ## 安装
 
@@ -84,58 +84,52 @@ python -m src.compiler hello.duan
 
 ## 编译运行
 
-### 方式1：统一 CLI（推荐）
-
 ```bash
-# 使用 ANTLR 后端编译
-python -m cli.duan_unified project/记账.duan --target antlr -o 记账.exe
+# 解释执行（推荐）
+duan run hello.duan
 
-# 使用 SRC 后端编译（仅支持 3.x 语法）
-python -m cli.duan_unified project/记账.duan --target src -o 记账.exe
+# 编译为 Python 文件
+duan compile hello.duan -o hello.py
 ```
 
-### 方式2：ANTLR 专用 CLI
-
+后端选择：
 ```bash
-python antlrparser/duan_llvm.py project/你的程序.duan
-```
-
-### 方式3：Python 解释器运行
-
-```bash
-python bootstrap/bootstrap_v3_compiled.py project/你的程序.duan
+# SRC 后端（3.x 纯缩进语法，推荐）
+duan run hello.duan --backend src
 ```
 
 ## 项目结构
 
 ```
 duan/
-├── antlrparser/          # ANTLR 后端（支持 1.x/2.x/3.x 语法）
-│   ├── duan_llvm.py    # LLVM 编译流程入口
-│   ├── llvm_codegen.py  # LLVM IR 代码生成
-│   └── *.g4             # ANTLR 语法文件
-├── src/                 # 手写递归下降后端（仅支持 3.x 语法）
+├── src/                 # 核心编译器
 │   ├── lexer.py        # 词法分析器
 │   ├── parser_stmt.py  # 语法分析器
 │   ├── ast_nodes.py    # AST 节点定义
-│   └── compiler.py     # 编译器主体（包含 AST 适配器）
-├── bootstrap/           # 自举编译器（段言实现）
+│   ├── compiler.py     # 编译器主体
+│   └── optimizer/      # 优化器
 ├── cli/                 # 命令行工具
-│   └── duan_unified.py # 统一 CLI（支持 --target antlr|src）
-├── project/             # 示例程序
-│   └── 记账.duan       # 记账程序
+│   └── duan.py         # CLI 入口
+├── stdlib/              # 标准库（11 个模块）
+│   ├── 日志.duan/py
+│   ├── 表格.duan/py
+│   └── ...
+├── benchmarks/          # 性能基准测试
+├── examples/            # 示例程序
+│   └── hello.duan
 ├── tests/               # 测试
 └── docs/                # 文档
 ```
 
-## 双后端说明
+## 编译器架构
 
-| 后端 | 路径 | 支持语法 | 特点 |
-|------|------|----------|------|
-| ANTLR | antlrparser/ | 1.x/2.x/3.x | 功能完整，支持旧语法 |
-| SRC | src/ | 3.x 纯缩进 | 轻量级，无外部依赖 |
-
-推荐新项目使用 **3.x 纯缩进语法**，通过 SRC 后端或 ANTLR 后端编译均可。
+| 组件 | 说明 |
+|------|------|
+| 词法分析 | 手写词法分析器，支持 Unicode 中文关键字 |
+| 语法分析 | 递归下降解析器，v3.x 纯缩进语法 |
+| 类型检查 | Hindley-Milner 全局类型推断 |
+| 代码生成 | Python 代码生成（类型擦除策略） |
+| 优化器 | 常量折叠、死代码消除、循环不变量外提 |
 
 ## 语法参考（3.x）
 
