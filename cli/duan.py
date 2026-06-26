@@ -176,8 +176,22 @@ def cmd_run(args):
 
 
 def cmd_compile(args):
-    """编译段言源代码为 Python 文件"""
+    """编译段言源代码为 Python 文件或可执行文件"""
     source = _read_source(args.file)
+
+    # LLVM 后端：直接编译为原生 .exe
+    if args.backend == 'llvm':
+        try:
+            from duan_llvm import compile_duan
+            output = args.output or (Path(args.file).stem + '.exe')
+            compile_duan(args.file, output, verbose=args.verbose)
+            return
+        except Exception as e:
+            print(f"LLVM 编译错误: {e}", file=sys.stderr)
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+            sys.exit(1)
 
     try:
         if args.backend == 'src':
@@ -202,10 +216,71 @@ def cmd_compile(args):
             traceback.print_exc()
         sys.exit(1)
 
-    # 写输出文件
+    # 确定输出路径
     output_path = args.output or (Path(args.file).stem + '.py')
-    Path(output_path).write_text(py_code, encoding='utf-8')
-    print(f"编译成功: {args.file} -> {output_path}")
+    output_path = Path(output_path)
+
+    # 如果目标是 .exe，使用 PyInstaller 打包
+    if output_path.suffix.lower() == '.exe':
+        _compile_to_exe(py_code, output_path, args)
+    else:
+        output_path.write_text(py_code, encoding='utf-8')
+        print(f"编译成功: {args.file} -> {output_path}")
+
+
+def _compile_to_exe(py_code: str, exe_path: Path, args):
+    """使用 PyInstaller 将 Python 代码打包为 .exe"""
+    import tempfile
+    import subprocess
+    import shutil
+
+    exe_name = exe_path.stem
+    exe_dir = exe_path.parent.resolve()
+
+    # 写入临时 .py 文件
+    py_path = exe_dir / f"{exe_name}.py"
+    py_path.write_text(py_code, encoding='utf-8')
+    print(f"生成 Python 代码: {py_path}")
+
+    # 调用 PyInstaller 打包
+    print(f"正在打包为 .exe（使用 PyInstaller）...")
+    try:
+        result = subprocess.run(
+            [
+                sys.executable, '-m', 'PyInstaller',
+                '--onefile', '--console',
+                '--name', exe_name,
+                '--distpath', str(exe_dir),
+                '--workpath', str(exe_dir / 'build'),
+                '--specpath', str(exe_dir / 'build'),
+                str(py_path),
+            ],
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            cwd=str(exe_dir),
+        )
+        if result.returncode != 0:
+            # 输出 PyInstaller 的错误信息
+            error_msg = result.stderr or result.stdout
+            if error_msg:
+                # 只显示最后几行关键错误
+                lines = error_msg.strip().split('\n')
+                print(f"PyInstaller 错误:\n{'\n'.join(lines[-10:])}", file=sys.stderr)
+            raise RuntimeError(f"PyInstaller 打包失败 (exit code {result.returncode})")
+
+        # 清理构建文件
+        build_dir = exe_dir / 'build'
+        if build_dir.exists():
+            shutil.rmtree(build_dir, ignore_errors=True)
+
+        print(f"编译成功: {args.file} -> {exe_path}")
+
+    except FileNotFoundError:
+        print("错误: 未找到 PyInstaller。请运行: pip install pyinstaller", file=sys.stderr)
+        print(f"已生成 Python 文件: {py_path}，可直接用 python 运行", file=sys.stderr)
+        sys.exit(1)
 
 
 def cmd_ast(args):
@@ -278,8 +353,8 @@ def main():
     comp_p = subparsers.add_parser('compile', help='编译为 Python 文件')
     comp_p.add_argument('file', help='源文件路径')
     comp_p.add_argument('-o', '--output', help='输出文件路径（默认: 同名 .py）')
-    comp_p.add_argument('--backend', choices=['antlr', 'src'], default='antlr',
-                        help='使用的后端（默认: antlr）')
+    comp_p.add_argument('--backend', choices=['antlr', 'src', 'llvm'], default='antlr',
+                        help='使用的后端（默认: antlr，llvm=原生编译）')
 
     # ── ast ──
     ast_p = subparsers.add_parser('ast', help='显示 AST')

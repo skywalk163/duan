@@ -45,10 +45,19 @@ definition
 // ----- 段落定义（统一语法）-----
 
 paragraphDef
-    : K_SEGMENT ID ( K_RECEIVE paramList? )? ( K_RETURN typeAnnotation? )?
-      COLON
-      block
-      K_END PERIOD?
+    : BOOK_L ID BOOK_R K_SEGMENT ( LPAREN paramList? RPAREN )? COLON block K_END PERIOD?  // 《名称》段(参数)
+    | K_SEGMENT ID ( K_RECEIVE paramList? )? ( K_RETURN typeAnnotation? )? COLON block K_END PERIOD?  // 段 名称 接收 参数
+    ;
+
+// ----- 块规则（统一处理"结束"标记）-----
+// 块只包含语句，由父规则负责匹配"结束"标记
+block
+    : stmt*
+    ;
+
+// 块内容仅为语句
+blockContent
+    : stmt
     ;
 
 // ----- 类定义（统一语法）-----
@@ -108,11 +117,7 @@ param
     : identifier_like ( COLON typeAnnotation )? ( K_EQUAL expr )?
     ;
 
-block
-    : stmt*
-    ;
-
-// ----- 类型定义 -----
+// ----- 语句 -----
 
 dataTypeDef
     : BOOK_L ID BOOK_R K_DATA_TYPE COLON
@@ -187,6 +192,7 @@ assignStmt
     | K_SELF ID ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?            // 己属性 = 值
     | primary DOT ID ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?       // 对象.属性 = 值
     | primary K_DE ID ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?      // 对象的属性 = 值
+    | primary LBRACKET expr RBRACKET ( ASSIGN | K_EQUAL | K_AS ) expr PERIOD?  // 甲[丁] = 值
     ;
 
 // 复合赋值：甲 加上 1。
@@ -204,16 +210,14 @@ compoundAssignOp
     ;
 
 ifStmt
-    : K_IF expr COLON block
-      ( K_ELSE_IF expr COLON block )*
-      ( K_ELSE COLON block )?
-      K_END PERIOD?
+    : K_IF expr K_THEN? COLON block K_END PERIOD?
+      ( K_ELSE_IF expr K_THEN? COLON block K_END PERIOD? )*
+      ( K_ELSE K_THEN? COLON block K_END PERIOD? )?
     ;
 
 foreachStmt
     : K_FOREACH ID ( K_OF | K_AT ) expr
-      COLON block
-      K_END PERIOD?
+      COLON block K_END PERIOD?
     ;
 
 foreachVar
@@ -224,8 +228,7 @@ foreachVar
 
 whileStmt
     : K_WHILE expr
-      ( COLON block )?
-      K_END PERIOD?
+      ( COLON block K_END PERIOD? )?
     ;
 
 returnStmt
@@ -241,9 +244,8 @@ continueStmt
     ;
 
 tryStmt
-    : K_TRY COLON block
-      K_CATCH ID COLON block
-      K_END PERIOD?
+    : K_TRY COLON block K_END PERIOD?
+      K_CATCH ID COLON block K_END PERIOD?
     ;
 
 throwStmt
@@ -253,11 +255,10 @@ throwStmt
 matchStmt
     : K_MATCH expr COLON
       matchCase*
-      K_END PERIOD?
     ;
 
 matchCase
-    : K_CASE matchPattern (K_IF expr)? COLON block
+    : K_CASE matchPattern (K_IF expr)? COLON block K_END PERIOD?
     ;
 
 matchPattern
@@ -277,7 +278,7 @@ matchPatternList
     ;
 
 printStmt
-    : ( K_PRINT | K_OUTPUT ) expr PERIOD?
+    : ( K_PRINT | K_OUTPUT ) LPAREN exprList? RPAREN PERIOD?
     ;
 
 // ----- 上下文管理器 -----
@@ -369,10 +370,11 @@ primary
     | K_NEW ID ( LPAREN exprList? RPAREN | exprList )   // 新建 对象(参数) 或 新建 对象 参数
     | listComprehension                                   // 列表推导：[表达式 遍历 变量 之 列表]
     | lambdaExpr                                          // 匿名函数：接收 甲：返回 甲 乘 甲。
-    | ID implicitCall?                                    // 变量 或 隐式函数调用：函数名 参数1, 参数2
-    | typeAsIdentifier                                     // 类型关键字用作标识符（如变量名"数"）
-    | LPAREN expr RPAREN
-    | LBRACKET bracketContent RBRACKET                               // 列表/字典字面量或推导
+    | ID                                    // 变量
+    | typeAsIdentifier                                     // 类型关键字用作标识符
+    | LPAREN expr RPAREN                                   // 括号表达式
+    | LBRACKET RBRACKET                                   // 空列表
+    | LBRACKET bracketContent RBRACKET                    // 列表/字典字面量或推导
     | BOOK_L ID BOOK_R                                 // 《段落名》
     // 动词调用（支持动词白名单中的动词）
     | K_FIRST LPAREN expr RPAREN                       // 首(列表)
@@ -412,8 +414,6 @@ primary
     | K_CD LPAREN expr RPAREN                          // 切换目录(路径)
     | K_EXEC LPAREN expr RPAREN                        // 执行命令(命令)
     // I/O操作动词
-    | K_PRINT LPAREN exprList? RPAREN                  // 打印(...)
-    | K_OUTPUT LPAREN exprList? RPAREN                 // 输出(...)
     | K_INPUT LPAREN expr? RPAREN                      // 输入(提示)
     | K_READ LPAREN expr? RPAREN                       // 读取(提示)
     ;
@@ -469,7 +469,7 @@ bracketContent
     : dictComprehension                                               // 字典推导：键: 值 遍历 变量 之 列表
     | dictLiteral                                                     // 字典字面量：键: 值, ...
     | expr K_FOREACH identifier_like ( K_OF | K_AT ) expr ( K_IF expr )?  // 列表推导
-    | exprList                                                        // 列表字面量
+    | exprList?                                                       // 列表字面量（支持空列表）
     ;
 
 

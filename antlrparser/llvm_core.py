@@ -1,289 +1,272 @@
 """
-段言（Duan）LLVM IR 代码生成器 - 基类
-
-LLVM 代码生成器基类，包含核心框架方法。
+LLVM 代码生成器核心 - v2
+基于字符串类型系统 (i8*)
 """
+import re
 
-import os
-import subprocess
-from typing import List, Optional
-
-from duan_ast import (
-    ASTNode, Module, NumberLiteral, StringLiteral, BooleanLiteral,
-    NullLiteral, Identifier, SegmentName, ModuleName,
-    BinaryOp, UnaryOp, FunctionCall, PipeExpression,
-    PropertyAccess, IndexAccess, ListLiteral, DictLiteral, DictEntry,
-    VariableDeclaration, Assignment, CompoundAssignment, IfStatement, ForeachStatement,
-    WhileStatement, BreakStatement, ContinueStatement, ReturnStatement,
-    TryStatement, ThrowStatement, PrintStatement, ExpressionStatement,
-    Parameter, SegmentDefinition, ImportStatement, ExportStatement,
-    ClassDefinition, InterfaceDefinition, MethodDefinition, ConstructorDefinition,
-    NewExpression,
-)
-
-# LLVM 工具路径
-LLVM_BIN = r"E:\Program Files\LLVM\bin"
-CLANG = os.path.join(LLVM_BIN, "clang.exe")
+from abc import ABC, abstractmethod
 
 
-class LLVMCodeGenCore:
-    """AST → LLVM IR 文本生成器（基类，核心框架方法）"""
+class LLVMCodeGenCore(ABC):
+    """LLVM IR 生成器核心"""
 
     def __init__(self):
-        self.lines: List[str] = []
-        self.indent_level = 0
-        self.variables: dict = {}         # 变量名 -> 寄存器名（指针）
-        self.strings: dict = {}           # 字符串常量 -> 全局变量名
-        self.string_counter = 0
-        self.label_counter = 0
-        self.current_function = None
-        self.reg_counter = 0              # 寄存器编号计数器
-        self.global_decls: List[str] = [] # 全局声明（函数之前）
-        self.float_vars: set = set()      # 浮点变量集合
-        self.array_vars: set = set()      # 数组变量集合
-        self.dict_vars: set = set()       # 字典变量集合
-        self.type_info: dict = {}         # 变量类型信息
-        self.segment_counter = 0          # 段落计数器（用于生成唯一函数名）
-        self.segment_name_map: dict = {}  # 中文函数名 -> 英文函数名映射
+        self._lines = []
+        self._strings = {}  # 字符串常量池
+        self._str_counter = 0
+        self._reg_counter = 0
+        self._label_counter = 0
+        self._globals = {}  # 全局变量名 → 初始值
+        self._var_names = {}  # 原始变量名 → 安全 LLVM 名
+        self._var_counter = 0
+        self._func_name_map = {}  # 原始函数名 → 安全 LLVM 名
+        self._func_counter = 0
+        self._string_decls = []
+        self._func_decls = set()  # 已声明的外部函数
+        self._current_func = None
+        self._current_func_params = {}  # 参数名 → 寄存器名
+        self._local_vars = {}  # 局部变量名 → alloca 寄存器名
+        self._pending_allocas = []  # 待分配的 alloca 列表（在函数开头分配）
 
-    # =========================================================================
-    # 辅助方法
-    # =========================================================================
+    def new_register(self):
+        self._reg_counter += 1
+        return f'%{self._reg_counter}'
 
-    def emit(self, line: str = ""):
-        """写一行 LLVM IR"""
-        indent = "  " * self.indent_level
-        self.lines.append(f"{indent}{line}")
+    def new_label(self, prefix='label'):
+        self._label_counter += 1
+        return f'{prefix}_{self._label_counter}'
 
-    def new_label(self, prefix: str = "L") -> str:
-        self.label_counter += 1
-        return f"{prefix}{self.label_counter}"
+    def _emit_string(self, s):
+        """注册字符串常量，返回标签名"""
+        if s not in self._strings:
+            self._str_counter += 1
+            name = f'@.str.{self._str_counter}'
+            self._strings[s] = name
+            # 转义特殊字符
+            escaped = s.replace('\\', '\\5C').replace('"', '\\22').replace('\n', '\\0A').replace('\r', '\\0D').replace('\t', '\\09')
+            self._string_decls.append(f'{name} = private unnamed_addr constant [{len(s.encode("utf-8")) + 1} x i8] c"{escaped}\\00"')
+        return self._strings[s]
 
-    def new_register(self) -> str:
-        """分配一个新的虚拟寄存器 (%1, %2, ...)"""
-        self.reg_counter += 1
-        return f"%{self.reg_counter}"
+    def emit(self, line):
+        self._lines.append(line)
 
-    def get_string_ref(self, value: str) -> str:
-        """为字符串常量创建全局变量，返回指针"""
-        if value in self.strings:
-            return self.strings[value]
-        name = f".str.{self.string_counter}"
-        self.string_counter += 1
-        self.strings[value] = name
-        return name
+    def emit_blank(self):
+        self._lines.append('')
 
-    def _get_segment_name(self, chinese_name: str) -> str:
-        """将中文段落名转换为有效的LLVM函数名"""
-        if chinese_name in self.segment_name_map:
-            return self.segment_name_map[chinese_name]
+    def declare_runtime(self):
+        """声明所有运行时函数"""
+        funcs = [
+            # 输入输出
+            'declare i8* @duan_input()',
+            'declare void @duan_print(i8*)',
+            'declare void @duan_println(i8*)',
+            'declare void @duan_print_int(i32)',
+            # 字符串
+            'declare i8* @duan_concat(i8*, i8*)',
+            'declare i8* @duan_concat3(i8*, i8*, i8*)',
+            'declare i32 @duan_str_eq(i8*, i8*)',
+            'declare i32 @duan_str_len(i8*)',
+            # 数字
+            'declare i8* @duan_itoa(i32)',
+            'declare i32 @duan_atoi(i8*)',
+            'declare double @duan_atof(i8*)',
+            'declare i8* @duan_ftoa(double)',
+            # 列表
+            'declare i8* @duan_list_new()',
+            'declare i32 @duan_list_len(i8*)',
+            'declare i8* @duan_list_get(i8*, i32)',
+            'declare i8* @duan_list_append(i8*, i8*)',
+            'declare i8* @duan_list_clear(i8*)',
+            # 时间
+            'declare double @duan_timestamp()',
+            'declare i8* @duan_format_time(double, i8*)',
+            # 文件
+            'declare i32 @duan_file_exists(i8*)',
+            'declare i8* @duan_read_file(i8*)',
+            'declare void @duan_write_file(i8*, i8*)',
+            # JSON
+            'declare i8* @duan_list_to_json(i8*, i32)',
+            'declare i8* @duan_json_parse(i8*)',
+            # 内存
+            'declare i8* @malloc(i64)',
+            'declare void @free(i8*)',
+            'declare i32 @printf(i8*, ...)',
+        ]
+        for f in funcs:
+            self._func_decls.add(f)
 
-        # 生成唯一的英文函数名（确保是有效的 LLVM 标识符）
-        self.segment_counter += 1
-        # 特殊处理主段
-        if chinese_name == '主段':
-            name = 'main'
+    def _get_string_ptr(self, label):
+        """获取字符串指针: getelementptr"""
+        reg = self.new_register()
+        self.emit(f'{reg} = getelementptr inbounds [{len(label)} x i8], [{len(label)} x i8]* {label}, i64 0, i64 0')
+        return reg
+
+    def _safe_var_name(self, name):
+        """将中文变量名转换为安全的 ASCII LLVM 标识符"""
+        if name not in self._var_names:
+            self._var_counter += 1
+            self._var_names[name] = f'v{self._var_counter}'
+        return self._var_names[name]
+
+    def _safe_func_name(self, name):
+        """将中文段落名转换为安全的 ASCII LLVM 标识符"""
+        if name not in self._func_name_map:
+            self._func_counter += 1
+            self._func_name_map[name] = f'f{self._func_counter}'
+        return self._func_name_map[name]
+
+    def get_var(self, name):
+        """获取变量值 (i8*)"""
+        if name in self._current_func_params:
+            return self._current_func_params[name]
+        if name in self._local_vars:
+            alloca_reg = self._local_vars[name]
+            reg = self.new_register()
+            self.emit(f'{reg} = load i8*, i8** {alloca_reg}')
+            return reg
+        if name in self._globals:
+            safe = self._safe_var_name(name)
+            # 全局变量直接 emit load，不使用 pending 机制避免寄存器错乱
+            reg = self.new_register()
+            self.emit(f'{reg} = load i8*, i8** @__var_{safe}')
+            return reg
+        return None
+
+    def get_var_i32(self, name):
+        """获取变量值作为 i32"""
+        var = self.get_var(name)
+        if var is None:
+            return None
+        reg = self.new_register()
+        self.emit(f'{reg} = call i32 @duan_atoi(i8* {var})')
+        return reg
+
+    def alloca_local(self, name):
+        """为局部变量分配栈空间
+        如果变量已预分配，则直接返回；否则加入 pending allocas。
+        """
+        if name not in self._local_vars or self._local_vars[name] is None:
+            reg = self.new_register()
+            line = f'{reg} = alloca i8*'
+            self._pending_allocas.append(line)
+            self._local_vars[name] = reg
+
+    def flush_allocas(self):
+        """将延迟的 alloca 指令 emit 到当前位置"""
+        for line in self._pending_allocas:
+            self.emit(line)
+        self._pending_allocas = []
+
+    def flush_allocas_at(self, insert_idx):
+        """将延迟的 alloca 指令插入到指定位置"""
+        # 首先为 pending allocas 分配正确的寄存器号（基于当前 _reg_counter）
+        for i, line in enumerate(self._pending_allocas):
+            # 提取原始寄存器号
+            import re
+            match = re.search(r'%(\d+)', line)
+            if match:
+                old_num = int(match.group(1))
+                new_num = self._reg_counter + i + 1
+                new_reg = f'%{new_num}'
+                # 替换行中的原始寄存器号
+                self._pending_allocas[i] = line.replace(f'%{old_num}', new_reg, 1)
+                # 更新 _local_vars 中的映射
+                for name in list(self._local_vars.keys()):
+                    if self._local_vars[name] == f'%{old_num}':
+                        self._local_vars[name] = new_reg
+        # 插入 allocas
+        count = len(self._pending_allocas)
+        for line in reversed(self._pending_allocas):
+            self._lines.insert(insert_idx, line)
+        self._pending_allocas = []
+        # 更新 _reg_counter
+        self._reg_counter += count
+
+    def set_var(self, name, value_reg):
+        """设置变量值"""
+        if name in self._globals:
+            safe = self._safe_var_name(name)
+            self.emit(f'store i8* {value_reg}, i8** @__var_{safe}')
+        elif name in self._local_vars:
+            alloca_reg = self._local_vars[name]
+            self.emit(f'store i8* {value_reg}, i8** {alloca_reg}')
+        elif name in self._current_func_params:
+            self._current_func_params[name] = value_reg
+
+    def gen_binary_op(self, op, left_reg, right_reg):
+        """生成二元运算，返回 (i8* 结果寄存器, 类型)"""
+        l_i32 = self.new_register()
+        r_i32 = self.new_register()
+        result_i32 = self.new_register()
+        result_str = self.new_register()
+        self.emit(f'{l_i32} = call i32 @duan_atoi(i8* {left_reg})')
+        self.emit(f'{r_i32} = call i32 @duan_atoi(i8* {right_reg})')
+        if op == 'ADD':
+            self.emit(f'{result_i32} = add i32 {l_i32}, {r_i32}')
+        elif op == 'SUB':
+            self.emit(f'{result_i32} = sub i32 {l_i32}, {r_i32}')
+        elif op == 'MUL':
+            self.emit(f'{result_i32} = mul i32 {l_i32}, {r_i32}')
+        elif op == 'DIV':
+            self.emit(f'{result_i32} = sdiv i32 {l_i32}, {r_i32}')
         else:
-            import hashlib
-            # 使用哈希生成一个确定性的标识符
-            hash_val = hashlib.md5(chinese_name.encode('utf-8')).hexdigest()[:6]
-            name = f'seg_{self.segment_counter}_{hash_val}'
+            self.emit(f'{result_i32} = add i32 {l_i32}, {r_i32}')
+        self.emit(f'{result_str} = call i8* @duan_itoa(i32 {result_i32})')
+        return result_str, 'i8*'
 
-        self.segment_name_map[chinese_name] = name
-        return name
+    def gen_cmp(self, op, left_reg, right_reg):
+        """生成比较，返回 i1"""
+        eq_reg = self.new_register()
+        self.emit(f'{eq_reg} = call i32 @duan_str_eq(i8* {left_reg}, i8* {right_reg})')
+        if op == 'EQ':
+            cmp_reg = self.new_register()
+            self.emit(f'{cmp_reg} = icmp ne i32 {eq_reg}, 0')
+        elif op == 'NE':
+            cmp_reg = self.new_register()
+            self.emit(f'{cmp_reg} = icmp eq i32 {eq_reg}, 0')
+        elif op in ('LT', 'GT', 'LE', 'GE'):
+            l_i32 = self.new_register()
+            r_i32 = self.new_register()
+            self.emit(f'{l_i32} = call i32 @duan_atoi(i8* {left_reg})')
+            self.emit(f'{r_i32} = call i32 @duan_atoi(i8* {right_reg})')
+            cmp_reg = self.new_register()
+            if op == 'LT':
+                self.emit(f'{cmp_reg} = icmp slt i32 {l_i32}, {r_i32}')
+            elif op == 'GT':
+                self.emit(f'{cmp_reg} = icmp sgt i32 {l_i32}, {r_i32}')
+            elif op == 'LE':
+                self.emit(f'{cmp_reg} = icmp sle i32 {l_i32}, {r_i32}')
+            elif op == 'GE':
+                self.emit(f'{cmp_reg} = icmp sge i32 {l_i32}, {r_i32}')
+        return cmp_reg
 
-    # =========================================================================
-    # 模块级生成
-    # =========================================================================
+    def gen_string_constant(self, value):
+        """生成字符串常量"""
+        label = self._emit_string(value)
+        return self._get_string_ptr(label)
 
-    def generate(self, module: Module) -> str:
-        """生成完整的 LLVM IR 模块"""
-        self.lines = []
-        self.variables = {}
-        self.strings = {}
-        self.string_counter = 0
-        self.label_counter = 0
-        self.global_decls: List[str] = []  # 全局声明（函数之前）
+    def gen_global_var(self, name, init_value=''):
+        """声明全局变量"""
+        self._globals[name] = init_value
 
-        # 模块声明
-        self.emit(f'; 段言 (Duan) 编译输出')
-        self.emit(f'target triple = "x86_64-pc-windows-msvc"')
-        self.emit('')
-
-        # 声明运行时函数
-        self._declare_runtime()
-
-        # 添加默认的 printf 格式字符串
-        self._add_global('.printf_fmt', '[4 x i8] c"%d\\0A\\00"')
-
-        # 生成段落定义
-        for seg in module.segments:
-            self._generate_segment(seg)
-
-        # 生成类定义
-        for cls in module.classes:
-            self._generate_class(cls)
-
-        # 生成接口定义（接口暂时只做声明）
-        for iface in module.interfaces:
-            self._generate_interface(iface)
-
-        # 生成顶层语句（包装在 main 中）
-        if module.statements:
-            self._generate_main(module.statements)
-
-        # 把全局声明插入到 runtime 声明之后、函数之前
-        # 重建输出
-        header_end = 0
-        for i, line in enumerate(self.lines):
-            if line.startswith('define ') or line.startswith('; 段言'):
-                continue
-            if line.strip() == '':
-                header_end = i + 1
-
-        result_lines = []
-        in_header = True
-        for line in self.lines:
-            if line.startswith('define '):
-                if in_header:
-                    # 在这里插入全局声明
-                    for g in self.global_decls:
-                        result_lines.append(g)
-                    result_lines.append('')
-                    in_header = False
-                result_lines.append(line)
-            else:
-                result_lines.append(line)
-
-        return "\n".join(result_lines)
-
-    def _add_global(self, name: str, value: str):
-        """添加一个全局变量声明"""
-        decl = f'@{name} = private unnamed_addr constant {value}'
-        if decl not in self.global_decls:
-            self.global_decls.append(decl)
-
-    def _declare_runtime(self):
-        """声明需要用到的 C 运行时函数"""
-        # 标准IO函数
-        self.emit('declare i32 @printf(i8*, ...)')
-        self.emit('declare i32 @puts(i8*)')
-        self.emit('declare i32 @fputs(i8*, i8*)')
-
-        # 内存管理
-        self.emit('declare i8* @malloc(i64)')
-        self.emit('declare void @free(i8*)')
-
-        # 数学函数（浮点数）
-        self.emit('declare double @sin(double)')
-        self.emit('declare double @cos(double)')
-        self.emit('declare double @tan(double)')
-        self.emit('declare double @exp(double)')
-        self.emit('declare double @log(double)')
-        self.emit('declare double @log10(double)')
-        self.emit('declare double @sqrt(double)')
-        self.emit('declare double @pow(double, double)')
-        self.emit('declare double @fabs(double)')
-        self.emit('declare double @floor(double)')
-        self.emit('declare double @ceil(double)')
-        self.emit('declare double @round(double)')
-        self.emit('declare double @cbrt(double)')
-        self.emit('declare double @fmod(double, double)')
-        self.emit('declare double @fmin(double, double)')
-        self.emit('declare double @fmax(double, double)')
-
-        # 字符串函数
-        self.emit('declare i32 @strlen(i8*)')
-        self.emit('declare i8* @strcpy(i8*, i8*)')
-        self.emit('declare i8* @strcat(i8*, i8*)')
-        self.emit('declare i32 @strcmp(i8*, i8*)')
-        self.emit('declare i8* @strstr(i8*, i8*)')
-
-        # 文件操作
-        self.emit('declare i8* @fopen(i8*, i8*)')
-        self.emit('declare i32 @fclose(i8*)')
-        self.emit('declare i64 @fread(i8*, i64, i64, i8*)')
-        self.emit('declare i32 @fwrite(i8*, i64, i64, i8*)')
-
-        # 列表操作（数组）
-        self.emit('declare i32* @duan_list_new(i64)')
-        self.emit('declare i32 @duan_list_length(i32*)')
-        self.emit('declare i32 @duan_list_append(i32*, i32)')
-        self.emit('declare i32 @duan_list_get(i32*, i64)')
-        self.emit('declare void @duan_list_set(i32*, i64, i32)')
-        self.emit('declare i32* @duan_list_copy(i32*)')
-        self.emit('declare void @duan_list_free(i32*)')
-
-        # 类型转换函数
-        self.emit('declare i8* @duan_itoa(i32)')
-
-        # 字典操作（哈希表）
-        self.emit('declare i8* @duan_dict_new()')
-        self.emit('declare void @duan_dict_set(i8*, i8*, i32)')
-        self.emit('declare i32 @duan_dict_get(i8*, i8*)')
-        self.emit('declare i1 @duan_dict_contains(i8*, i8*)')
-        self.emit('declare void @duan_dict_remove(i8*, i8*)')
-        self.emit('declare void @duan_dict_free(i8*)')
-        self.emit('')
-
-    def _collect_strings(self, module):
-        """预收集所有字符串常量（遍历 AST）"""
-        # 简化：在 generate_string_global 中动态添加
-        pass
-
-    def _generate_string_global(self, name: str, value: str):
-        """生成字符串全局常量定义"""
-        # 将字符串转换为 UTF-8 字节
-        utf8_bytes = value.encode('utf-8')
-        # 转义特殊字符
-        escaped = []
-        for b in utf8_bytes:
-            if b == ord('\\'):
-                escaped.append('\\5C')
-            elif b == ord('\n'):
-                escaped.append('\\0A')
-            elif b == ord('"'):
-                escaped.append('\\22')
-            elif b < 32 or b > 126:
-                # 非 ASCII 字符用十六进制转义
-                escaped.append(f'\\{b:02X}')
-            else:
-                escaped.append(chr(b))
-        escaped_str = ''.join(escaped)
-        # 使用字节长度而非字符长度
-        byte_length = len(utf8_bytes)
-        self._add_global(name, f'[{byte_length + 1} x i8] c"{escaped_str}\\00"')
-
-    # =========================================================================
-    # main 包装
-    # =========================================================================
-
-    def _generate_main(self, statements: List[ASTNode]):
-        """将顶层语句包装在 main 函数中"""
-        self.emit('define i32 @main() {')
-        self.indent_level = 1
-        self.variables = {}
-        self.reg_counter = 0
-        self.current_function = 'main'
-
-        # 为变量分配 alloca
-        for stmt in statements:
-            if isinstance(stmt, VariableDeclaration):
-                reg = self.new_register()
-                # 判断变量类型
-                is_class = isinstance(stmt.value, NewExpression) if stmt.value else False
-                if is_class:
-                    self.emit(f'{reg} = alloca i8*, align 8')
-                    self.type_info[stmt.name] = f'class_{stmt.value.class_name}'
-                else:
-                    self.emit(f'{reg} = alloca i32, align 4')
-                    self.type_info[stmt.name] = 'int'
-                self.variables[stmt.name] = reg
-
-        for stmt in statements:
-            self._generate_statement(stmt)
-
-        self.emit('ret i32 0')
-        self.indent_level = 0
-        self.emit('}')
-        self.emit('')
+    def finalize(self):
+        """生成最终 IR"""
+        lines = []
+        # 字符串声明
+        for s in self._string_decls:
+            lines.append(s)
+        if self._string_decls:
+            lines.append('')
+        # 外部函数声明
+        for f in sorted(self._func_decls):
+            lines.append(f)
+        lines.append('')
+        # 全局变量声明
+        for name in self._globals:
+            safe = self._safe_var_name(name)
+            lines.append(f'@__var_{safe} = global i8* null')
+        if self._globals:
+            lines.append('')
+        # 主体代码
+        lines.extend(self._lines)
+        return '\n'.join(lines)

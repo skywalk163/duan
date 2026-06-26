@@ -210,8 +210,9 @@ class TestCodeGeneration(unittest.TestCase):
     def test_unwrap_generates_assert(self):
         """测试点：代码生成中包含 _duan_unwrap 调用"""
         from code_generator import PythonCodeGenerator
+        from ast_nodes import UnwrapExpression
         from ast_nodes_v3 import (
-            Module, Identifier, NumberLiteral, UnwrapExpression,
+            Module, Identifier, NumberLiteral,
             VarDecl, ParagraphCall,
         )
         # 手动构建一个最小 AST：定义 x = 42!  打印x。

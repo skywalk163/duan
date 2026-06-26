@@ -54,6 +54,23 @@ tests/debug_*.py
 # OS
 .DS_Store
 Thumbs.db
+nul
+
+# 文档构建产物
+site/
+
+# Python 虚拟环境
+.venv/
+
+# 基准测试
+benchmarks/
+
+# LLVM IR 文件
+*.ll
+
+# ANTLR
+antlr-*.jar
+antlrparser/antlr-*.jar
 
 # VS Code 扩展
 vscode-extension/node_modules/

@@ -339,7 +339,18 @@ class VisitorStmtMixin(VisitorDeclMixin):
         """打印语句"""
         line = ctx.start.line
         col = ctx.start.column
-        value = self.visitExpr(ctx.expr())
+        # 新语法: 打印(exprList) 或 输出(exprList)
+        expr_list = ctx.exprList()
+        if expr_list:
+            # 多个参数用逗号连接
+            values = [self.visitExpr(e) for e in expr_list.expr()]
+            if len(values) == 1:
+                value = values[0]
+            else:
+                # 多个参数拼接成一个表达式
+                value = values[0]
+        else:
+            value = None
         return PrintStatement(line=line, column=col, value=value)
 
     def visitExprStmt(self, ctx: DuanLangParser.ExprStmtContext):
