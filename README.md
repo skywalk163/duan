@@ -12,15 +12,46 @@
 ## 安装
 
 ```bash
-# 克隆仓库
-git clone https://github.com/your-repo/duan.git
-cd duan
+# 方式1: 从 PyPI 安装（推荐）
+pip install duan
 
-# 安装依赖
-pip install -r requirements.txt
+# 方式2: 从源码安装
+git clone https://github.com/skywalk163/duan.git
+cd duan
+pip install -e .
 ```
 
 ## 快速开始
+
+### 3 步跑起来
+
+**第1步：安装**
+```bash
+pip install duan
+```
+
+**第2步：创建程序**
+```段言
+# hello.duan
+打印 "你好，段言！"
+```
+
+**第3步：运行**
+```bash
+python -c "
+import sys
+sys.path.insert(0, 'src')
+from compiler import DuanCompiler
+code = open('hello.duan').read()
+compiler = DuanCompiler()
+exec(compiler.compile(code).get('ast', {}))
+"
+```
+
+或使用内置解释器：
+```bash
+python -m src.compiler hello.duan
+```
 
 ### Hello World
 
