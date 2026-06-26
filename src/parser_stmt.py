@@ -1144,6 +1144,20 @@ class ParserStmtMixin:
         # 》
         self._consume(TokenType.RBOOK)
         
+        # 泛型参数？（可选）如：《映射》段[T, U](...)
+        generic_params = []
+        if self._current() and self._current().type == TokenType.LBRACKET:
+            self._consume(TokenType.LBRACKET)
+            while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                param_name = self._consume().value
+                generic_params.append(param_name)
+                if self._current() and self._current().type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                else:
+                    break
+            if self._current() and self._current().type == TokenType.RBRACKET:
+                self._consume(TokenType.RBRACKET)
+        
         # 段
         self._consume(TokenType.KEYWORD, '段')
         
@@ -1225,7 +1239,7 @@ class ParserStmtMixin:
             stmt = self._parse_statement()
             body = [stmt] if stmt else []
         
-        return Paragraph(name, params, return_type, body)
+        return Paragraph(name, params, return_type, body, generic_params=generic_params)
     
     def _parse_paragraph_v2(self) -> Paragraph:
         """解析段落定义：段落/函数 段名 参数/接收/输入 参数名。"""
@@ -1266,6 +1280,20 @@ class ParserStmtMixin:
                 break
         
         name = ''.join(name_parts)
+        
+        # 泛型参数？（可选）如：段落 映射[T, U] 参数 甲：
+        generic_params = []
+        if self._current() and self._current().type == TokenType.LBRACKET:
+            self._consume(TokenType.LBRACKET)
+            while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                param_name = self._consume().value
+                generic_params.append(param_name)
+                if self._current() and self._current().type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                else:
+                    break
+            if self._current() and self._current().type == TokenType.RBRACKET:
+                self._consume(TokenType.RBRACKET)
         
         # 参数列表（可选）- 支持"参数"、"接收"和"输入"三种写法，也支持括号 (a, b) 形式
         params = []
@@ -1400,7 +1428,7 @@ class ParserStmtMixin:
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
         
-        return Paragraph(name, params, return_type, body)
+        return Paragraph(name, params, return_type, body, generic_params=generic_params)
     
     def _parse_body(self) -> List[ASTNode]:
         """解析代码块
@@ -1682,6 +1710,22 @@ class ParserStmtMixin:
             raise ParseError(f"期望类名，但得到 {name_tok.type if name_tok else '输入结束'}")
         class_name = ''.join(name_parts)
 
+        # 泛型参数？（可选）如：类 栈[T]:
+        generic_params = []
+        if self._current() and self._current().type == TokenType.LBRACKET:
+            self._consume(TokenType.LBRACKET)
+            while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                param_name = self._consume().value
+                generic_params.append(param_name)
+                if self._current() and self._current().type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                else:
+                    break
+            if self._current() and self._current().type == TokenType.RBRACKET:
+                self._consume(TokenType.RBRACKET)
+            else:
+                raise ParseError(f"期望右方括号 ']'，但得到 {self._current()}")
+
         # 继承？（可选）
         base_classes = []
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '继承':
@@ -1777,7 +1821,8 @@ class ParserStmtMixin:
             name=class_name,
             attributes=attributes,
             methods=methods,
-            base_classes=base_classes
+            base_classes=base_classes,
+            generic_params=generic_params,
         )
 
     def _parse_attribute_declaration(self) -> AttributeDeclaration:
@@ -1840,6 +1885,20 @@ class ParserStmtMixin:
             else:
                 raise ParseError(f"期望方法名，但得到 {name_tok.type if name_tok else '输入结束'}", name_tok.line if name_tok else 0, name_tok.col if name_tok else 0, name_tok.value if name_tok else None)
 
+        # 泛型参数？（可选）如：段落 映射[T, U] 接收 列表：
+        generic_params = []
+        if self._current() and self._current().type == TokenType.LBRACKET:
+            self._consume(TokenType.LBRACKET)
+            while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                param_name = self._consume().value
+                generic_params.append(param_name)
+                if self._current() and self._current().type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                else:
+                    break
+            if self._current() and self._current().type == TokenType.RBRACKET:
+                self._consume(TokenType.RBRACKET)
+
         # 参数列表（支持"参数"和"接收"两种写法）
         parameters = []
         if self._current() and self._current().type == TokenType.KEYWORD:       
@@ -1901,7 +1960,8 @@ class ParserStmtMixin:
             parameters=parameters,
             body=body,
             return_type=return_type,
-            is_constructor=is_constructor
+            is_constructor=is_constructor,
+            generic_params=generic_params,
         )
 
     def _parse_interface_definition(self) -> InterfaceDefinition:
