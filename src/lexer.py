@@ -52,6 +52,60 @@ def _is_han_fast(ch: str) -> bool:
     return _HAN_START <= cp <= _HAN_END
 
 
+# ASCII 字符分类查表（0-127）
+_ASCII_CLASS = bytearray(128)
+
+# 字符分类位掩码
+_CLASS_DIGIT = 0x01
+_CLASS_ALPHA = 0x02
+_CLASS_ALNUM = 0x04
+_CLASS_SPACE = 0x08
+_CLASS_WHITESPACE = 0x10
+
+for _i in range(128):
+    _ch = chr(_i)
+    if _ch.isdigit():
+        _ASCII_CLASS[_i] |= _CLASS_DIGIT
+    if _ch.isalpha():
+        _ASCII_CLASS[_i] |= _CLASS_ALPHA
+    if _ch.isalnum():
+        _ASCII_CLASS[_i] |= _CLASS_ALNUM
+    if _ch == ' ' or _ch == '\t':
+        _ASCII_CLASS[_i] |= _CLASS_SPACE
+    if _ch in ' \t\r':
+        _ASCII_CLASS[_i] |= _CLASS_WHITESPACE
+
+
+def _is_ascii_digit(ch: str) -> bool:
+    """判断 ASCII 字符是否为数字（查表法）"""
+    cp = ord(ch)
+    return cp < 128 and (_ASCII_CLASS[cp] & _CLASS_DIGIT) != 0
+
+
+def _is_ascii_alpha(ch: str) -> bool:
+    """判断 ASCII 字符是否为字母（查表法）"""
+    cp = ord(ch)
+    return cp < 128 and (_ASCII_CLASS[cp] & _CLASS_ALPHA) != 0
+
+
+def _is_ascii_alnum(ch: str) -> bool:
+    """判断 ASCII 字符是否为字母或数字（查表法）"""
+    cp = ord(ch)
+    return cp < 128 and (_ASCII_CLASS[cp] & _CLASS_ALNUM) != 0
+
+
+def _is_ascii_space_tab(ch: str) -> bool:
+    """判断 ASCII 字符是否为空格或制表符（查表法）"""
+    cp = ord(ch)
+    return cp < 128 and (_ASCII_CLASS[cp] & _CLASS_SPACE) != 0
+
+
+def _is_ascii_whitespace(ch: str) -> bool:
+    """判断 ASCII 字符是否为空白字符（空格、制表符、回车）（查表法）"""
+    cp = ord(ch)
+    return cp < 128 and (_ASCII_CLASS[cp] & _CLASS_WHITESPACE) != 0
+
+
 # 模块级关键字预计算（只计算一次）
 _ALL_KEYWORDS_WITH_VERBS = ALL_KEYWORDS | set(VERB_ARITY.keys())
 
@@ -88,6 +142,55 @@ _CHINESE_DIGITS = {
     '十': 10, '百': 100, '千': 1000, '万': 10000,
 }
 
+# 中文引号映射（模块级常量，避免重复创建）
+_QUOTE_MAP = {
+    '「': '"', '」': '"',
+    '『': "'", '』': "'",
+}
+
+# 中文闭合引号映射（模块级常量）
+_CLOSE_QUOTE_MAP = {
+    '「': '」',
+    '『': '』',
+}
+
+# 中文标点符号集合（模块级常量）
+_CJK_PUNCTUATION = frozenset('。：；，（）【】')
+
+# 复合词安全单字关键字（模块级 frozenset）
+_COMPOUND_SAFE_SINGLE_KEYWORDS = frozenset({
+    '数', '列', '串', '典', '集',
+    '从',
+    '段',
+    '空', '真', '假',
+    '父',
+    '的',
+    '若',
+    '则',
+    '对',
+    '长',
+})
+
+# 符号到 TokenType 的映射（模块级常量）
+_SYMBOL_TOKEN_MAP = {
+    '.': TokenType.DOT,
+    ',': TokenType.COMMA,
+    ';': TokenType.SEMICOLON,
+    ':': TokenType.COLON,
+    '(': TokenType.LPAREN,
+    ')': TokenType.RPAREN,
+    '[': TokenType.LBRACKET,
+    ']': TokenType.RBRACKET,
+    '<': TokenType.LBOOK,
+    '>': TokenType.RBOOK,
+    '\\': TokenType.COMMA,
+    '=': TokenType.EQUALS,
+    '@': TokenType.AT,
+    '+': TokenType.PLUS,
+    '!': TokenType.BANG,
+    '\uff01': TokenType.BANG,
+}
+
 
 class LexerError(Exception):
     """词法分析错误"""
@@ -104,98 +207,28 @@ class LexerError(Exception):
 
 class Lexer:
     """段言词法分析器：无空格分词 + 三层机制"""
-    
-    # CJK 汉字范围
-    HAN_START = 0x4E00
-    HAN_END = 0x9FFF
-    
-    # 中文数字
-    CHINESE_DIGITS = {
-        '零': 0, '一': 1, '二': 2, '三': 3, '四': 4,
-        '五': 5, '六': 6, '七': 7, '八': 8, '九': 9,
-        '十': 10, '百': 100, '千': 1000, '万': 10000,
-    }
-    
-    # 简单中文数字（零到十）
-    SIMPLE_CHINESE_NUMBERS = {
-        '零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
-    }
-    
+
+    CHINESE_DIGITS = _CHINESE_DIGITS
+    SIMPLE_CHINESE_NUMBERS = _SIMPLE_CHINESE_NUMBERS
+    compound_safe_single_keywords = _COMPOUND_SAFE_SINGLE_KEYWORDS
+
     def __init__(self, source: str = None):
         """初始化词法分析器
-        
+
         支持两种调用方式：
         - Lexer(source).tokenize()
         - Lexer().tokenize(source)
-        
+
         Args:
             source: 可选的源码字符串
         """
         self._source = source
-        
-        # 预计算关键字长度分组（优化匹配速度）
-        self.keywords_by_length: Dict[int, Set[str]] = {}
-        self.max_keyword_len = 0
-        
-        for kw in ALL_KEYWORDS:
-            length = len(kw)
-            if length not in self.keywords_by_length:
-                self.keywords_by_length[length] = set()
-            self.keywords_by_length[length].add(kw)
-            if length > self.max_keyword_len:
-                self.max_keyword_len = length
-        
-        # 添加动词到关键字集合（用于分词）
-        self.all_keywords_with_verbs = ALL_KEYWORDS | set(VERB_ARITY.keys())
-        
-        # 重新计算包含动词的长度分组
-        self.all_keywords_by_length: Dict[int, Set[str]] = {}
-        self.all_max_keyword_len = 0
-        
-        for kw in self.all_keywords_with_verbs:
-            length = len(kw)
-            if length not in self.all_keywords_by_length:
-                self.all_keywords_by_length[length] = set()
-            self.all_keywords_by_length[length].add(kw)
-            if length > self.all_max_keyword_len:
-                self.all_max_keyword_len = length
-        
-        # 复合词安全：这些单字关键字在复合词中常见（如"对象"中的"对"），
-        # 当后接CJK字符时应跳过，避免拆分复合词
-        # 注意：算术运算符（加、减、乘、除、模、幂）和循环关键字"当"现在在此列，
-        # 因为它们经常出现在复合词中（如"当前"、"追加"）
-        self.compound_safe_single_keywords: Set[str] = {
-            '数', '列', '串', '典', '集',   # 类型
-            '从',                             # 导入
-            '段',                             # 段落
-            '空', '真', '假',                 # 特殊值（常见复合词如 空间、真实、假设）
-            '父',                             # 作用域（常见复合词如 父类、父级）
-            '的',                             # 助词
-            '若',                             # 条件（常见复合词如 若干、若非）
-            '则',                             # 条件（常见复合词如 规则、法则）
-            '对',                             # 遍历别名（常见复合词如 对象、对于、对比）
-            '长',                             # 长度（常见复合词如 长度、成长、延长）
-        }
-        
-        # 预计算符号映射到 TokenType（优化符号匹配）
-        self._symbol_token_map: Dict[str, TokenType] = {
-            '.': TokenType.DOT,
-            ',': TokenType.COMMA,
-            ';': TokenType.SEMICOLON,
-            ':': TokenType.COLON,
-            '(': TokenType.LPAREN,
-            ')': TokenType.RPAREN,
-            '[': TokenType.LBRACKET,
-            ']': TokenType.RBRACKET,
-            '<': TokenType.LBOOK,
-            '>': TokenType.RBOOK,
-            '\\': TokenType.COMMA,
-            '=': TokenType.EQUALS,
-            '@': TokenType.AT,
-            '+': TokenType.PLUS,
-            '!': TokenType.BANG,
-            '\uff01': TokenType.BANG,  # 中文感叹号 ！
-        }
+        self.keywords_by_length = _KEYWORDS_BY_LENGTH
+        self.max_keyword_len = _MAX_KEYWORD_LEN
+        self.all_keywords_with_verbs = _ALL_KEYWORDS_WITH_VERBS
+        self.all_keywords_by_length = _ALL_KEYWORDS_BY_LENGTH
+        self.all_max_keyword_len = _ALL_MAX_KEYWORD_LEN
+        self._symbol_token_map = _SYMBOL_TOKEN_MAP
     
     def tokenize(self, source: str = None) -> List[Token]:
         """将源码转为 Token 流
@@ -230,7 +263,7 @@ class Lexer:
         while i < n:
             # 安全计数器（防止意外死循环）
             _main_loop_safety += 1
-            if _main_loop_safety > 50000:
+            if _main_loop_safety > 1000000:
                 raise RuntimeError(f"词法分析主循环超出安全上限 ({_main_loop_safety}次迭代), 位置: {i}, 字符: {repr(source[i:i+30])}")
             
             # 处理换行
@@ -242,7 +275,8 @@ class Lexer:
                 
                 # 计算下一行的缩进
                 indent = 0
-                while i < n and source[i] in ' \t':
+                _is_space_tab = _is_ascii_space_tab
+                while i < n and _is_space_tab(source[i]):
                     if source[i] == '\t':
                         indent += 4
                     else:
@@ -275,7 +309,7 @@ class Lexer:
                 continue
             
             # 跳过空白
-            if source[i] in ' \t\r':
+            if _is_ascii_whitespace(source[i]):
                 col += 1
                 i += 1
                 continue
@@ -338,7 +372,7 @@ class Lexer:
                 continue
             
             # 处理数字
-            if source[i].isdigit() or (source[i] == '-' and i + 1 < n and source[i+1].isdigit()):
+            if _is_ascii_digit(source[i]) or (source[i] == '-' and i + 1 < n and _is_ascii_digit(source[i+1])):
                 token, consumed = self._tokenize_number(source, i, line, col)
                 tokens.append(token)
                 col += consumed
@@ -354,7 +388,8 @@ class Lexer:
             # 因为 "甲加三" 中的 "三" 需要根据上下文判断
             
             # 处理标识符和关键字（核心：无空格分词）
-            if self._is_han(source[i]) or source[i].isalpha() or source[i] == '_':
+            ch_i = source[i]
+            if _is_han_fast(ch_i) or _is_ascii_alpha(ch_i) or ch_i == '_':
                 new_tokens, consumed = self._tokenize_identifier_or_keyword(source, i, line, col, user_definitions)
                 tokens.extend(new_tokens)
                 col += consumed
@@ -380,18 +415,18 @@ class Lexer:
         """判断两个字符是否属于同一类型（用于分词边界检测）"""
         if not ch1 or not ch2:
             return False
-        
+
         # 汉字只能和汉字连续
-        if self._is_han(ch1):
-            return self._is_han(ch2)
-        
+        if _is_han_fast(ch1):
+            return _is_han_fast(ch2)
+
         # 字母、数字、下划线可以连续（但汉字应该分开）
-        if self._is_han(ch2):
+        if _is_han_fast(ch2):
             return False
-        
-        if ch1 == '_' or ch1.isalnum():
-            return ch2 == '_' or ch2.isalnum()
-        
+
+        if ch1 == '_' or _is_ascii_alnum(ch1):
+            return ch2 == '_' or _is_ascii_alnum(ch2)
+
         return False
     
     def _try_parse_chinese_number(self, source: str, pos: int):
@@ -572,16 +607,10 @@ class Lexer:
         """处理字符串"""
         start_col = col
         quote_char = source[i]
-        
-        # 中文引号映射
-        quote_map = {
-            '「': '"', '」': '"',
-            '『': "'", '』': "'",
-        }
-        
-        if quote_char in quote_map:
+
+        if quote_char in _QUOTE_MAP:
             # 中文引号
-            close_quote = {'「': '」', '『': '』'}.get(quote_char)
+            close_quote = _CLOSE_QUOTE_MAP[quote_char]
             
             j = i + 1
             chars = []
@@ -628,19 +657,21 @@ class Lexer:
         """处理数字"""
         start = i
         j = i
-        
+        n = len(source)
+        _is_digit = _is_ascii_digit
+
         # 负号
         if source[j] == '-':
             j += 1
-        
+
         # 整数部分
-        while j < len(source) and source[j].isdigit():
+        while j < n and _is_digit(source[j]):
             j += 1
-        
+
         # 小数部分
-        if j < len(source) and source[j] == '.':
+        if j < n and source[j] == '.':
             j += 1
-            while j < len(source) and source[j].isdigit():
+            while j < n and _is_digit(source[j]):
                 j += 1
         
         num_str = source[start:j]
@@ -676,6 +707,7 @@ class Lexer:
         tokens = []
         n = len(source)
         _is_han = _is_han_fast
+        _is_ascii_alnum_f = _is_ascii_alnum
         _Token = Token
         _TokenType = TokenType
 
@@ -683,16 +715,18 @@ class Lexer:
         if _is_han(source[i]):
             # 汉字处理：实现三层分词
             consumed = self._tokenize_chinese_sequence(source, i, line, col, tokens, user_definitions)
-            
+
             # 处理汉字后紧跟ASCII字母/数字的情况（如"计算器1"）
             next_pos = i + consumed
             if next_pos < n:
                 next_ch = source[next_pos]
-                if next_ch.isascii() and (next_ch.isalnum() or next_ch == '_'):
+                cp_next = ord(next_ch)
+                if cp_next < 128 and (_is_ascii_alnum_f(next_ch) or next_ch == '_'):
                     j = next_pos
                     while j < n:
                         ch = source[j]
-                        if ch.isascii() and (ch.isalnum() or ch == '_'):
+                        cp = ord(ch)
+                        if cp < 128 and (_is_ascii_alnum_f(ch) or ch == '_'):
                             j += 1
                         else:
                             break
@@ -701,20 +735,20 @@ class Lexer:
                     if tokens and tokens[-1].type == TokenType.IDENTIFIER:
                         tokens[-1] = _Token(_TokenType.IDENTIFIER, tokens[-1].value + suffix, tokens[-1].line, tokens[-1].col)
                         consumed += len(suffix)
-            
+
             return tokens, consumed
         else:
             # 英文标识符：收集连续的字母、数字、下划线
             j = i + 1
-            while j < n and (source[j].isalnum() or source[j] == '_'):
+            while j < n and (_is_ascii_alnum_f(source[j]) or source[j] == '_'):
                 j += 1
-            
+
             word = source[i:j]
             if word in ALL_KEYWORDS:
                 tokens.append(_Token(_TokenType.KEYWORD, word, line, col))
             else:
                 tokens.append(_Token(_TokenType.IDENTIFIER, word, line, col))
-            
+
             return tokens, j - i
     
     def _tokenize_chinese_sequence(self, source: str, i: int, line: int, col: int, tokens: List[Token], user_definitions: Set[str] = None) -> int:
@@ -730,12 +764,12 @@ class Lexer:
         _is_han = _is_han_fast
         _match_kw = self._match_keyword
         _try_parse_cn_num = self._try_parse_chinese_number
-        _simple_nums = self.SIMPLE_CHINESE_NUMBERS
-        _cn_digits = self.CHINESE_DIGITS
-        _compound_safe = self.compound_safe_single_keywords
+        _simple_nums = _SIMPLE_CHINESE_NUMBERS
+        _cn_digits = _CHINESE_DIGITS
+        _compound_safe = _COMPOUND_SAFE_SINGLE_KEYWORDS
         _symbol_map = SYMBOL_MAP
         _common_compounds = COMMON_COMPOUND_WORDS
-        _punctuation = '。：；，（）【】'
+        _punctuation = _CJK_PUNCTUATION
         _Token = Token
         _TokenType = TokenType
         _tokens_append = tokens.append
@@ -1056,15 +1090,17 @@ class Lexer:
         definitions = set()
         i = 0
         n = len(source)
+        _is_han = _is_han_fast
+        _is_space_tab = _is_ascii_space_tab
 
         # 安全计数器（防止意外死循环）
         _scan_safety = 0
 
         while i < n:
             _scan_safety += 1
-            if _scan_safety > 50000:
+            if _scan_safety > 1000000:
                 raise RuntimeError(f"_scan_user_definitions 超出安全上限 ({_scan_safety}次迭代), i={i}, n={n}")
-            
+
             # 查找段落定义：《段名》段 或 《类名》类 或 《方法名》方法(参数)
             if source[i] == '《':
                 j = i + 1
@@ -1086,7 +1122,7 @@ class Lexer:
                             p = next_start + 3  # 跳过 方法(
                             while p < n and source[p] != ')':
                                 # 跳过空白
-                                if source[p] in ' \t':
+                                if _is_space_tab(source[p]):
                                     p += 1
                                     continue
                                 # 跳过逗号
@@ -1095,7 +1131,7 @@ class Lexer:
                                     continue
                                 # 收集参数名
                                 param_start = p
-                                while p < n and self._is_han(source[p]) and source[p] not in '，, )）':
+                                while p < n and _is_han(source[p]) and source[p] not in '，, )）':
                                     p += 1
                                 if p > param_start:
                                     param_name = source[param_start:p]
@@ -1108,36 +1144,36 @@ class Lexer:
                             definitions.add(name)
                 i = k + 1
                 continue
-            
+
             # 查找 "段落 段名 参数 参数名" 格式
             if source[i:i+2] == '段落':
                 j = i + 2
                 # 跳过空白
-                while j < n and source[j] in ' \t':
+                while j < n and _is_space_tab(source[j]):
                     j += 1
                 # 收集段名
                 k = j
-                while k < n and self._is_han(source[k]):
+                while k < n and _is_han(source[k]):
                     k += 1
                 if k > j:
                     segment_name = source[j:k]
                     # 收集段落名（允许覆盖动词名称）
                     if segment_name not in ALL_KEYWORDS:
                         definitions.add(segment_name)
-                
+
                 # 检查是否有 "参数" 关键字
                 j = k
-                while j < n and source[j] in ' \t':
+                while j < n and _is_space_tab(source[j]):
                     j += 1
                 if source[j:j+2] == '参数':
                     j += 2
                     # 跳过空白
-                    while j < n and source[j] in ' \t':
+                    while j < n and _is_space_tab(source[j]):
                         j += 1
                     # 收集参数名（可能多个参数）
                     while j < n:
                         k = j
-                        while k < n and self._is_han(source[k]) and source[k] not in '。：':
+                        while k < n and _is_han(source[k]) and source[k] not in '。：':
                             k += 1
                         if k > j:
                             param_name = source[j:k]
@@ -1146,23 +1182,23 @@ class Lexer:
                                 definitions.add(param_name)
                         j = k
                         # 跳过空白
-                        while j < n and source[j] in ' \t':
+                        while j < n and _is_space_tab(source[j]):
                             j += 1
                         # 检查是否结束（句号、冒号或换行）
                         if j >= n or source[j] in '。：\n':
                             break
                 i = j
                 continue
-            
+
             # 查找 "定义" 或 "设" 开头的定义语句
             if source[i:i+2] == '定义':
                 j = i + 2
                 # 跳过空白
-                while j < n and source[j] in ' \t':
+                while j < n and _is_space_tab(source[j]):
                     j += 1
                 # 收集标识符（收集到赋值关键字"等于"/"为"为止）
                 k = j
-                while k < n and self._is_han(source[k]):
+                while k < n and _is_han(source[k]):
                     # 只把赋值关键字（等于、为）作为断点
                     # 其他关键字（如结束、返回、跳过等）都可以是变量名的一部分
                     next_kw, length = self._match_keyword(source, k)
@@ -1180,15 +1216,15 @@ class Lexer:
             elif source[i] == '设':
                 j = i + 1
                 # 跳过空白
-                while j < n and source[j] in ' \t':
+                while j < n and _is_space_tab(source[j]):
                     j += 1
                 # 收集标识符（设 甲 为 值）
                 k = j
                 collected_something = False
-                while k < n and self._is_han(source[k]):
+                while k < n and _is_han(source[k]):
                     # 只检查是否遇到"为"关键字（跳过空格），动词在开头时可跳过
                     lookahead = k
-                    while lookahead < n and source[lookahead] in ' \t':
+                    while lookahead < n and _is_space_tab(source[lookahead]):
                         lookahead += 1
                     if lookahead < n and source[lookahead] == '为':
                         break

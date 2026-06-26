@@ -13,6 +13,7 @@
 """
 
 from typing import List, Optional, Tuple
+from tokens import Token
 from duan_parser_v3 import *
 from verb_info import get_arity, is_verb
 

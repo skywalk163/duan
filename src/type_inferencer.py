@@ -127,8 +127,10 @@ class TypeInferencer:
         self._builtin_type_names = {'数', '串', '布尔', '空', '列表', '字典', '任意', '元组', '集合'}
 
     # ---- 类型字符串解析 ----
-    def _parse_type_string(self, type_str: str) -> Type:
+    def _parse_type_string(self, type_str) -> Type:
         """将类型字符串解析为 Type 对象"""
+        if type_str is None:
+            return TYPE_ANY
         return self.type_parser.parse(type_str)
 
     # ---- 注册枚举 ----

@@ -120,6 +120,22 @@ class BinaryOp(ASTNode):
         return f"({self.left} {self.operator} {self.right})"
 
 
+class UnaryOp(ASTNode):
+    __slots__ = ('operator', 'operand')
+    """一元运算
+    
+    支持的运算符：
+    - '非'：逻辑非
+    - '-'：负号
+    """
+    def __init__(self, operator: str, operand: ASTNode):
+        self.operator = operator
+        self.operand = operand
+    
+    def __repr__(self):
+        return f"({self.operator} {self.operand})"
+
+
 class NumberLiteral(ASTNode):
     __slots__ = ('value',)
     """数字字面量"""
@@ -518,14 +534,20 @@ class InterfaceDefinition(ASTNode):
 
 
 class DestructuringAssignment(ASTNode):
-    __slots__ = ('variables', 'value')
-    """解构赋值"""
-    def __init__(self, variables: List[str], value: ASTNode):
+    __slots__ = ('variables', 'value', 'style')
+    """解构赋值
+    
+    style: 'tuple' 或 'list'，区分元组解构和列表解构
+    """
+    def __init__(self, variables: List[str], value: ASTNode, style: str = 'tuple'):
         self.variables = variables
         self.value = value
+        self.style = style  # 'tuple' 或 'list'
     
     def __repr__(self):
-        return f"DestructuringAssignment({', '.join(self.variables)} = {self.value})"
+        bracket = '(' if self.style == 'tuple' else '['
+        end_bracket = ')' if self.style == 'tuple' else ']'
+        return f"DestructuringAssignment({bracket}{', '.join(self.variables)}{end_bracket} = {self.value})"
 
 
 class WithStmt(ASTNode):
@@ -552,11 +574,22 @@ class DictLiteral(ASTNode):
         return f"DictLiteral({{{', '.join(items)}}})"
 
 
-class UnwrapExpression(ASTNode):
-    __slots__ = ('value',)
-    """解包表达式（值! 或 unwrap(值)）"""
-    def __init__(self, value):
-        self.value = value
-
+class RangeExpr(ASTNode):
+    __slots__ = ('start', 'end', 'step')
+    """范围表达式
+    
+    语法：
+    - 1至10       # 从1到10（包含10）
+    - 1到10       # 从1到10（包含10）
+    - 1到10步2    # 从1到10，步长为2
+    
+    生成 Python: range(start, end+1) 或 range(start, end+1, step)
+    """
+    def __init__(self, start: ASTNode, end: ASTNode, step: ASTNode = None):
+        self.start = start
+        self.end = end
+        self.step = step
+    
     def __repr__(self):
-        return f"UnwrapExpression({self.value})"
+        step_str = f"步{self.step}" if self.step else ""
+        return f"RangeExpr({self.start}至{self.end}{step_str})"

@@ -58,7 +58,7 @@ class TokenType(Enum):
     EOF = auto()         # 文件结束
 
 
-@dataclass
+@dataclass(slots=True)
 class Token:
     """Token 数据结构"""
     type: TokenType
