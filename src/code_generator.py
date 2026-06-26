@@ -4,14 +4,14 @@
 将段言AST转换为Python代码
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict
 from duan_parser_v3 import *
 from keywords import VERB_ARITY
 import ast_nodes as ast_nodes_module
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr
 
 
 # =============================================================================
@@ -40,6 +40,7 @@ class PythonCodeGenerator:
         self.indent_level = 0
         self.indent_str = "    "  # 4空格缩进
         self.output_lines: List[str] = []
+        self._indent_cache: Dict[int, str] = {}
         
         # 追踪导入的符号
         self._imported_symbols: set = set()
@@ -354,12 +355,22 @@ class PythonCodeGenerator:
             self.output_lines.insert(insert_pos, "")
             self.output_lines.insert(insert_pos, abc_import)
         
+        return self._build_output()
+    
+    def _build_output(self) -> str:
+        """构建最终输出字符串"""
         return '\n'.join(self.output_lines)
+    
+    def _get_indent(self, level: int) -> str:
+        """获取指定层级的缩进字符串（带缓存）"""
+        if level not in self._indent_cache:
+            self._indent_cache[level] = self.indent_str * level
+        return self._indent_cache[level]
     
     def _add_line(self, line: str):
         """添加一行代码"""
         if line:
-            self.output_lines.append(self.indent_str * self.indent_level + line)
+            self.output_lines.append(self._get_indent(self.indent_level) + line)
         else:
             self.output_lines.append('')
     
@@ -1046,6 +1057,23 @@ class PythonCodeGenerator:
             # 检查方法名是否需要映射转换
             mapped_member = self.method_name_map.get(expr.member, member)
             
+            # 检查导入的模块成员访问映射
+            # 如 JSON.序列化 → _duan_builtin.序列化JSON, JSON.解析 → _duan_builtin.解析JSON
+            module_member_map = {
+                'JSON.序列化': '_duan_builtin.序列化JSON',
+                'JSON.解析': '_duan_builtin.解析JSON',
+                'JSON.美化': '_duan_builtin.美化JSON',
+            }
+            full_access = f"{obj}.{member}"
+            if full_access in module_member_map:
+                mapped = module_member_map[full_access]
+                if expr.is_method_call:
+                    args = [self._generate_expr(arg) for arg in expr.args]
+                    args_str = ', '.join(args)
+                    return f"{mapped}({args_str})"
+                else:
+                    return mapped
+            
             if expr.is_method_call:
                 # 方法调用
                 args = [self._generate_expr(arg) for arg in expr.args]
@@ -1130,6 +1158,15 @@ class PythonCodeGenerator:
             else:
                 return f"({then_expr} if {condition} else None)"
 
+        elif isinstance(expr, RangeExpr):
+            # 范围表达式 -> range(start, end+1) 或 range(start, end+1, step)
+            start = self._generate_expr(expr.start)
+            end = self._generate_expr(expr.end)
+            if expr.step:
+                step = self._generate_expr(expr.step)
+                return f"range({start}, ({end}) + 1, {step})"
+            return f"range({start}, ({end}) + 1)"
+
         else:
             raise CodeGenError(f"不支持的表达式类型", type(expr).__name__)
     
@@ -1156,10 +1193,16 @@ class PythonCodeGenerator:
             # 从...导入：from 数学 import 平方根, 幂
             symbols_str = ', '.join(stmt.symbols)
             if stmt.alias:
-                self._add_line(f"from {mapped_module} import {symbols_str} as {stmt.alias}")
+                if mapped_module:
+                    self._add_line(f"from {mapped_module} import {symbols_str} as {stmt.alias}")
+                else:
+                    self._add_line(f"import {symbols_str} as {stmt.alias}")
                 self._imported_symbols.add(stmt.alias)
             else:
-                self._add_line(f"from {mapped_module} import {symbols_str}")
+                if mapped_module:
+                    self._add_line(f"from {mapped_module} import {symbols_str}")
+                else:
+                    self._add_line(f"import {symbols_str}")
                 # 追踪导入的符号
                 for symbol in stmt.symbols:
                     self._imported_symbols.add(symbol)
@@ -1182,7 +1225,10 @@ class PythonCodeGenerator:
         if stmt.names:
             # from module import names
             names_str = ', '.join(stmt.names)
-            self._add_line(f"from {mapped_module} import {names_str}")
+            if mapped_module:
+                self._add_line(f"from {mapped_module} import {names_str}")
+            else:
+                self._add_line(f"import {names_str}")
             for name in stmt.names:
                 self._imported_symbols.add(name)
         else:

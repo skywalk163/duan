@@ -22,21 +22,45 @@ import sys
 
 class ParseError(Exception):
     """语法解析错误"""
-    def __init__(self, message: str, line: int = 0, col: int = 0, token_value: str = None):
+    def __init__(self, message: str, line: int = 0, col: int = 0, token_value: str = None, source_lines: list = None):
         self.message = message
         self.line = line
         self.col = col
         self.token_value = token_value
-        parts = [f"语法错误"]
+        self.source_lines = source_lines or []
+        
+        parts = []
+        
+        # 错误类型（带颜色标记）
+        parts.append("\n┌─ 语法错误")
+        
+        # 位置信息
         if line:
-            parts.append(f"(行{line}")
+            pos_info = f"行 {line}"
             if col:
-                parts[-1] += f", 列{col}"
-            parts[-1] += ")"
-        parts.append(f": {message}")
+                pos_info += f", 列 {col}"
+            parts.append(f"│ 位置: {pos_info}")
+        
+        # 源代码上下文
+        if line and self.source_lines:
+            parts.append("│")
+            for i in range(max(0, line - 2), min(len(self.source_lines), line + 1)):
+                line_num = i + 1
+                line_content = self.source_lines[i].rstrip()
+                prefix = "│ " if line_num != line else "│→"
+                parts.append(f"{prefix} {line_num:4d} │ {line_content}")
+                # 在错误列位置添加指示符
+                if line_num == line and col:
+                    parts.append(f"│       │ {' ' * (min(col, 60) - 1)}^ 错误在这里")
+        
+        # 错误信息
+        parts.append(f"│ 原因: {message}")
         if token_value:
-            parts.append(f" (附近: '{token_value}')")
-        super().__init__(''.join(parts))
+            parts.append(f"│ 附近: '{token_value}'")
+        
+        parts.append("└─")
+        
+        super().__init__('\n'.join(parts))
 
 
 # =============================================================================

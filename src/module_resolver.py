@@ -139,8 +139,8 @@ class ModuleResolver:
         Raises:
             ModuleNotFoundError: 模块未找到
         """
-        # 模块文件名
-        module_file = f"{module_name}.duan"
+        # 模块文件名（优先 .duan，其次 .py）
+        module_files = [f"{module_name}.duan", f"{module_name}.py"]
         
         # 构建搜索路径
         search_dirs = []
@@ -164,11 +164,12 @@ class ModuleResolver:
             if not search_path.is_absolute():
                 search_path = Path.cwd() / search_path
             
-            module_path = search_path / module_file
-            searched.append(str(module_path))
-            
-            if module_path.exists():
-                return module_path.resolve()
+            for module_file in module_files:
+                module_path = search_path / module_file
+                searched.append(str(module_path))
+                
+                if module_path.exists():
+                    return module_path.resolve()
         
         # 未找到
         raise ModuleNotFoundError(module_name, searched)
@@ -192,9 +193,36 @@ class ModuleResolver:
         with open(module_path, 'r', encoding='utf-8') as f:
             source = f.read()
         
+        # 根据文件扩展名选择解析方式
+        suffix = module_path.suffix
+        if suffix == '.py':
+            return self._parse_python_module(module_path, source)
+        
+        # 段言文件：使用段言解析器
         # 词法分析和语法解析
-        tokens = self.lexer.tokenize(source)
-        module_ast = self.parser.parse(source)
+        try:
+            tokens = self.lexer.tokenize(source)
+            module_ast = self.parser.parse(source)
+        except Exception:
+            # 段言解析器失败（如 src 后端 lexer bug），
+            # 尝试用同名 .py 文件解析
+            py_path = module_path.with_suffix('.py')
+            if py_path.exists():
+                with open(py_path, 'r', encoding='utf-8') as f:
+                    py_source = f.read()
+                return self._parse_python_module(py_path, py_source)
+            # 没有 .py fallback，尝试从文本提取导出符号和导入依赖
+            text_exports = self._extract_exports_from_text(source)
+            text_deps = self._extract_imports_from_text(source)
+            module_info = ModuleInfo(
+                name=module_name,
+                path=module_path,
+                imports=[],
+                dependencies=text_deps,
+                exports=text_exports
+            )
+            self.module_cache[module_name] = module_info
+            return module_info
         
         # 提取导入语句
         imports = []
@@ -218,6 +246,22 @@ class ModuleResolver:
                 else:
                     exports.extend(stmt.symbols)
         
+        # 如果段言解析未能提取到 exports，尝试同名 .py 文件
+        if not exports:
+            py_path = module_path.with_suffix('.py')
+            if py_path.exists():
+                with open(py_path, 'r', encoding='utf-8') as f:
+                    py_source = f.read()
+                return self._parse_python_module(py_path, py_source)
+        
+        # 如果仍然没有 exports，尝试从源码文本中提取"导出"语句
+        if not exports:
+            exports = self._extract_exports_from_text(source)
+        
+        # 如果段言解析未能提取到 dependencies，也尝试从文本提取
+        if not dependencies:
+            dependencies = self._extract_imports_from_text(source)
+        
         # 创建模块信息
         module_info = ModuleInfo(
             name=module_name,
@@ -231,6 +275,165 @@ class ModuleResolver:
         self.module_cache[module_name] = module_info
         
         return module_info
+    
+    def _parse_python_module(self, module_path: Path, source: str) -> ModuleInfo:
+        """
+        解析 Python 格式的模块文件（如 stdlib 中的 .py 文件）
+        
+        使用 Python AST 解析器提取导出符号和导入依赖。
+        
+        Args:
+            module_path: 模块文件路径
+            source: 文件源代码
+        
+        Returns:
+            模块信息
+        """
+        module_name = module_path.stem
+        
+        # 检查缓存
+        if module_name in self.module_cache:
+            return self.module_cache[module_name]
+        
+        import ast as python_ast
+        
+        try:
+            tree = python_ast.parse(source)
+        except SyntaxError:
+            # 解析失败，返回空信息
+            module_info = ModuleInfo(
+                name=module_name,
+                path=module_path,
+                imports=[],
+                dependencies=set(),
+                exports=[]
+            )
+            self.module_cache[module_name] = module_info
+            return module_info
+        
+        # 提取导入依赖
+        dependencies = set()
+        for node in python_ast.walk(tree):
+            if isinstance(node, python_ast.Import):
+                for alias in node.names:
+                    dependencies.add(alias.name)
+            elif isinstance(node, python_ast.ImportFrom):
+                if node.module:
+                    dependencies.add(node.module)
+        
+        # 提取导出符号
+        exports = []
+        # 先检查 __all__
+        all_names = None
+        for node in python_ast.walk(tree):
+            if isinstance(node, python_ast.Assign):
+                for target in node.targets:
+                    if isinstance(target, python_ast.Name) and target.id == '__all__':
+                        if isinstance(node.value, python_ast.List):
+                            all_names = [
+                                elt.value for elt in node.value.elts
+                                if isinstance(elt, python_ast.Constant)
+                            ]
+        
+        if all_names is not None:
+            exports = all_names
+        else:
+            # 没有 __all__，收集所有顶级定义
+            for node in tree.body:
+                if isinstance(node, python_ast.FunctionDef):
+                    exports.append(node.name)
+                elif isinstance(node, python_ast.ClassDef):
+                    exports.append(node.name)
+                elif isinstance(node, python_ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, python_ast.Name):
+                            exports.append(target.id)
+        
+        module_info = ModuleInfo(
+            name=module_name,
+            path=module_path,
+            imports=[],
+            dependencies=dependencies,
+            exports=exports
+        )
+        
+        self.module_cache[module_name] = module_info
+        return module_info
+    
+    def _extract_exports_from_text(self, source: str) -> List[str]:
+        """
+        从源码文本中提取"导出"语句声明的符号名。
+        
+        支持两种格式：
+        - 导出 符号一 符号二。
+        - 导出《符号一》，《符号二》。
+        
+        Args:
+            source: 源码文本
+        
+        Returns:
+            导出符号名列表
+        """
+        import re
+        exports = []
+        for line in source.split('\n'):
+            line = line.strip()
+            if not line.startswith('导出'):
+                continue
+            
+            # 格式1: 导出《符号一》，《符号二》。
+            # 格式2: 导出 符号一 符号二。
+            # 提取《》内的名称
+            book_names = re.findall(r'《([^》]+)》', line)
+            if book_names:
+                exports.extend(book_names)
+                continue
+            
+            # 提取空格/逗号分隔的名称（去掉句号）
+            # 格式: 导出 符号一 符号二。 或 导出 符号一，符号二。
+            rest = line[2:].strip()  # 去掉"导出"
+            rest = rest.rstrip('。')  # 去掉句号
+            if rest:
+                # 按逗号或空格分割
+                names = re.split(r'[，,\s]+', rest)
+                exports.extend(n for n in names if n)
+        
+        return exports
+    
+    def _extract_imports_from_text(self, source: str) -> Set[str]:
+        """
+        从源码文本中提取"从...导入..."语句声明的模块依赖。
+        
+        支持格式：
+        - 从《模块名》导入《符号》。
+        - 从《模块名》导入《符号一》，《符号二》。
+        - 导入《模块名》。
+        
+        Args:
+            source: 源码文本
+        
+        Returns:
+            依赖模块名集合
+        """
+        import re
+        dependencies = set()
+        for line in source.split('\n'):
+            line = line.strip()
+            
+            # 格式: 从《模块名》导入...
+            if line.startswith('从'):
+                match = re.match(r'从《([^》]+)》', line)
+                if match:
+                    dependencies.add(match.group(1))
+                continue
+            
+            # 格式: 导入《模块名》。
+            if line.startswith('导入'):
+                match = re.match(r'导入《([^》]+)》', line)
+                if match:
+                    dependencies.add(match.group(1))
+        
+        return dependencies
     
     def build_dependency_graph(self, main_module: str, from_dir: str = None) -> DependencyGraph:
         """

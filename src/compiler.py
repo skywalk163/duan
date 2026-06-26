@@ -17,6 +17,20 @@ from keywords import VERB_ARITY
 from duan_parser_v3 import DuanParser, ParseError
 import ast_nodes as ast
 import ast_nodes_v3 as v3_ast
+from optimizer import (
+    DeadCodeEliminationOptimizer,
+    ConstantFoldingOptimizer,
+    LoopInvariantOptimizer,
+)
+
+OPTIMIZERS = [
+    DeadCodeEliminationOptimizer,
+    ConstantFoldingOptimizer,
+    LoopInvariantOptimizer,
+]
+
+
+_compile_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 
 
 # =============================================================================
@@ -587,7 +601,7 @@ class DuanCompiler:
     # ------------------------------------------------------------------
     # 核心入口
     # ------------------------------------------------------------------
-    def compile(self, source: str) -> Dict[str, Any]:
+    def compile(self, source: str, optimize: bool = True) -> Dict[str, Any]:
         """完整编译流程。返回字典：
 
         {
@@ -608,7 +622,11 @@ class DuanCompiler:
         # 3) AST 适配
         our_ast = self.adapt(raw_ast)
 
-        # 4) 类型检查
+        # 4) 优化（默认开启）
+        if optimize:
+            our_ast = self.optimize_ast(our_ast)
+
+        # 5) 类型检查
         self.type_check(our_ast)
 
         return {
@@ -623,7 +641,7 @@ class DuanCompiler:
     # ------------------------------------------------------------------
     # 项目级入口（多模块编译）
     # ------------------------------------------------------------------
-    def compile_project(self, project_root: Optional[str] = None) -> Dict[str, Any]:
+    def compile_project(self, project_root: Optional[str] = None, optimize: bool = True) -> Dict[str, Any]:
         """编译整个段言项目（支持多模块。
 
         流程：
@@ -753,6 +771,9 @@ class DuanCompiler:
                 tokens_mod = self.tokenize(mod_source)
                 raw_ast_mod = self.parse_raw(mod_source)
                 our_ast_mod = self.adapt(raw_ast_mod)
+                # 优化（默认开启）
+                if optimize:
+                    our_ast_mod = self.optimize_ast(our_ast_mod)
                 # 类型推断：让 inferencer 拥有当前模块及其导入模块符号
                 from type_inferencer import TypeInferencer  # type: ignore
                 mod_inferencer = TypeInferencer()
@@ -823,6 +844,13 @@ class DuanCompiler:
     def adapt(self, raw_ast) -> ast.Module:
         """将 v3 AST 适配为我们的 ast_nodes.Module"""
         return self._adapter.convert_module(raw_ast)
+
+    def optimize_ast(self, module: ast.Module) -> ast.Module:
+        """依次运行所有优化器，返回优化后的模块"""
+        for optimizer_cls in OPTIMIZERS:
+            optimizer = optimizer_cls()
+            module = optimizer.optimize(module)
+        return module
 
     def type_check(self, module: ast.Module) -> Any:
         """对适配后的 AST 进行类型推断与检查。返回 inferencer 实例。"""
@@ -950,6 +978,36 @@ class DuanCompiler:
 # =============================================================================
 # 顶层便捷函数
 # =============================================================================
+
+def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
+    """编译文件并返回编译结果
+
+    Args:
+        file_path: 源文件路径
+        use_cache: 是否使用编译缓存，默认为 True
+
+    Returns:
+        编译结果字典，与 DuanCompiler.compile() 返回格式相同
+    """
+    abs_path = os.path.abspath(file_path)
+    mtime = os.path.getmtime(abs_path)
+
+    if use_cache and abs_path in _compile_cache:
+        cached_mtime, cached_result = _compile_cache[abs_path]
+        if cached_mtime == mtime:
+            return cached_result
+
+    with open(abs_path, 'r', encoding='utf-8') as f:
+        source = f.read()
+
+    compiler = DuanCompiler()
+    result = compiler.compile(source)
+
+    if use_cache:
+        _compile_cache[abs_path] = (mtime, result)
+
+    return result
+
 
 def compile_source(source: str) -> DuanCompiler:
     """编译源码并返回已完成类型检查的编译器实例"""

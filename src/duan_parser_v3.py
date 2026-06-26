@@ -18,7 +18,7 @@ from parser_expr import ParserExprMixin
 # 重新导出 AST 节点类型（确保 from duan_parser_v3 import * 正常工作）
 from ast_nodes_v3 import (
     ASTNode, Module, VarDecl, IfStmt, ForeachStmt, WhileStmt, 
-    ReturnStmt, BreakStmt, ContinueStmt, BinaryOp, NumberLiteral,
+    ReturnStmt, BreakStmt, ContinueStmt, BinaryOp, UnaryOp, NumberLiteral,
     StringLiteral, Identifier, ParagraphCall, Paragraph, Pipeline,
     ImportStmt, ExportStmt, ClassInstantiation, SelfAssignment,
     CompoundAssignment, MemberAccess, IndexAccess, ClassDefinition,
@@ -27,7 +27,7 @@ from ast_nodes_v3 import (
     LambdaExpression, ListLiteral, MatchStmt, MatchCase, MatchPattern,
     DictComprehension, DestructuringAssignment, ConditionalExpression,
     WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition,
-    MethodSignature, IndexedAssignment,
+    MethodSignature, IndexedAssignment, RangeExpr,
 )
 
 
@@ -40,7 +40,7 @@ __all__ = [
     'DuanParser', 'ParseError',
     # AST 节点类型
     'ASTNode', 'Module', 'VarDecl', 'IfStmt', 'ForeachStmt', 'WhileStmt',
-    'ReturnStmt', 'BreakStmt', 'ContinueStmt', 'BinaryOp', 'NumberLiteral',
+    'ReturnStmt', 'BreakStmt', 'ContinueStmt', 'BinaryOp', 'UnaryOp', 'NumberLiteral',
     'StringLiteral', 'Identifier', 'ParagraphCall', 'Paragraph', 'Pipeline',
     'ImportStmt', 'ExportStmt', 'ClassInstantiation', 'SelfAssignment',
     'CompoundAssignment', 'MemberAccess', 'IndexAccess', 'ClassDefinition',
@@ -49,7 +49,7 @@ __all__ = [
     'LambdaExpression', 'ListLiteral', 'MatchStmt', 'MatchCase', 'MatchPattern',
     'DictComprehension', 'DestructuringAssignment', 'ConditionalExpression',
     'WithStmt', 'DecoratorDefinition', 'DictLiteral', 'InterfaceDefinition',
-    'MethodSignature', 'IndexedAssignment',
+    'MethodSignature', 'IndexedAssignment', 'RangeExpr',
 ]
 
 

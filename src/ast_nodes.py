@@ -15,7 +15,7 @@ from typing import List, Optional, Union, Any
 # 基础节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class ASTNode:
     """AST 节点基类"""
     line: int = 0
@@ -26,31 +26,31 @@ class ASTNode:
 # 字面量节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class NumberLiteral(ASTNode):
     """数字字面量"""
     value: Union[int, float] = 0
 
 
-@dataclass
+@dataclass(slots=True)
 class StringLiteral(ASTNode):
     """字符串字面量"""
     value: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class BooleanLiteral(ASTNode):
     """布尔字面量"""
     value: bool = False
 
 
-@dataclass
+@dataclass(slots=True)
 class NullLiteral(ASTNode):
     """空值字面量"""
     pass
 
 
-@dataclass
+@dataclass(slots=True)
 class SelfReference(ASTNode):
     """self引用（己）"""
     pass
@@ -60,19 +60,19 @@ class SelfReference(ASTNode):
 # 标识符与名称节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class Identifier(ASTNode):
     """标识符（变量名、段落名引用等）"""
     name: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class SegmentName(ASTNode):
     """段落名（《名称》）"""
     name: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class ModuleName(ASTNode):
     """模块/篇名（【名称】）"""
     name: str = ""
@@ -82,7 +82,7 @@ class ModuleName(ASTNode):
 # 表达式节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class BinaryOp(ASTNode):
     """二元运算"""
     left: ASTNode = None
@@ -90,14 +90,14 @@ class BinaryOp(ASTNode):
     right: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class UnaryOp(ASTNode):
     """一元运算"""
     operator: str = ""
     operand: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class FunctionCall(ASTNode):
     """函数/段落调用"""
     name: Union[SegmentName, Identifier] = None
@@ -105,46 +105,46 @@ class FunctionCall(ASTNode):
     type_args: List[str] = field(default_factory=list)  # 显式类型参数（如 映射[数](...)）
 
 
-@dataclass
+@dataclass(slots=True)
 class PipeExpression(ASTNode):
     """管道表达式（-> 或 并 连接）"""
     expressions: List[ASTNode] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class PropertyAccess(ASTNode):
     """属性访问（之字结构：对象之属性）"""
     obj: ASTNode = None
     property_name: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class IndexAccess(ASTNode):
     """索引访问（对象[索引]）"""
     obj: ASTNode = None
     index: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class ListLiteral(ASTNode):
     """列表字面量"""
     elements: List[ASTNode] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class DictEntry(ASTNode):
     """典条目（键值对）"""
     key: ASTNode = None
     value: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class DictLiteral(ASTNode):
     """典字面量（字典）"""
     entries: List[DictEntry] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class NewExpression(ASTNode):
     """类实例化表达式（新类名()）"""
     class_name: str = ""
@@ -152,7 +152,7 @@ class NewExpression(ASTNode):
     type_args: List[str] = field(default_factory=list)  # 显式类型参数（如 数组[数](3)）
 
 
-@dataclass
+@dataclass(slots=True)
 class ConditionalExpression(ASTNode):
     """三元条件表达式：如果 条件 那么 值1 否则 值2"""
     condition: ASTNode = None
@@ -160,13 +160,13 @@ class ConditionalExpression(ASTNode):
     else_expr: Optional[ASTNode] = None
 
 
-@dataclass
+@dataclass(slots=True)
 class StringInterpolation(ASTNode):
     """字符串插值："你好，{名字}" -> f-string"""
     parts: List[Union[str, ASTNode]] = field(default_factory=list)  # 交替的字符串和表达式
 
 
-@dataclass
+@dataclass(slots=True)
 class ListComprehension(ASTNode):
     """列表推导：[表达式 遍历 变量 之 列表]"""
     expression: ASTNode = None          # 输出表达式
@@ -175,21 +175,21 @@ class ListComprehension(ASTNode):
     condition: Optional[ASTNode] = None # 可选过滤条件
 
 
-@dataclass
+@dataclass(slots=True)
 class LambdaExpression(ASTNode):
     """匿名函数：接收 甲：返回 甲 乘 甲。"""
     parameters: List[Parameter] = field(default_factory=list)
     body: ASTNode = None                # 表达式体
 
 
-@dataclass
+@dataclass(slots=True)
 class MatchStatement(ASTNode):
     """模式匹配：匹配 值：情况 ... 结束。"""
     subject: ASTNode = None             # 被匹配的值
     cases: List['MatchCase'] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class MatchCase(ASTNode):
     """匹配分支"""
     pattern: 'MatchPattern' = None      # 匹配模式
@@ -197,7 +197,7 @@ class MatchCase(ASTNode):
     body: List[ASTNode] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class MatchPattern(ASTNode):
     """匹配模式"""
     kind: str = ""                      # 'number', 'string', 'bool', 'null', 'variable', 'wildcard', 'list', 'type_check'
@@ -207,7 +207,7 @@ class MatchPattern(ASTNode):
     binding: str = ""                   # 变量绑定名
 
 
-@dataclass
+@dataclass(slots=True)
 class DictComprehension(ASTNode):
     """字典推导：{键: 值 遍历 变量 之 列表}"""
     key_expr: ASTNode = None            # 键表达式
@@ -217,21 +217,21 @@ class DictComprehension(ASTNode):
     condition: Optional[ASTNode] = None # 可选过滤条件
 
 
-@dataclass
+@dataclass(slots=True)
 class DecoratorDefinition(ASTNode):
     """装饰器定义：@段落名 标注 段落 ..."""
     decorator_name: str = ""            # 装饰器段落名
     paragraph: 'SegmentDefinition' = None  # 被装饰的段落
 
 
-@dataclass
+@dataclass(slots=True)
 class DestructuringAssignment(ASTNode):
     """解构赋值：设 (甲, 乙) 为 元组"""
     variables: List[str] = field(default_factory=list)  # 解构变量列表
     value: ASTNode = None               # 被解构的值
 
 
-@dataclass
+@dataclass(slots=True)
 class WithStatement(ASTNode):
     """上下文管理器：使用 表达式 作为 变量：...结束。"""
     context_expr: ASTNode = None        # 上下文表达式
@@ -243,7 +243,7 @@ class WithStatement(ASTNode):
 # 语句节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class VariableDeclaration(ASTNode):
     """变量声明"""
     name: str = ""
@@ -253,14 +253,14 @@ class VariableDeclaration(ASTNode):
     destructure_names: List[str] = field(default_factory=list)  # 解构赋值变量名列表
 
 
-@dataclass
+@dataclass(slots=True)
 class Assignment(ASTNode):
     """赋值语句"""
     target: ASTNode = None
     value: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class CompoundAssignment(ASTNode):
     """复合赋值（甲 加上 1 → 甲 += 1）"""
     target: str = ""        # 变量名
@@ -268,7 +268,7 @@ class CompoundAssignment(ASTNode):
     value: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class IfStatement(ASTNode):
     """条件语句"""
     condition: ASTNode = None
@@ -278,7 +278,7 @@ class IfStatement(ASTNode):
     elseif_bodies: List[List[ASTNode]] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ForeachStatement(ASTNode):
     """遍历循环"""
     variable: str = ""
@@ -286,52 +286,54 @@ class ForeachStatement(ASTNode):
     body: List[ASTNode] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class WhileStatement(ASTNode):
     """当循环"""
     condition: ASTNode = None
     body: List[ASTNode] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class BreakStatement(ASTNode):
     """跳出语句"""
     pass
 
 
-@dataclass
+@dataclass(slots=True)
 class ContinueStatement(ASTNode):
     """跳过语句"""
     pass
 
 
-@dataclass
+@dataclass(slots=True)
 class ReturnStatement(ASTNode):
     """返回语句"""
     value: Optional[ASTNode] = None
 
 
-@dataclass
+@dataclass(slots=True)
 class TryStatement(ASTNode):
     """异常捕获"""
     try_body: List[ASTNode] = field(default_factory=list)
-    catch_var: str = ""
+    catch_type: str = ""       # 异常类型（如 "ValueError"）
+    catch_var: str = ""         # 异常变量名
     catch_body: List[ASTNode] = field(default_factory=list)
+    finally_body: List[ASTNode] = field(default_factory=list)  # finally 块
 
 
-@dataclass
+@dataclass(slots=True)
 class ThrowStatement(ASTNode):
     """抛出异常"""
     value: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class PrintStatement(ASTNode):
     """打印/输出语句"""
     value: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class ExpressionStatement(ASTNode):
     """表达式语句"""
     expression: ASTNode = None
@@ -341,7 +343,7 @@ class ExpressionStatement(ASTNode):
 # 段落定义节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class Parameter(ASTNode):
     """参数定义"""
     name: str = ""
@@ -353,19 +355,19 @@ class Parameter(ASTNode):
 # 异步/并发节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class AwaitExpression(ASTNode):
     """等待表达式（等待 异步操作）"""
     expression: ASTNode = None
 
 
-@dataclass
+@dataclass(slots=True)
 class DeferStatement(ASTNode):
     """推迟语句（推迟 语句 — 在作用域退出时执行）"""
     body: List[ASTNode] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class AsyncScope(ASTNode):
     """并行作用域（结构化并发）：并行 { 任务1 任务2 }"""
     tasks: List[ASTNode] = field(default_factory=list)
@@ -373,7 +375,7 @@ class AsyncScope(ASTNode):
     timeout: Optional[ASTNode] = None  # 可选超时
 
 
-@dataclass
+@dataclass(slots=True)
 class SegmentDefinition(ASTNode):
     """段落定义"""
     name: str = ""
@@ -388,14 +390,14 @@ class SegmentDefinition(ASTNode):
 # 数据/错误类型定义
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class DataTypeField(ASTNode):
     """数据类型字段"""
     name: str = ""
     type_annotation: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class AttributeDeclaration(ASTNode):
     """属性声明（类定义中使用）"""
     name: str = ""
@@ -403,14 +405,14 @@ class AttributeDeclaration(ASTNode):
     default_value: Optional[ASTNode] = None
 
 
-@dataclass
+@dataclass(slots=True)
 class DataTypeDefinition(ASTNode):
     """数据类型定义"""
     name: str = ""
     fields: List[DataTypeField] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ErrorTypeDefinition(ASTNode):
     """错误类型定义"""
     name: str = ""
@@ -421,7 +423,7 @@ class ErrorTypeDefinition(ASTNode):
 # 类和接口定义
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class MethodDefinition(ASTNode):
     """方法定义"""
     name: str = ""
@@ -431,7 +433,7 @@ class MethodDefinition(ASTNode):
     is_static: bool = False
 
 
-@dataclass
+@dataclass(slots=True)
 class ConstructorDefinition(ASTNode):
     """构造函数定义"""
     name: str = ""
@@ -439,7 +441,7 @@ class ConstructorDefinition(ASTNode):
     body: List[ASTNode] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ClassDefinition(ASTNode):
     """类定义"""
     name: str = ""
@@ -451,7 +453,7 @@ class ClassDefinition(ASTNode):
     constructor: Optional[ConstructorDefinition] = None
 
 
-@dataclass
+@dataclass(slots=True)
 class InterfaceMethod(ASTNode):
     """接口方法签名"""
     name: str = ""
@@ -459,14 +461,14 @@ class InterfaceMethod(ASTNode):
     return_type: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class InterfaceProperty(ASTNode):
     """接口属性签名"""
     name: str = ""
     type_annotation: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class InterfaceDefinition(ASTNode):
     """接口定义"""
     name: str = ""
@@ -479,14 +481,14 @@ class InterfaceDefinition(ASTNode):
 # 类型注解节点（泛型支持）
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class GenericType(ASTNode):
     """泛型类型（如 列表[数]、字典[串, 数]）"""
     base_type: str = ""
     type_arguments: List[str] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class GenericParameterDecl(ASTNode):
     """泛型参数声明"""
     name: str = ""
@@ -497,14 +499,14 @@ class GenericParameterDecl(ASTNode):
 # 枚举/代数数据类型（ADT）
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class EnumVariant(ASTNode):
     """枚举变体"""
     name: str = ""
     fields: List[DataTypeField] = field(default_factory=list)  # 携带的数据字段
 
 
-@dataclass
+@dataclass(slots=True)
 class EnumDefinition(ASTNode):
     """枚举/代数数据类型定义"""
     name: str = ""
@@ -517,7 +519,7 @@ class EnumDefinition(ASTNode):
 # Trait/接口系统增强
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class TraitMethodSignature(ASTNode):
     """Trait 方法签名"""
     name: str = ""
@@ -526,7 +528,7 @@ class TraitMethodSignature(ASTNode):
     has_default: bool = False  # 是否有默认实现
 
 
-@dataclass
+@dataclass(slots=True)
 class TraitDefinition(ASTNode):
     """Trait 定义"""
     name: str = ""
@@ -535,7 +537,7 @@ class TraitDefinition(ASTNode):
     super_traits: List[str] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class TraitImplementation(ASTNode):
     """Trait 实现"""
     trait_name: str = ""
@@ -548,13 +550,13 @@ class TraitImplementation(ASTNode):
 # 空安全类型
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class UnwrapExpression(ASTNode):
     """解包表达式（值! 或 unwrap(值)）"""
     value: Any = None
 
 
-@dataclass
+@dataclass(slots=True)
 class OptionalType(ASTNode):
     """可空类型（如 数|空）"""
     inner_type: str = ""
@@ -564,7 +566,7 @@ class OptionalType(ASTNode):
 # 类型别名
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class TypeAlias(ASTNode):
     """类型别名定义"""
     name: str = ""
@@ -576,20 +578,20 @@ class TypeAlias(ASTNode):
 # 模块节点
 # =============================================================================
 
-@dataclass
+@dataclass(slots=True)
 class ImportStatement(ASTNode):
     """导入语句"""
     module: str = ""
     names: List[str] = field(default_factory=list)
 
 
-@dataclass
+@dataclass(slots=True)
 class ExportStatement(ASTNode):
     """导出语句"""
     name: str = ""
 
 
-@dataclass
+@dataclass(slots=True)
 class Module(ASTNode):
     """模块（篇）- 顶层节点"""
     name: Optional[str] = None

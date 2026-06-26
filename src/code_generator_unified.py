@@ -43,6 +43,7 @@ class UnifiedCodeGenerator:
         self.indent_level = 0
         self.indent_str = "    "  # 4空格缩进
         self.output_lines: List[str] = []
+        self._indent_cache: Dict[int, str] = {}
         self.type_inferencer = TypeInferencer()
         self.type_cache: Dict[int, 'Type'] = {}  # 存储推断的类型
         self.user_functions = set()  # 用户定义的函数名
@@ -88,8 +89,8 @@ class UnifiedCodeGenerator:
             '首': '__import__("operator").itemgetter(0)',
             '末': '__import__("operator").itemgetter(-1)',
             '余': '__import__("builtins").slice(1, None)',
-            '排序': 'sorted',
-            '反转': 'reversed',
+            '排序': '_duan_builtin.列表排序',
+            '反转': '_duan_builtin.列表反转',
             '求和': 'sum',
             '求最大': 'max',
             '求最小': 'min',
@@ -113,6 +114,14 @@ class UnifiedCodeGenerator:
             '目录名': '_duan_builtin.目录名',
             '文件名': '_duan_builtin.文件名',
             '扩展名': '_duan_builtin.扩展名',
+            # JSON 操作（模块方法调用）
+            'JSON.序列化': '_duan_builtin.JSON序列化',
+            'JSON.解析': 'json.loads',
+            'json.序列化': '_duan_builtin.JSON序列化',
+            'json.解析': 'json.loads',
+            # 时间操作
+            '时间戳': '_duan_builtin.时间戳',
+            '格式化时间': '_duan_builtin.格式化时间',
             # 系统操作动词
             '环境变量': '_duan_builtin.环境变量',
             '设置环境变量': '_duan_builtin.设置环境变量',
@@ -153,6 +162,53 @@ class UnifiedCodeGenerator:
             '是列表': '_duan_builtin.是列表',
             '是字典': '_duan_builtin.是字典',
             '是空': '_duan_builtin.是空',
+            '是字母': '_duan_builtin.是字母',
+            '是数字符': '_duan_builtin.是数字',
+            '是空白': '_duan_builtin.是空白',
+            # 随机函数
+            '随机整数': '_duan_builtin.随机整数',
+            '随机浮点': '_duan_builtin.随机浮点',
+            '随机选择': '_duan_builtin.随机选择',
+            # 统计函数
+            '阶乘': '_duan_builtin.阶乘',
+            '平均数': '_duan_builtin.平均数',
+            '中位数': '_duan_builtin.中位数',
+            '众数': '_duan_builtin.众数',
+            '方差': '_duan_builtin.方差',
+            '标准差': '_duan_builtin.标准差',
+            '样本方差': '_duan_builtin.样本方差',
+            '样本标准差': '_duan_builtin.样本标准差',
+            '累积和': '_duan_builtin.累积和',
+            # 数学常量
+            '圆周率': '_duan_builtin.圆周率',
+            '自然常数': '_duan_builtin.自然常数',
+            '角度转弧度': '_duan_builtin.角度转弧度',
+            '弧度转角度': '_duan_builtin.弧度转角度',
+            # 字符串扩展
+            '截取': '_duan_builtin.截取',
+            '字符串获取': '_duan_builtin.字符串获取',
+            # 列表扩展
+            '列表弹出': '_duan_builtin.列表弹出',
+            '列': '_duan_builtin.列',
+            # 字典扩展
+            '字典键列表': '_duan_builtin.字典键列表',
+            '字典值列表': '_duan_builtin.字典值列表',
+            '字典项列表': '_duan_builtin.字典项列表',
+            '字典包含键': '_duan_builtin.字典包含键',
+            '字典删除': '_duan_builtin.字典删除',
+            # 路径操作
+            '分割路径': '_duan_builtin.分割路径',
+            '分割扩展名': '_duan_builtin.分割扩展名',
+            # 系统操作
+            '读取行': '_duan_builtin.读取行',
+            '写入输出': '_duan_builtin.写入输出',
+            '刷新输出': '_duan_builtin.刷新输出',
+            '写入错误': '_duan_builtin.写入错误',
+            '打印错误': '_duan_builtin.打印错误',
+            # JSON 操作
+            '解析JSON': '_duan_builtin.解析JSON',
+            '序列化JSON': '_duan_builtin.序列化JSON',
+            '美化JSON': '_duan_builtin.美化JSON',
         }
     
     def generate(self, module) -> str:
@@ -214,10 +270,16 @@ class UnifiedCodeGenerator:
         self._add_line("        _duan_builtin.字典创建 = dict")
         self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
+        self._add_line("        _duan_builtin.时间戳 = lambda: int(__import__('time').time())")
+        self._add_line("        _duan_builtin.格式化时间 = lambda ts, fmt: __import__('time').strftime(fmt, __import__('time').localtime(ts))")
+        self._add_line("        _duan_builtin.JSON序列化 = lambda obj, indent=2: json.dumps(obj, ensure_ascii=False, indent=indent)")
         self._add_line("else:")
         self._add_line("    import types")
         self._add_line("    _duan_builtin = types.ModuleType('_duan_builtin')")
         self._add_line("    _duan_builtin.打印 = print")
+        self._add_line("    _duan_builtin.时间戳 = lambda: int(__import__('time').time())")
+        self._add_line("    _duan_builtin.格式化时间 = lambda ts, fmt: __import__('time').strftime(fmt, __import__('time').localtime(ts))")
+        self._add_line("    _duan_builtin.JSON序列化 = lambda obj, indent=2: json.dumps(obj, ensure_ascii=False, indent=indent)")
         self._add_line("")
         
         # 生成导入语句
@@ -256,12 +318,50 @@ class UnifiedCodeGenerator:
             for stmt in module.statements:
                 self._generate_statement(stmt)
         
+        # 如果定义了主程序函数，且模块顶层没有显式调用，自动添加入口调用
+        has_main = '主程序' in self.user_functions or 'mean' in self.user_functions
+        has_explicit_call = False
+        if has_main and hasattr(module, 'statements'):
+            main_name = '主程序' if '主程序' in self.user_functions else 'mean'
+            for stmt in module.statements:
+                if is_instance(stmt, 'ExpressionStatement'):
+                    expr = stmt.expression
+                    if is_instance(expr, 'FunctionCall'):
+                        if is_instance(expr.name, 'Identifier') and expr.name.name == main_name:
+                            has_explicit_call = True
+                            break
+                elif is_instance(stmt, 'FunctionCall'):
+                    if is_instance(stmt.name, 'Identifier') and stmt.name.name == main_name:
+                        has_explicit_call = True
+                        break
+                elif is_instance(stmt, 'Identifier') and stmt.name == main_name:
+                    has_explicit_call = True
+                    break
+        
+        if has_main and not has_explicit_call:
+            main_name = '主程序' if '主程序' in self.user_functions else 'mean'
+            self._add_line('')
+            self._add_line(f'if __name__ == \'__main__\':')
+            self.indent_level += 1
+            self._add_line(f'{main_name}()')
+            self.indent_level -= 1
+        
+        return self._build_output()
+    
+    def _build_output(self) -> str:
+        """构建最终输出字符串"""
         return '\n'.join(self.output_lines)
+    
+    def _get_indent(self, level: int) -> str:
+        """获取指定层级的缩进字符串（带缓存）"""
+        if level not in self._indent_cache:
+            self._indent_cache[level] = self.indent_str * level
+        return self._indent_cache[level]
     
     def _add_line(self, line: str):
         """添加一行代码"""
         if line:
-            self.output_lines.append(self.indent_str * self.indent_level + line)
+            self.output_lines.append(self._get_indent(self.indent_level) + line)
         else:
             self.output_lines.append('')
     
@@ -280,63 +380,78 @@ class UnifiedCodeGenerator:
         node_type = type(stmt).__name__
         
         # 变量声明
-        if is_instance(stmt, 'VariableDeclaration'):
+        if is_instance(stmt, 'VariableDeclaration') or is_instance(stmt, 'VarDecl'):
             self._generate_var_decl(stmt)
         
         # 条件语句
-        elif is_instance(stmt, 'IfStatement'):
+        elif is_instance(stmt, 'IfStatement') or is_instance(stmt, 'IfStmt'):
             self._generate_if_stmt(stmt)
         
         # 遍历循环
-        elif is_instance(stmt, 'ForeachStatement'):
+        elif is_instance(stmt, 'ForeachStatement') or is_instance(stmt, 'ForEachStmt') or is_instance(stmt, 'ForeachStmt'):
             self._generate_foreach_stmt(stmt)
         
         # 当循环
-        elif is_instance(stmt, 'WhileStatement'):
+        elif is_instance(stmt, 'WhileStatement') or is_instance(stmt, 'WhileStmt'):
             self._generate_while_stmt(stmt)
         
         # 返回语句
-        elif is_instance(stmt, 'ReturnStatement'):
+        elif is_instance(stmt, 'ReturnStatement') or is_instance(stmt, 'ReturnStmt'):
             self._generate_return_stmt(stmt)
         
         # 打印语句
-        elif is_instance(stmt, 'PrintStatement'):
+        elif is_instance(stmt, 'PrintStatement') or is_instance(stmt, 'PrintStmt'):
             self._generate_print_stmt(stmt)
         
         # 表达式语句
-        elif is_instance(stmt, 'ExpressionStatement'):
+        elif is_instance(stmt, 'ExpressionStatement') or is_instance(stmt, 'ExprStmt'):
             expr_code = self._generate_expr(stmt.expression)
             self._add_line(expr_code)
         
         # 赋值语句
-        elif is_instance(stmt, 'Assignment'):
+        elif is_instance(stmt, 'Assignment') or is_instance(stmt, 'AssignStmt'):
             target_code = self._generate_expr(stmt.target)
             value_code = self._generate_expr(stmt.value)
             self._add_line(f"{target_code} = {value_code}")
         
+        # 复合赋值语句
+        elif is_instance(stmt, 'CompoundAssignment'):
+            op_map = {
+                '加': '+=', '减': '-=', '乘': '*=', '除': '/=',
+                '模': '%=', '幂': '**=',
+                '加上': '+=', '减去': '-=', '乘以': '*=', '除以': '/=',
+            }
+            target_code = self._sanitize_name(stmt.target) if isinstance(stmt.target, str) else self._generate_expr(stmt.target)
+            op = op_map.get(stmt.operator, '+=')
+            value_code = self._generate_expr(stmt.value)
+            self._add_line(f"{target_code} {op} {value_code}")
+        
         # 跳出语句
-        elif is_instance(stmt, 'BreakStatement'):
+        elif is_instance(stmt, 'BreakStatement') or is_instance(stmt, 'BreakStmt'):
             self._add_line("break")
         
         # 跳过语句
-        elif is_instance(stmt, 'ContinueStatement'):
+        elif is_instance(stmt, 'ContinueStatement') or is_instance(stmt, 'ContinueStmt'):
             self._add_line("continue")
         
         # 异常处理
-        elif is_instance(stmt, 'TryStatement'):
+        elif is_instance(stmt, 'TryStatement') or is_instance(stmt, 'TryStmt'):
             self._generate_try_stmt(stmt)
         
         # 抛出异常
-        elif is_instance(stmt, 'ThrowStatement'):
+        elif is_instance(stmt, 'ThrowStatement') or is_instance(stmt, 'ThrowStmt'):
             value_code = self._generate_expr(stmt.value)
+            # Python 要求异常派生自 BaseException，字符串需包装在 Exception() 中
+            if is_instance(stmt.value, 'StringLiteral'):
+                value_code = f"Exception({value_code})"
             self._add_line(f"raise {value_code}")
         
         # 模式匹配
-        elif is_instance(stmt, 'MatchStatement'):
+        elif is_instance(stmt, 'MatchStatement') or is_instance(stmt, 'MatchStmt'):
             self._generate_match_stmt(stmt)
         
         # 上下文管理器
-        elif is_instance(stmt, 'WithStatement'):
+        elif is_instance(stmt, 'WithStatement') or is_instance(stmt, 'WithStmt'):
             self._generate_with_stmt(stmt)
         
         # 解构赋值
@@ -348,15 +463,15 @@ class UnifiedCodeGenerator:
             self._generate_decorator(stmt)
         
         # 导入语句
-        elif is_instance(stmt, 'ImportStatement'):
+        elif is_instance(stmt, 'ImportStatement') or is_instance(stmt, 'ImportStmt'):
             self._generate_import_stmt(stmt)
         
         # 导出语句
-        elif is_instance(stmt, 'ExportStatement'):
+        elif is_instance(stmt, 'ExportStatement') or is_instance(stmt, 'ExportStmt'):
             pass  # Python中不需要特殊处理
         
         # 函数调用作为语句
-        elif is_instance(stmt, 'FunctionCall'):
+        elif is_instance(stmt, 'FunctionCall') or is_instance(stmt, 'ParagraphCall'):
             expr_code = self._generate_expr(stmt)
             self._add_line(expr_code)
         
@@ -366,7 +481,7 @@ class UnifiedCodeGenerator:
             self._add_line(f"{name}()")
         
         # 段落定义
-        elif is_instance(stmt, 'SegmentDefinition'):
+        elif is_instance(stmt, 'SegmentDefinition') or is_instance(stmt, 'Paragraph') or is_instance(stmt, 'FunctionDefinition'):
             self._generate_segment(stmt)
         
         # 类定义
@@ -374,7 +489,7 @@ class UnifiedCodeGenerator:
             self._generate_class(stmt)
         
         # 推迟语句（defer）
-        elif is_instance(stmt, 'DeferStatement'):
+        elif is_instance(stmt, 'DeferStatement') or is_instance(stmt, 'DeferStmt'):
             self._generate_defer_stmt(stmt)
         
         # 并行作用域（结构化并发）
@@ -393,15 +508,47 @@ class UnifiedCodeGenerator:
     
     def _generate_if_stmt(self, stmt):
         """生成条件语句"""
+        # ========== 死代码消除优化 ==========
+        # 检查条件是否是常量
+        condition_val = None
+        if hasattr(stmt.condition, 'value'):
+            cond_val = stmt.condition.value
+            if isinstance(cond_val, bool):
+                condition_val = cond_val
+            elif is_instance(stmt.condition, 'BooleanLiteral'):
+                condition_val = stmt.condition.value
+        
+        if condition_val is True:
+            # 条件恒为真，只生成 then 分支
+            self._add_line("# 常量条件优化 (恒真)")
+            then_body = getattr(stmt, 'then_body', []) or []
+            for s in then_body:
+                self._generate_statement(s)
+            return
+        elif condition_val is False:
+            # 条件恒为假，跳过 then 分支，只生成 else 分支（如果有）
+            self._add_line("# 常量条件优化 (恒假)")
+            # 处理 else 分支
+            if hasattr(stmt, 'else_body') and stmt.else_body:
+                if isinstance(stmt.else_body, list):
+                    for s in stmt.else_body:
+                        self._generate_statement(s)
+                elif is_instance(stmt.else_body, 'IfStmt'):
+                    # 嵌套的 if (elif/else)
+                    self._generate_if_stmt(stmt.else_body)
+            return
+        # ========== 死代码消除优化结束 ==========
+        
         condition = self._generate_expr(stmt.condition)
         self._add_line(f"if {condition}:")
         
         self.indent_level += 1
-        for s in stmt.then_body:
+        then_body = getattr(stmt, 'then_body', []) or []
+        for s in then_body:
             self._generate_statement(s)
         self.indent_level -= 1
         
-        # 处理elif
+        # 处理elif：检查 elseif_conditions/elseif_bodies 格式
         if hasattr(stmt, 'elseif_conditions') and stmt.elseif_conditions:
             for i, elif_cond in enumerate(stmt.elseif_conditions):
                 elif_body = stmt.elseif_bodies[i] if hasattr(stmt, 'elseif_bodies') and i < len(stmt.elseif_bodies) else []
@@ -411,9 +558,34 @@ class UnifiedCodeGenerator:
                 for s in elif_body:
                     self._generate_statement(s)
                 self.indent_level -= 1
+        # 处理elif：检查 else_body 是否是嵌套的 IfStmt（elif 链）
+        elif hasattr(stmt, 'else_body') and stmt.else_body and isinstance(stmt.else_body, type(stmt)):
+            # else_body 是嵌套的 IfStmt，表示 elif
+            current = stmt.else_body
+            while current and isinstance(current, type(stmt)):
+                cond_code = self._generate_expr(current.condition)
+                self._add_line(f"elif {cond_code}:")
+                self.indent_level += 1
+                current_then = getattr(current, 'then_body', []) or []
+                for s in current_then:
+                    self._generate_statement(s)
+                self.indent_level -= 1
+                current = getattr(current, 'else_body', None)
+                if current and not isinstance(current, type(stmt)):
+                    # 最后一个 else
+                    self._add_line("else:")
+                    self.indent_level += 1
+                    if isinstance(current, list):
+                        for s in current:
+                            self._generate_statement(s)
+                    else:
+                        self._generate_statement(current)
+                    self.indent_level -= 1
+                    current = None
+            return
         
         # 处理else
-        if hasattr(stmt, 'else_body') and stmt.else_body:
+        if hasattr(stmt, 'else_body') and stmt.else_body and isinstance(stmt.else_body, list):
             self._add_line("else:")
             self.indent_level += 1
             for s in stmt.else_body:
@@ -463,8 +635,13 @@ class UnifiedCodeGenerator:
             self._generate_statement(s)
         self.indent_level -= 1
         
-        if stmt.catch_var:
-            self._add_line(f"except Exception as {stmt.catch_var}:")
+        if stmt.catch_var or stmt.catch_type:
+            # 构建 except 子句
+            exc_type = stmt.catch_type if stmt.catch_type else "Exception"
+            if stmt.catch_var:
+                self._add_line(f"except {exc_type} as {stmt.catch_var}:")
+            else:
+                self._add_line(f"except {exc_type}:")
             self.indent_level += 1
             for s in stmt.catch_body:
                 self._generate_statement(s)
@@ -475,6 +652,12 @@ class UnifiedCodeGenerator:
             self.indent_level += 1
             for s in stmt.finally_body:
                 self._generate_statement(s)
+            self.indent_level -= 1
+        elif not (stmt.catch_var or stmt.catch_type):
+            # Python 要求 try 必须有 except 或 finally
+            self._add_line("finally:")
+            self.indent_level += 1
+            self._add_line("pass")
             self.indent_level -= 1
     
     def _generate_match_stmt(self, stmt):
@@ -607,12 +790,37 @@ class UnifiedCodeGenerator:
     
     def _generate_import_stmt(self, stmt):
         """生成导入语句"""
-        module_name = stmt.module.replace('《', '').replace('》', '')
-        if hasattr(stmt, 'names') and stmt.names:
-            names = ', '.join(stmt.names)
-            self._add_line(f"from {module_name} import {names}")
+        module_name = getattr(stmt, 'module', None) or getattr(stmt, 'module_name', '')
+        if isinstance(module_name, str):
+            module_name = module_name.replace('《', '').replace('》', '')
+        # 模块名映射：段言标准库模块 → Python 模块
+        # 注意：数学、时间、编码、正则等有独立 stdlib 中文模块，保持原名映射
+        # 只有 Python 原生模块名不同时才需要映射
+        module_map = {'JSON': 'json', '系统': 'sys', '操作系统': 'os'}
+        names = getattr(stmt, 'names', None) or getattr(stmt, 'symbols', None)
+        if names:
+            names_list = []
+            for name in names:
+                if isinstance(name, str):
+                    names_list.append(name.replace('《', '').replace('》', ''))
+                elif hasattr(name, 'name'):
+                    names_list.append(name.name.replace('《', '').replace('》', ''))
+                else:
+                    names_list.append(str(name))
+            names_str = ', '.join(names_list)
+            if module_name:
+                mapped = module_map.get(module_name, module_name)
+                self._add_line(f"from {mapped} import {names_str}")
+            else:
+                # 直接导入：检查每个名字是否需要映射
+                mapped_names = []
+                for name in names_list:
+                    mapped_names.append(module_map.get(name, name))
+                names_str = ', '.join(mapped_names)
+                self._add_line(f"import {names_str}")
         else:
-            self._add_line(f"import {module_name}")
+            mapped = module_map.get(module_name, module_name)
+            self._add_line(f"import {mapped}")
     
     def _generate_segment(self, segment):
         """生成段落定义"""
@@ -766,16 +974,17 @@ class UnifiedCodeGenerator:
         
         self.indent_level += 1
         
-        # 生成字段
+        # 生成字段（只在构造函数中初始化，不在类体级别）
+        # 属性声明如"属性 名称"只是声明，实际赋值在构造函数中进行
+        # 只生成有默认值的字段
         if hasattr(cls, 'fields') and cls.fields:
             for field in cls.fields:
                 if is_instance(field, 'VariableDeclaration') or is_instance(field, 'AttributeDeclaration'):
-                    field_name = self._sanitize_name(field.name)
+                    # 只有有默认值的字段才在类体级别生成
                     if hasattr(field, 'default_value') and field.default_value is not None:
+                        field_name = self._sanitize_name(field.name)
                         value_code = self._generate_expr(field.default_value)
                         self._add_line(f"self.{field_name} = {value_code}")
-                    else:
-                        self._add_line(f"self.{field_name} = None")
         
         # 生成构造函数
         if hasattr(cls, 'constructor') and cls.constructor:
@@ -869,6 +1078,40 @@ class UnifiedCodeGenerator:
             right = self._generate_expr(expr.right)
             op = self.operator_map.get(expr.operator, expr.operator)
             
+            # ========== 常量折叠优化 ==========
+            # 如果两个操作数都是数字常量，在编译时计算结果
+            try:
+                left_val = expr.left.value if hasattr(expr.left, 'value') else None
+                right_val = expr.right.value if hasattr(expr.right, 'value') else None
+                
+                # 纯数字运算常量折叠
+                if (left_val is not None and right_val is not None and
+                    isinstance(left_val, (int, float)) and
+                    isinstance(right_val, (int, float)) and
+                    op in ('+', '-', '*', '/', '%', '**')):
+                    if op == '+':
+                        result = left_val + right_val
+                    elif op == '-':
+                        result = left_val - right_val
+                    elif op == '*':
+                        result = left_val * right_val
+                    elif op == '/':
+                        result = left_val / right_val
+                    elif op == '%':
+                        result = left_val % right_val
+                    elif op == '**':
+                        result = left_val ** right_val
+                    return str(result)
+            except (TypeError, ZeroDivisionError):
+                pass  # 运行时错误，保持原样
+            
+            # 字符串字面量拼接常量折叠
+            if (op == '+' and expr.operator in ['+', '加'] and
+                hasattr(expr.left, 'value') and isinstance(expr.left.value, str) and
+                hasattr(expr.right, 'value') and isinstance(expr.right.value, str)):
+                return repr(expr.left.value + expr.right.value)
+            # ========== 常量折叠优化结束 ==========
+
             # 处理加法：如果任一操作数是字符串，需要进行类型转换
             if op == '+' and expr.operator in ['+', '加']:
                 expr_type = self.type_cache.get(id(expr))
@@ -887,16 +1130,32 @@ class UnifiedCodeGenerator:
         # 一元运算
         elif is_instance(expr, 'UnaryOp'):
             operand = self._generate_expr(expr.operand)
-            return f"{expr.operator}{operand}"
+            # 中文运算符映射
+            unary_op_map = {
+                '非': 'not ',
+                '不是': 'not ',
+                '-': '-',
+            }
+            op = unary_op_map.get(expr.operator, expr.operator)
+            return f"({op}{operand})"
         
         # 函数调用
-        elif is_instance(expr, 'FunctionCall'):
+        elif is_instance(expr, 'FunctionCall') or is_instance(expr, 'ParagraphCall'):
             # 正确处理函数名（可能是 PropertyAccess、Identifier 等）
             func_expr = expr.name
             if is_instance(func_expr, 'PropertyAccess'):
                 # 方法调用：obj.method(args)
                 obj = self._generate_expr(func_expr.obj)
-                func_name = f"{obj}.{func_expr.property_name}"
+                method_name = func_expr.property_name
+                # 中文方法名映射到 Python 方法名
+                method_map = {
+                    '清空': 'clear', '追加': 'append', '弹出': 'pop',
+                    '排序': 'sort', '反转': 'reverse', '拷贝': 'copy',
+                    '长度': '__len__', '获取': 'get', '设置': 'update',
+                    '删除': 'remove', '包含': '__contains__',
+                }
+                mapped_method = method_map.get(method_name, method_name)
+                func_name = f"{obj}.{mapped_method}"
             elif is_instance(func_expr, 'Identifier'):
                 func_name = self._sanitize_name(func_expr.name)
             elif hasattr(func_expr, 'name'):
@@ -910,7 +1169,7 @@ class UnifiedCodeGenerator:
             if func_name not in self.user_functions and func_name in self.builtin_map:
                 func_name = self.builtin_map[func_name]
             
-            args = [self._generate_expr(arg) for arg in expr.arguments]
+            args = [self._generate_expr(arg) for arg in (getattr(expr, 'arguments', None) or getattr(expr, 'args', []))]
             args_str = ', '.join(args)
             return f"{func_name}({args_str})"
         
@@ -945,6 +1204,17 @@ class UnifiedCodeGenerator:
                         value = self._generate_expr(e.value)
                         entries.append(f"{key}: {value}")
             return f"{{{', '.join(entries)}}}"
+        
+        # 范围表达式：1至10 -> range(1, 11), 1到10步2 -> range(1, 11, 2)
+        elif is_instance(expr, 'RangeExpr'):
+            start = self._generate_expr(expr.start)
+            end = self._generate_expr(expr.end)
+            # 段言的范围是包含结束值的，所以需要 +1
+            if expr.step:
+                step = self._generate_expr(expr.step)
+                return f"range({start}, {end} + 1, {step})"
+            else:
+                return f"range({start}, {end} + 1)"
         
         # 类实例化
         elif is_instance(expr, 'NewExpression'):
