@@ -217,7 +217,7 @@ class AstAdapter:
             body=self._to_list_stmts(node.body),
             return_type=getattr(node, 'return_type', None),
             modifiers=[],
-            generic_params=[],
+            generic_params=list(getattr(node, 'generic_params', []) or []),
         )
 
     def _convert_paragraph_call(self, node) -> ast.FunctionCall:
@@ -306,7 +306,7 @@ class AstAdapter:
 
         return ast.ClassDefinition(
             name=node.name,
-            generic_params=[],
+            generic_params=list(getattr(node, 'generic_params', []) or []),
             superclasses=list(getattr(node, 'base_classes', []) or []),
             interfaces=[],
             fields=[
@@ -346,6 +346,7 @@ class AstAdapter:
             body=self._to_list_stmts(getattr(node, 'body', [])),
             return_type=getattr(node, 'return_type', None),
             is_static=False,
+            generic_params=list(getattr(node, 'generic_params', []) or []),
         )
 
     def _convert_attribute_declaration(self, node) -> ast.AttributeDeclaration:

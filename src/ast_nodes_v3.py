@@ -86,13 +86,15 @@ class WhileStmt(ASTNode):
 
 
 class Paragraph(ASTNode):
-    __slots__ = ('name', 'params', 'return_type', 'body')
+    __slots__ = ('name', 'params', 'return_type', 'body', 'generic_params')
     """段落定义"""
-    def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str], body: List[ASTNode]):
+    def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str], body: List[ASTNode],
+                 generic_params: List[str] = None):
         self.name = name
         self.params = params
         self.return_type = return_type
         self.body = body
+        self.generic_params = generic_params or []
     
     def __repr__(self):
         return f"Paragraph({self.name})"
@@ -292,15 +294,17 @@ class AttributeDeclaration(ASTNode):
 
 
 class MethodDefinition(ASTNode):
-    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor')
+    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor', 'generic_params')
     """方法定义"""
     def __init__(self, name: str, parameters: List[Parameter], body: List[ASTNode], 
-                 return_type: str = None, is_constructor: bool = False):
+                 return_type: str = None, is_constructor: bool = False,
+                 generic_params: List[str] = None):
         self.name = name
         self.parameters = parameters
         self.body = body
         self.return_type = return_type
         self.is_constructor = is_constructor
+        self.generic_params = generic_params or []
     
     def __repr__(self):
         return f"MethodDefinition({self.name})"
@@ -342,14 +346,16 @@ class SelfAssignment(ASTNode):
 
 
 class ClassDefinition(ASTNode):
-    __slots__ = ('name', 'attributes', 'methods', 'base_classes')
+    __slots__ = ('name', 'attributes', 'methods', 'base_classes', 'generic_params')
     """类定义"""
     def __init__(self, name: str, attributes: List[AttributeDeclaration], 
-                 methods: List[MethodDefinition], base_classes: List[str] = None):
+                 methods: List[MethodDefinition], base_classes: List[str] = None,
+                 generic_params: List[str] = None):
         self.name = name
         self.attributes = attributes
         self.methods = methods
         self.base_classes = base_classes or []
+        self.generic_params = generic_params or []
     
     def __repr__(self):
         return f"ClassDefinition({self.name})"

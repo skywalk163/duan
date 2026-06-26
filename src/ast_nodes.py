@@ -431,6 +431,7 @@ class MethodDefinition(ASTNode):
     body: List[ASTNode] = field(default_factory=list)
     return_type: Optional[str] = None
     is_static: bool = False
+    generic_params: List[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
