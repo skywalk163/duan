@@ -245,6 +245,15 @@ class DuanLangParserListener(ParseTreeListener):
         pass
 
 
+    # Enter a parse tree produced by DuanLangParser#target.
+    def enterTarget(self, ctx:DuanLangParser.TargetContext):
+        pass
+
+    # Exit a parse tree produced by DuanLangParser#target.
+    def exitTarget(self, ctx:DuanLangParser.TargetContext):
+        pass
+
+
     # Enter a parse tree produced by DuanLangParser#ifStmt.
     def enterIfStmt(self, ctx:DuanLangParser.IfStmtContext):
         pass
@@ -596,15 +605,6 @@ class DuanLangParserListener(ParseTreeListener):
         pass
 
 
-    # Enter a parse tree produced by DuanLangParser#bracketContent.
-    def enterBracketContent(self, ctx:DuanLangParser.BracketContentContext):
-        pass
-
-    # Exit a parse tree produced by DuanLangParser#bracketContent.
-    def exitBracketContent(self, ctx:DuanLangParser.BracketContentContext):
-        pass
-
-
     # Enter a parse tree produced by DuanLangParser#typeAnnotation.
     def enterTypeAnnotation(self, ctx:DuanLangParser.TypeAnnotationContext):
         pass
@@ -629,15 +629,6 @@ class DuanLangParserListener(ParseTreeListener):
 
     # Exit a parse tree produced by DuanLangParser#exprList.
     def exitExprList(self, ctx:DuanLangParser.ExprListContext):
-        pass
-
-
-    # Enter a parse tree produced by DuanLangParser#conditionalExpr.
-    def enterConditionalExpr(self, ctx:DuanLangParser.ConditionalExprContext):
-        pass
-
-    # Exit a parse tree produced by DuanLangParser#conditionalExpr.
-    def exitConditionalExpr(self, ctx:DuanLangParser.ConditionalExprContext):
         pass
 
 

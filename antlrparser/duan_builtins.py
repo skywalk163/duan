@@ -17,6 +17,7 @@ class BuiltinsMixin:
             # 典操作
             DuanBuiltinFunction('_典', self._builtin_dict, min_args=0),
             # 类型转换
+            DuanBuiltinFunction('转字符串', self._builtin_to_string, min_args=1, max_args=1),
             DuanBuiltinFunction('_串化', self._builtin_to_string, min_args=1, max_args=1),
             DuanBuiltinFunction('_数化', self._builtin_to_number, min_args=1, max_args=1),
             DuanBuiltinFunction('_布尔化', self._builtin_to_bool, min_args=1, max_args=1),
@@ -54,6 +55,7 @@ class BuiltinsMixin:
             DuanBuiltinFunction('indexOf', self._builtin_index_of, min_args=2, max_args=2),
             DuanBuiltinFunction('contains', self._builtin_contains, min_args=2, max_args=2),
             # 列表函数
+            DuanBuiltinFunction('列表长度', self._builtin_list_len, min_args=1, max_args=1),
             DuanBuiltinFunction('listLen', self._builtin_list_len, min_args=1, max_args=1),
             DuanBuiltinFunction('listAppend', self._builtin_list_append, min_args=2, max_args=2),
             DuanBuiltinFunction('listReverse', self._builtin_list_reverse, min_args=1, max_args=1),

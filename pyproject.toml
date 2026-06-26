@@ -62,7 +62,12 @@ duanc = "cli.duanc:main"
 
 [tool.setuptools.packages.find]
 include = ["src*", "cli*", "stdlib*", "antlrparser*"]
-exclude = ["tests*", "benchmarks*", "examples*", "project*", "bootstrap*", "docs*", "tools*", "lsp*", "debug-adapter*", "vscode-extension*", "scripts*"]
+exclude = [
+    "tests*", "benchmarks*", "examples*", "project*", "bootstrap*",
+    "docs*", "tools*", "lsp*", "debug-adapter*", "vscode-extension*", "scripts*",
+    "**/test*", "**/*_test*", "**/self_hosted*", "**/duan_parser*", "**/duan_parser2*", "**/duan_parser_new*",
+    "**/antlrparser/antlrparser*", "**/web_playground*"
+]
 
 [tool.setuptools.package-data]
 "*" = ["*.duan"]

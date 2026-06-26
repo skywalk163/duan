@@ -32,6 +32,16 @@ class DuanLangParserVisitor(ParseTreeVisitor):
         return self.visitChildren(ctx)
 
 
+    # Visit a parse tree produced by DuanLangParser#block.
+    def visitBlock(self, ctx:DuanLangParser.BlockContext):
+        return self.visitChildren(ctx)
+
+
+    # Visit a parse tree produced by DuanLangParser#blockContent.
+    def visitBlockContent(self, ctx:DuanLangParser.BlockContentContext):
+        return self.visitChildren(ctx)
+
+
     # Visit a parse tree produced by DuanLangParser#classDef.
     def visitClassDef(self, ctx:DuanLangParser.ClassDefContext):
         return self.visitChildren(ctx)
@@ -79,11 +89,6 @@ class DuanLangParserVisitor(ParseTreeVisitor):
 
     # Visit a parse tree produced by DuanLangParser#param.
     def visitParam(self, ctx:DuanLangParser.ParamContext):
-        return self.visitChildren(ctx)
-
-
-    # Visit a parse tree produced by DuanLangParser#block.
-    def visitBlock(self, ctx:DuanLangParser.BlockContext):
         return self.visitChildren(ctx)
 
 

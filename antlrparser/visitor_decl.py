@@ -43,7 +43,7 @@ from duan_ast import (
 )
 
 
-class VisitorDeclMixin:
+class VisitorDeclMixin(DuanLangParserVisitor):
     """声明 visit 方法混入类"""
 
     def __init__(self):
@@ -206,6 +206,26 @@ class VisitorDeclMixin:
             modifiers=modifiers,
         )
 
+    def visitParagraphBody(self, ctx):
+        """段落体：用于兼容旧的语法名称"""
+        return self.visitBlock(ctx)
+
+    def visitBlock(self, ctx: DuanLangParser.BlockContext):
+        """代码块（语句列表）"""
+        stmts = []
+        for child in ctx.getChildren():
+            # 只处理StmtContext，忽略K_END标记
+            if isinstance(child, DuanLangParser.StmtContext):
+                stmt = self.visitStmt(child)
+                if stmt:
+                    stmts.append(stmt)
+            elif isinstance(child, DuanLangParser.DefinitionContext):
+                # 块内嵌套定义
+                defn = self.visitDefinition(child)
+                if defn:
+                    stmts.append(defn)
+        return stmts
+
     def visitClassDef(self, ctx: DuanLangParser.ClassDefContext):
         """类定义"""
         name = ctx.ID().getText()
@@ -347,28 +367,20 @@ class VisitorDeclMixin:
         properties = []
 
         for member in ctx.interfaceMember():
-            if member.methodSignature():
-                ms = member.methodSignature()
-                method_name = ms.ID().getText()
-                params = []
-                if ms.paramList():
-                    params = self.visitParamList(ms.paramList())
-                return_type = self.visitTypeAnnotation(ms.typeAnnotation())
-                methods.append(InterfaceMethod(
-                    line=ms.start.line, column=ms.start.column,
-                    name=method_name,
-                    parameters=params,
-                    return_type=return_type,
-                ))
-            elif member.propertySignature():
-                ps = member.propertySignature()
-                prop_name = ps.ID().getText()
-                prop_type = ps.typeAnnotation().getText()
-                properties.append(InterfaceProperty(
-                    line=ps.start.line, column=ps.start.column,
-                    name=prop_name,
-                    type_annotation=prop_type,
-                ))
+            # interfaceMember: K_METHOD ID LPAREN paramList? RPAREN (K_RETURN typeAnnotation)? PERIOD?
+            method_name = member.ID().getText()
+            params = []
+            if member.paramList():
+                params = self.visitParamList(member.paramList())
+            return_type = None
+            if member.typeAnnotation():
+                return_type = self.visitTypeAnnotation(member.typeAnnotation())
+            methods.append(InterfaceMethod(
+                line=member.start.line, column=member.start.column,
+                name=method_name,
+                parameters=params,
+                return_type=return_type,
+            ))
 
         return InterfaceDefinition(
             line=line, column=col,
@@ -437,7 +449,18 @@ class VisitorDeclMixin:
         """代码块（语句列表）"""
         stmts = []
         for child in ctx.getChildren():
-            if isinstance(child, DuanLangParser.StmtContext):
+            # 处理BlockContentContext
+            if isinstance(child, DuanLangParser.BlockContentContext):
+                # 检查是否有K_END标记
+                if child.K_END():
+                    # 遇到"结束"标记，终止块
+                    break
+                inner = child.stmt()
+                if inner:
+                    stmt = self.visitStmt(inner)
+                    if stmt:
+                        stmts.append(stmt)
+            elif isinstance(child, DuanLangParser.StmtContext):
                 stmt = self.visitStmt(child)
                 if stmt:
                     stmts.append(stmt)
@@ -544,8 +567,9 @@ class VisitorDeclMixin:
                 return Assignment(line=line, column=col, target=target, value=value)
 
         # 普通变量声明：设 甲 为 值 — 用 identifier_like 获取变量名
-        if ctx.identifier_like():
-            name = self._get_identifier_like_name(ctx.identifier_like(0))
+        ils = ctx.identifier_like()
+        if ils and len(ils) > 0:
+            name = self._get_identifier_like_name(ils[0] if isinstance(ils, list) else ils)
             value = self.visitExpr(ctx.expr()) if ctx.expr() else None
 
             # 特殊处理：以"己"开头的变量名 -> 转换为属性赋值
@@ -559,17 +583,24 @@ class VisitorDeclMixin:
 
             return VariableDeclaration(line=line, column=col, name=name, value=value)
 
+        # 兼容旧语法：定义 变量名 等于 值。 (K_DEFINE ID)
+        if ctx.ID():
+            ids = ctx.ID()
+            name = ids[0].getText() if isinstance(ids, list) else ids.getText()
+            value = self.visitExpr(ctx.expr()) if ctx.expr() else None
+            return VariableDeclaration(line=line, column=col, name=name, value=value)
+
         return None
 
     def visitAssignStmt(self, ctx: DuanLangParser.AssignStmtContext):
         """赋值语句"""
         line = ctx.start.line
         col = ctx.start.column
-        value = self.visitExpr(ctx.expr())
 
         # 己属性赋值：己属性名 = 值
         if ctx.K_SELF():
             prop = ctx.ID().getText() if ctx.ID() else ''
+            value = self.visitExpr(ctx.expr(0))
             target = PropertyAccess(line=line, column=col,
                                     obj=SelfReference(line=line, column=col),
                                     property_name=prop)
@@ -579,6 +610,7 @@ class VisitorDeclMixin:
         if ctx.primary() and ctx.DOT():
             expr = self.visitPrimary(ctx.primary())
             prop = ctx.ID().getText()
+            value = self.visitExpr(ctx.expr(0))
             target = PropertyAccess(line=line, column=col,
                                     obj=expr, property_name=prop)
             return Assignment(line=line, column=col, target=target, value=value)
@@ -587,13 +619,23 @@ class VisitorDeclMixin:
         if ctx.primary() and ctx.K_DE():
             expr = self.visitPrimary(ctx.primary())
             prop = ctx.ID().getText()
+            value = self.visitExpr(ctx.expr(0))
             target = PropertyAccess(line=line, column=col,
                                     obj=expr, property_name=prop)
             return Assignment(line=line, column=col, target=target, value=value)
 
+        # 索引赋值：primary [ expr ] = 值（甲[丁] = 值）
+        if ctx.primary() and ctx.LBRACKET():
+            obj = self.visitPrimary(ctx.primary())
+            index = self.visitExpr(ctx.expr(0))
+            value = self.visitExpr(ctx.expr(1))
+            target = IndexAccess(line=line, column=col, obj=obj, index=index)
+            return Assignment(line=line, column=col, target=target, value=value)
+
         # 简单变量赋值：甲 = 值（使用 identifier_like）
+        value = self.visitExpr(ctx.expr(0))
         if ctx.identifier_like():
-            name = self._get_identifier_like_name(ctx.identifier_like(0))
+            name = self._get_identifier_like_name(ctx.identifier_like())
         elif ctx.ID():
             name = ctx.ID().getText()
         else:

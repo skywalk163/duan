@@ -491,21 +491,7 @@ class VisitorExprMixin(VisitorStmtMixin):
                                name=Identifier(line=line, column=col, name='执行命令'),
                                arguments=[self.visitExpr(ctx.expr(0))])
 
-        # I/O操作动词
-        if ctx.K_PRINT():
-            args = []
-            if ctx.exprList():
-                args = self.visitExprList(ctx.exprList())
-            return FunctionCall(line=line, column=col,
-                               name=Identifier(line=line, column=col, name='打印'),
-                               arguments=args)
-        if ctx.K_OUTPUT():
-            args = []
-            if ctx.exprList():
-                args = self.visitExprList(ctx.exprList())
-            return FunctionCall(line=line, column=col,
-                               name=Identifier(line=line, column=col, name='输出'),
-                               arguments=args)
+        # I/O操作动词 (K_PRINT和K_OUTPUT已移至printStmt规则)
         if ctx.K_INPUT():
             args = []
             if ctx.expr():
@@ -537,12 +523,6 @@ class VisitorExprMixin(VisitorStmtMixin):
                     return PropertyAccess(line=line, column=col,
                                           obj=SelfReference(line=line, column=col),
                                           property_name=prop_name)
-            # 检查是否有隐式函数调用（无括号参数列表）
-            if ctx.implicitCall():
-                arguments = self.visitImplicitCall(ctx.implicitCall())
-                return FunctionCall(line=line, column=col,
-                                    name=Identifier(line=line, column=col, name=name),
-                                    arguments=arguments)
             return Identifier(line=line, column=col, name=name)
 
         # 类型关键字用作标识符（如变量名"数"）
