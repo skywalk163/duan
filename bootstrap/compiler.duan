@@ -20,10 +20,8 @@
   定义 ast 等于 《parse》(tokens)。
   定义 py_code 等于 《generate》(ast)。
   返回 py_code。
-结束。
 
 # compile_file: reads a .duan file and compiles it to Python
 段落 compile_file 接收 filepath：
   定义 content 等于 《_读文件》(filepath)。
   返回 compile_source(content)。
-结束。

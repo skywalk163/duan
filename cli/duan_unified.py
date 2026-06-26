@@ -74,43 +74,20 @@ class DuanUnifiedCLI:
     
     def compile_with_antlr(self, source: str, output_file: Optional[str] = None, run: bool = False) -> int:
         """使用ANTLR后端编译"""
-        from antlr4 import InputStream, CommonTokenStream
-        from DuanLangLexer import DuanLangLexer
-        from DuanLangParser import DuanLangParser
-        from duan_visitor import DuanLangASTBuilder
+        from duan_visitor import DuanParser
         from code_generator_unified import UnifiedCodeGenerator
-        from duan_error_handler import ChineseErrorListener
         
-        # 词法分析
-        input_stream = InputStream(source)
-        lexer = DuanLangLexer(input_stream)
+        # 使用 DuanParser 进行完整的预处理（_auto_close_blocks、_preprocess_async 等）
+        duan_parser = DuanParser()
+        module = duan_parser.parse(source)
         
-        # 添加中文错误监听器
-        error_listener = ChineseErrorListener()
-        lexer.removeErrorListeners()
-        lexer.addErrorListener(error_listener)
-        
-        tokens = CommonTokenStream(lexer)
-        
-        # 语法分析
-        parser = DuanLangParser(tokens)
-        parser.removeErrorListeners()
-        parser.addErrorListener(error_listener)
-        
-        tree = parser.program()
-        
-        if error_listener.has_errors():
-            for error in error_listener.get_errors():
+        if duan_parser.errors:
+            for error in duan_parser.errors:
                 print(error, file=sys.stderr)
             return 1
         
-        # AST构建
-        builder = DuanLangASTBuilder()
-        module = builder.visitProgram(tree)
-        
-        if builder.errors:
-            for error in builder.errors:
-                print(f"[语义错误] {error}", file=sys.stderr)
+        if module is None:
+            print("[错误] 解析失败", file=sys.stderr)
             return 1
         
         # 代码生成
@@ -138,48 +115,81 @@ class DuanUnifiedCLI:
         
         return 0
     
-    def compile_with_src(self, source: str, output_file: Optional[str] = None, run: bool = False) -> int:
-        """使用src手写解析器编译"""
-        from lexer import Lexer
-        from duan_parser_v3 import DuanParser
-        from code_generator import PythonCodeGenerator
+    def compile_with_src(self, source: str, output_file: Optional[str] = None, run: bool = False, target: str = 'python') -> int:
+        """使用src手写解析器编译
         
-        # 词法分析
-        lexer = Lexer()
-        tokens = lexer.tokenize(source)
+        Args:
+            source: 源代码
+            output_file: 输出文件路径
+            run: 是否执行
+            target: 目标格式 ('python' 或 'llvm')
+        """
+        from compiler import DuanCompiler
         
-        # 语法分析
-        parser = DuanParser()
-        module = parser.parse(source)
+        compiler = DuanCompiler()
         
-        if not module:
-            print("[语法错误] 解析失败", file=sys.stderr)
-            return 1
-        
-        # 代码生成
-        generator = PythonCodeGenerator()
-        python_code = generator.generate(module)
-        
-        if output_file:
-            with open(output_file, 'w', encoding='utf-8') as f:
-                f.write(python_code)
-            print(f"[成功] 已生成: {output_file}")
-        
-        if run:
-            # 执行代码
+        if target == 'llvm':
+            # LLVM IR 生成：只做解析和适配，跳过类型检查
             try:
-                # 创建执行环境，包含必要的内置变量
-                exec_globals = {
-                    '__name__': '__main__',
-                    '__file__': output_file or '<duan_script>',
-                    '__builtins__': __builtins__,
-                }
-                exec(python_code, exec_globals)
+                tokens = compiler.tokenize(source)
+                raw_ast = compiler.parse_raw(source)
+                module = compiler.adapt(raw_ast)
+                
+                if not module:
+                    print("[语法错误] 解析失败", file=sys.stderr)
+                    return 1
+                
+                llvm_ir = compiler.generate_llvm_ir(module)
+                
+                if output_file:
+                    with open(output_file, 'w', encoding='utf-8') as f:
+                        f.write(llvm_ir)
+                    print(f"[成功] 已生成 LLVM IR: {output_file}")
+                else:
+                    print(llvm_ir)
+                
+                return 0
             except Exception as e:
-                print(f"[运行错误] {e}", file=sys.stderr)
+                print(f"[LLVM IR 生成错误] {e}", file=sys.stderr)
+                import traceback
+                traceback.print_exc()
                 return 1
-        
-        return 0
+        else:
+            # Python 代码生成：完整编译流程
+            result = compiler.compile(source)
+            
+            if compiler.errors:
+                for error in compiler.errors:
+                    print(f"[错误] {error}", file=sys.stderr)
+                return 1
+            
+            module = result.get('ast')
+            if not module:
+                print("[语法错误] 解析失败", file=sys.stderr)
+                return 1
+            
+            from code_generator import PythonCodeGenerator
+            generator = PythonCodeGenerator()
+            python_code = generator.generate(module)
+            
+            if output_file:
+                with open(output_file, 'w', encoding='utf-8') as f:
+                    f.write(python_code)
+                print(f"[成功] 已生成: {output_file}")
+            
+            if run:
+                try:
+                    exec_globals = {
+                        '__name__': '__main__',
+                        '__file__': output_file or '<duan_script>',
+                        '__builtins__': __builtins__,
+                    }
+                    exec(python_code, exec_globals)
+                except Exception as e:
+                    print(f"[运行错误] {e}", file=sys.stderr)
+                    return 1
+            
+            return 0
     
     def interpret_run(self, source_file: str) -> int:
         """使用解释器直接运行"""
@@ -197,11 +207,32 @@ class DuanUnifiedCLI:
     def start_repl(self) -> int:
         """启动REPL"""
         try:
+            # 先尝试导入 tools.repl（新位置）
+            from tools.repl import DuanREPL
+            repl = DuanREPL()
+            repl.run()
+            return 0
+        except ImportError:
+            pass
+        
+        try:
+            # 再尝试导入 duan_repl（旧位置）
             from duan_repl import main as repl_main
             repl_main()
             return 0
         except ImportError:
             print("[错误] REPL模块不可用", file=sys.stderr)
+            return 1
+    
+    def start_debug_repl(self) -> int:
+        """启动调试REPL"""
+        try:
+            from tools.duan_debug_repl import DuanDebugREPL
+            repl = DuanDebugREPL()
+            repl.run()
+            return 0
+        except ImportError:
+            print("[错误] 调试REPL模块不可用", file=sys.stderr)
             return 1
     
     def show_ast(self, source: str, backend: str = 'antlr') -> int:
@@ -263,18 +294,24 @@ def main():
         subparsers = parser.add_subparsers(dest='command', help='子命令')
         
         # run 子命令
-        run_parser = subparsers.add_parser('run', help='解释执行')
+        run_parser = subparsers.add_parser('run', help='解释执行文件')
         run_parser.add_argument('file', help='源文件路径')
         
         # compile 子命令
-        compile_parser = subparsers.add_parser('compile', help='编译为Python文件')
+        compile_parser = subparsers.add_parser('compile', help='编译文件')
         compile_parser.add_argument('file', help='源文件路径')
         compile_parser.add_argument('-o', '--output', help='输出文件路径')
-        compile_parser.add_argument('--backend', choices=['antlr', 'src'], default='antlr',
-                                   help='选择编译后端')
+        compile_parser.add_argument('--backend', choices=['antlr', 'src'], default='src',
+                                   help='选择编译后端（默认：src）')
+        compile_parser.add_argument('--target', choices=['py', 'js', 'wasm'], default='py',
+                                   help='目标代码（默认：py）')
         
         # repl 子命令
         subparsers.add_parser('repl', help='启动交互式REPL')
+        
+        # debug 子命令
+        debug_parser = subparsers.add_parser('debug', help='启动调试REPL')
+        debug_parser.add_argument('file', nargs='?', help='要调试的文件路径（可选）')
         
         args = parser.parse_args()
         
@@ -296,10 +333,23 @@ def main():
             if args.backend == 'antlr':
                 return cli.compile_with_antlr(source, output_file=output_file, run=False)
             else:
-                return cli.compile_with_src(source, output_file=output_file, run=False)
+                return cli.compile_with_src(source, output_file=output_file, run=False, target=args.target)
         
         elif args.command == 'repl':
             return cli.start_repl()
+        
+        elif args.command == 'debug':
+            if args.file:
+                # 调试模式下加载文件
+                if not os.path.exists(args.file):
+                    print(f"[错误] 文件不存在: {args.file}", file=sys.stderr)
+                    return 1
+                from tools.duan_debug_repl import DuanDebugREPL
+                repl = DuanDebugREPL()
+                repl.load_file(args.file)
+                return 0
+            else:
+                return cli.start_debug_repl()
     
     else:
         # 默认模式：编译并运行
