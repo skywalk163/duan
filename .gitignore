@@ -55,6 +55,11 @@ tests/debug_*.py
 .DS_Store
 Thumbs.db
 
+# VS Code 扩展
+vscode-extension/node_modules/
+vscode-extension/out/
+vscode-extension/dist/
+
 # 特定项目
 build/
 dist/
