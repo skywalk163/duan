@@ -1,0 +1,52 @@
+site_name: 段言 (Duan) 文档
+site_description: 段言 - 中文自然语言编程语言
+site_author: Duan Contributors
+site_url: https://skywalk163.github.io/duan
+
+repo_name: skywalk163/duan
+repo_url: https://github.com/skywalk163/duan
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: zh
+  palette:
+    primary: indigo
+    accent: indigo
+  font:
+    text: 思源黑体
+    code: 思源黑体
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - admonition
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+  - tables
+
+nav:
+  - 首页: index.md
+  - 快速开始: getting-started.md
+  - 语法规范: syntax.md
+  - 标准库: stdlib.md
+  - 工具链: tools.md
+  - 案例: examples.md
