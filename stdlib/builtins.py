@@ -396,6 +396,11 @@ def 字符串获取(text: str, index: int) -> str:
     return text[index]
 
 
+def 截取(text: str, start: int, end: int) -> str:
+    """截取字符串的一部分"""
+    return text[start:end]
+
+
 def 分割字符串(text: str, separator: str = None) -> List[str]:
     """分割字符串"""
     return text.split(separator)
@@ -542,6 +547,21 @@ def 是字典(值) -> bool:
 def 是空(值) -> bool:
     """检查是否为空值"""
     return 值 is None
+
+
+def 是字母(char: str) -> bool:
+    """检查字符是否为字母"""
+    return str.isalpha(char)
+
+
+def 是数字(char: str) -> bool:
+    """检查字符是否为数字"""
+    return str.isdigit(char)
+
+
+def 是空白(char: str) -> bool:
+    """检查字符是否为空格或空白字符"""
+    return str.isspace(char)
 
 
 # =============================================================================
@@ -855,6 +875,7 @@ __all__ = [
     # 类型检查
     '是整数', '是浮点', '是字符串',
     '是列表', '是字典', '是空',
+    '是字母', '是数字', '是空白',
     
     # 数学/统计/随机
     '随机整数', '随机浮点', '随机选择',

@@ -30,3 +30,59 @@ try:
     from .正则 import *
 except ImportError:
     pass
+
+# 新增标准库模块
+try:
+    from .日志 import *
+except ImportError:
+    pass
+
+try:
+    from .进制转换 import *
+except ImportError:
+    pass
+
+try:
+    from .迭代工具 import *
+except ImportError:
+    pass
+
+try:
+    from .命令行参数 import *
+except ImportError:
+    pass
+
+try:
+    from .终端颜色 import *
+except ImportError:
+    pass
+
+try:
+    from .系统信息 import *
+except ImportError:
+    pass
+
+try:
+    from .配置 import *
+except ImportError:
+    pass
+
+try:
+    from .表格 import *
+except ImportError:
+    pass
+
+try:
+    from .随机数据 import *
+except ImportError:
+    pass
+
+try:
+    from .缓存 import *
+except ImportError:
+    pass
+
+try:
+    from .CSV import *
+except ImportError:
+    pass
