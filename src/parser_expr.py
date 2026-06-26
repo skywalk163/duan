@@ -16,6 +16,7 @@ from typing import List, Any, Optional, Union
 from tokens import Token, TokenType
 from keywords import VERB_ARITY, KEYWORDS_DOUBLE, KEYWORDS_SPECIAL
 from ast_nodes_v3 import *
+from ast_nodes import UnwrapExpression
 from parser_core import ParseError
 
 
@@ -123,6 +124,12 @@ class ParserExprMixin:
         if tok is None:
             raise ParseError(f"意外的输入结束")
         
+        # 一元运算符：非（逻辑非）
+        if tok.type == TokenType.KEYWORD and tok.value == '非':
+            self._consume(TokenType.KEYWORD, '非')
+            operand = self._parse_primary()
+            return UnaryOp('非', operand)
+        
         # 三元条件表达式：如果 条件 那么 值1 否则 值2
         if tok.type == TokenType.KEYWORD and tok.value == '如果':
             self._consume(TokenType.KEYWORD, '如果')
@@ -147,6 +154,28 @@ class ParserExprMixin:
         if tok.type == TokenType.NUMBER:
             self._consume()
             expr = NumberLiteral(tok.value)
+            
+            # 检查是否为范围表达式：1至10 或 1到10 或 1到10步2
+            next_tok = self._current()
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('至', '到'):
+                self._consume(TokenType.KEYWORD)  # 消耗「至」或「到」
+                end_tok = self._current()
+                if end_tok and end_tok.type == TokenType.NUMBER:
+                    end_val = self._consume(TokenType.NUMBER).value
+                    end_expr = NumberLiteral(end_val)
+                    
+                    # 检查是否有步长：步 数字
+                    step_expr = None
+                    step_tok = self._current()
+                    if step_tok and step_tok.type == TokenType.KEYWORD and step_tok.value == '步':
+                        self._consume(TokenType.KEYWORD, '步')
+                        step_num_tok = self._current()
+                        if step_num_tok and step_num_tok.type == TokenType.NUMBER:
+                            step_val = self._consume(TokenType.NUMBER).value
+                            step_expr = NumberLiteral(step_val)
+                    
+                    expr = RangeExpr(expr, end_expr, step_expr)
+            
             return self._parse_postfix(expr)
 
         # 中文数字
@@ -835,7 +864,7 @@ class ParserExprMixin:
             tok = self._current()
             if tok.type == TokenType.IDENTIFIER:
                 params.append(self._consume(TokenType.IDENTIFIER).value)
-            elif tok.type == TokenType.KEYWORD and tok.value not in ('返回', '结束', '匹配', '情况', '如果', '若', '否则', '遍历', '当', '设', '定义', '类', '构造', '段落', '函数', '尝试', '捕获', '抛出', '最终', '导入', '导出', '从'):
+            elif tok.type == TokenType.KEYWORD and tok.value not in ('返回', '匹配', '情况', '如果', '若', '否则', '遍历', '当', '设', '定义', '类', '构造', '段落', '函数', '尝试', '捕获', '抛出', '最终', '导入', '导出', '从'):
                 # 允许非语句关键字作为参数名
                 params.append(self._consume(TokenType.KEYWORD).value)
             else:
