@@ -72,6 +72,20 @@ benchmarks/
 antlr-*.jar
 antlrparser/antlr-*.jar
 
+# ANTLR 生成文件
+antlrparser/.antlr/
+antlrparser/antlrparser/
+antlrparser/duan_parser/DuanLangLexer.interp
+antlrparser/duan_parser/DuanLangLexer.tokens
+antlrparser/duan_parser/DuanLangParser.interp
+antlrparser/duan_parser/DuanLangParser.tokens
+
+# CI/CD
+.github/workflows/pypi-publish.yml
+
+# 比赛文件
+trae_competition.zip
+
 # VS Code 扩展
 vscode-extension/node_modules/
 vscode-extension/out/
