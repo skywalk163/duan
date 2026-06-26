@@ -62,9 +62,6 @@ site/
 # Python 虚拟环境
 .venv/
 
-# 基准测试
-benchmarks/
-
 # LLVM IR 文件
 *.ll
 
