@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "duan"
-version = "1.6.1"
+version = "1.7.0"
 description = "段言（Duan）— 中文自然语言编程语言"
 readme = "README.md"
 license = {text = "MIT"}
