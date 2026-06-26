@@ -5,6 +5,171 @@
 
 ---
 
+## [1.6.1] - 2026-06-25
+
+**编辑器集成与深度调试功能。** 完成 VS Code 插件、LSP 客户端集成、调试适配器（DAP 协议）、交互式调试 REPL，完善 Phase 7.5 和 Phase 7.6 至约 90% 完成度。
+
+### ✨ 新增
+
+#### 🎨 VS Code 插件 (`vscode-extension/`)
+- **完整的扩展配置**（`package.json`）：
+  - 语言 ID：`duan`
+  - 文件关联：`.duan` 文件
+  - 调试器定义：`duan` 类型
+  - 命令注册：运行文件、打开 REPL、重启服务器
+- **LSP 客户端集成**（`src/extension.ts`）：
+  - 自动连接 LSP 服务器
+  - 支持 stdio 和调试模式启动
+  - 中间件支持自定义补全和悬停
+- **调试配置提供者**（`src/debugConfiguration.ts`）：
+  - 启动调试、附加调试配置
+  - 自动检测当前文件
+  - 配置文件验证
+
+#### 📝 语法与代码片段
+- **TextMate 语法定义**（`syntaxes/duan.tmLanguage.json`）：
+  - 关键字高亮（控制流、声明、类型）
+  - 动词高亮（算术、字符串、列表操作）
+  - 中文标识符支持
+  - 字符串插值高亮
+- **代码片段**（`snippets/duan.json`）：
+  - 函数定义（段落）
+  - 条件语句（如果）
+  - 循环语句（遍历、当）
+  - 类定义
+  - 异常处理（尝试）
+- **语言配置**（`language-configuration.json`）：
+  - 自动闭合括号
+  - 缩进规则
+  - 折叠标记
+
+#### 🐛 调试适配器 (`debug-adapter/`)
+- **DAP 协议实现**（`duan_debug_adapter.py`）：
+  - 完整的调试协议消息处理
+  - 断点管理（设置、清除、条件断点）
+  - 线程和调用栈
+  - 变量查看
+  - 配置生成器（`config_generator.py`）
+
+#### 🔧 深度调试功能
+- **调试器核心**（`tools/duan_debug.py`）：
+  - `DuanDebugger`：断点管理、单步执行、变量监视
+  - `DebuggerContext`：调试上下文管理器
+  - `StackFrame`：调用栈帧
+  - 支持条件断点、命中计数
+- **交互式调试 REPL**（`tools/duan_debug_repl.py`）：
+  - `b <行号>`：设置断点
+  - `d <行号>`：删除断点
+  - `c`：继续执行
+  - `n`：单步跳过
+  - `s`：单步进入
+  - `r`：单步返回
+  - `p <变量>`：打印变量
+  - `w`：显示调用栈
+  - `l`：显示源代码
+  - `vars`：显示所有变量
+
+#### 🔗 CLI 集成
+- **新增 `duan debug` 命令**：
+  ```bash
+  duan debug                    # 启动调试 REPL
+  duan debug hello.duan        # 调试指定文件
+  ```
+
+### 📦 项目结构
+
+```
+vscode-extension/          # VS Code 插件
+├── package.json           # 扩展配置
+├── language-configuration.json  # 语言配置
+├── src/
+│   ├── extension.ts       # 扩展入口
+│   └── debugConfiguration.ts  # 调试配置
+├── syntaxes/
+│   └── duan.tmLanguage.json   # 语法高亮
+└── snippets/
+    └── duan.json         # 代码片段
+
+debug-adapter/             # 调试适配器
+├── duan_debug_adapter.py  # DAP 协议实现
+└── config_generator.py    # 配置生成器
+
+tools/                     # 工具
+├── repl.py               # REPL
+├── duan_debug.py         # 调试器核心
+└── dnan_debug_repl.py    # 调试 REPL
+```
+
+### 🧪 测试
+
+- **单元测试新增**：
+  - `tests/unit/test_errors.py`：错误格式化测试（6 个）
+  - `tests/unit/test_lsp.py`：LSP 基础测试（13 个）
+- **测试总数**：88 个单元/集成测试全部通过（1 跳过）
+
+---
+
+## [1.6.0] - 2026-06-25
+
+**性能优化与工具链完善。** 建立基准测试框架，词法分析器性能提升约 **2.1 倍**，新增 REPL 交互式解释器，完善开发工具链，代码生成器增加常量折叠与死代码消除优化，添加错误提示美化与 LSP 基础框架。
+
+### ✨ 新增
+
+#### ⚡ 性能优化
+- **基准测试框架**（`benchmarks/run_benchmarks.py`）：
+  - 8 个基准测试程序（fibonacci、bubble_sort、class_system、hanoi 等）
+  - 编译各阶段计时：词法分析 → 语法解析 → 代码生成 → 执行
+  - 内存占用测量（`--mem` 参数）
+  - JSON 格式输出（`--json` 参数）
+  - Token 数量统计
+- **词法分析器重大优化（平均提升 2.1 倍）**：
+  - 消除 `_is_han` 字典缓存：CJK 汉字范围是连续的，直接 `ord()` 比较比字典查找快
+  - 热点方法局部变量缓存：`_tokenize_chinese_sequence`、`_tokenize_identifier_or_keyword` 等
+  - 关键字匹配优化：使用模块级 `_ALL_KEYWORDS_BY_LENGTH` 替代实例属性
+  - Token 对象轻量化：`@dataclass(slots=True)` 减少内存和 GC 压力
+  - 各基准测试提升：bubble_sort 2.7x、class_system 2.5x、large_expressions 2.6x
+- **代码生成优化**：
+  - **常量折叠**：编译时计算常量表达式（数字运算、字符串拼接）
+  - **死代码消除**：移除恒真/恒假条件分支
+- **解析器性能分析**：完成解析器性能热点分析，识别 `_current`、`_consume` 等高频调用点
+
+#### 🔧 工具链完善
+- **错误提示美化**（`src/errors.py`）：
+  - 中文错误类型映射（SyntaxError → 语法错误、NameError → 名称错误等）
+  - 源代码上下文显示（带行号和列指示符）
+  - 栈追踪美化（只显示项目内的调用栈）
+  - 自定义异常类：`DuanError`、`LexerError`、`SemanticError`
+- **REPL 交互式解释器**（`tools/repl.py`）增强：
+  - 命令历史记录功能
+  - 调试命令：`跟踪(trace)`、`断点(bp)`
+  - 美化的变量显示（带类型信息）
+  - 美化的帮助和错误输出
+- **LSP 语言服务器**（`lsp/duan_lsp.py`）基础框架：
+  - 文档管理器：支持打开、更改、关闭文档
+  - 代码补全：关键字、动词、变量名
+  - 跳转定义：查找变量/函数定义位置
+  - 诊断信息：语法错误实时提示
+  - 文档符号：提取函数、变量定义
+
+#### 📦 项目结构
+- **`tools/` 工具包**：统一存放 REPL、调试器等开发工具
+- **`benchmarks/` 基准测试目录**：测试程序、运行器和结果分析
+
+### 🐛 修复
+
+- **CLI REPL 导入路径**：修复 `duan_unified.py` 中 REPL 模块导入，支持从 `tools.repl` 加载
+
+### 🧪 测试
+
+- 所有 64 个单元/集成测试全部通过（1 跳过）
+- 词法分析器 8 个单元测试通过
+- 解析器 12 个单元测试通过
+- 类系统 10 个集成测试通过
+- 模块系统 3 个集成测试通过
+- 标准库 28 个集成测试通过
+
+---
+
 ## [1.5.0] - 2026-06-25
 
 **类系统与模块系统深度完善。** 类继承、构造函数、方法重写功能全部打通，模块依赖解析与导入导出完整可用，测试覆盖 93 个用例全部通过。

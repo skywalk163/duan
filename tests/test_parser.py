@@ -125,8 +125,7 @@ class TestLoops:
     def test_while_loop(self, parser):
         """测试while循环"""
         code = '''当 甲 小于 十：
-  甲 等于 甲 加 一。
-结束。'''
+  甲 等于 甲 加 一。'''
         
         module = parser.parse(code)
         
@@ -241,7 +240,6 @@ class TestComplexPrograms:
         code = '''《阶乘》段(数)：
   如果数小于等于1那么返回1。
   返回数乘《阶乘》(数减1)。
-  结束。
 
 定义结果等于《阶乘》(5)。
 打印结果。'''
@@ -255,7 +253,6 @@ class TestComplexPrograms:
         code = '''《斐波那契》段(数)：
   如果数小于等于2那么返回1。
   返回《斐波那契》(数减1)加《斐波那契》(数减2)。
-  结束。
 
 定义结果等于《斐波那契》(10)。
 打印结果。'''

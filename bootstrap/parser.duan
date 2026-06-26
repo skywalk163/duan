@@ -14,96 +14,73 @@
 # =============================================================================
 段 tok_kw：
   返回 "关键字"。
-结束。
 
 段 tok_id：
   返回 "标识符"。
-结束。
 
 段 tok_num：
   返回 "数字"。
-结束。
 
 段 tok_str：
   返回 "字符串"。
-结束。
 
 段 tok_indent：
   返回 "缩进"。
-结束。
 
 段 tok_dedent：
   返回 "反缩进"。
-结束。
 
 段 tok_newline：
   返回 "换行"。
-结束。
 
 段 tok_eof：
   返回 "结束"。
-结束。
 
 段 tok_comment：
   返回 "注释"。
-结束。
 
 段 sym_period：
   返回 "句号"。
-结束。
 
 段 sym_colon：
   返回 "冒号"。
-结束。
 
 段 sym_comma：
   返回 "逗号"。
-结束。
 
 段 sym_lparen：
   返回 "左括号"。
-结束。
 
 段 sym_rparen：
   返回 "右括号"。
-结束。
 
 段 sym_lbook：
   返回 "左书名号"。
-结束。
 
 段 sym_rbook：
   返回 "右书名号"。
-结束。
 
 # =============================================================================
 # Parser helpers
 # =============================================================================
 段 token_type 接收 tok：
   返回 《字典获取》(tok, "种别")。
-结束。
 
 段 token_value 接收 tok：
   返回 《字典获取》(tok, "值")。
-结束。
 
 段 is_kw 接收 tok, expected：
   如果 《字典获取》(tok, "种别") 等于 "关键字" 且 《字典获取》(tok, "值") 等于 expected：
     返回 真。
-  结束。
   返回 假。
-结束。
 
 段 is_sym 接收 tok, expected：
   如果 《字典获取》(tok, "种别") 等于 expected：
     返回 真。
-  结束。
   返回 假。
-结束。
 
 段 is_eof 接收 tok：
   返回 《字典获取》(tok, "种别") 等于 "结束"。
-结束。
 
 段 skip_newlines 接收 tokens, pos：
   定义 p 等于 pos。
@@ -114,58 +91,244 @@
       p 加上 1。
     否则：
       跳出。
-    结束。
-  结束。
   返回 p。
-结束。
 
 # =============================================================================
-# Expression parsing
+# Expression parsing (with operator precedence)
 # =============================================================================
+段 is_binary_op 接收 ttype, tval：
+  如果 ttype 等于 "关键字"：
+    如果 tval 等于 "加" 或 tval 等于 "减" 或 tval 等于 "乘" 或 tval 等于 "除"：
+      返回 真。
+    如果 tval 等于 "模" 或 tval 等于 "幂"：
+      返回 真。
+    如果 tval 等于 "加上" 或 tval 等于 "减去" 或 tval 等于 "乘以" 或 tval 等于 "除以"：
+      返回 真。
+    如果 tval 等于 "等于" 或 tval 等于 "不等于"：
+      返回 真。
+    如果 tval 等于 "大于" 或 tval 等于 "小于" 或 tval 等于 "大于等于" 或 tval 等于 "小于等于"：
+      返回 真。
+    如果 tval 等于 "且" 或 tval 等于 "与" 或 tval 等于 "或"：
+      返回 真。
+  返回 假。
+
 段 parse_expr 接收 tokens, pos：
+  定义 result 等于 《parse_or_expr》(tokens, pos)。
+  返回 result。
+
+段 parse_or_expr 接收 tokens, pos：
+  定义 left_result 等于 《parse_and_expr》(tokens, pos)。
+  定义 left 等于 《列表获取》(left_result, 0)。
+  定义 p 等于 《列表获取》(left_result, 1)。
+  当 p 小于 《列表长度》(tokens)：
+    定义 tok 等于 《列表获取》(tokens, p)。
+    定义 ttype 等于 《字典获取》(tok, "种别")。
+    定义 tval 等于 《字典获取》(tok, "值")。
+    如果 ttype 等于 "关键字" 且 (tval 等于 "或")：
+      p 加上 1。
+      定义 right_result 等于 《parse_and_expr》(tokens, p)。
+      定义 right 等于 《列表获取》(right_result, 0)。
+      p 等于 《列表获取》(right_result, 1)。
+      设 left 为 《make_binary_op》(tval, left, right)。
+    否则：
+      跳出。
+  返回 [left, p]。
+
+段 parse_and_expr 接收 tokens, pos：
+  定义 left_result 等于 《parse_compare_expr》(tokens, pos)。
+  定义 left 等于 《列表获取》(left_result, 0)。
+  定义 p 等于 《列表获取》(left_result, 1)。
+  当 p 小于 《列表长度》(tokens)：
+    定义 tok 等于 《列表获取》(tokens, p)。
+    定义 ttype 等于 《字典获取》(tok, "种别")。
+    定义 tval 等于 《字典获取》(tok, "值")。
+    如果 ttype 等于 "关键字" 且 (tval 等于 "且" 或 tval 等于 "与")：
+      p 加上 1。
+      定义 right_result 等于 《parse_compare_expr》(tokens, p)。
+      定义 right 等于 《列表获取》(right_result, 0)。
+      p 等于 《列表获取》(right_result, 1)。
+      设 left 为 《make_binary_op》(tval, left, right)。
+    否则：
+      跳出。
+  返回 [left, p]。
+
+段 parse_compare_expr 接收 tokens, pos：
+  定义 left_result 等于 《parse_add_expr》(tokens, pos)。
+  定义 left 等于 《列表获取》(left_result, 0)。
+  定义 p 等于 《列表获取》(left_result, 1)。
+  如果 p 小于 《列表长度》(tokens)：
+    定义 tok 等于 《列表获取》(tokens, p)。
+    定义 ttype 等于 《字典获取》(tok, "种别")。
+    定义 tval 等于 《字典获取》(tok, "值")。
+    如果 ttype 等于 "关键字"：
+      如果 tval 等于 "等于" 或 tval 等于 "不等于" 或 tval 等于 "大于" 或 tval 等于 "小于" 或 tval 等于 "大于等于" 或 tval 等于 "小于等于"：
+        p 加上 1。
+        定义 right_result 等于 《parse_add_expr》(tokens, p)。
+        定义 right 等于 《列表获取》(right_result, 0)。
+        p 等于 《列表获取》(right_result, 1)。
+        设 left 为 《make_binary_op》(tval, left, right)。
+  返回 [left, p]。
+
+段 parse_add_expr 接收 tokens, pos：
+  定义 left_result 等于 《parse_mul_expr》(tokens, pos)。
+  定义 left 等于 《列表获取》(left_result, 0)。
+  定义 p 等于 《列表获取》(left_result, 1)。
+  当 p 小于 《列表长度》(tokens)：
+    定义 tok 等于 《列表获取》(tokens, p)。
+    定义 ttype 等于 《字典获取》(tok, "种别")。
+    定义 tval 等于 《字典获取》(tok, "值")。
+    定义 is_add_op 为 假。
+    定义 op_name 为 ""。
+    # 关键字形式：加、加上、减、减去
+    如果 ttype 等于 "关键字"：
+      如果 tval 等于 "加" 或 tval 等于 "加上"：
+        设 is_add_op 为 真。
+        设 op_name 为 "加"。
+      否则 如果 tval 等于 "减" 或 tval 等于 "减去"：
+        设 is_add_op 为 真。
+        设 op_name 为 "减"。
+    # 符号形式：+、-
+    否则 如果 ttype 等于 "加"：
+      设 is_add_op 为 真。
+      设 op_name 为 "加"。
+    否则 如果 ttype 等于 "减"：
+      设 is_add_op 为 真。
+      设 op_name 为 "减"。
+    如果 is_add_op：
+      p 加上 1。
+      定义 right_result 等于 《parse_mul_expr》(tokens, p)。
+      定义 right 等于 《列表获取》(right_result, 0)。
+      p 等于 《列表获取》(right_result, 1)。
+      设 left 为 《make_binary_op》(op_name, left, right)。
+    否则：
+      跳出。
+  返回 [left, p]。
+
+段 parse_mul_expr 接收 tokens, pos：
+  定义 left_result 等于 《parse_unary_expr》(tokens, pos)。
+  定义 left 等于 《列表获取》(left_result, 0)。
+  定义 p 等于 《列表获取》(left_result, 1)。
+  当 p 小于 《列表长度》(tokens)：
+    定义 tok 等于 《列表获取》(tokens, p)。
+    定义 ttype 等于 《字典获取》(tok, "种别")。
+    定义 tval 等于 《字典获取》(tok, "值")。
+    定义 is_mul_op 为 假。
+    定义 op_name 为 ""。
+    # 关键字形式：乘、乘以、除、除以、模、幂
+    如果 ttype 等于 "关键字"：
+      如果 tval 等于 "乘" 或 tval 等于 "乘以"：
+        设 is_mul_op 为 真。
+        设 op_name 为 "乘"。
+      否则 如果 tval 等于 "除" 或 tval 等于 "除以"：
+        设 is_mul_op 为 真。
+        设 op_name 为 "除"。
+      否则 如果 tval 等于 "模"：
+        设 is_mul_op 为 真。
+        设 op_name 为 "模"。
+      否则 如果 tval 等于 "幂"：
+        设 is_mul_op 为 真。
+        设 op_name 为 "幂"。
+    # 符号形式：*、/、%、^
+    否则 如果 ttype 等于 "乘"：
+      设 is_mul_op 为 真。
+      设 op_name 为 "乘"。
+    否则 如果 ttype 等于 "除"：
+      设 is_mul_op 为 真。
+      设 op_name 为 "除"。
+    否则 如果 ttype 等于 "模"：
+      设 is_mul_op 为 真。
+      设 op_name 为 "模"。
+    否则 如果 ttype 等于 "幂"：
+      设 is_mul_op 为 真。
+      设 op_name 为 "幂"。
+    如果 is_mul_op：
+      p 加上 1。
+      定义 right_result 等于 《parse_unary_expr》(tokens, p)。
+      定义 right 等于 《列表获取》(right_result, 0)。
+      p 等于 《列表获取》(right_result, 1)。
+      设 left 为 《make_binary_op》(op_name, left, right)。
+    否则：
+      跳出。
+  返回 [left, p]。
+
+段 parse_unary_expr 接收 tokens, pos：
   定义 tok 等于 《列表获取》(tokens, pos)。
   定义 ttype 等于 《字典获取》(tok, "种别")。
   定义 tval 等于 《字典获取》(tok, "值")。
+  # Unary operators: 非, 减 (negative)
+  如果 ttype 等于 "关键字" 且 (tval 等于 "非" 或 tval 等于 "不是")：
+    定义 operand_result 等于 《parse_unary_expr》(tokens, pos 加 1)。
+    定义 operand 等于 《列表获取》(operand_result, 0)。
+    定义 node 等于 《make_unary_op》(tval, operand)。
+    返回 [node, 《列表获取》(operand_result, 1)]。
+  # Primary expression
+  定义 result 等于 《parse_primary》(tokens, pos)。
+  返回 result。
 
+段 parse_primary 接收 tokens, pos：
+  定义 tok 等于 《列表获取》(tokens, pos)。
+  定义 ttype 等于 《字典获取》(tok, "种别")。
+  定义 tval 等于 《字典获取》(tok, "值")。
   # Number literal
   如果 ttype 等于 "数字"：
     定义 node 等于 《make_number》(tval)。
     返回 [node, pos 加 1]。
-  结束。
-
   # String literal
   如果 ttype 等于 "字符串"：
     定义 node 等于 《make_string》(tval)。
     返回 [node, pos 加 1]。
-  结束。
-
+  # Template string (f-string)
+  如果 ttype 等于 "模板字符串"：
+    定义 node 等于 《make_template_string》(tval)。
+    返回 [node, pos 加 1]。
   # Keyword literals (真, 假, 空)
   如果 ttype 等于 "关键字" 且 (tval 等于 "真" 或 tval 等于 "假")：
     定义 node 等于 《make_boolean》(tval)。
     返回 [node, pos 加 1]。
-  结束。
   如果 ttype 等于 "关键字" 且 tval 等于 "空"：
     定义 node 等于 《make_null》()。
     返回 [node, pos 加 1]。
-  结束。
-
   # Identifier
   如果 ttype 等于 "标识符"：
+    定义 p 等于 pos 加 1。
+    如果 p 小于 《列表长度》(tokens)：
+      定义 next_t 等于 《列表获取》(tokens, p)。
+      如果 《字典获取》(next_t, "种别") 等于 "左括号"：
+        定义 name 等于 tval。
+        定义 args 等于 《列表创建》()。
+        p 加上 1。
+        如果 p 小于 《列表长度》(tokens)：
+          定义 rp_tok 等于 《列表获取》(tokens, p)。
+          如果 《字典获取》(rp_tok, "种别") 不等于 "右括号"：
+            当 真：
+              定义 arg_result 等于 《parse_expr》(tokens, p)。
+              定义 arg 等于 《列表获取》(arg_result, 0)。
+              定义 p 等于 《列表获取》(arg_result, 1)。
+              《列表追加》(args, arg)。
+              如果 p 小于 《列表长度》(tokens)：
+                定义 sep 等于 《列表获取》(tokens, p)。
+                如果 《字典获取》(sep, "种别") 等于 "逗号"：
+                  p 加上 1。
+                  跳过。
+              跳出。
+        如果 p 小于 《列表长度》(tokens)：
+          定义 rp 等于 《列表获取》(tokens, p)。
+          如果 《字典获取》(rp, "种别") 等于 "右括号"：
+            p 加上 1。
+        定义 node 等于 《make_func_call》(name, args)。
+        返回 [node, p]。
     定义 node 等于 《make_identifier》(tval)。
     返回 [node, pos 加 1]。
-  结束。
-
   # Function call: 《name》(args)
   如果 ttype 等于 "左书名号"：
     定义 name_tok 等于 《列表获取》(tokens, pos 加 1)。
     定义 name 等于 《字典获取》(name_tok, "值")。
-    定义 rbook 等于 《列表获取》(tokens, pos 加 2)。  # skip 》
-    定义 lparen 等于 《列表获取》(tokens, pos 加 3)。  # skip (
+    定义 rbook 等于 《列表获取》(tokens, pos 加 2)。
+    定义 lparen 等于 《列表获取》(tokens, pos 加 3)。
     定义 args 等于 《列表创建》()。
     定义 p 等于 pos 加 4。
     定义 rp_tok 等于 《列表获取》(tokens, p)。
     如果 《字典获取》(rp_tok, "种别") 不等于 "右括号"：
-      # Parse arguments
       当 真：
         定义 arg_result 等于 《parse_expr》(tokens, p)。
         定义 arg 等于 《列表获取》(arg_result, 0)。
@@ -174,23 +337,131 @@
         定义 sep 等于 《列表获取》(tokens, p)。
         如果 《字典获取》(sep, "种别") 等于 "逗号"：
           p 加上 1。
-          继续。
-        结束。
+          跳过。
         跳出。
-      结束。
-    结束。
-    定义 rp 等于 《列表获取》(tokens, p)。  # )
+    定义 rp 等于 《列表获取》(tokens, p)。
     如果 《字典获取》(rp, "种别") 等于 "右括号"：
       p 加上 1。
-    结束。
     定义 node 等于 《make_func_call》(name, args)。
     返回 [node, p]。
-  结束。
-
+  # List or Dict literal: [...] or ["a": 1, ...]
+  # 先 peek 看是否为字典（首元素后紧跟冒号）
+  如果 ttype 等于 "左中括号"：
+    定义 首元素后位置 等于 pos 加 1。
+    定义 是不是字典 等于 假。
+    如果 首元素后位置 小于 《列表长度》(tokens)：
+      定义 peek_t 等于 《列表获取》(tokens, 首元素后位置)。
+      如果 《字典获取》(peek_t, "种别") 不等于 "右中括号"：
+        # 跳过首元素
+        定义 first_result 等于 《parse_expr》(tokens, 首元素后位置)。
+        定义 after_first 等于 《列表获取》(first_result, 1)。
+        如果 after_first 小于 《列表长度》(tokens)：
+          定义 next_after 等于 《列表获取》(tokens, after_first)。
+          如果 《字典获取》(next_after, "种别") 等于 "冒号"：
+            设 是不是字典 为 真。
+    如果 是不是字典：
+      # 字典字面量：["k1": v1, "k2": v2, ...]
+      定义 pairs 等于 《列表创建》()。
+      定义 p 等于 pos 加 1。
+      当 p 小于 《列表长度》(tokens)：
+        定义 next_t 等于 《列表获取》(tokens, p)。
+        如果 《字典获取》(next_t, "种别") 等于 "右中括号"：
+          p 加上 1。
+          跳出。
+        定义 key_result 等于 《parse_expr》(tokens, p)。
+        定义 key_node 等于 《列表获取》(key_result, 0)。
+        定义 p 等于 《列表获取》(key_result, 1)。
+        # 跳过冒号
+        如果 p 小于 《列表长度》(tokens)：
+          定义 colon_t 等于 《列表获取》(tokens, p)。
+          如果 《字典获取》(colon_t, "种别") 等于 "冒号"：
+            p 加上 1。
+        定义 val_result 等于 《parse_expr》(tokens, p)。
+        定义 val_node 等于 《列表获取》(val_result, 0)。
+        定义 p 等于 《列表获取》(val_result, 1)。
+        定义 pair 等于 《列表创建》()。
+        《列表追加》(pair, key_node)。
+        《列表追加》(pair, val_node)。
+        《列表追加》(pairs, pair)。
+        如果 p 小于 《列表长度》(tokens)：
+          定义 sep 等于 《列表获取》(tokens, p)。
+          如果 《字典获取》(sep, "种别") 等于 "逗号"：
+            p 加上 1。
+          否则：
+            如果 《字典获取》(sep, "种别") 等于 "右中括号"：
+              p 加上 1。
+            跳出。
+      定义 node 等于 《make_dict_literal》(pairs)。
+      返回 [node, p]。
+    # 否则是列表字面量
+    定义 elems 等于 《列表创建》()。
+    定义 p 等于 pos 加 1。
+    当 p 小于 《列表长度》(tokens)：
+      定义 next_t 等于 《列表获取》(tokens, p)。
+      如果 《字典获取》(next_t, "种别") 等于 "右中括号"：
+        p 加上 1。
+        跳出。
+      定义 elem_result 等于 《parse_expr》(tokens, p)。
+      《列表追加》(elems, 《列表获取》(elem_result, 0))。
+      定义 p 等于 《列表获取》(elem_result, 1)。
+      如果 p 小于 《列表长度》(tokens)：
+        定义 sep 等于 《列表获取》(tokens, p)。
+        如果 《字典获取》(sep, "种别") 等于 "逗号"：
+          p 加上 1。
+        否则：
+          如果 《字典获取》(sep, "种别") 等于 "右中括号"：
+            p 加上 1。
+          跳出。
+    定义 node 等于 《make_list_literal》(elems)。
+    返回 [node, p]。
+  # Dict literal: {key1: val1, key2: val2, ...}
+  如果 ttype 等于 "左花括号"：
+    定义 pairs 等于 《列表创建》()。
+    定义 p 等于 pos 加 1。
+    当 p 小于 《列表长度》(tokens)：
+      定义 next_t 等于 《列表获取》(tokens, p)。
+      如果 《字典获取》(next_t, "种别") 等于 "右花括号"：
+        p 加上 1。
+        跳出。
+      定义 key_result 等于 《parse_expr》(tokens, p)。
+      定义 key_node 等于 《列表获取》(key_result, 0)。
+      定义 p 等于 《列表获取》(key_result, 1)。
+      # Skip colon
+      如果 p 小于 《列表长度》(tokens)：
+        定义 colon_t 等于 《列表获取》(tokens, p)。
+        如果 《字典获取》(colon_t, "种别") 等于 "冒号"：
+          p 加上 1。
+      定义 val_result 等于 《parse_expr》(tokens, p)。
+      定义 val_node 等于 《列表获取》(val_result, 0)。
+      定义 p 等于 《列表获取》(val_result, 1)。
+      定义 pair 等于 《列表创建》()。
+      《列表追加》(pair, key_node)。
+      《列表追加》(pair, val_node)。
+      《列表追加》(pairs, pair)。
+      如果 p 小于 《列表长度》(tokens)：
+        定义 sep 等于 《列表获取》(tokens, p)。
+        如果 《字典获取》(sep, "种别") 等于 "逗号"：
+          p 加上 1。
+        否则：
+          如果 《字典获取》(sep, "种别") 等于 "右花括号"：
+            p 加上 1。
+          跳出。
+    定义 node 等于 《make_dict_literal》(pairs)。
+    返回 [node, p]。
+  # Parenthesized expression: (expr)
+  如果 ttype 等于 "左括号"：
+    定义 p 等于 pos 加 1。
+    定义 expr_result 等于 《parse_expr》(tokens, p)。
+    定义 expr 等于 《列表获取》(expr_result, 0)。
+    定义 p 等于 《列表获取》(expr_result, 1)。
+    如果 p 小于 《列表长度》(tokens)：
+      定义 rp 等于 《列表获取》(tokens, p)。
+      如果 《字典获取》(rp, "种别") 等于 "右括号"：
+        p 加上 1。
+    返回 [expr, p]。
   # Default: return identifier (fallback)
   定义 node 等于 《make_identifier》(tval)。
   返回 [node, pos 加 1]。
-结束。
 
 # =============================================================================
 # Statement parsing
@@ -207,15 +478,12 @@
     如果 ttype 等于 "句号" 或 ttype 等于 "反缩进" 或 ttype 等于 "结束"：
       定义 node 等于 《make_return》(空)。
       返回 [node, p 加 1]。
-    结束。
     定义 result 等于 《parse_expr》(tokens, p)。
     定义 node 等于 《make_return》(《列表获取》(result, 0))。
     p 等于 《列表获取》(result, 1)。
     返回 [node, p]。
-  结束。
   定义 node 等于 《make_return》(空)。
   返回 [node, p]。
-结束。
 
 段 parse_var_decl 接收 tokens, pos：
   定义 tok 等于 《列表获取》(tokens, pos)。  # 定义
@@ -223,17 +491,15 @@
   定义 name_tok 等于 《列表获取》(tokens, p)。
   定义 var_name 等于 《字典获取》(name_tok, "值")。
   p 加上 1。
-  # Skip "等于" keyword
+  # Skip "等于" or "为" keyword
   如果 p 小于 《列表长度》(tokens)：
     定义 eq_tok 等于 《列表获取》(tokens, p)。
-    如果 《字典获取》(eq_tok, "种别") 等于 "关键字" 且 《字典获取》(eq_tok, "值") 等于 "等于"：
-      p 加上 1。
-    结束。
-  结束。
+    如果 《字典获取》(eq_tok, "种别") 等于 "关键字"：
+      如果 《字典获取》(eq_tok, "值") 等于 "等于" 或 《字典获取》(eq_tok, "值") 等于 "为"：
+        p 加上 1。
   定义 result 等于 《parse_expr》(tokens, p)。
   定义 node 等于 《make_var_decl》(var_name, 《列表获取》(result, 0))。
   返回 [node, 《列表获取》(result, 1)]。
-结束。
 
 段 parse_assign 接收 tokens, pos：
   定义 tok 等于 《列表获取》(tokens, pos)。  # 设
@@ -246,12 +512,9 @@
     定义 as_tok 等于 《列表获取》(tokens, p)。
     如果 《字典获取》(as_tok, "种别") 等于 "关键字" 且 《字典获取》(as_tok, "值") 等于 "为"：
       p 加上 1。
-    结束。
-  结束。
   定义 result 等于 《parse_expr》(tokens, p)。
   定义 node 等于 《make_assign》(var_name, 《列表获取》(result, 0))。
   返回 [node, 《列表获取》(result, 1)]。
-结束。
 
 段 parse_compound_assign 接收 tokens, pos, op：
   定义 tok 等于 《列表获取》(tokens, pos)。  # identifier
@@ -260,7 +523,6 @@
   定义 result 等于 《parse_expr》(tokens, p 加 1)。  # skip operator
   定义 node 等于 《make_compound_assign》(var_name, op, 《列表获取》(result, 0))。
   返回 [node, 《列表获取》(result, 1)]。
-结束。
 
 段 parse_block 接收 tokens, pos：
   # Parse a block after indent, return after dedent
@@ -271,14 +533,11 @@
     定义 stype 等于 《字典获取》(stmt_tok, "种别")。
     如果 stype 等于 "反缩进" 或 stype 等于 "结束"：
       跳出。
-    结束。
     定义 stmt_result 等于 《parse_stmt》(tokens, p)。
     《列表追加》(body, 《列表获取》(stmt_result, 0))。
     p 等于 《列表获取》(stmt_result, 1)。
     定义 p 等于 《skip_newlines》(tokens, p)。
-  结束。
   返回 [body, p]。
-结束。
 
 段 parse_while 接收 tokens, pos：
   定义 tok 等于 《列表获取》(tokens, pos)。  # 当
@@ -291,8 +550,6 @@
     定义 col_tok 等于 《列表获取》(tokens, p)。
     如果 《字典获取》(col_tok, "种别") 等于 "冒号"：
       p 加上 1。
-    结束。
-  结束。
   # Parse body block
   定义 p 等于 《skip_newlines》(tokens, p)。
   如果 p 小于 《列表长度》(tokens)：
@@ -307,15 +564,10 @@
         定义 dedent_tok 等于 《列表获取》(tokens, p)。
         如果 《字典获取》(dedent_tok, "种别") 等于 "反缩进"：
           p 加上 1。
-        结束。
-      结束。
       定义 node 等于 《make_while_loop》(cond, body)。
       返回 [node, p]。
-    结束。
-  结束。
   定义 node 等于 《make_while_loop》(cond, 《列表创建》())。
   返回 [node, p]。
-结束。
 
 段 parse_if 接收 tokens, pos：
   定义 tok 等于 《列表获取》(tokens, pos)。  # 如果
@@ -328,8 +580,6 @@
     定义 col_tok 等于 《列表获取》(tokens, p)。
     如果 《字典获取》(col_tok, "种别") 等于 "冒号"：
       p 加上 1。
-    结束。
-  结束。
   # Parse if body
   定义 p 等于 《skip_newlines》(tokens, p)。
   定义 body 等于 《列表创建》()。
@@ -345,16 +595,25 @@
         定义 dedent_tok 等于 《列表获取》(tokens, p)。
         如果 《字典获取》(dedent_tok, "种别") 等于 "反缩进"：
           p 加上 1。
-        结束。
-      结束。
-    结束。
-  结束。
-  # Parse elif branches (否则若)
+  # Parse elif branches (否则若 / 否则 如果)
   定义 elif_branches 等于 《列表创建》()。
   当 p 小于 《列表长度》(tokens)：
     定义 elif_tok 等于 《列表获取》(tokens, p)。
+    定义 is_elif 为 假。
+    定义 elif_p 为 p。
+    # 检查 "否则若" 形式
     如果 《字典获取》(elif_tok, "种别") 等于 "关键字" 且 《字典获取》(elif_tok, "值") 等于 "否则若"：
-      定义 p 等于 p 加 1。
+      设 is_elif 为 真。
+      设 elif_p 为 p 加 1。
+    # 检查 "否则 如果" 形式
+    否则 如果 《字典获取》(elif_tok, "种别") 等于 "关键字" 且 《字典获取》(elif_tok, "值") 等于 "否则"：
+      如果 p 加 1 小于 《列表长度》(tokens)：
+        定义 next_tok 等于 《列表获取》(tokens, p 加 1)。
+        如果 《字典获取》(next_tok, "种别") 等于 "关键字" 且 《字典获取》(next_tok, "值") 等于 "如果"：
+          设 is_elif 为 真。
+          设 elif_p 为 p 加 2。
+    如果 is_elif:
+      定义 p 等于 elif_p。
       定义 elif_cond 等于 《parse_expr》(tokens, p)。
       定义 elif_cond_node 等于 《列表获取》(elif_cond, 0)。
       p 等于 《列表获取》(elif_cond, 1)。
@@ -363,8 +622,6 @@
         定义 col 等于 《列表获取》(tokens, p)。
         如果 《字典获取》(col, "种别") 等于 "冒号"：
           p 加上 1。
-        结束。
-      结束。
       # Parse elif body
       定义 p 等于 《skip_newlines》(tokens, p)。
       定义 elif_body 等于 《列表创建》()。
@@ -379,15 +636,12 @@
             定义 de 等于 《列表获取》(tokens, p)。
             如果 《字典获取》(de, "种别") 等于 "反缩进"：
               p 加上 1。
-            结束。
-          结束。
-        结束。
-      结束。
-      《列表追加》(elif_branches, [elif_cond_node, elif_body])。
-      继续。
-    结束。
+      定义 branch_pair 等于 《列表创建》()。
+      《列表追加》(branch_pair, elif_cond_node)。
+      《列表追加》(branch_pair, elif_body)。
+      《列表追加》(elif_branches, branch_pair)。
+      跳过。
     跳出。
-  结束。
   # Parse else body
   定义 else_body 等于 空。
   如果 p 小于 《列表长度》(tokens)：
@@ -399,8 +653,6 @@
         定义 col 等于 《列表获取》(tokens, p)。
         如果 《字典获取》(col, "种别") 等于 "冒号"：
           p 加上 1。
-        结束。
-      结束。
       定义 p 等于 《skip_newlines》(tokens, p)。
       定义 eb 等于 《列表创建》()。
       如果 p 小于 《列表长度》(tokens)：
@@ -414,16 +666,9 @@
             定义 de 等于 《列表获取》(tokens, p)。
             如果 《字典获取》(de, "种别") 等于 "反缩进"：
               p 加上 1。
-            结束。
-          结束。
-        结束。
-      结束。
       设 else_body 为 eb。
-    结束。
-  结束。
   定义 node 等于 《make_if_stmt》(cond, body, elif_branches, else_body)。
   返回 [node, p]。
-结束。
 
 段 parse_paragraph_def 接收 tokens, pos：
   定义 kw 等于 《列表获取》(tokens, pos)。  # 段 or 段落
@@ -444,13 +689,31 @@
         定义 pt_type 等于 《字典获取》(pt, "种别")。
         如果 pt_type 等于 "冒号"：
           跳出。
-        结束。
         如果 pt_type 等于 "标识符"：
-          《列表追加》(params, 《字典获取》(pt, "值"))。
+          定义 param_name 等于 《字典获取》(pt, "值")。
           p 加上 1。
+          # Check for default value: = expr
+          定义 default_val 等于 空。
+          如果 p 小于 《列表长度》(tokens)：
+            定义 eq_tok 等于 《列表获取》(tokens, p)。
+            定义 eq_type 等于 《字典获取》(eq_tok, "种别")。
+            定义 eq_val 等于 《字典获取》(eq_tok, "值")。
+            定义 has_default 为 假。
+            如果 eq_type 等于 "赋值" 且 eq_val 等于 "="：
+              设 has_default 为 真。
+            否则 如果 eq_type 等于 "关键字" 且 eq_val 等于 "等于"：
+              设 has_default 为 真。
+            如果 has_default：
+              p 加上 1。
+              定义 default_result 等于 《parse_expr》(tokens, p)。
+              设 default_val 为 《列表获取》(default_result, 0)。
+              定义 p 等于 《列表获取》(default_result, 1)。
+          定义 param_pair 等于 《列表创建》()。
+          《列表追加》(param_pair, param_name)。
+          《列表追加》(param_pair, default_val)。
+          《列表追加》(params, param_pair)。
         否则：
           跳出。
-        结束。
         # Check for comma separator
         如果 p 小于 《列表长度》(tokens)：
           定义 sep 等于 《列表获取》(tokens, p)。
@@ -458,18 +721,11 @@
             p 加上 1。
           否则：
             跳出。
-          结束。
-        结束。
-      结束。
-    结束。
-  结束。
   # Skip colon
   如果 p 小于 《列表长度》(tokens)：
     定义 col_tok 等于 《列表获取》(tokens, p)。
     如果 《字典获取》(col_tok, "种别") 等于 "冒号"：
       p 加上 1。
-    结束。
-  结束。
   # Parse body block
   定义 p 等于 《skip_newlines》(tokens, p)。
   定义 body 等于 《列表创建》()。
@@ -485,62 +741,133 @@
         定义 dedent_tok 等于 《列表获取》(tokens, p)。
         如果 《字典获取》(dedent_tok, "种别") 等于 "反缩进"：
           p 加上 1。
-        结束。
-      结束。
-    结束。
-  结束。
   定义 node 等于 《make_paragraph_def》(name, params, body)。
   返回 [node, p]。
-结束。
 
 # =============================================================================
 # Statement dispatcher
 # =============================================================================
 段 parse_stmt 接收 tokens, pos：
+  # Boundary check
+  如果 pos 大于等于 《列表长度》(tokens)：
+    返回 [空, pos]。
   定义 tok 等于 《列表获取》(tokens, pos)。
   定义 ttype 等于 《字典获取》(tok, "种别")。
   定义 tval 等于 《字典获取》(tok, "值")。
-
   # Skip EOF
   如果 ttype 等于 "结束"：
     返回 [空, pos 加 1]。
-  结束。
-
+  # Skip period if at start
+  如果 ttype 等于 "句号"：
+    返回 《parse_stmt》(tokens, pos 加 1)。
   # Paragraph definition: 段 name ... or 段落 name ...
   如果 ttype 等于 "关键字" 且 (tval 等于 "段" 或 tval 等于 "段落")：
-    返回 《parse_paragraph_def》(tokens, pos)。
-  结束。
-
+    定义 result 等于 《parse_paragraph_def》(tokens, pos)。
+    返回 result。
   # Variable declaration: 定义 name 等于 expr。
   如果 ttype 等于 "关键字" 且 tval 等于 "定义"：
-    返回 《parse_var_decl》(tokens, pos)。
-  结束。
-
+    定义 result 等于 《parse_var_decl》(tokens, pos)。
+    返回 result。
   # Assignment: 设 name 为 expr。
   如果 ttype 等于 "关键字" 且 tval 等于 "设"：
-    返回 《parse_assign》(tokens, pos)。
-  结束。
-
+    定义 result 等于 《parse_assign》(tokens, pos)。
+    返回 result。
   # Return: 返回 expr。
   如果 ttype 等于 "关键字" 且 tval 等于 "返回"：
-    返回 《parse_return_stmt》(tokens, pos)。
-  结束。
-
+    定义 result 等于 《parse_return_stmt》(tokens, pos)。
+    返回 result。
   # If: 如果 cond： body 结束。
   如果 ttype 等于 "关键字" 且 tval 等于 "如果"：
-    返回 《parse_if》(tokens, pos)。
-  结束。
-
+    定义 result 等于 《parse_if》(tokens, pos)。
+    返回 result。
   # While: 当 cond： body 结束。
   如果 ttype 等于 "关键字" 且 tval 等于 "当"：
-    返回 《parse_while》(tokens, pos)。
-  结束。
-
+    定义 result 等于 《parse_while》(tokens, pos)。
+    返回 result。
+  # Print: 打印 expr。 或 打印(arg1, arg2, ...)。
+  如果 ttype 等于 "关键字" 且 (tval 等于 "打印" 或 tval 等于 "输出")：
+    定义 p 等于 pos 加 1。
+    如果 p 小于 《列表长度》(tokens)：
+      定义 next_tok 等于 《列表获取》(tokens, p)。
+      如果 《字典获取》(next_tok, "种别") 等于 "左括号"：
+        定义 name 等于 tval。
+        定义 args 等于 《列表创建》()。
+        p 加上 1。
+        如果 p 小于 《列表长度》(tokens)：
+          定义 rp_tok 等于 《列表获取》(tokens, p)。
+          如果 《字典获取》(rp_tok, "种别") 不等于 "右括号"：
+            当 真：
+              定义 arg_result 等于 《parse_expr》(tokens, p)。
+              定义 arg 等于 《列表获取》(arg_result, 0)。
+              定义 p 等于 《列表获取》(arg_result, 1)。
+              《列表追加》(args, arg)。
+              如果 p 小于 《列表长度》(tokens)：
+                定义 sep 等于 《列表获取》(tokens, p)。
+                如果 《字典获取》(sep, "种别") 等于 "逗号"：
+                  p 加上 1。
+                  跳过。
+              跳出。
+        如果 p 小于 《列表长度》(tokens)：
+          定义 rp 等于 《列表获取》(tokens, p)。
+          如果 《字典获取》(rp, "种别") 等于 "右括号"：
+            p 加上 1。
+        定义 node 等于 《make_func_call》(name, args)。
+        返回 [node, p]。
+    定义 val_result 等于 《parse_expr》(tokens, p)。
+    定义 val 等于 《列表获取》(val_result, 0)。
+    定义 p 等于 《列表获取》(val_result, 1)。
+    定义 node 等于 《make_print》(val)。
+    返回 [node, p]。
+  # Break / Continue
+  如果 ttype 等于 "关键字" 且 tval 等于 "跳出"：
+    定义 node 等于 《make_break》()。
+    返回 [node, pos 加 1]。
+  如果 ttype 等于 "关键字" 且 tval 等于 "跳过"：
+    定义 node 等于 《make_continue》()。
+    返回 [node, pos 加 1]。
+  # Compound assignment: identifier 加上 expr。
+  如果 ttype 等于 "标识符"：
+    如果 pos 加 1 小于 《列表长度》(tokens)：
+      定义 next_tok 等于 《列表获取》(tokens, pos 加 1)。
+      定义 nttype 等于 《字典获取》(next_tok, "种别")。
+      定义 ntval 等于 《字典获取》(next_tok, "值")。
+      如果 nttype 等于 "关键字"：
+        如果 ntval 等于 "加上" 或 ntval 等于 "减去" 或 ntval 等于 "乘以" 或 ntval 等于 "除以" 或 ntval 等于 "模以" 或 ntval 等于 "幂以"：
+          返回 《parse_compound_assign》(tokens, pos, ntval)。
+        # 隐式变量声明: identifier 等于 expr。
+        如果 ntval 等于 "等于"：
+          定义 var_name 等于 tval。
+          定义 p 等于 pos 加 2。
+          定义 result 等于 《parse_expr》(tokens, p)。
+          定义 node 等于 《make_var_decl》(var_name, 《列表获取》(result, 0))。
+          返回 [node, 《列表获取》(result, 1)]。
+    # 无括号函数调用: identifier expr1 expr2 ... 。
+    如果 pos 加 1 小于 《列表长度》(tokens)：
+      定义 next_tok 等于 《列表获取》(tokens, pos 加 1)。
+      定义 nttype 等于 《字典获取》(next_tok, "种别")。
+      # 如果下一个 token 是表达式起始 token（字符串/数字/标识符/左中括号/左书名号/模板字符串）
+      如果 nttype 等于 "字符串" 或 nttype 等于 "数字" 或 nttype 等于 "标识符" 或 nttype 等于 "左中括号" 或 nttype 等于 "左书名号" 或 nttype 等于 "模板字符串"：
+        定义 name 等于 tval。
+        定义 args 等于 《列表创建》()。
+        定义 p 等于 pos 加 1。
+        当 真：
+          定义 arg_result 等于 《parse_expr》(tokens, p)。
+          定义 arg 等于 《列表获取》(arg_result, 0)。
+          定义 p 等于 《列表获取》(arg_result, 1)。
+          《列表追加》(args, arg)。
+          # 检查是否还有更多参数（必须也是表达式起始 token）
+          如果 p 小于 《列表长度》(tokens)：
+            定义 peek_tok 等于 《列表获取》(tokens, p)。
+            定义 pt 等于 《字典获取》(peek_tok, "种别")。
+            如果 pt 等于 "字符串" 或 pt 等于 "数字" 或 pt 等于 "标识符" 或 pt 等于 "左中括号" 或 pt 等于 "左书名号" 或 pt 等于 "模板字符串"：
+              跳过。
+          跳出。
+        定义 node 等于 《make_func_call》(name, args)。
+        返回 [node, p]。
   # Expression statement (function call, etc.)
   定义 result 等于 《parse_expr》(tokens, pos)。
   定义 node 等于 《make_expr_stmt》(《列表获取》(result, 0))。
   返回 [node, 《列表获取》(result, 1)]。
-结束。
 
 # =============================================================================
 # Main parse entry point
@@ -549,39 +876,34 @@
   定义 stmts 等于 《列表创建》()。
   定义 pos 等于 0。
   定义 tok_count 等于 《列表长度》(tokens)。
-
   当 pos 小于 tok_count：
     定义 p 等于 《skip_newlines》(tokens, pos)。
     如果 p 大于等于 tok_count：
       跳出。
-    结束。
     定义 tok 等于 《列表获取》(tokens, p)。
     定义 ttype 等于 《字典获取》(tok, "种别")。
     定义 tval 等于 《字典获取》(tok, "值")。
-
     # Skip EOF
     如果 ttype 等于 "结束"：
       跳出。
-    结束。
-
     # Skip comments
     如果 ttype 等于 "注释"：
       设 pos 为 p 加 1。
-      继续。
-    结束。
-
-    # Parse export statement: 导出 name。
+      跳过。
+    # Parse export statement: 导出 name1, name2, ...。
     如果 ttype 等于 "关键字" 且 tval 等于 "导出"：
-      设 pos 为 p 加 2。  # skip 导出 and name
-      继续。
-    结束。
-
+      # Skip the whole export statement
+      当 p 小于 tok_count：
+        定义 t 等于 《列表获取》(tokens, p)。
+        如果 《字典获取》(t, "种别") 等于 "换行" 或 《字典获取》(t, "种别") 等于 "句号"：
+          设 pos 为 p 加 1。
+          跳出。
+        p 加上 1。
+      跳过。
     # Parse import statement: 导入 name。
     如果 ttype 等于 "关键字" 且 tval 等于 "导入"：
       设 pos 为 p 加 1。
-      继续。
-    结束。
-
+      跳过。
     # Parse "从《module》导入《name》" style import
     如果 ttype 等于 "关键字" 且 tval 等于 "从"：
       # Skip the whole import statement
@@ -590,20 +912,12 @@
         如果 《字典获取》(t, "种别") 等于 "换行" 或 《字典获取》(t, "种别") 等于 "句号"：
           设 pos 为 p 加 1。
           跳出。
-        结束。
         p 加上 1。
-      结束。
-      继续。
-    结束。
-
+      跳过。
     定义 result 等于 《parse_stmt》(tokens, p)。
     定义 stmt 等于 《列表获取》(result, 0)。
     如果 stmt 不等于 空：
       《列表追加》(stmts, stmt)。
-    结束。
     设 pos 为 《列表获取》(result, 1)。
-  结束。
-
   定义 program 等于 《make_program》(stmts)。
   返回 program。
-结束。

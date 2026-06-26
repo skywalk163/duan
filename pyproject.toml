@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=64.0"]
-build-backend = "setuptools.backends._legacy:_Backend"
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "duan"
-version = "1.0.0"
+version = "1.6.1"
 description = "段言（Duan）— 中文自然语言编程语言"
 readme = "README.md"
 license = {text = "MIT"}
@@ -69,7 +69,8 @@ include = ["src*", "cli*", "stdlib*", "antlrparser*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py", "_test_*.py"]
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --ignore=tests/archive"
+norecursedirs = ["archive", "__pycache__"]
 
 [tool.flake8]
 max-line-length = 120
