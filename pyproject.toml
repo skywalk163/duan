@@ -61,18 +61,17 @@ duan = "cli.duan:main"
 duanc = "cli.duanc:main"
 
 [tool.setuptools.packages.find]
-include = ["src*", "cli*", "stdlib*", "antlrparser*"]
+include = ["src*", "cli*", "stdlib*"]
 exclude = [
     "tests*", "benchmarks*", "examples*", "project*", "bootstrap*",
     "docs*", "tools*", "lsp*", "debug-adapter*", "vscode-extension*", "scripts*",
     "**/test*", "**/*_test*", "**/self_hosted*", "**/duan_parser*", "**/duan_parser2*", "**/duan_parser_new*",
-    "**/antlrparser/antlrparser*", "**/web_playground*"
+    "**/antlrparser*", "**/web_playground*", "**/*_debug*", "**/ir.py", "**/codegen_x64.py", "**/linker.py"
 ]
 
 [tool.setuptools.package-data]
 "*" = ["*.duan"]
 "stdlib" = ["*.duan", "*.py"]
-"antlrparser" = ["*.g4"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
