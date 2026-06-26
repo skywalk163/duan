@@ -62,9 +62,12 @@ duanc = "cli.duanc:main"
 
 [tool.setuptools.packages.find]
 include = ["src*", "cli*", "stdlib*", "antlrparser*"]
+exclude = ["tests*", "benchmarks*", "examples*", "project*", "bootstrap*", "docs*", "tools*", "lsp*", "debug-adapter*", "vscode-extension*", "scripts*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.duan"]
+"stdlib" = ["*.duan", "*.py"]
+"antlrparser" = ["*.g4"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
