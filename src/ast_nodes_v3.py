@@ -205,18 +205,34 @@ class ContinueStmt(ASTNode):
 
 
 class TryStmt(ASTNode):
-    __slots__ = ('try_body', 'catch_type', 'catch_var', 'catch_body', 'finally_body')
+    __slots__ = ('try_body', 'catch_clauses', 'catch_type', 'catch_var', 'catch_body', 'finally_body')
     """异常捕获语句"""
-    def __init__(self, try_body: List[ASTNode], catch_type: str = None, catch_var: str = None,
+    def __init__(self, try_body: List[ASTNode], catch_clauses: List = None, 
+                 catch_type: str = None, catch_var: str = None,
                  catch_body: List[ASTNode] = None, finally_body: List[ASTNode] = None):
         self.try_body = try_body
+        self.catch_clauses = catch_clauses or []
         self.catch_type = catch_type
         self.catch_var = catch_var
         self.catch_body = catch_body or []
         self.finally_body = finally_body or []
     
     def __repr__(self):
+        if self.catch_clauses:
+            return f"TryStmt(catch_clauses: {len(self.catch_clauses)})"
         return f"TryStmt(catch: {self.catch_var})"
+
+
+class CatchClause(ASTNode):
+    __slots__ = ('catch_type', 'catch_var', 'catch_body')
+    """捕获子句"""
+    def __init__(self, catch_type: str = None, catch_var: str = None, catch_body: List[ASTNode] = None):
+        self.catch_type = catch_type
+        self.catch_var = catch_var
+        self.catch_body = catch_body or []
+    
+    def __repr__(self):
+        return f"CatchClause(type={self.catch_type}, var={self.catch_var})"
 
 
 class ThrowStmt(ASTNode):
@@ -332,6 +348,17 @@ class IndexedAssignment(ASTNode):
     
     def __repr__(self):
         return f"IndexedAssignment({self.target}[{self.index}] = {self.value})"
+
+
+class Assignment(ASTNode):
+    __slots__ = ('target', 'value')
+    """赋值语句（target 可以是 Identifier、PropertyAccess、IndexAccess 等）"""
+    def __init__(self, target: ASTNode, value: ASTNode):
+        self.target = target
+        self.value = value
+    
+    def __repr__(self):
+        return f"Assignment({self.target} = {self.value})"
 
 
 class SelfAssignment(ASTNode):

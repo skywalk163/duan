@@ -71,6 +71,7 @@ class AstAdapter:
             'IndexAccess': self._convert_index_access,
             'CompoundAssignment': self._convert_compound_assignment,
             'SelfAssignment': self._convert_self_assignment,
+            'Assignment': self._convert_assignment,
             'IndexedAssignment': self._convert_indexed_assignment,
             'Parameter': self._convert_parameter,
             'ImportStmt': self._convert_import_stmt,
@@ -91,6 +92,7 @@ class AstAdapter:
             'MatchCase': self._convert_match_case,
             'LambdaExpression': self._convert_lambda_expression,
             'UnwrapExpression': self._convert_unwrap_expression,
+            'RangeExpr': self._convert_range_expr,
         }
 
     # ------------------------------------------------------------------
@@ -269,6 +271,22 @@ class AstAdapter:
             body=self._to_list_stmts(node.body),
         )
 
+    def _convert_range_expr(self, node) -> ast.ASTNode:
+        """将 v3 RangeExpr 转换为 FunctionCall(范围, start, end)"""
+        start = self.convert(node.start)
+        end = self.convert(node.end)
+        args = [start]
+        if end is not None:
+            args.append(end)
+        if node.step is not None and node.step != 1:
+            args.append(self.convert(node.step))
+        return ast.FunctionCall(
+            name=ast.Identifier(name='范围'),
+            arguments=args,
+            column=0,
+            line=0,
+        )
+
     def _convert_while_stmt(self, node) -> ast.WhileStatement:
         return ast.WhileStatement(
             condition=self.convert(node.condition),
@@ -387,6 +405,12 @@ class AstAdapter:
             value=self.convert(node.value),
         )
 
+    def _convert_assignment(self, node) -> ast.Assignment:
+        return ast.Assignment(
+            target=self.convert(node.target),
+            value=self.convert(node.value),
+        )
+
     def _convert_self_assignment(self, node) -> ast.Assignment:
         return ast.Assignment(
             target=ast.Identifier(name=f"self.{node.attr_name}"),
@@ -451,10 +475,21 @@ class AstAdapter:
         return ast.FunctionCall(name=ast.Identifier(name='<pipeline>'), arguments=[], type_args=[])
 
     def _convert_try_stmt(self, node) -> ast.TryStatement:
+        catch_clauses = []
+        v3_clauses = getattr(node, 'catch_clauses', [])
+        if v3_clauses:
+            for ct, cv, cb in v3_clauses:
+                catch_clauses.append(ast.CatchClause(
+                    catch_type=ct or "",
+                    catch_var=cv or "",
+                    catch_body=self._to_list_stmts(cb),
+                ))
+        
         return ast.TryStatement(
             try_body=self._to_list_stmts(getattr(node, 'try_body', [])),
-            catch_var=getattr(node, 'catch_var', None),
-            catch_type=getattr(node, 'catch_type', None),
+            catch_clauses=catch_clauses,
+            catch_var=getattr(node, 'catch_var', None) or "",
+            catch_type=getattr(node, 'catch_type', None) or "",
             catch_body=self._to_list_stmts(getattr(node, 'catch_body', [])),
             finally_body=self._to_list_stmts(getattr(node, 'finally_body', [])),
         )
