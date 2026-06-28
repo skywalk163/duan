@@ -5,9 +5,16 @@
 ## 特性
 
 - **中文关键字**：使用中文关键字如`遍历`、`如果`、`那么`等
-- **纯缩进语法**：v3.x 中文关键字，类似 Python 的缩进风格
+- **纯缩进语法**：v3.x 中文关键字，类似 Python 的缩进风格，无"结束"关键字
 - **统一编译器**：手写递归下降解析器 + Python 代码生成
-- **标准库**：11 个中文命名模块（日志、表格、CSV 等）
+- **LLVM 后端**：支持原生编译为 EXE，typed 模式性能优异
+- **标准库**：23 个中文命名模块（日志、表格、CSV、JSON 等）
+- **泛型系统**：泛型函数、泛型类、泛型方法
+- **模块系统**：导入/导出、包管理、跨模块继承
+- **类与对象**：面向对象编程，支持继承、构造函数
+- **异常处理**：抛出、尝试、捕获、最终
+- **开发工具链**：REPL、调试器、LSP 语言服务器、VS Code 插件
+- **性能优化**：常量折叠、死代码消除、循环不变量外提
 
 ## 安装
 
@@ -38,19 +45,7 @@ pip install duan
 
 **第3步：运行**
 ```bash
-python -c "
-import sys
-sys.path.insert(0, 'src')
-from compiler import DuanCompiler
-code = open('hello.duan').read()
-compiler = DuanCompiler()
-exec(compiler.compile(code).get('ast', {}))
-"
-```
-
-或使用内置解释器：
-```bash
-python -m src.compiler hello.duan
+duan run hello.duan
 ```
 
 ### Hello World
@@ -90,12 +85,28 @@ duan run hello.duan
 
 # 编译为 Python 文件
 duan compile hello.duan -o hello.py
+
+# 编译为 Windows EXE（需安装 pyinstaller）
+pip install pyinstaller
+duan compile hello.duan -o hello.exe
+
+# LLVM 原生编译（需安装 clang/LLVM）
+duan compile hello.duan --backend llvm-typed -o hello.exe
 ```
 
 后端选择：
 ```bash
-# SRC 后端（3.x 纯缩进语法，推荐）
+# SRC 后端（3.x 纯缩进语法，推荐，Python 解释执行）
 duan run hello.duan --backend src
+
+# ANTLR 后端（兼容模式，支持 v3 纯缩进语法）
+duan run hello.duan --backend antlr
+
+# LLVM string 模式（原生编译，字符串类型系统）
+duan compile hello.duan --backend llvm -o hello.exe
+
+# LLVM typed 模式（原生编译，DuanValue 类型系统，推荐）
+duan compile hello.duan --backend llvm-typed -o hello.exe
 ```
 
 ## 项目结构
@@ -107,17 +118,28 @@ duan/
 │   ├── parser_stmt.py  # 语法分析器
 │   ├── ast_nodes.py    # AST 节点定义
 │   ├── compiler.py     # 编译器主体
-│   └── optimizer/      # 优化器
+│   ├── llvm/           # LLVM 后端
+│   │   ├── codegen.py       # LLVM 代码生成（string 模式）
+│   │   ├── codegen_typed.py # LLVM 代码生成（typed 模式）
+│   │   ├── runtime_typed.c  # typed 模式运行时库
+│   │   ├── compiler.py      # LLVM 编译入口
+│   │   └── core.py          # 代码生成核心
+│   ├── optimizer/      # 代码优化器（常量折叠、死代码消除等）
+│   └── ...
 ├── cli/                 # 命令行工具
 │   └── duan.py         # CLI 入口
-├── stdlib/              # 标准库（11 个模块）
+├── stdlib/              # 标准库（23 个模块）
 │   ├── 日志.duan/py
 │   ├── 表格.duan/py
+│   ├── JSON.duan/py
 │   └── ...
+├── antlrparser/         # ANTLR 后端
+│   ├── indent_preprocessor.py  # v3 缩进语法预处理
+│   └── ...
+├── lsp/                 # LSP 语言服务器
 ├── benchmarks/          # 性能基准测试
 ├── examples/            # 示例程序
-│   └── hello.duan
-├── tests/               # 测试
+├── tests/               # 测试（unit / integration / e2e）
 └── docs/                # 文档
 ```
 
@@ -128,7 +150,9 @@ duan/
 | 词法分析 | 手写词法分析器，支持 Unicode 中文关键字 |
 | 语法分析 | 递归下降解析器，v3.x 纯缩进语法 |
 | 类型检查 | Hindley-Milner 全局类型推断 |
-| 代码生成 | Python 代码生成（类型擦除策略） |
+| 代码生成（Python） | Python 代码生成（类型擦除策略） |
+| 代码生成（LLVM） | LLVM IR 生成，DuanValue 类型化后端 |
+| 运行时（C） | typed 模式运行时库，提供基础操作实现 |
 | 优化器 | 常量折叠、死代码消除、循环不变量外提 |
 
 ## 语法参考（3.x）
@@ -188,10 +212,14 @@ duan/
 
 更多文档请参考：
 
+- [快速开始](docs/getting-started.md)
+- [语法参考](docs/syntax.md)
 - [架构设计](docs/architecture.md)
-- [完整规范文档](docs/段言-完整规范文档.md)
-- [API 参考](docs/API_REFERENCE.md)
+- [标准库](docs/stdlib.md)
+- [完整语法规范 v3.1](docs/统一语法规范_v3.1.md)
 - [开发指南](docs/DEVELOPMENT_GUIDE.md)
+- [API 参考](docs/API_REFERENCE.md)
+- [工具链](docs/tools.md)
 
 ## 开发
 

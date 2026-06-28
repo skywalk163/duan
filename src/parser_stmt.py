@@ -168,6 +168,10 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '己':
             return self._parse_self_assignment()
 
+        # super调用：父.方法名(参数)
+        if tok.type == TokenType.KEYWORD and tok.value == '父':
+            return self._parse_expr_stmt()
+
         # 装饰器：@段落名 标注 段落 ...
         if tok.type == TokenType.AT:
             return self._parse_decorator()
@@ -187,14 +191,54 @@ class ParserStmtMixin:
         return expr
     
     def _parse_self_assignment(self) -> ASTNode:
-        """解析self赋值语句：己属性名 为 值。
+        """解析self赋值语句或属性赋值语句
         
-        语法：己属性名 为 值。
-        生成：self.属性名 = 值
+        语法1（方法内部）：己属性名 为 值。
+        生成：SelfAssignment(attr_name, value)
+        
+        语法2（设置对象属性）：己 obj.attr 为 值。
+        生成：Assignment(target=MemberAccess(obj, attr), value)
         """
         # 己
         self._consume(TokenType.KEYWORD, '己')
         
+        # 保存当前位置，用于回溯
+        saved_pos = self.pos
+        
+        # 先尝试解析一个表达式，看看是不是属性访问
+        # 我们先尝试解析标识符，然后看看后面有没有点号
+        if self._current() and self._current().type == TokenType.IDENTIFIER:
+            first_ident = self._consume(TokenType.IDENTIFIER)
+            # 看看后面是不是点号
+            if self._current() and self._current().type == TokenType.DOT:
+                # 这是属性访问：obj.attr = value
+                # 回退，用表达式解析器来解析
+                self.pos = saved_pos
+                target_expr = self._parse_expr()
+                
+                # 为
+                if self._match(TokenType.KEYWORD, '为'):
+                    self._consume(TokenType.KEYWORD, '为')
+                elif self._match(TokenType.KEYWORD, '等于'):
+                    self._consume(TokenType.KEYWORD, '等于')
+                else:
+                    tok = self._current()
+                    raise ParseError(f"期望'为'或'等于'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
+                
+                # 值
+                value = self._parse_expr()
+                
+                # 句号（可选）
+                if self._current() and self._current().type == TokenType.DOT:
+                    self._consume(TokenType.DOT)
+                
+                # 返回赋值节点（target 是属性访问表达式）
+                return Assignment(target_expr, value)
+            else:
+                # 不是属性访问，回退，按原来的 SelfAssignment 处理
+                self.pos = saved_pos
+        
+        # 原来的 SelfAssignment 处理逻辑
         # 属性名（可能以"己"开头，但已经被消费了）
         # 这里属性名可能是单个标识符，也可能带类型等
         attr_name_tokens = []
@@ -1023,6 +1067,45 @@ class ParserStmtMixin:
         
         return ParameterList(params)
     
+    def _parse_catch_clause(self):
+        """解析单个捕获子句
+        
+        返回: (catch_type, catch_var, catch_body)
+        """
+        catch_type = None
+        catch_var = None
+        
+        # 读取类型/变量名
+        tok = self._current()
+        if tok and tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            # 先读取第一个标识符/关键字
+            first = self._consume().value
+            
+            # 检查下一个 token
+            next_tok = self._current()
+            if next_tok and next_tok.type == TokenType.COLON:
+                # 只有一个标识符/关键字，后面是冒号
+                # 启发式判断：以大写字母开头视为类型名，否则视为变量名
+                if first and first[0].isupper():
+                    catch_type = first
+                else:
+                    catch_var = first
+            elif next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                # 有类型和变量名
+                catch_type = first
+                catch_var = self._consume().value
+            else:
+                # 只有一个标识符，视为变量名
+                catch_var = first
+        
+        # 冒号
+        self._consume(TokenType.COLON)
+        
+        # catch块
+        catch_body = self._parse_body()
+        
+        return catch_type, catch_var, catch_body
+    
     def _parse_try_stmt(self) -> TryStmt:
         """解析异常捕获语句
         
@@ -1035,13 +1118,21 @@ class ParserStmtMixin:
         或带类型过滤：
         尝试：
           语句...
-        捕获 值错误：
+        捕获 值异常：
           语句...
         
         或带类型和变量：
         尝试：
           语句...
-        捕获 值错误 异常变量：
+        捕获 值异常 异常变量：
+          语句...
+        
+        或多个捕获块：
+        尝试：
+          语句...
+        捕获 我的异常 e：
+          语句...
+        捕获 异常 e：
           语句...
         
         或带最终块：
@@ -1051,6 +1142,7 @@ class ParserStmtMixin:
           语句...
         最终：
           语句...
+        结束。
         """
         # 尝试
         self._consume(TokenType.KEYWORD, '尝试')
@@ -1061,46 +1153,24 @@ class ParserStmtMixin:
         # try块
         try_body = self._parse_body()
         
-        # 捕获（可选）
+        # 捕获（可选，支持多个）
+        catch_clauses = []
         catch_type = None
         catch_var = None
         catch_body = []
-        if self._match(TokenType.KEYWORD, '捕获'):
+        
+        first_catch = True
+        while self._match(TokenType.KEYWORD, '捕获'):
             self._consume(TokenType.KEYWORD, '捕获')
             
-            # 读取类型/变量名
-            # 可能的情况：
-            # 1. 标识符 -> :           => 变量名（向后兼容）
-            # 2. 标识符 -> 标识符 -> :  => 类型 + 变量名
-            # 3. 关键字 -> :           => 类型
-            # 4. 关键字 -> 标识符 -> :  => 类型 + 变量名
-            tok = self._current()
-            if tok and tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                # 先读取第一个标识符/关键字
-                first = self._consume().value
-                
-                # 检查下一个 token
-                next_tok = self._current()
-                if next_tok and next_tok.type == TokenType.COLON:
-                    # 情况1或3：只有一个标识符/关键字，后面是冒号
-                    # 启发式判断：以大写字母开头视为类型名，否则视为变量名
-                    if first and first[0].isupper():
-                        catch_type = first
-                    else:
-                        catch_var = first
-                elif next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                    # 情况2或4：有类型和变量名
-                    catch_type = first
-                    catch_var = self._consume().value
-                else:
-                    # 只有一个标识符，视为变量名
-                    catch_var = first
+            ct, cv, cb = self._parse_catch_clause()
+            catch_clauses.append((ct, cv, cb))
             
-            # 冒号
-            self._consume(TokenType.COLON)
-            
-            # catch块
-            catch_body = self._parse_body()
+            if first_catch:
+                catch_type = ct
+                catch_var = cv
+                catch_body = cb
+                first_catch = False
         
         # 最终（可选）
         finally_body = []
@@ -1113,7 +1183,19 @@ class ParserStmtMixin:
             # finally块
             finally_body = self._parse_body()
         
-        return TryStmt(try_body, catch_type, catch_var, catch_body, finally_body)
+        # 消耗"结束"关键字（可选）
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+        elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
+            self._consume(TokenType.IDENTIFIER)
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+        
+        return TryStmt(try_body, catch_clauses=catch_clauses, 
+                       catch_type=catch_type, catch_var=catch_var, 
+                       catch_body=catch_body, finally_body=finally_body)
     
     def _parse_throw_stmt(self) -> ThrowStmt:
         """解析抛出异常语句
@@ -1369,7 +1451,12 @@ class ParserStmtMixin:
                     if param_type is not None or not (self._current() and self._current().type == TokenType.COLON):
                         params.append({'name': param_name, 'type': param_type})
                 elif tok.type == TokenType.KEYWORD:
-                    # 参数名可能是关键字（如数学运算符），但排除语句关键字
+                    # 参数名可能是关键字（如数学运算符），但排除语句关键字和"参数"本身
+                    if tok.value in ('参数', '接收', '输入'):
+                        self._consume(TokenType.KEYWORD, tok.value)
+                        continue
+                    if tok.value == '返回' or tok.value in _stmt_keywords:
+                        break
                     param_name = self._consume(TokenType.KEYWORD).value
                     # 类型注解（可选）
                     param_type = None
@@ -1483,8 +1570,10 @@ class ParserStmtMixin:
             if tok.type == TokenType.KEYWORD and tok.value == '否则':
                 break
 
-            # 异常处理的特殊标记（捕获、最终）
-            if tok.type == TokenType.KEYWORD and tok.value in ('捕获', '最终'):
+            # 异常处理的特殊标记（捕获、最终、结束）
+            if tok.type == TokenType.KEYWORD and tok.value in ('捕获', '最终', '结束'):
+                break
+            if tok.type == TokenType.IDENTIFIER and tok.value == '结束':
                 break
 
             # 类/接口定义（在body中遇到的，作为嵌套处理）

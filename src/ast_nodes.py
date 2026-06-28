@@ -312,12 +312,21 @@ class ReturnStatement(ASTNode):
 
 
 @dataclass(slots=True)
+class CatchClause(ASTNode):
+    """捕获子句"""
+    catch_type: str = ""
+    catch_var: str = ""
+    catch_body: List[ASTNode] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class TryStatement(ASTNode):
     """异常捕获"""
     try_body: List[ASTNode] = field(default_factory=list)
-    catch_type: str = ""       # 异常类型（如 "ValueError"）
-    catch_var: str = ""         # 异常变量名
-    catch_body: List[ASTNode] = field(default_factory=list)
+    catch_clauses: List[CatchClause] = field(default_factory=list)
+    catch_type: str = ""       # 异常类型（如 "ValueError"）- 向后兼容
+    catch_var: str = ""         # 异常变量名 - 向后兼容
+    catch_body: List[ASTNode] = field(default_factory=list)  # 向后兼容
     finally_body: List[ASTNode] = field(default_factory=list)  # finally 块
 
 
