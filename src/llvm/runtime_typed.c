@@ -691,6 +691,9 @@ int64_t dv_len(DuanValue* v) {
         if (strncmp(s, "list:", 5) == 0) {
             return atoll(s + 5);
         }
+        if (strncmp(s, "dict:", 5) == 0) {
+            return atoll(s + 5);
+        }
         return (int64_t)strlen(s);
     }
     if (v->type == 4) {
@@ -1233,6 +1236,290 @@ void dv_str_split(DuanValue* result, DuanValue* str, DuanValue* delim) {
 }
 
 /* ================================================================
+ * 字典操作
+ * 字典存储格式: "dict:N:key1\x1fvalue1\x1fkey2\x1fvalue2..."
+ * 使用 \x1f (ASCII 31) 作为键值对分隔符
+ * ================================================================ */
+
+void dv_dict_new(DuanValue* result) {
+    result->type = 3;  /* 复用 type=3，使用 str 字段存储 */
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = dv_strdup("dict:0:");
+    result->boolean = 0;
+}
+
+int64_t dv_dict_len(DuanValue* v) {
+    if (v->type != 3 || !v->str) return 0;
+    if (strncmp(v->str, "dict:", 5) != 0) return 0;
+    return atoll(v->str + 5);
+}
+
+void dv_dict_set(DuanValue* result, DuanValue* dict, DuanValue* key, DuanValue* value) {
+    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+        dv_dict_new(result);
+        return;
+    }
+    
+    /* 将值转换为字符串以便存储 */
+    DuanValue value_str;
+    dv_value_to_string(&value_str, value);
+    DuanValue key_str;
+    dv_value_to_string(&key_str, key);
+    
+    const char* orig = dict->str;
+    int64_t count = dv_dict_len(dict);
+    
+    /* 计算新字符串大小 */
+    int key_len = (int)strlen(key_str.str);
+    int val_len = (int)strlen(value_str.str);
+    int buf_size = (int)strlen(orig) + key_len + val_len + 8;
+    
+    char* new_str = (char*)malloc(buf_size);
+    if (!new_str) {
+        dv_free(&value_str);
+        dv_free(&key_str);
+        dv_dict_new(result);
+        return;
+    }
+    
+    /* 构建新的字典字符串 */
+    int pos = 0;
+    pos += snprintf(new_str + pos, buf_size - pos, "dict:%lld:", (long long)(count + 1));
+    
+    /* 复制原有的键值对 */
+    const char* p = orig + 5;
+    p = strchr(p, ':');
+    if (p) p++;
+    for (int64_t i = 0; i < count; i++) {
+        const char* key_start = p;
+        const char* key_end = strstr(key_start, "\x1f");
+        if (!key_end) break;
+        int klen = (int)(key_end - key_start);
+        
+        const char* val_start = key_end + 1;
+        const char* val_end = strstr(val_start, "\x1f");
+        if (!val_end) val_end = val_start + strlen(val_start);
+        int vlen = (int)(val_end - val_start);
+        
+        memcpy(new_str + pos, key_start, key_end - key_start);
+        pos += key_end - key_start;
+        new_str[pos++] = '\x1f';
+        
+        memcpy(new_str + pos, val_start, val_end - val_start);
+        pos += val_end - val_start;
+        new_str[pos++] = '\x1f';
+        
+        p = val_end;
+        if (*p == '\x1f') p++;
+    }
+    
+    /* 添加新的键值对 */
+    memcpy(new_str + pos, key_str.str, key_len);
+    pos += key_len;
+    new_str[pos++] = '\x1f';
+    memcpy(new_str + pos, value_str.str, val_len);
+    pos += val_len;
+    new_str[pos] = '\0';
+    
+    dv_free(&value_str);
+    dv_free(&key_str);
+    
+    result->type = 3;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = new_str;
+    result->boolean = 0;
+}
+
+void dv_dict_get(DuanValue* result, DuanValue* dict, DuanValue* key) {
+    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+        dv_null(result);
+        return;
+    }
+    
+    DuanValue key_str;
+    dv_value_to_string(&key_str, key);
+    
+    const char* orig = dict->str;
+    int64_t count = dv_dict_len(dict);
+    
+    const char* p = orig + 5;
+    p = strchr(p, ':');
+    if (p) p++;
+    
+    for (int64_t i = 0; i < count; i++) {
+        const char* key_start = p;
+        const char* key_end = strstr(key_start, "\x1f");
+        if (!key_end) break;
+        int klen = (int)(key_end - key_start);
+        
+        const char* val_start = key_end + 1;
+        const char* val_end = strstr(val_start, "\x1f");
+        if (!val_end) val_end = val_start + strlen(val_start);
+        int vlen = (int)(val_end - val_start);
+        
+        if (klen == (int)strlen(key_str.str) && 
+            strncmp(key_start, key_str.str, klen) == 0) {
+            /* 找到匹配的键，返回值 */
+            char* val_copy = (char*)malloc(vlen + 1);
+            if (val_copy) {
+                memcpy(val_copy, val_start, vlen);
+                val_copy[vlen] = '\0';
+            }
+            dv_free(&key_str);
+            dv_str(result, val_copy ? val_copy : "");
+            if (val_copy) free(val_copy);
+            return;
+        }
+        
+        p = val_end;
+        if (*p == '\x1f') p++;
+    }
+    
+    dv_free(&key_str);
+    dv_null(result);
+}
+
+void dv_dict_has(DuanValue* result, DuanValue* dict, DuanValue* key) {
+    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+        result->type = 5;
+        result->i64 = 0;
+        result->f64 = 0.0;
+        result->boolean = 0;
+        return;
+    }
+    
+    DuanValue key_str;
+    dv_value_to_string(&key_str, key);
+    
+    const char* orig = dict->str;
+    int64_t count = dv_dict_len(dict);
+    
+    const char* p = orig + 5;
+    p = strchr(p, ':');
+    if (p) p++;
+    
+    int found = 0;
+    for (int64_t i = 0; i < count && !found; i++) {
+        const char* key_start = p;
+        const char* key_end = strstr(key_start, "\x1f");
+        if (!key_end) break;
+        int klen = (int)(key_end - key_start);
+        
+        const char* val_start = key_end + 1;
+        const char* val_end = strstr(val_start, "\x1f");
+        if (!val_end) val_end = val_start + strlen(val_start);
+        
+        if (klen == (int)strlen(key_str.str) && 
+            strncmp(key_start, key_str.str, klen) == 0) {
+            found = 1;
+        }
+        
+        p = val_end;
+        if (*p == '\x1f') p++;
+    }
+    
+    dv_free(&key_str);
+    result->type = 5;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->boolean = found;
+}
+
+void dv_dict_keys(DuanValue* result, DuanValue* dict) {
+    dv_list_new(result);
+    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+        return;
+    }
+    
+    int64_t count = dv_dict_len(dict);
+    const char* orig = dict->str;
+    
+    const char* p = orig + 5;
+    p = strchr(p, ':');
+    if (p) p++;
+    
+    for (int64_t i = 0; i < count; i++) {
+        const char* key_start = p;
+        const char* key_end = strstr(key_start, "\x1f");
+        if (!key_end) break;
+        int klen = (int)(key_end - key_start);
+        
+        char* key_copy = (char*)malloc(klen + 1);
+        if (key_copy) {
+            memcpy(key_copy, key_start, klen);
+            key_copy[klen] = '\0';
+        }
+        
+        DuanValue key_val;
+        dv_str(&key_val, key_copy ? key_copy : "");
+        if (key_copy) free(key_copy);
+        
+        DuanValue list_copy;
+        dv_clone(&list_copy, result);
+        dv_list_append(result, &list_copy, &key_val);
+        dv_free(&list_copy);
+        dv_free(&key_val);
+        
+        const char* val_start = key_end + 1;
+        const char* val_end = strstr(val_start, "\x1f");
+        if (!val_end) val_end = val_start + strlen(val_start);
+        p = val_end;
+        if (*p == '\x1f') p++;
+    }
+}
+
+void dv_dict_values(DuanValue* result, DuanValue* dict) {
+    dv_list_new(result);
+    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+        return;
+    }
+    
+    int64_t count = dv_dict_len(dict);
+    const char* orig = dict->str;
+    
+    const char* p = orig + 5;
+    p = strchr(p, ':');
+    if (p) p++;
+    
+    for (int64_t i = 0; i < count; i++) {
+        const char* key_start = p;
+        const char* key_end = strstr(key_start, "\x1f");
+        if (!key_end) break;
+        
+        const char* val_start = key_end + 1;
+        const char* val_end = strstr(val_start, "\x1f");
+        if (!val_end) val_end = val_start + strlen(val_start);
+        int vlen = (int)(val_end - val_start);
+        
+        char* val_copy = (char*)malloc(vlen + 1);
+        if (val_copy) {
+            memcpy(val_copy, val_start, vlen);
+            val_copy[vlen] = '\0';
+        }
+        
+        DuanValue val_val;
+        dv_str(&val_val, val_copy ? val_copy : "");
+        if (val_copy) free(val_copy);
+        
+        DuanValue list_copy;
+        dv_clone(&list_copy, result);
+        dv_list_append(result, &list_copy, &val_val);
+        dv_free(&list_copy);
+        dv_free(&val_val);
+        
+        p = val_end;
+        if (*p == '\x1f') p++;
+    }
+}
+
+void dv_dict_remove(DuanValue* result, DuanValue* dict, DuanValue* key) {
+    /* 字典不支持删除操作，复制原字典 */
+    dv_clone(result, dict);
+}
+
+/* ================================================================
  * 时间函数
  * ================================================================ */
 
@@ -1559,6 +1846,62 @@ static int __dv_try_level = -1;
 static char __dv_exception_str[1024];
 static void* __dv_current_jmp_buf = NULL;  // 当前活跃的 jmp_buf
 
+/* 调用栈追踪系统 */
+#define MAX_CALL_STACK 64
+#define MAX_STACK_ENTRY_LEN 128
+typedef struct {
+    char func_name[MAX_STACK_ENTRY_LEN];
+    char file_name[MAX_STACK_ENTRY_LEN];
+    int line_number;
+} StackEntry;
+
+static StackEntry __dv_call_stack[MAX_CALL_STACK];
+static int __dv_call_stack_size = 0;
+
+void dv_stack_push(const char* func_name, const char* file_name, int line_number) {
+    if (__dv_call_stack_size < MAX_CALL_STACK) {
+        StackEntry* entry = &__dv_call_stack[__dv_call_stack_size];
+        strncpy(entry->func_name, func_name ? func_name : "unknown", MAX_STACK_ENTRY_LEN - 1);
+        entry->func_name[MAX_STACK_ENTRY_LEN - 1] = '\0';
+        strncpy(entry->file_name, file_name ? file_name : "", MAX_STACK_ENTRY_LEN - 1);
+        entry->file_name[MAX_STACK_ENTRY_LEN - 1] = '\0';
+        entry->line_number = line_number;
+        __dv_call_stack_size++;
+    }
+}
+
+void dv_stack_pop(void) {
+    if (__dv_call_stack_size > 0) {
+        __dv_call_stack_size--;
+    }
+}
+
+int dv_get_stack_trace(char* buf, int buf_size) {
+    if (!buf || buf_size <= 0) return 0;
+    buf[0] = '\0';
+    
+    for (int i = __dv_call_stack_size - 1; i >= 0; i--) {
+        StackEntry* entry = &__dv_call_stack[i];
+        char entry_str[MAX_STACK_ENTRY_LEN * 2];
+        if (entry->line_number > 0) {
+            snprintf(entry_str, sizeof(entry_str), "    at %s (%s:%d)\n",
+                    entry->func_name, entry->file_name, entry->line_number);
+        } else {
+            snprintf(entry_str, sizeof(entry_str), "    at %s\n", entry->func_name);
+        }
+        strncat(buf, entry_str, buf_size - strlen(buf) - 1);
+    }
+    return (int)strlen(buf);
+}
+
+int dv_get_stack_size(void) {
+    return __dv_call_stack_size;
+}
+
+void dv_clear_stack_trace(void) {
+    __dv_call_stack_size = 0;
+}
+
 void dv_try_enter(int* result, void* jmp_buf_ptr) {
     __dv_try_level++;
     if (__dv_try_level < MAX_TRY_DEPTH) {
@@ -1627,11 +1970,23 @@ void dv_get_class_name(DuanValue* obj, char* buf, int buf_size);
 int dv_is_object(DuanValue* v);
 int dv_isinstance(DuanValue* obj, const char* class_name);
 void dv_class_get_member(DuanValue* result, DuanValue* obj, const char* field_name);
+void dv_class_set_member(DuanValue* obj, const char* field_name, DuanValue* value);
+void dv_class_new_named(DuanValue* result, const char* class_name);  // 前向声明
 
 static DuanValue __dv_current_exception_obj;
 static int __dv_has_exception_obj = 0;
 
 void dv_throw_exception(DuanValue* exception_obj) {
+    /* 获取当前栈追踪 */
+    char stack_trace[4096];
+    dv_get_stack_trace(stack_trace, sizeof(stack_trace));
+    
+    /* 设置异常的栈追踪属性 */
+    DuanValue stack_val;
+    dv_str(&stack_val, stack_trace);
+    dv_class_set_member(exception_obj, "栈追踪", &stack_val);
+    dv_free(&stack_val);
+    
     if (__dv_try_level < 0 || __dv_try_level >= MAX_TRY_DEPTH) {
         /* 没有 try 块，直接打印错误信息并退出 */
         char class_name[MAX_CLASS_NAME_LEN];
@@ -1645,6 +2000,9 @@ void dv_throw_exception(DuanValue* exception_obj) {
         fprintf(stderr, "未捕获的异常: %s: %s\n", 
                 class_name[0] ? class_name : "未知异常",
                 msg_str ? msg_str : "");
+        if (stack_trace[0]) {
+            fprintf(stderr, "调用栈:\n%s", stack_trace);
+        }
         free(msg_str);
         dv_free(&msg_val);
         exit(1);
@@ -1662,6 +2020,99 @@ void dv_throw_exception(DuanValue* exception_obj) {
     
     int level = __dv_try_level;
     longjmp(__dv_jmp_bufs[level], 1);
+}
+
+/* 创建带原因的异常 */
+void dv_create_exception_with_cause(DuanValue* result, const char* class_name, 
+                                   const char* message, DuanValue* cause) {
+    /* 先创建普通异常对象 */
+    dv_class_new_named(result, class_name);
+    
+    /* 设置消息 */
+    DuanValue msg_val;
+    dv_str(&msg_val, message ? message : "");
+    dv_class_set_member(result, "消息", &msg_val);
+    dv_free(&msg_val);
+    
+    /* 如果有原因，设置原因属性 */
+    if (cause) {
+        DuanValue cause_clone;
+        dv_clone(&cause_clone, cause);
+        dv_class_set_member(result, "原因", &cause_clone);
+        dv_free(&cause_clone);
+    }
+    
+    /* 设置空栈追踪（稍后抛出时会填充） */
+    DuanValue empty_stack;
+    dv_str(&empty_stack, "");
+    dv_class_set_member(result, "栈追踪", &empty_stack);
+    dv_free(&empty_stack);
+}
+
+/* 获取异常的完整描述（包括原因链） */
+int dv_exception_to_full_string(DuanValue* exception_obj, char* buf, int buf_size) {
+    if (!buf || buf_size <= 0) return 0;
+    buf[0] = '\0';
+    
+    DuanValue current_ex;
+    dv_clone(&current_ex, exception_obj);
+    
+    int depth = 0;
+    while (current_ex.type == 6 && dv_is_object(&current_ex)) {  // TYPE_OBJ
+        if (depth > 0) {
+            strncat(buf, "\n原因: ", buf_size - strlen(buf) - 1);
+        }
+        
+        char class_name[MAX_CLASS_NAME_LEN];
+        dv_get_class_name(&current_ex, class_name, sizeof(class_name));
+        
+        DuanValue msg_val;
+        dv_null(&msg_val);
+        dv_class_get_member(&msg_val, &current_ex, "消息");
+        char* msg_str = dv_to_string(&msg_val);
+        
+        char ex_line[512];
+        snprintf(ex_line, sizeof(ex_line), "%s: %s", 
+                class_name[0] ? class_name : "异常",
+                msg_str ? msg_str : "");
+        strncat(buf, ex_line, buf_size - strlen(buf) - 1);
+        
+        free(msg_str);
+        dv_free(&msg_val);
+        
+        /* 获取栈追踪 */
+        DuanValue stack_val;
+        dv_null(&stack_val);
+        dv_class_get_member(&stack_val, &current_ex, "栈追踪");
+        char* stack_str = dv_to_string(&stack_val);
+        if (stack_str && stack_str[0]) {
+            strncat(buf, "\n调用栈:\n", buf_size - strlen(buf) - 1);
+            strncat(buf, stack_str, buf_size - strlen(buf) - 1);
+        }
+        free(stack_str);
+        dv_free(&stack_val);
+        
+        /* 获取原因，继续循环 */
+        DuanValue next_ex;
+        dv_null(&next_ex);
+        dv_class_get_member(&next_ex, &current_ex, "原因");
+        
+        dv_free(&current_ex);
+        
+        if (next_ex.type == 6 && dv_is_object(&next_ex)) {
+            dv_clone(&current_ex, &next_ex);
+            dv_free(&next_ex);
+            depth++;
+        } else {
+            dv_free(&next_ex);
+            break;
+        }
+        
+        if (depth > 10) break;  // 防止循环引用
+    }
+    
+    dv_free(&current_ex);
+    return (int)strlen(buf);
 }
 
 void dv_get_current_exception(DuanValue* result) {

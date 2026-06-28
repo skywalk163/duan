@@ -152,6 +152,18 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             f'declare i32 @dv_register_static_method(ptr, ptr, ptr)',
             f'declare void @dv_call_class_method(ptr, ptr, ptr, ptr, i32)',
             f'declare void @dv_call_static_method(ptr, ptr, ptr, ptr, i32)',
+            # 异常栈追踪
+            f'declare void @dv_stack_push(ptr, ptr, i32)',
+            f'declare void @dv_stack_pop()',
+            f'declare void @dv_create_exception_with_cause(ptr, ptr, ptr, ptr)',
+            f'declare i64 @dv_exception_to_full_string(ptr, ptr, i32)',
+            # 字典操作
+            f'declare void @dv_dict_new(ptr)',
+            f'declare void @dv_dict_set(ptr, ptr, ptr, ptr)',
+            f'declare void @dv_dict_get(ptr, ptr, ptr)',
+            f'declare void @dv_dict_has(ptr, ptr, ptr)',
+            f'declare void @dv_dict_keys(ptr, ptr)',
+            f'declare void @dv_dict_values(ptr, ptr)',
         ]
         for f in funcs:
             self._func_decls.add(f)
@@ -854,6 +866,11 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if name in ('list', '列表', '创建列表'):
             return self._gen_typed_list_from_builtin_args(args)
 
+        # 字典操作
+        if name in ('dict', '字典', '新建字典', '创建字典'):
+            dict_dv = self._call_dv_func('dv_dict_new')
+            return dict_dv, 'dv'
+
         return None
 
     def _gen_typed_list_from_builtin_args(self, args: List[str]) -> Tuple[str, str]:
@@ -929,15 +946,10 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         """处理 obj.成员 (属性访问表达式)"""
         obj_dv, _ = self._gen_expression(expr.obj)
         member = expr.property_name
-        if member == '长度' or member == 'len':
+        if member == '长度' or member == 'len' or member == '大小' or member == 'size':
             slot = self._store_dv(obj_dv)
             i64_val = self.new_register()
-            self.emit(f'{i64_val} = call i64 @dv_list_len(ptr {slot})')
-            return self._create_int_dv(i64_val), 'dv'
-        if member == '大小' or member == 'size':
-            slot = self._store_dv(obj_dv)
-            i64_val = self.new_register()
-            self.emit(f'{i64_val} = call i64 @dv_str_len(ptr {slot})')
+            self.emit(f'{i64_val} = call i64 @dv_len(ptr {slot})')
             return self._create_int_dv(i64_val), 'dv'
         obj_slot = self._store_dv(obj_dv)
         member_reg = self.gen_string_constant(member)
@@ -1636,13 +1648,16 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 self.emit(f'store {DUANVALUE_STRUCT} {dv_val}, ptr {self._method_result_ptr}')
             else:
                 self.emit(f'call void @dv_null(ptr {self._method_result_ptr})')
+            self.emit('call void @dv_stack_pop()')
             self.emit('ret void')
         else:
             if stmt.value:
                 dv_val, _ = self._gen_expression(stmt.value)
+                self.emit('call void @dv_stack_pop()')
                 self.emit(f'ret {DUANVALUE_STRUCT} {dv_val}')
             else:
                 null_dv = self._call_dv_func('dv_null')
+                self.emit('call void @dv_stack_pop()')
                 self.emit(f'ret {DUANVALUE_STRUCT} {null_dv}')
 
     def _gen_typed_print(self, stmt: ast.PrintStatement):
@@ -1790,6 +1805,11 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self.emit(f'define {DUANVALUE_STRUCT} @_seg_{safe}({", ".join(param_strs)}) {{')
         self.emit('entry:')
 
+        # 栈追踪：函数入口压栈
+        func_name_ptr = self.gen_string_constant(name)
+        file_name_ptr = self.gen_string_constant("")
+        self.emit(f'call void @dv_stack_push(ptr {func_name_ptr}, ptr {file_name_ptr}, i32 0)')
+
         self._collect_vars_from_stmts(body)
         for vname in self._local_vars.keys():
             reg = self.new_register()
@@ -1801,6 +1821,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
 
         if not self._ends_with_terminator(body):
             null_dv = self._call_dv_func('dv_null')
+            self.emit('call void @dv_stack_pop()')
             self.emit(f'ret {DUANVALUE_STRUCT} {null_dv}')
         self.emit('}')
         self.emit_blank()
@@ -1839,6 +1860,12 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         else:
             self.emit(f'define void @{method_safe_name}(ptr %result, ptr %self, ptr %args, i32 %num_args) {{')
         self.emit('entry:')
+
+        # 栈追踪：方法入口压栈
+        method_name = f'{class_name}.{method_def.name}'
+        func_name_ptr = self.gen_string_constant(method_name)
+        file_name_ptr = self.gen_string_constant("")
+        self.emit(f'call void @dv_stack_push(ptr {func_name_ptr}, ptr {file_name_ptr}, i32 0)')
 
         params = getattr(method_def, 'parameters', []) or []
 
