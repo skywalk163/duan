@@ -59,6 +59,9 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             f'declare void @dv_str(ptr, ptr)',
             f'declare void @dv_bool(ptr, i32)',
             f'declare void @dv_null(ptr)',
+            f'declare i32 @dv_is_null(ptr)',
+            f'declare void @dv_null_coalesce(ptr, ptr, ptr)',
+            f'declare void @dv_safe_get(ptr, ptr, ptr)',
             f'declare void @dv_add(ptr, ptr, ptr)',
             f'declare void @dv_sub(ptr, ptr, ptr)',
             f'declare void @dv_mul(ptr, ptr, ptr)',
@@ -870,6 +873,33 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if name in ('dict', '字典', '新建字典', '创建字典'):
             dict_dv = self._call_dv_func('dv_dict_new')
             return dict_dv, 'dv'
+
+        # 可空类型操作
+        if name in ('是空', 'is_null', 'null?'):
+            if args:
+                slot = self._store_dv(args[0])
+                result = self.new_register()
+                self.emit(f'{result} = call i32 @dv_is_null(ptr {slot})')
+                return self._create_bool_dv(result), 'dv'
+            return self._create_bool_dv('true'), 'dv'
+
+        if name in ('空合并', 'null_coalesce', '??'):
+            if len(args) >= 2:
+                v_slot = self._store_dv(args[0])
+                default_slot = self._store_dv(args[1])
+                result_slot = self._new_dv_slot()
+                self.emit(f'call void @dv_null_coalesce(ptr {result_slot}, ptr {v_slot}, ptr {default_slot})')
+                return self._load_dv(result_slot), 'dv'
+            return self._call_dv_func('dv_null'), 'dv'
+
+        if name in ('安全获取', 'safe_get', '?.'):
+            if len(args) >= 2:
+                obj_slot = self._store_dv(args[0])
+                attr_slot = self._store_dv(args[1])
+                result_slot = self._new_dv_slot()
+                self.emit(f'call void @dv_safe_get(ptr {result_slot}, ptr {obj_slot}, ptr {attr_slot})')
+                return self._load_dv(result_slot), 'dv'
+            return self._call_dv_func('dv_null'), 'dv'
 
         return None
 

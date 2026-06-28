@@ -38,8 +38,12 @@ typedef struct {
     int type;          /* 0=NULL 1=INT 2=FLOAT 3=STR 4=LIST 5=BOOL */
     int64_t i64;       /* INT */
     double f64;        /* FLOAT */
-    char* str;         /* STR / LIST (序列化) */
+    char* str;         /* STR / LIST (序列化，仅用于 type=3) */
     int boolean;       /* BOOL */
+    /* LIST 类型专用字段 (type=4) */
+    int list_size;     /* 当前元素数量 */
+    int list_capacity; /* 分配的数组容量 */
+    struct DuanValue** list_data; /* 元素数组指针 */
 } DuanValue;
 
 /* ================================================================
@@ -64,6 +68,32 @@ void dv_null(DuanValue* result) {
     result->f64 = 0.0;
     result->str = NULL;
     result->boolean = 0;
+}
+
+int dv_is_null(DuanValue* v) {
+    return v && v->type == 0;
+}
+
+/* null 合并操作符：如果 v 是 null，返回 default_val，否则返回 v */
+void dv_null_coalesce(DuanValue* result, DuanValue* v, DuanValue* default_val) {
+    if (v && v->type != 0) {
+        dv_clone(result, v);
+    } else {
+        dv_clone(result, default_val);
+    }
+}
+
+/* 安全获取属性：如果 obj 为 null，返回 null；否则返回 obj.属性 */
+void dv_safe_get(DuanValue* result, DuanValue* obj, DuanValue* attr_name) {
+    if (!obj || obj->type == 0) {
+        dv_null(result);
+        return;
+    }
+    if (obj->type == 6) {  /* OBJ 类型 */
+        dv_class_get_member(result, obj, attr_name->str);
+    } else {
+        dv_null(result);
+    }
 }
 
 void dv_int(DuanValue* result, int64_t x) {
@@ -104,16 +134,45 @@ void dv_bool(DuanValue* result, int b) {
 
 void dv_free(DuanValue* v) {
     if (!v) return;
-    if ((v->type == 3 || v->type == 4) && v->str) {
+    if (v->type == 3 && v->str) {
         free(v->str);
         v->str = NULL;
+    } else if (v->type == 4 && v->list_data) {
+        for (int i = 0; i < v->list_size; i++) {
+            if (v->list_data[i]) {
+                dv_free(v->list_data[i]);
+                free(v->list_data[i]);
+            }
+        }
+        free(v->list_data);
+        v->list_data = NULL;
+        v->list_size = 0;
+        v->list_capacity = 0;
     }
 }
 
 void dv_clone(DuanValue* result, DuanValue* v) {
     *result = *v;
-    if ((v->type == 3 || v->type == 4) && v->str) {
+    if (v->type == 3 && v->str) {
         result->str = dv_strdup(v->str);
+    } else if (v->type == 4) {
+        /* 复制列表数据 */
+        result->list_data = NULL;
+        result->list_size = 0;
+        result->list_capacity = 0;
+        if (v->list_size > 0 && v->list_data) {
+            result->list_capacity = v->list_capacity > 0 ? v->list_capacity : v->list_size;
+            result->list_data = (struct DuanValue**)malloc(result->list_capacity * sizeof(DuanValue*));
+            for (int i = 0; i < v->list_size; i++) {
+                if (v->list_data[i]) {
+                    result->list_data[i] = (DuanValue*)malloc(sizeof(DuanValue));
+                    dv_clone(result->list_data[i], v->list_data[i]);
+                } else {
+                    result->list_data[i] = NULL;
+                }
+            }
+            result->list_size = v->list_size;
+        }
     }
 }
 
@@ -670,372 +729,258 @@ void dv_str_replace(DuanValue* result, DuanValue* str, DuanValue* old_s, DuanVal
  * 列表操作
  * ================================================================ */
 
-void dv_list_new(DuanValue* result) {
-    result->type = 3;  /* 内部用字符串表示列表: "list:N:..." */
+/* 列表初始化辅助函数 */
+static void dv_list_init_internal(DuanValue* result, int capacity) {
+    result->type = 4;  /* LIST 类型 */
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = dv_strdup("list:0:");
+    result->str = NULL;
     result->boolean = 0;
+    result->list_size = 0;
+    result->list_capacity = capacity > 0 ? capacity : 4;
+    result->list_data = (struct DuanValue**)malloc(result->list_capacity * sizeof(DuanValue*));
+    for (int i = 0; i < result->list_capacity; i++) {
+        result->list_data[i] = NULL;
+    }
+}
+
+/* 列表增长辅助函数 */
+static void dv_list_grow(DuanValue* list) {
+    if (!list || list->type != 4) return;
+    int new_capacity = list->list_capacity * 2;
+    struct DuanValue** new_data = (struct DuanValue**)malloc(new_capacity * sizeof(DuanValue*));
+    for (int i = 0; i < list->list_size; i++) {
+        new_data[i] = list->list_data[i];
+    }
+    for (int i = list->list_size; i < new_capacity; i++) {
+        new_data[i] = NULL;
+    }
+    free(list->list_data);
+    list->list_data = new_data;
+    list->list_capacity = new_capacity;
+}
+
+/* 列表添加元素辅助函数 */
+static void dv_list_add_internal(DuanValue* list, DuanValue* elem) {
+    if (!list || list->type != 4 || !elem) return;
+    if (list->list_size >= list->list_capacity) {
+        dv_list_grow(list);
+    }
+    if (list->list_size < list->list_capacity) {
+        list->list_data[list->list_size] = elem;
+        list->list_size++;
+    }
+}
+
+void dv_list_new(DuanValue* result) {
+    dv_list_init_internal(result, 4);
 }
 
 int64_t dv_list_len(DuanValue* v) {
-    if (v->type != 4 && v->type != 3) return 0;
-    const char* s = (v->type == 4 || v->type == 3) ? (v->str ? v->str : "") : "";
-    if (strncmp(s, "list:", 5) != 0) return 0;
-    return atoll(s + 5);
+    if (v->type != 4) return 0;
+    return v->list_size;
 }
 
 int64_t dv_len(DuanValue* v) {
     if (v->type == 3) {
         const char* s = v->str ? v->str : "";
-        if (strncmp(s, "list:", 5) == 0) {
-            return atoll(s + 5);
-        }
         if (strncmp(s, "dict:", 5) == 0) {
             return atoll(s + 5);
         }
         return (int64_t)strlen(s);
     }
     if (v->type == 4) {
-        const char* s = v->str ? v->str : "";
-        if (strncmp(s, "list:", 5) == 0) {
-            return atoll(s + 5);
-        }
+        return v->list_size;
     }
     return 0;
 }
 
 void dv_list_get(DuanValue* result, DuanValue* list, int64_t index) {
-    if (list->type != 4 && list->type != 3) {
-        dv_str(result, "");
+    if (list->type != 4) {
+        dv_null(result);
         return;
     }
-    const char* s = list->str ? list->str : "";
-    if (strncmp(s, "list:", 5) != 0) {
-        dv_str(result, "");
+    if (index < 0 || index >= list->list_size) {
+        dv_null(result);
         return;
     }
-    const char* p = strchr(s + 5, ':');
-    if (!p) {
-        dv_str(result, "");
-        return;
+    DuanValue* elem = list->list_data[index];
+    if (elem) {
+        dv_clone(result, elem);
+    } else {
+        dv_null(result);
     }
-    p++;
-    /* 跳过 index 个元素 */
-    for (int64_t i = 0; i < index; i++) {
-        if (!*p) {
-            dv_str(result, "");
-            return;
-        }
-        const char* sep = strchr(p, '\x1f');
-        if (!sep) {
-            dv_str(result, "");
-            return;
-        }
-        p = sep + 1;
-    }
-    const char* end = strchr(p, '\x1f');
-    if (!end) end = p + strlen(p);
-    size_t len = end - p;
-    char* r = (char*)malloc(len + 1);
-    if (r) { memcpy(r, p, len); r[len] = '\0'; }
-    /* 检测纯数字 → 返回 INT 类型 */
-    int is_int = 1;
-    int neg = 0;
-    if (len > 0 && *p == '-') { neg = 1; }
-    for (size_t i = neg ? 1 : 0; i < len; i++) {
-        if (p[i] < '0' || p[i] > '9') { is_int = 0; break; }
-    }
-    if (is_int && len > (size_t)neg) {
-        result->type = 1;
-        result->i64 = atoll(r);
-        result->f64 = 0.0;
-        result->str = NULL;
-        result->boolean = 0;
-        free(r);
-        return;
-    }
-    /* 检测纯数字含小数点 → 返回 FLOAT 类型 */
-    int is_float = 1;
-    int dot = 0;
-    for (size_t i = neg ? 1 : 0; i < len; i++) {
-        if (p[i] == '.') { dot++; continue; }
-        if (p[i] < '0' || p[i] > '9') { is_float = 0; break; }
-    }
-    if (is_float && dot == 1) {
-        result->type = 2;
-        result->i64 = 0;
-        result->f64 = atof(r);
-        result->str = NULL;
-        result->boolean = 0;
-        free(r);
-        return;
-    }
-    result->type = 3;
-    result->i64 = 0;
-    result->f64 = 0.0;
-    result->str = dv_strdup(r ? r : "");
-    result->boolean = 0;
-    free(r);
 }
 
+/* 列表操作：基于动态数组实现 */
+
 void dv_list_append(DuanValue* result, DuanValue* list, DuanValue* elem) {
-    DuanValue local_list;
-    if (list->type != 4 && list->type != 3) {
-        dv_free(&local_list);
-        dv_list_new(&local_list);
-    } else {
-        dv_clone(&local_list, list);
-    }
-    char* elem_str = dv_to_string(elem);
-    int64_t len = dv_list_len(&local_list);
-    char prefix[32];
-    snprintf(prefix, sizeof(prefix), "list:%lld:", (long long)(len + 1));
+    if (!result) return;
     
-    const char* data_ptr = local_list.str ? strchr(local_list.str + 5, ':') : NULL;
-    if (!data_ptr) data_ptr = "";
-    else data_ptr++;
-    
-    size_t new_size = strlen(prefix) + strlen(data_ptr) + strlen(elem_str) + 2;
-    char* r = (char*)malloc(new_size);
-    if (r) {
-        if (*data_ptr) {
-            snprintf(r, new_size, "%s%s\x1f%s", prefix, data_ptr, elem_str);
-        } else {
-            snprintf(r, new_size, "%s%s", prefix, elem_str);
+    DuanValue* new_list;
+    if (list->type == 4) {
+        /* 复制原列表 */
+        new_list = (DuanValue*)malloc(sizeof(DuanValue));
+        if (!new_list) { dv_list_new(result); return; }
+        dv_list_init_internal(new_list, list->list_capacity + 1);
+        for (int i = 0; i < list->list_size; i++) {
+            DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+            if (copy) {
+                dv_clone(copy, list->list_data[i]);
+                dv_list_add_internal(new_list, copy);
+            }
         }
+    } else {
+        new_list = (DuanValue*)malloc(sizeof(DuanValue));
+        if (!new_list) { dv_list_new(result); return; }
+        dv_list_init_internal(new_list, 4);
     }
-    free(elem_str);
-    dv_free(&local_list);
-    if (r) {
-        result->type = 3;
-        result->i64 = 0;
-        result->f64 = 0.0;
-        result->str = dv_strdup(r);
-        result->boolean = 0;
-        free(r);
+    
+    /* 添加新元素 */
+    DuanValue* elem_copy = (DuanValue*)malloc(sizeof(DuanValue));
+    if (elem_copy) {
+        dv_clone(elem_copy, elem);
+        dv_list_add_internal(new_list, elem_copy);
+    }
+    
+    result->type = 4;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+    result->list_size = new_list->list_size;
+    result->list_capacity = new_list->list_capacity;
+    result->list_data = new_list->list_data;
+    free(new_list);
+}
+
+void dv_list_clear(DuanValue* result, DuanValue* list) {
+    if (result == list) {
+        /* 清空当前列表 */
+        for (int i = 0; i < list->list_size; i++) {
+            if (list->list_data[i]) {
+                dv_free(list->list_data[i]);
+                free(list->list_data[i]);
+                list->list_data[i] = NULL;
+            }
+        }
+        list->list_size = 0;
     } else {
         dv_list_new(result);
     }
 }
 
-void dv_list_clear(DuanValue* result, DuanValue* list) {
-    dv_free(list);
-    dv_list_new(result);
-}
-
 void dv_list_set(DuanValue* result, DuanValue* list, int64_t index, DuanValue* elem) {
-    int64_t len = dv_list_len(list);
-    if (index < 0 || index >= len) {
+    if (list->type != 4 || index < 0 || index >= list->list_size) {
         dv_clone(result, list);
         return;
     }
     
-    char* elem_str = dv_to_string(elem);
-    const char* s = list->str ? list->str : "";
-    const char* p = strchr(s + 5, ':');
-    if (!p) { dv_str(result, ""); free(elem_str); return; }
-    p++;
+    /* 复制列表 */
+    DuanValue* new_list = (DuanValue*)malloc(sizeof(DuanValue));
+    if (!new_list) { dv_clone(result, list); return; }
     
-    const char* start = p;
-    const char* elem_start = NULL;
-    const char* elem_end = NULL;
-    
-    for (int64_t i = 0; i <= len; i++) {
-        if (i == index) elem_start = p;
-        const char* sep = strchr(p, '\x1f');
-        if (!sep) {
-            if (i == index) elem_end = p + strlen(p);
-            break;
+    dv_list_init_internal(new_list, list->list_capacity);
+    for (int i = 0; i < list->list_size; i++) {
+        DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+        if (i == index && elem) {
+            dv_clone(copy, elem);
+        } else {
+            dv_clone(copy, list->list_data[i]);
         }
-        if (i == index) elem_end = sep;
-        p = sep + 1;
+        dv_list_add_internal(new_list, copy);
     }
     
-    if (!elem_start || !elem_end) {
-        dv_clone(result, list);
-        free(elem_str);
-        return;
-    }
-    
-    size_t before_len = elem_start - start;
-    size_t total_data_len = strlen(start);
-    size_t elem_end_offset = elem_end - start;
-    size_t after_len = (elem_end_offset + 1 <= total_data_len) ? (total_data_len - elem_end_offset - 1) : 0;
-    size_t new_size = strlen(s) - (elem_end - elem_start) + strlen(elem_str) + 32;
-    char* r = (char*)malloc(new_size);
-    if (!r) { dv_clone(result, list); free(elem_str); return; }
-    
-    char prefix[32];
-    snprintf(prefix, sizeof(prefix), "list:%lld:", (long long)len);
-    size_t prefix_len = strlen(prefix);
-    
-    memcpy(r, prefix, prefix_len);
-    memcpy(r + prefix_len, start, before_len);
-    size_t pos = prefix_len + before_len;
-    memcpy(r + pos, elem_str, strlen(elem_str));
-    pos += strlen(elem_str);
-    if (after_len > 0) {
-        r[pos++] = '\x1f';
-        memcpy(r + pos, elem_end + 1, after_len);
-        pos += after_len;
-    }
-    r[pos] = '\0';
-    
-    result->type = 3;
+    result->type = 4;
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = r;
+    result->str = NULL;
     result->boolean = 0;
-    free(elem_str);
+    result->list_size = new_list->list_size;
+    result->list_capacity = new_list->list_capacity;
+    result->list_data = new_list->list_data;
+    free(new_list);
 }
 
 void dv_list_insert(DuanValue* result, DuanValue* list, int64_t index, DuanValue* elem) {
-    int64_t len = dv_list_len(list);
-    if (index < 0) index = 0;
-    if (index > len) index = len;
-    
-    if (index == len) {
-        dv_list_append(result, list, elem);
+    if (list->type != 4) {
+        dv_list_new(result);
         return;
     }
     
-    char* elem_str = dv_to_string(elem);
-    const char* s = list->str ? list->str : "";
-    const char* p = strchr(s + 5, ':');
-    if (!p) { dv_str(result, ""); free(elem_str); return; }
-    p++;
+    if (index < 0) index = 0;
+    if (index > list->list_size) index = list->list_size;
     
-    const char* start = p;
-    const char* ins_pos = p;
+    /* 复制列表 */
+    DuanValue* new_list = (DuanValue*)malloc(sizeof(DuanValue));
+    if (!new_list) { dv_clone(result, list); return; }
     
-    for (int64_t i = 0; i < index; i++) {
-        const char* sep = strchr(p, '\x1f');
-        if (!sep) break;
-        p = sep + 1;
-        ins_pos = p;
+    dv_list_init_internal(new_list, list->list_capacity + 1);
+    for (int i = 0; i < list->list_size; i++) {
+        if (i == index) {
+            DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+            dv_clone(copy, elem);
+            dv_list_add_internal(new_list, copy);
+        }
+        DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+        dv_clone(copy, list->list_data[i]);
+        dv_list_add_internal(new_list, copy);
+    }
+    if (index >= list->list_size) {
+        DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+        dv_clone(copy, elem);
+        dv_list_add_internal(new_list, copy);
     }
     
-    size_t before_len = ins_pos - start;
-    if (before_len > 0) before_len--;
-    size_t after_len = strlen(start) - (ins_pos - start);
-    size_t new_size = strlen(s) + strlen(elem_str) + 32;
-    char* r = (char*)malloc(new_size);
-    if (!r) { dv_clone(result, list); free(elem_str); return; }
-    
-    char prefix[32];
-    snprintf(prefix, sizeof(prefix), "list:%lld:", (long long)(len + 1));
-    size_t prefix_len = strlen(prefix);
-    size_t pos = prefix_len;
-    
-    memcpy(r, prefix, prefix_len);
-    if (before_len > 0) {
-        memcpy(r + pos, start, before_len);
-        pos += before_len;
-        r[pos++] = '\x1f';
-    }
-    memcpy(r + pos, elem_str, strlen(elem_str));
-    pos += strlen(elem_str);
-    if (after_len > 0) {
-        r[pos++] = '\x1f';
-        memcpy(r + pos, ins_pos, after_len);
-        pos += after_len;
-    }
-    r[pos] = '\0';
-    
-    result->type = 3;
+    result->type = 4;
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = r;
+    result->str = NULL;
     result->boolean = 0;
-    free(elem_str);
+    result->list_size = new_list->list_size;
+    result->list_capacity = new_list->list_capacity;
+    result->list_data = new_list->list_data;
+    free(new_list);
 }
 
 void dv_list_remove(DuanValue* result, DuanValue* list, int64_t index) {
-    int64_t len = dv_list_len(list);
-    if (index < 0) index = len + index;
-    if (index < 0 || index >= len) {
+    if (list->type != 4 || index < 0 || index >= list->list_size) {
         dv_clone(result, list);
         return;
     }
     
-    const char* s = list->str ? list->str : "";
-    const char* p = strchr(s + 5, ':');
-    if (!p) { dv_clone(result, list); return; }
-    p++;
+    /* 复制列表（跳过要删除的元素） */
+    DuanValue* new_list = (DuanValue*)malloc(sizeof(DuanValue));
+    if (!new_list) { dv_clone(result, list); return; }
     
-    const char* start = p;
-    const char* elem_start = NULL;
-    const char* elem_end = NULL;
-    
-    for (int64_t i = 0; i < len; i++) {
-        if (i == index) elem_start = p;
-        const char* sep = strchr(p, '\x1f');
-        if (!sep) {
-            if (i == index) elem_end = p + strlen(p);
-            break;
-        }
-        if (i == index) elem_end = sep;
-        p = sep + 1;
+    dv_list_init_internal(new_list, list->list_capacity);
+    for (int i = 0; i < list->list_size; i++) {
+        if (i == index) continue;
+        DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+        dv_clone(copy, list->list_data[i]);
+        dv_list_add_internal(new_list, copy);
     }
     
-    if (!elem_start || !elem_end) {
-        dv_clone(result, list);
-        return;
-    }
-    
-    size_t before_len = elem_start - start;
-    size_t after_total = strlen(start) - (elem_end - start);
-    if (after_total > 0) after_total--;
-    
-    size_t new_size = strlen(s) - (elem_end - elem_start) + 32;
-    char* r = (char*)malloc(new_size);
-    if (!r) { dv_clone(result, list); return; }
-    
-    char prefix[32];
-    snprintf(prefix, sizeof(prefix), "list:%lld:", (long long)(len - 1));
-    size_t prefix_len = strlen(prefix);
-    
-    memcpy(r, prefix, prefix_len);
-    size_t pos = prefix_len;
-    if (before_len > 0) {
-        memcpy(r + pos, start, before_len - 1);
-        pos += before_len - 1;
-    }
-    if (after_total > 0) {
-        if (pos > prefix_len) r[pos++] = '\x1f';
-        memcpy(r + pos, elem_end + 1, after_total);
-        pos += after_total;
-    }
-    r[pos] = '\0';
-    
-    result->type = 3;
+    result->type = 4;
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = r;
+    result->str = NULL;
     result->boolean = 0;
+    result->list_size = new_list->list_size;
+    result->list_capacity = new_list->list_capacity;
+    result->list_data = new_list->list_data;
+    free(new_list);
 }
 
 int64_t dv_list_index_of(DuanValue* list, DuanValue* elem) {
-    int64_t len = dv_list_len(list);
-    char* elem_str = dv_to_string(elem);
-    const char* s = list->str ? list->str : "";
-    const char* p = strchr(s + 5, ':');
-    if (!p) { free(elem_str); return -1; }
-    p++;
+    if (list->type != 4 || !elem) return -1;
     
-    for (int64_t i = 0; i < len; i++) {
-        const char* sep = strchr(p, '\x1f');
-        const char* end = sep ? sep : p + strlen(p);
-        size_t elen = end - p;
-        if (elen == strlen(elem_str) && strncmp(p, elem_str, elen) == 0) {
-            free(elem_str);
+    for (int i = 0; i < list->list_size; i++) {
+        DuanValue* e = list->list_data[i];
+        if (e && dv_eq(e, elem)) {
             return i;
         }
-        if (!sep) break;
-        p = sep + 1;
     }
-    free(elem_str);
     return -1;
 }
 
@@ -1044,142 +989,73 @@ int64_t dv_list_contains(DuanValue* list, DuanValue* elem) {
 }
 
 void dv_list_reverse(DuanValue* result, DuanValue* list) {
-    int64_t len = dv_list_len(list);
-    if (len <= 1) {
-        dv_clone(result, list);
+    if (list->type != 4) {
+        dv_list_new(result);
         return;
     }
     
-    char** elems = (char**)malloc(len * sizeof(char*));
-    if (!elems) { dv_clone(result, list); return; }
+    DuanValue* new_list = (DuanValue*)malloc(sizeof(DuanValue));
+    if (!new_list) { dv_clone(result, list); return; }
     
-    const char* s = list->str ? list->str : "";
-    const char* p = strchr(s + 5, ':');
-    if (!p) { free(elems); dv_clone(result, list); return; }
-    p++;
-    
-    for (int64_t i = 0; i < len; i++) {
-        const char* sep = strchr(p, '\x1f');
-        const char* end = sep ? sep : p + strlen(p);
-        size_t elen = end - p;
-        elems[i] = (char*)malloc(elen + 1);
-        if (elems[i]) {
-            memcpy(elems[i], p, elen);
-            elems[i][elen] = '\0';
-        } else {
-            elems[i] = dv_strdup("");
-        }
-        if (!sep) break;
-        p = sep + 1;
+    dv_list_init_internal(new_list, list->list_capacity);
+    for (int i = list->list_size - 1; i >= 0; i--) {
+        DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+        dv_clone(copy, list->list_data[i]);
+        dv_list_add_internal(new_list, copy);
     }
     
-    size_t total_len = 0;
-    for (int64_t i = 0; i < len; i++) {
-        total_len += strlen(elems[len - 1 - i]);
-    }
-    total_len += len + 32;
-    
-    char* r = (char*)malloc(total_len);
-    if (!r) {
-        for (int64_t i = 0; i < len; i++) free(elems[i]);
-        free(elems);
-        dv_clone(result, list);
-        return;
-    }
-    
-    char prefix[32];
-    snprintf(prefix, sizeof(prefix), "list:%lld:", (long long)len);
-    size_t pos = strlen(prefix);
-    memcpy(r, prefix, pos);
-    
-    for (int64_t i = 0; i < len; i++) {
-        if (i > 0) r[pos++] = '\x1f';
-        const char* e = elems[len - 1 - i];
-        size_t elen = strlen(e);
-        memcpy(r + pos, e, elen);
-        pos += elen;
-        free(elems[len - 1 - i]);
-    }
-    r[pos] = '\0';
-    free(elems);
-    
-    result->type = 3;
+    result->type = 4;
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = r;
+    result->str = NULL;
     result->boolean = 0;
+    result->list_size = new_list->list_size;
+    result->list_capacity = new_list->list_capacity;
+    result->list_data = new_list->list_data;
+    free(new_list);
 }
 
-static int cmp_str(const void* a, const void* b) {
-    return strcmp(*(const char**)a, *(const char**)b);
+static int cmp_dv(const void* a, const void* b) {
+    DuanValue* va = *(DuanValue**)a;
+    DuanValue* vb = *(DuanValue**)b;
+    if (!va && !vb) return 0;
+    if (!va) return -1;
+    if (!vb) return 1;
+    char* sa = dv_to_string(va);
+    char* sb = dv_to_string(vb);
+    int cmp = strcmp(sa ? sa : "", sb ? sb : "");
+    free(sa);
+    free(sb);
+    return cmp;
 }
 
 void dv_list_sort(DuanValue* result, DuanValue* list) {
-    int64_t len = dv_list_len(list);
-    if (len <= 1) {
+    if (list->type != 4 || list->list_size <= 1) {
         dv_clone(result, list);
         return;
     }
     
-    char** elems = (char**)malloc(len * sizeof(char*));
-    if (!elems) { dv_clone(result, list); return; }
+    DuanValue* new_list = (DuanValue*)malloc(sizeof(DuanValue));
+    if (!new_list) { dv_clone(result, list); return; }
     
-    const char* s = list->str ? list->str : "";
-    const char* p = strchr(s + 5, ':');
-    if (!p) { free(elems); dv_clone(result, list); return; }
-    p++;
-    
-    for (int64_t i = 0; i < len; i++) {
-        const char* sep = strchr(p, '\x1f');
-        const char* end = sep ? sep : p + strlen(p);
-        size_t elen = end - p;
-        elems[i] = (char*)malloc(elen + 1);
-        if (elems[i]) {
-            memcpy(elems[i], p, elen);
-            elems[i][elen] = '\0';
-        } else {
-            elems[i] = dv_strdup("");
-        }
-        if (!sep) break;
-        p = sep + 1;
+    dv_list_init_internal(new_list, list->list_capacity);
+    for (int i = 0; i < list->list_size; i++) {
+        DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
+        dv_clone(copy, list->list_data[i]);
+        dv_list_add_internal(new_list, copy);
     }
     
-    qsort(elems, (size_t)len, sizeof(char*), cmp_str);
+    qsort(new_list->list_data, new_list->list_size, sizeof(DuanValue*), cmp_dv);
     
-    size_t total_len = 0;
-    for (int64_t i = 0; i < len; i++) {
-        total_len += strlen(elems[i]);
-    }
-    total_len += len + 32;
-    
-    char* r = (char*)malloc(total_len);
-    if (!r) {
-        for (int64_t i = 0; i < len; i++) free(elems[i]);
-        free(elems);
-        dv_clone(result, list);
-        return;
-    }
-    
-    char prefix[32];
-    snprintf(prefix, sizeof(prefix), "list:%lld:", (long long)len);
-    size_t pos = strlen(prefix);
-    memcpy(r, prefix, pos);
-    
-    for (int64_t i = 0; i < len; i++) {
-        if (i > 0) r[pos++] = '\x1f';
-        size_t elen = strlen(elems[i]);
-        memcpy(r + pos, elems[i], elen);
-        pos += elen;
-        free(elems[i]);
-    }
-    r[pos] = '\0';
-    free(elems);
-    
-    result->type = 3;
+    result->type = 4;
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = r;
+    result->str = NULL;
     result->boolean = 0;
+    result->list_size = new_list->list_size;
+    result->list_capacity = new_list->list_capacity;
+    result->list_data = new_list->list_data;
+    free(new_list);
 }
 
 void dv_str_split(DuanValue* result, DuanValue* str, DuanValue* delim) {
@@ -1200,14 +1076,13 @@ void dv_str_split(DuanValue* result, DuanValue* str, DuanValue* delim) {
         }
     }
     
-    int buf_size = 512 + (int)strlen(s) + count * 32;
-    char* out = (char*)malloc(buf_size);
-    if (!out) {
+    /* 创建 type=4 的列表 */
+    DuanValue* list = (DuanValue*)malloc(sizeof(DuanValue));
+    if (!list) {
         dv_list_new(result);
         return;
     }
-    snprintf(out, buf_size, "list:%d:", count);
-    int pos = (int)strlen(out);
+    dv_list_init_internal(list, count > 4 ? count : 4);
     
     p = s;
     for (int i = 0; i < count; i++) {
@@ -1218,21 +1093,30 @@ void dv_str_split(DuanValue* result, DuanValue* str, DuanValue* delim) {
             end = p + strlen(p);
         }
         int part_len = (int)(end - p);
-        if (pos + part_len + 2 >= buf_size) break;
-        memcpy(out + pos, p, part_len);
-        pos += part_len;
-        if (i < count - 1) {
-            out[pos++] = '\x1f';
-            p = end + d_len;
+        char* part = (char*)malloc(part_len + 1);
+        if (part) {
+            memcpy(part, p, part_len);
+            part[part_len] = '\0';
         }
+        
+        DuanValue* elem = (DuanValue*)malloc(sizeof(DuanValue));
+        if (elem) {
+            dv_str(elem, part ? part : "");
+            dv_list_add_internal(list, elem);
+        }
+        if (part) free(part);
+        p = end + d_len;
     }
-    out[pos] = '\0';
     
-    result->type = 3;
+    result->type = 4;
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = out;
+    result->str = NULL;
     result->boolean = 0;
+    result->list_size = list->list_size;
+    result->list_capacity = list->list_capacity;
+    result->list_data = list->list_data;
+    free(list);
 }
 
 /* ================================================================
