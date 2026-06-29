@@ -60,6 +60,8 @@ class PythonCodeGenerator:
         # 类方法名追踪（用于方法内自动添加 self. 前缀调用其他方法）
         self._class_method_names: set = set()
         self._in_class_method: bool = False
+        # 当前方法参数名追踪（避免将参数名误判为类属性）
+        self._current_method_params: set = set()
         
         # 方法名映射（中文到英文）
         self.method_name_map = {
@@ -650,44 +652,66 @@ class PythonCodeGenerator:
     def _generate_class_definition(self, stmt):
         """生成类定义"""
         class_name = self._sanitize_name(stmt.name)
-        
+
         # 类定义行
         if stmt.base_classes:
             bases = ', '.join(self._sanitize_name(b) for b in stmt.base_classes)
             self._add_line(f"class {class_name}({bases}):")
         else:
             self._add_line(f"class {class_name}:")
-        
+
         self.indent_level += 1
-        
-        # 收集类属性名
-        self._class_attr_names = set()
+
+        # 分离静态属性和实例属性
+        static_attrs = []
+        instance_attrs = []
         if hasattr(stmt, 'attributes') and stmt.attributes:
             for attr in stmt.attributes:
-                self._class_attr_names.add(self._sanitize_name(attr.name))
-        
+                if getattr(attr, 'is_static', False):
+                    static_attrs.append(attr)
+                else:
+                    instance_attrs.append(attr)
+
+        # 收集类属性名（用于方法内自动添加 self. 前缀）
+        self._class_attr_names = set()
+        for attr in instance_attrs:
+            self._class_attr_names.add(self._sanitize_name(attr.name))
+        for attr in static_attrs:
+            self._class_attr_names.add(self._sanitize_name(attr.name))
+
         # 收集类方法名
         self._class_method_names = set()
         if hasattr(stmt, 'methods') and stmt.methods:
             for method in stmt.methods:
                 method_name = method.name if hasattr(method, 'name') else ''
                 self._class_method_names.add(method_name)
-        
+
         # 检查是否有用户定义的构造函数
         has_constructor = False
+        ctor_method = None
         if hasattr(stmt, 'methods') and stmt.methods:
             for method in stmt.methods:
                 method_name = method.name if hasattr(method, 'name') else ''
                 is_ctor = getattr(method, 'is_constructor', False) or method_name in ('构造', '初始化')
                 if is_ctor or method_name == '__init__':
                     has_constructor = True
+                    ctor_method = method
                     break
-        
-        # 生成 __init__ 方法初始化属性（仅在无用户构造函数时）
-        if self._class_attr_names and not has_constructor:
+
+        # 生成静态属性（类变量）
+        for attr in static_attrs:
+            attr_name = self._sanitize_name(attr.name)
+            if attr.default_value:
+                default = self._generate_expr(attr.default_value)
+                self._add_line(f"{attr_name} = {default}")
+            else:
+                self._add_line(f"{attr_name} = None")
+
+        # 如果没有用户构造函数但有实例属性，自动生成 __init__
+        if instance_attrs and not has_constructor:
             self._add_line("def __init__(self):")
             self.indent_level += 1
-            for attr in stmt.attributes:
+            for attr in instance_attrs:
                 attr_name = self._sanitize_name(attr.name)
                 if attr.default_value:
                     default = self._generate_expr(attr.default_value)
@@ -695,29 +719,25 @@ class PythonCodeGenerator:
                 else:
                     self._add_line(f"self.{attr_name} = None")
             self.indent_level -= 1
-        
+
         # 生成方法
         if hasattr(stmt, 'methods') and stmt.methods:
             for method in stmt.methods:
-                # 如果有构造函数和类属性，将属性初始化合并到构造函数中
-                if has_constructor and self._class_attr_names:
-                    method_name = method.name if hasattr(method, 'name') else ''
-                    is_ctor = getattr(method, 'is_constructor', False) or method_name in ('构造', '初始化')
-                    if is_ctor:
-                        self._generate_method(method, stmt.attributes)
-                    else:
-                        self._generate_method(method)
+                method_name = method.name if hasattr(method, 'name') else ''
+                is_ctor = getattr(method, 'is_constructor', False) or method_name in ('构造', '初始化')
+                if is_ctor and instance_attrs:
+                    self._generate_method(method, instance_attrs)
                 else:
                     self._generate_method(method)
-        
+
         # 如果类体为空，添加 pass
-        if not self._class_attr_names and not (hasattr(stmt, 'methods') and stmt.methods):
+        if not static_attrs and not instance_attrs and not (hasattr(stmt, 'methods') and stmt.methods):
             self._add_line("pass")
-        
+
         # 清理类属性追踪
         self._class_attr_names = set()
         self._class_method_names = set()
-        
+
         self.indent_level -= 1
         self._add_line("")
     
@@ -872,31 +892,44 @@ class PythonCodeGenerator:
     def _generate_method(self, method, class_attributes=None):
         """生成方法定义"""
         method_name = method.name
-        
+
         # 构造函数特殊处理
         if method.is_constructor or method_name == '构造':
             method_name = '__init__'
-        elif getattr(method, 'is_private', False):
-            method_name = f"__{method_name}"
-        
-        # 参数列表（第一个参数是 self）
-        params = ['self']
+
+        # 静态方法不需要 self 参数
+        is_static = getattr(method, 'is_static', False)
+        if is_static:
+            params = []
+        else:
+            params = ['self']
+
+        # 访问修饰符：私有方法加 _ 前缀
+        access = getattr(method, 'access_modifier', 'public')
+        if access == 'private':
+            method_name = f"_{method_name}"
+
+        # 收集参数名（用于排除 self. 前缀）
+        self._current_method_params = set()
         if hasattr(method, 'parameters') and method.parameters:
             for param in method.parameters:
                 param_name = self._sanitize_name(param.name)
+                self._current_method_params.add(param.name)
                 params.append(param_name)
-        
+
         params_str = ', '.join(params)
-        
+
         # 方法定义（必须包含括号）
+        if is_static:
+            self._add_line(f"@staticmethod")
         self._add_line(f"def {method_name}({params_str}):")
-        
+
         self.indent_level += 1
-        
+
         # 设置类方法上下文，用于自动添加 self. 前缀
-        self._in_class_method = True
-        
-        # 如果是构造函数且有类属性，先添加属性初始化语句（未在构造函数中初始化的属性）
+        self._in_class_method = not is_static
+
+        # 如果是构造函数且有类属性，为未在构造函数体中初始化的属性生成默认值
         attr_init_lines = []
         if method_name == '__init__' and class_attributes:
             # 收集已在构造函数中初始化的属性名
@@ -908,21 +941,25 @@ class PythonCodeGenerator:
                             initialized_attrs.add(self._sanitize_name(stmt[1]))
                     elif isinstance(stmt, VarDecl):
                         initialized_attrs.add(self._sanitize_name(stmt.name))
-            # 为未初始化的类属性生成初始化语句
+                    elif hasattr(stmt, 'target'):
+                        # Assignment 或 SelfAssignment 节点
+                        target = stmt.target
+                        if isinstance(target, str):
+                            initialized_attrs.add(self._sanitize_name(target))
+                        elif hasattr(target, 'name'):
+                            initialized_attrs.add(self._sanitize_name(target.name))
+            # 只为有默认值且未在构造函数中初始化的属性生成初始化语句
             for attr in class_attributes:
                 attr_name = self._sanitize_name(attr.name)
-                if attr_name not in initialized_attrs:
-                    if attr.default_value:
-                        default = self._generate_expr(attr.default_value)
-                        attr_init_lines.append(f"self.{attr_name} = {default}")
-                    else:
-                        attr_init_lines.append(f"self.{attr_name} = None")
-        
+                if attr_name not in initialized_attrs and attr.default_value:
+                    default = self._generate_expr(attr.default_value)
+                    attr_init_lines.append(f"self.{attr_name} = {default}")
+
         # 先输出属性初始化语句，再生成方法体
         if attr_init_lines:
             for line in attr_init_lines:
                 self._add_line(line)
-        
+
         # 生成方法体
         if hasattr(method, 'body') and method.body:
             for stmt in method.body:
@@ -944,8 +981,9 @@ class PythonCodeGenerator:
         self.indent_level -= 1
         self._add_line("")
         
-        # 重置类方法上下文
+        # 重置类方法上下文和参数追踪
         self._in_class_method = False
+        self._current_method_params = set()
     
     def _generate_expr(self, expr: ASTNode) -> str:
         """生成表达式"""
@@ -986,9 +1024,9 @@ class PythonCodeGenerator:
             # 检查是否是中文数字
             if expr.name in self.chinese_numbers:
                 return str(self.chinese_numbers[expr.name])
-            # 如果是导入的符号且无参数，但不在 MemberAccess 中时，生成为函数调用（0参数函数）
-            # 注意：模块导入（如 JSON）不应添加括号，只有真正的函数调用才需要
-            # 模块应该直接作为对象使用
+            # 类方法中，如果引用的是类属性且不是参数名，添加 self. 前缀
+            if self._in_class_method and expr.name in self._class_attr_names and expr.name not in self._current_method_params:
+                return f"self.{name}"
             return name
         
         # 检查 ast_nodes 模块中的 Identifier（兼容两种定义）
@@ -1078,14 +1116,17 @@ class PythonCodeGenerator:
                 # 方法调用
                 args = [self._generate_expr(arg) for arg in expr.args]
                 args_str = ', '.join(args)
-                
+
+                # 特殊处理：父.构造(...) -> super().__init__(...)
+                if obj == "super()" and expr.member == '构造':
+                    return f"super().__init__({args_str})"
                 # 特殊处理：长度方法 -> len(obj)
                 if expr.member == '长度':
                     return f"len({obj})"
                 # 特殊处理：包含方法 -> item in obj
                 elif expr.member == '包含':
                     return f"{args_str} in {obj}"
-                
+
                 return f"{obj}.{mapped_member}({args_str})"
             else:
                 # 属性访问

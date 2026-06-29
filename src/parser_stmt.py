@@ -207,8 +207,8 @@ class ParserStmtMixin:
         
         # 先尝试解析一个表达式，看看是不是属性访问
         # 我们先尝试解析标识符，然后看看后面有没有点号
-        if self._current() and self._current().type == TokenType.IDENTIFIER:
-            first_ident = self._consume(TokenType.IDENTIFIER)
+        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            first_ident = self._consume()
             # 看看后面是不是点号
             if self._current() and self._current().type == TokenType.DOT:
                 # 这是属性访问：obj.attr = value
@@ -223,7 +223,7 @@ class ParserStmtMixin:
                     self._consume(TokenType.KEYWORD, '等于')
                 else:
                     tok = self._current()
-                    raise ParseError(f"期望'为'或'等于'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
+                    self._error(f"期望'为'或'等于'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
                 
                 # 值
                 value = self._parse_expr()
@@ -243,20 +243,16 @@ class ParserStmtMixin:
         # 这里属性名可能是单个标识符，也可能带类型等
         attr_name_tokens = []
         
-        # 收集属性名，直到遇到"为"关键字
+        # 收集属性名，直到遇到"为"或"等于"关键字
         while self._current():
             tok = self._current()
-            
-            if tok.type == TokenType.KEYWORD and tok.value == '为':
+
+            if tok.type == TokenType.KEYWORD and tok.value in ('为', '等于'):
                 break
-            
-            if tok.type == TokenType.IDENTIFIER:
+
+            if tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 attr_name_tokens.append(tok.value)
-                self._consume(TokenType.IDENTIFIER)
-            elif tok.type == TokenType.KEYWORD and tok.value not in ('为',):
-                # 属性名可能包含关键字
-                attr_name_tokens.append(tok.value)
-                self._consume(TokenType.KEYWORD)
+                self._consume()
             else:
                 break
         
@@ -271,7 +267,7 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '等于')
         else:
             # 兼容其他赋值操作符
-            raise ParseError(f"期望'为'或'等于'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
+            self._error(f"期望'为'或'等于'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
         
         # 值
         value = self._parse_expr()
@@ -314,7 +310,7 @@ class ParserStmtMixin:
                 if self._current() and self._current().type == TokenType.DOT:
                     self._consume(TokenType.DOT)
                 # 暂不支持复合赋值
-                raise ParseError(f"暂不支持索引复合赋值", name_tok.line, name_tok.col, name_tok.value)
+                self._error(f"暂不支持索引复合赋值", name_tok.line, name_tok.col, name_tok.value)
             
             # 检查等于/为
             if not self._match(TokenType.KEYWORD, '等于') and not self._match(TokenType.KEYWORD, '为'):
@@ -392,7 +388,7 @@ class ParserStmtMixin:
             elif tok.type == TokenType.KEYWORD:
                 module_name = self._consume(TokenType.KEYWORD).value
             else:
-                raise ParseError(f"期望模块名，但得到 {tok.type} = '{tok.value}'（建议：使用「从 模块名 导入 名称。」语法）", tok.line, tok.col)
+                self._error(f"期望模块名，但得到 {tok.type} = '{tok.value}'（建议：使用「从 模块名 导入 名称。」语法）", tok.line, tok.col)
         
         # 检查是否有别名：为
         alias = None
@@ -434,7 +430,7 @@ class ParserStmtMixin:
             elif tok.type == TokenType.KEYWORD:
                 module_name = self._consume(TokenType.KEYWORD).value
             else:
-                raise ParseError(f"期望模块名，但得到 {tok.type} = '{tok.value}'（建议：使用「从 模块名 导入 名称。」语法）", tok.line, tok.col)
+                self._error(f"期望模块名，但得到 {tok.type} = '{tok.value}'（建议：使用「从 模块名 导入 名称。」语法）", tok.line, tok.col)
         
         # 导入
         self._consume(TokenType.KEYWORD, '导入')
@@ -554,7 +550,7 @@ class ParserStmtMixin:
         elif name_tok and name_tok.type == TokenType.KEYWORD:
             name = self._consume(TokenType.KEYWORD).value
         else:
-            raise ParseError(f"期望标识符，但得到 {name_tok.type if name_tok else '输入结束'}",
+            self._error(f"期望标识符，但得到 {name_tok.type if name_tok else '输入结束'}",
                              name_tok.line if name_tok else 0, name_tok.col if name_tok else 0)
         
         # 类型注解（可选）：设 变量: 类型 为 值
@@ -648,14 +644,14 @@ class ParserStmtMixin:
         # 标识符（允许 KEYWORD 作为变量名）
         name_tok = self._current()
         if name_tok is None:
-            raise ParseError("期望标识符，但到达输入结束")
+            self._error("期望标识符，但到达输入结束")
 
         # 允许 KEYWORD 或 IDENTIFIER 作为变量名
         if name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
             self._consume()
             name = name_tok.value
         else:
-            raise ParseError(f"期望标识符，得到 {name_tok.type}", name_tok.line, name_tok.col, name_tok.value)
+            self._error(f"期望标识符，得到 {name_tok.type}", name_tok.line, name_tok.col, name_tok.value)
 
         # 类型注解（可选）：定义 变量: 类型 等于 值
         type_annotation = None
@@ -672,7 +668,7 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '为')
         else:
             tok = self._current()
-            raise ParseError(f"期望'等于'或'为'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
+            self._error(f"期望'等于'或'为'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
                              tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None)
 
         # 表达式
@@ -703,7 +699,7 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '如果')
         else:
             tok = self._current()
-            raise ParseError(f"期望'如果'或'若'，但得到'{tok.value if tok else '输入结束'}'",
+            self._error(f"期望'如果'或'若'，但得到'{tok.value if tok else '输入结束'}'",
                              tok.line if tok else 0, tok.col if tok else 0)
         
         # 条件
@@ -950,7 +946,7 @@ class ParserStmtMixin:
         elif self._match(TokenType.KEYWORD, '中的'):
             self._consume(TokenType.KEYWORD, '中的')
         else:
-            raise ParseError(f"遍历循环期望'在'、'之'或'中的'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
+            self._error(f"遍历循环期望'在'、'之'或'中的'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
         
         # 可迭代对象
         iterable = self._parse_expr()
@@ -1260,7 +1256,7 @@ class ParserStmtMixin:
                 elif tok and tok.type == TokenType.NUMBER:
                     param_name = str(self._consume(TokenType.NUMBER).value)
                 else:
-                    raise ParseError(f"期望参数名，但得到 {tok.type if tok else '输入结束'}（位置: L{tok.line if tok else '?'}:C{tok.col if tok else '?'}）")
+                    self._error(f"期望参数名，但得到 {tok.type if tok else '输入结束'}（位置: L{tok.line if tok else '?'}:C{tok.col if tok else '?'}）")
                 
                 # 类型注解（可选）
                 param_type = None
@@ -1334,7 +1330,7 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '段')
         else:
             tok = self._current()
-            raise ParseError(f"期望'段落'、'函数'或'段'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
+            self._error(f"期望'段落'、'函数'或'段'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
                              tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None)
         
         # 段名（支持IDENTIFIER, CHINESE_NUM, KEYWORD）
@@ -1347,7 +1343,7 @@ class ParserStmtMixin:
         elif name_tok and name_tok.type == TokenType.KEYWORD:
             name_parts.append(self._consume(TokenType.KEYWORD).value)
         else:
-            raise ParseError(f"期望标识符或中文数字作为段名，但得到 {name_tok.type if name_tok else '输入结束'}", name_tok.line if name_tok else 0, name_tok.col if name_tok else 0, name_tok.value if name_tok else None)
+            self._error(f"期望标识符或中文数字作为段名，但得到 {name_tok.type if name_tok else '输入结束'}", name_tok.line if name_tok else 0, name_tok.col if name_tok else 0, name_tok.value if name_tok else None)
         
         # 继续收集连续的中文数字或标识符/关键字作为段名（例如"三倍"）
         while self._current():
@@ -1711,7 +1707,7 @@ class ParserStmtMixin:
         if kw_tok and kw_tok.type in (TokenType.KEYWORD, TokenType.IDENTIFIER) and kw_tok.value == '方法':
             self._consume()
         else:
-            raise ParseError(f"期望'方法'，但得到 {kw_tok.type if kw_tok else '输入结束'}（附近: '{kw_tok.value if kw_tok else ''}'）", kw_tok.line if kw_tok else 0, kw_tok.col if kw_tok else 0)
+            self._error(f"期望'方法'，但得到 {kw_tok.type if kw_tok else '输入结束'}（附近: '{kw_tok.value if kw_tok else ''}'）", kw_tok.line if kw_tok else 0, kw_tok.col if kw_tok else 0)
         
         # 参数列表 (params)
         params = []
@@ -1796,7 +1792,7 @@ class ParserStmtMixin:
                     break
                 name_parts.append(self._consume().value)
         else:
-            raise ParseError(f"期望类名，但得到 {name_tok.type if name_tok else '输入结束'}")
+            self._error(f"期望类名，但得到 {name_tok.type if name_tok else '输入结束'}")
         class_name = ''.join(name_parts)
 
         # 泛型参数？（可选）如：类 栈[T]:
@@ -1813,7 +1809,7 @@ class ParserStmtMixin:
             if self._current() and self._current().type == TokenType.RBRACKET:
                 self._consume(TokenType.RBRACKET)
             else:
-                raise ParseError(f"期望右方括号 ']'，但得到 {self._current()}")
+                self._error(f"期望右方括号 ']'，但得到 {self._current()}")
 
         # 继承？（可选）
         base_classes = []
@@ -1824,7 +1820,7 @@ class ParserStmtMixin:
                 base_classes = [base_tok.value]
                 self._consume()
             else:
-                raise ParseError(f"期望父类名，但得到 {base_tok.type if base_tok else '输入结束'}")
+                self._error(f"期望父类名，但得到 {base_tok.type if base_tok else '输入结束'}")
 
         # 实现接口（可选）
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '实现':
@@ -1854,7 +1850,7 @@ class ParserStmtMixin:
         elif self._current() and self._current().type == TokenType.COLON:       
             self._consume(TokenType.COLON)
         else:
-            raise ParseError(f"期望句号或冒号，但得到 {self._current()}")       
+            self._error(f"期望句号或冒号，但得到 {self._current()}")       
 
         # 类体
         attributes = []
@@ -1879,27 +1875,53 @@ class ParserStmtMixin:
                         self._consume(TokenType.DEDENT)
                         continue
 
-                # 属性声明（支持公有和私有）
+                # 访问修饰符检测
+                access_modifier = 'public'
+                is_static = False
+                if tok.type == TokenType.KEYWORD and tok.value == '私有':
+                    access_modifier = 'private'
+                    self._consume(TokenType.KEYWORD, '私有')
+                    tok = self._current()
+                elif tok.type == TokenType.KEYWORD and tok.value == '公有':
+                    access_modifier = 'public'
+                    self._consume(TokenType.KEYWORD, '公有')
+                    tok = self._current()
+                elif tok.type == TokenType.KEYWORD and tok.value == '保护':
+                    access_modifier = 'protected'
+                    self._consume(TokenType.KEYWORD, '保护')
+                    tok = self._current()
+
+                # 静态修饰符检测
+                if tok.type == TokenType.KEYWORD and tok.value == '静态':
+                    is_static = True
+                    self._consume(TokenType.KEYWORD, '静态')
+                    tok = self._current()
+
+                # 属性声明（支持公有、私有、保护和静态）
                 if tok.type == TokenType.KEYWORD and tok.value == '属性':
                     attr = self._parse_attribute_declaration()
+                    attr.access_modifier = access_modifier
+                    attr.is_static = is_static
                     attributes.append(attr)
-                elif tok.type == TokenType.KEYWORD and tok.value == '私属性':       
+                elif tok.type == TokenType.KEYWORD and tok.value == '私属性':
                     attr = self._parse_attribute_declaration()
-                    attr.is_private = True  # 标记为私有
+                    attr.access_modifier = 'private'
                     attributes.append(attr)
 
                 # 构造函数
                 elif tok.type == TokenType.KEYWORD and tok.value == '构造':
-                    method = self._parse_method_definition(is_constructor=True)     
+                    method = self._parse_method_definition(is_constructor=True)
                     methods.append(method)
 
-                # 方法定义（支持公有和私有）
+                # 方法定义（支持公有、私有、保护和静态）
                 elif tok.type == TokenType.KEYWORD and tok.value in ('段落', '段', '函数'):
-                    method = self._parse_method_definition(is_constructor=False)    
+                    method = self._parse_method_definition(is_constructor=False)
+                    method.access_modifier = access_modifier
+                    method.is_static = is_static
                     methods.append(method)
-                elif tok.type == TokenType.KEYWORD and tok.value == '私段落':       
-                    method = self._parse_method_definition(is_constructor=False)    
-                    method.is_private = True  # 标记为私有
+                elif tok.type == TokenType.KEYWORD and tok.value == '私段落':
+                    method = self._parse_method_definition(is_constructor=False)
+                    method.access_modifier = 'private'
                     methods.append(method)
 
                 # 其他情况（不应该发生）
@@ -1917,20 +1939,40 @@ class ParserStmtMixin:
     def _parse_attribute_declaration(self) -> AttributeDeclaration:
         """解析属性声明
 
-        语法：属性 属性名[。]
+        语法：属性 属性名 [等于 默认值] [。]
         """
         # 属性
         self._consume(TokenType.KEYWORD, '属性')
 
-        # 属性名
-        name_tok = self._consume(TokenType.IDENTIFIER)
-        attr_name = name_tok.value
+        # 属性名（支持多字标识符，如"余额"被拆分为"余"+"额"）
+        attr_name_parts = []
+        while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            # 遇到分隔符时停止
+            if self._current().type == TokenType.DOT:
+                break
+            if self._current().type == TokenType.NEWLINE:
+                break
+            if self._current().type == TokenType.COLON:
+                break
+            attr_name_parts.append(self._current().value)
+            self._consume()
+        if not attr_name_parts:
+            name_tok = self._consume(TokenType.IDENTIFIER)
+            attr_name = name_tok.value
+        else:
+            attr_name = ''.join(attr_name_parts)
+
+        # 默认值（可选）
+        default_value = None
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '等于':
+            self._consume(TokenType.KEYWORD, '等于')
+            default_value = self._parse_expr()
 
         # 句号（可选）
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
 
-        return AttributeDeclaration(name=attr_name)
+        return AttributeDeclaration(name=attr_name, default_value=default_value)
 
     def _parse_method_definition(self, is_constructor=False) -> MethodDefinition:
         """解析方法定义
@@ -1963,7 +2005,7 @@ class ParserStmtMixin:
             if tok and tok.type == TokenType.KEYWORD and tok.value in ('段落', '段', '函数'):
                 self._consume(TokenType.KEYWORD)
             else:
-                raise ParseError(f"期望'段落'、'段'或'函数'，但得到'{tok.value if tok else '输入结束'}'", 
+                self._error(f"期望'段落'、'段'或'函数'，但得到'{tok.value if tok else '输入结束'}'", 
                                 tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None)
             
             # 方法名可能是IDENTIFIER或KEYWORD（如"加""减""乘"）
@@ -1972,7 +2014,7 @@ class ParserStmtMixin:
                 method_name = name_tok.value
                 self._consume()
             else:
-                raise ParseError(f"期望方法名，但得到 {name_tok.type if name_tok else '输入结束'}", name_tok.line if name_tok else 0, name_tok.col if name_tok else 0, name_tok.value if name_tok else None)
+                self._error(f"期望方法名，但得到 {name_tok.type if name_tok else '输入结束'}", name_tok.line if name_tok else 0, name_tok.col if name_tok else 0, name_tok.value if name_tok else None)
 
         # 泛型参数？（可选）如：段落 映射[T, U] 接收 列表：
         generic_params = []
@@ -1995,12 +2037,16 @@ class ParserStmtMixin:
             if kw == '参数' or kw == '接收':
                 self._consume(TokenType.KEYWORD)
 
-                # 收集参数（支持逗号分隔）
+                # 收集参数（支持多字参数名和逗号分隔）
                 while self._current():
                     ptok = self._current()
-                    if ptok.type == TokenType.IDENTIFIER:
-                        self._consume(TokenType.IDENTIFIER)
-                        parameters.append(Parameter(name=ptok.value))
+                    if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        param_parts = []
+                        while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_parts.append(self._current().value)
+                            self._consume()
+                        param_name = ''.join(param_parts)
+                        parameters.append(Parameter(name=param_name))
                         # 跳过逗号
                         if self._match(TokenType.COMMA):
                             self._consume(TokenType.COMMA)
@@ -2021,7 +2067,7 @@ class ParserStmtMixin:
         elif tok_colon and tok_colon.type == TokenType.COLON:
             self._consume(TokenType.COLON)
         else:
-            raise ParseError(f"期望句号或冒号，但得到 {tok_colon.type if tok_colon else '输入结束'}", tok_colon.line if tok_colon else 0, tok_colon.col if tok_colon else 0, tok_colon.value if tok_colon else None)
+            self._error(f"期望句号或冒号，但得到 {tok_colon.type if tok_colon else '输入结束'}", tok_colon.line if tok_colon else 0, tok_colon.col if tok_colon else 0, tok_colon.value if tok_colon else None)
 
         # 方法体
         body = []
@@ -2079,7 +2125,7 @@ class ParserStmtMixin:
             name_parts.append(self._consume().value)
         name = ''.join(name_parts)
         if not name:
-            raise ParseError(f"期望接口名，但得到 {self._current().type if self._current() else '输入结束'}")
+            self._error(f"期望接口名，但得到 {self._current().type if self._current() else '输入结束'}")
 
         # 继承（可选）
         super_interfaces = []
@@ -2155,7 +2201,7 @@ class ParserStmtMixin:
         if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
             name = self._consume().value
         else:
-            raise ParseError(f"期望方法名")
+            self._error(f"期望方法名")
 
         # 参数
         params = []
@@ -2274,7 +2320,7 @@ class ParserStmtMixin:
             elif var_tok and var_tok.type == TokenType.KEYWORD:
                 variable = self._consume(TokenType.KEYWORD).value
             else:
-                raise ParseError(f"期望变量名，但得到 {var_tok.type if var_tok else '输入结束'}")
+                self._error(f"期望变量名，但得到 {var_tok.type if var_tok else '输入结束'}")
 
         # 冒号（可选）
         if self._match(TokenType.COLON):
@@ -2305,7 +2351,7 @@ class ParserStmtMixin:
         if tok and tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):       
             decorator_name = self._consume().value
         else:
-            raise ParseError(f"期望装饰器名，但得到 {tok.type if tok else '输入结束'}")
+            self._error(f"期望装饰器名，但得到 {tok.type if tok else '输入结束'}")
 
         # 内置装饰器处理（@静态方法、@类方法、@特性、@抽象）
         if decorator_name in ('静态方法', '类方法', '特性', '抽象'):
@@ -2317,7 +2363,7 @@ class ParserStmtMixin:
             elif self._match(TokenType.KEYWORD, '构造'):
                 paragraph = self._parse_method_definition(is_constructor=True)  
             else:
-                raise ParseError("装饰器后必须跟段落定义或构造定义")
+                self._error("装饰器后必须跟段落定义或构造定义")
             return DecoratorDefinition(decorator_name, paragraph)
 
         # 标注（可选关键字）— 仅自定义装饰器
@@ -2333,7 +2379,7 @@ class ParserStmtMixin:
             # 段落 段名 参数形式
             paragraph = self._parse_paragraph_v2()
         else:
-            raise ParseError("装饰器后必须跟段落定义（'《段名》段' 或 '段落 段名'）")
+            self._error("装饰器后必须跟段落定义（'《段名》段' 或 '段落 段名'）")
 
         return DecoratorDefinition(decorator_name, paragraph)
 

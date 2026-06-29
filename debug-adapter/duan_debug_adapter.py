@@ -287,15 +287,15 @@ class DebugAdapter:
             })
             self.send_event('terminated')
             return
-        
+
         try:
             with open(program_path, 'r', encoding='utf-8') as f:
                 source = f.read()
-            
+
             # 编译
             compiler = DuanCompiler()
             result = compiler.compile(source)
-            
+
             if result['errors']:
                 for error in result['errors']:
                     self.send_event('output', {
@@ -304,37 +304,80 @@ class DebugAdapter:
                     })
                 self.send_event('terminated')
                 return
-            
-            # 生成代码
+
+            # 生成代码（带行号映射注释）
             codegen = UnifiedCodeGenerator()
             python_code = codegen.generate(result['ast'])
-            
+
+            # 在生成代码前添加行号映射表注释
+            python_code = self._inject_line_mapping(source, python_code)
+
             # 查找断点对应的行
             breakpoints_to_check = []
             for file_path, lines in self.breakpoints.items():
                 breakpoints_to_check.extend(lines)
-            
+
             # 执行
             old_stdout = sys.stdout
             sys.stdout = DuanOutputCapture(self)
             try:
-                exec(compile(python_code, program_path, 'exec'), {})
+                compiled = compile(python_code, program_path, 'exec')
+                exec_globals = {'__name__': '__main__', '__file__': program_path}
+                exec(compiled, exec_globals)
             except Exception as e:
+                # 转换 Python 异常 traceback 为段言源码行号
+                duan_error = self._format_duan_error(e, source, python_code)
                 self.send_event('output', {
                     'category': 'stderr',
-                    'output': format_exception(type(e), e, e.__traceback__)
+                    'output': duan_error
                 })
             finally:
                 sys.stdout = old_stdout
-            
+
             self.send_event('terminated')
-            
+
         except Exception as e:
             self.send_event('output', {
                 'category': 'stderr',
                 'output': format_exception(type(e), e, e.__traceback__)
             })
             self.send_event('terminated')
+
+    def _inject_line_mapping(self, source: str, python_code: str) -> str:
+        """在生成代码前注入源码行号映射表"""
+        source_lines = source.split('\n')
+        mapping_lines = []
+        for i, line in enumerate(source_lines, 1):
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#'):
+                mapping_lines.append(f"# DUAN_SRC:{i}:{stripped[:40]}")
+        mapping_header = '\n'.join(mapping_lines)
+        return f"# -*- coding: utf-8 -*-\n# 段言源码行号映射\n{mapping_header}\n\n{python_code}"
+
+    def _format_duan_error(self, e: Exception, source: str, python_code: str) -> str:
+        """将 Python 异常转换为带段言源码行号的错误信息"""
+        import traceback as tb
+        lines = []
+        lines.append(f"运行时错误: {e}")
+        lines.append("")
+
+        # 提取 traceback
+        exc_type, exc_value, exc_tb = sys.exc_info()
+        if exc_tb:
+            for frame, lineno in tb.walk_tb(exc_tb):
+                filename = frame.f_code.co_filename
+                func_name = frame.f_code.co_name
+                if filename.endswith('.duan'):
+                    # 获取对应源码行
+                    source_lines = source.split('\n')
+                    if 1 <= lineno <= len(source_lines):
+                        src_line = source_lines[lineno - 1].strip()
+                        lines.append(f"  文件 \"{filename}\", 行 {lineno}, 在 {func_name} 中")
+                        lines.append(f"    {src_line}")
+                    else:
+                        lines.append(f"  文件 \"{filename}\", 行 {lineno}, 在 {func_name} 中")
+        lines.append("")
+        return '\n'.join(lines)
     
     def _format_value(self, value: Any) -> str:
         """格式化变量值"""

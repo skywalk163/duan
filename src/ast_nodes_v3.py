@@ -298,29 +298,35 @@ class Parameter(ASTNode):
 
 
 class AttributeDeclaration(ASTNode):
-    __slots__ = ('name', 'type_annotation', 'default_value')
+    __slots__ = ('name', 'type_annotation', 'default_value', 'access_modifier', 'is_static')
     """属性声明"""
-    def __init__(self, name: str, type_annotation: str = None, default_value: ASTNode = None):
+    def __init__(self, name: str, type_annotation: str = None, default_value: ASTNode = None,
+                 access_modifier: str = 'public', is_static: bool = False):
         self.name = name
         self.type_annotation = type_annotation
         self.default_value = default_value
+        self.access_modifier = access_modifier
+        self.is_static = is_static
     
     def __repr__(self):
         return f"AttributeDeclaration({self.name})"
 
 
 class MethodDefinition(ASTNode):
-    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor', 'generic_params')
+    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor', 'generic_params', 'access_modifier', 'is_static')
     """方法定义"""
-    def __init__(self, name: str, parameters: List[Parameter], body: List[ASTNode], 
+    def __init__(self, name: str, parameters: List[Parameter], body: List[ASTNode],
                  return_type: str = None, is_constructor: bool = False,
-                 generic_params: List[str] = None):
+                 generic_params: List[str] = None,
+                 access_modifier: str = 'public', is_static: bool = False):
         self.name = name
         self.parameters = parameters
         self.body = body
         self.return_type = return_type
         self.is_constructor = is_constructor
         self.generic_params = generic_params or []
+        self.access_modifier = access_modifier
+        self.is_static = is_static
     
     def __repr__(self):
         return f"MethodDefinition({self.name})"
