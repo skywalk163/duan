@@ -21,32 +21,89 @@ theme:
     - navigation.tracking
     - navigation.tabs
     - navigation.sections
+    - navigation.top
     - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
 
 plugins:
-  - search
+  - search:
+      lang: zh
+  - git-revision-date-localized:
+      enable_creation_date: true
+  - awesome-pages
 
 markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
-  - pymdownx.superfences
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
   - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tabbed:
+      alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python:name:material.extensions.emoji.to_svg
   - admonition
   - attr_list
   - md_in_html
   - toc:
       permalink: true
+      toc_depth: 4
   - tables
+  - footnotes
 
 nav:
   - 首页: index.md
   - 快速开始: getting-started.md
-  - 语法规范: syntax.md
-  - 标准库: stdlib.md
-  - 工具链: tools.md
-  - 案例: examples.md
+
+  - 用户手册:
+      - 概览: USER_MANUAL.md
+      - 语法规范: syntax.md
+      - 标准库: stdlib.md
+      - 案例: examples.md
+
+  - 进阶:
+      - 类系统设计: class_system_design.md
+      - LLVM 后端: llvm_backend_design.md
+      - 模块系统: 模块系统与包管理.md
+      - 模式匹配: interface-design.md
+      - 完整规范: 段言-完整规范文档.md
+
+  - 开发指南:
+      - 架构设计: architecture.md
+      - 开发指南: DEVELOPMENT_GUIDE.md
+      - 项目结构: 项目结构说明.md
+      - API 参考: API_REFERENCE.md
+
+  - 工具链:
+      - 工具总览: tools.md
+      - REPL 设计: REPL_DESIGN.md
+      - 引导策略: BOOTSTRAP_STRATEGY.md
+
+  - 性能与优化:
+      - 性能优化: PERFORMANCE_OPTIMIZATION.md
+      - 优化分析: OPTIMIZATION_ANALYSIS.md
+      - 文件 I/O 报告: FILE_IO_REPORT.md
+      - 模块系统验证: MODULE_SYSTEM_VERIFICATION.md
+
+  - 变更记录:
+      - 进度报告: PROGRESS_REPORT.md
+      - 语言扩展: LANGUAGE_EXTENSIONS.md
+      - 发布检查: RELEASE_CHECKLIST.md
+      - 最终总结: FINAL_SUMMARY.md
+
+extra:
+  generator: false
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/skywalk163/duan
