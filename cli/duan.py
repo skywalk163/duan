@@ -38,13 +38,22 @@ VERSION = '段言编译器 v1.7.0'
 # ANTLR 后端（默认）
 # ═══════════════════════════════════════════════════════════════════
 
+def _preprocess_v3(source: str) -> str:
+    """预处理 v3 纯缩进语法（转换为带结束标记的形式）"""
+    from indent_preprocessor import preprocess_v3_syntax
+    return preprocess_v3_syntax(source)
+
+
 def _run_antlr(source: str) -> str:
     """用 ANTLR 解释器执行代码，返回输出"""
     from duan_visitor import DuanParser
     from duan_interpreter import Interpreter
 
+    # 预处理 v3 语法
+    processed_source = _preprocess_v3(source)
+
     parser = DuanParser()
-    module = parser.parse(source)
+    module = parser.parse(processed_source)
     if module is None:
         errors = '\n'.join(parser.errors)
         raise RuntimeError(f"解析失败:\n{errors}")
@@ -58,8 +67,11 @@ def _ast_antlr(source: str):
     """用 ANTLR 后端构建并打印 AST"""
     from duan_visitor import DuanParser
 
+    # 预处理 v3 语法
+    processed_source = _preprocess_v3(source)
+
     parser = DuanParser()
-    module = parser.parse(source)
+    module = parser.parse(processed_source)
     if module is None:
         errors = '\n'.join(parser.errors)
         raise RuntimeError(f"解析失败:\n{errors}")
@@ -179,15 +191,49 @@ def cmd_compile(args):
     """编译段言源代码为 Python 文件或可执行文件"""
     source = _read_source(args.file)
 
-    # LLVM 后端：直接编译为原生 .exe
+    # LLVM 后端（模式1：字符串模式）
     if args.backend == 'llvm':
         try:
-            from duan_llvm import compile_duan
+            from src.llvm.compiler import compile_duan
             output = args.output or (Path(args.file).stem + '.exe')
-            compile_duan(args.file, output, verbose=args.verbose)
+            compile_duan(args.file, output, verbose=args.verbose,
+                         optimize_level=args.optimize, debug=args.debug)
+            return
+        except ImportError:
+            try:
+                from llvm.compiler import compile_duan
+            except ImportError:
+                from ..llvm.compiler import compile_duan
+            output = args.output or (Path(args.file).stem + '.exe')
+            compile_duan(args.file, output, verbose=args.verbose,
+                         optimize_level=args.optimize, debug=args.debug)
             return
         except Exception as e:
-            print(f"LLVM 编译错误: {e}", file=sys.stderr)
+            print(f"LLVM (string) 编译错误: {e}", file=sys.stderr)
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+            sys.exit(1)
+
+    # LLVM 后端（模式2：typed 模式，使用 DuanValue 结构体）
+    if args.backend == 'llvm-typed':
+        try:
+            from src.llvm.compiler import compile_duan_typed
+            output = args.output or (Path(args.file).stem + '.exe')
+            compile_duan_typed(args.file, output, verbose=args.verbose,
+                               optimize_level=args.optimize, debug=args.debug)
+            return
+        except ImportError:
+            try:
+                from llvm.compiler import compile_duan_typed
+            except ImportError:
+                from ..llvm.compiler import compile_duan_typed
+            output = args.output or (Path(args.file).stem + '.exe')
+            compile_duan_typed(args.file, output, verbose=args.verbose,
+                               optimize_level=args.optimize, debug=args.debug)
+            return
+        except Exception as e:
+            print(f"LLVM (typed) 编译错误: {e}", file=sys.stderr)
             if args.verbose:
                 import traceback
                 traceback.print_exc()
@@ -201,8 +247,11 @@ def cmd_compile(args):
             from duan_visitor import DuanParser
             from code_generator_unified import UnifiedCodeGenerator
 
+            # 预处理 v3 语法
+            processed_source = _preprocess_v3(source)
+
             parser = DuanParser()
-            module = parser.parse(source)
+            module = parser.parse(processed_source)
             if module is None:
                 errors = '\n'.join(parser.errors)
                 raise RuntimeError(f"解析失败:\n{errors}")
@@ -318,6 +367,93 @@ def cmd_tokens(args):
         sys.exit(1)
 
 
+def cmd_check(args):
+    """语法检查：解析源代码但不执行"""
+    source = _read_source(args.file)
+
+    errors = []
+    warnings = []
+
+    try:
+        if args.backend == 'src':
+            from duan_parser_v3 import DuanParser
+            parser = DuanParser()
+            module = parser.parse(source)
+            if module is None:
+                errors.append("解析失败")
+        else:
+            from duan_visitor import DuanParser
+            from code_generator_unified import UnifiedCodeGenerator
+            processed_source = _preprocess_v3(source)
+            parser = DuanParser()
+            module = parser.parse(processed_source)
+            if module is None:
+                errors.extend(parser.errors)
+    except Exception as e:
+        errors.append(str(e))
+
+    # 简单统计
+    lines = source.split('\n')
+    stats = {
+        'total_lines': len(lines),
+        'code_lines': sum(1 for l in lines if l.strip() and not l.strip().startswith('#')),
+        'comment_lines': sum(1 for l in lines if l.strip().startswith('#')),
+    }
+
+    print(f"检查文件: {args.file}")
+    print(f"  总行数: {stats['total_lines']}")
+    print(f"  代码行: {stats['code_lines']}")
+    print(f"  注释行: {stats['comment_lines']}")
+
+    if errors:
+        print(f"\n❌ 发现 {len(errors)} 个错误:")
+        for err in errors:
+            print(f"    - {err}")
+        sys.exit(1)
+    else:
+        print(f"\n✅ 语法检查通过，未发现错误。")
+
+
+def cmd_init(args):
+    """初始化段言项目"""
+    project_name = args.name
+    project_dir = Path(project_name)
+
+    if project_dir.exists():
+        print(f"错误: 目录已存在: {project_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    project_dir.mkdir(parents=True)
+    (project_dir / 'src').mkdir()
+    (project_dir / 'tests').mkdir()
+
+    # 创建示例主文件
+    main_file = project_dir / 'src' / 'main.duan'
+    main_file.write_text("""# 段言项目入口
+
+段落 主函数：
+    打印 "你好，段言！"。
+
+主函数()。""", encoding='utf-8')
+
+    # 创建 duan.json 配置
+    config_file = project_dir / 'duan.json'
+    config_content = f'''{{
+  "name": "{project_name}",
+  "version": "0.1.0",
+  "entry": "src/main.duan",
+  "backend": "antlr"
+}}'''
+    config_file.write_text(config_content, encoding='utf-8')
+
+    print(f"✅ 项目 '{project_name}' 初始化完成")
+    print(f"   目录: {project_dir.resolve()}")
+    print(f"   入口: src/main.duan")
+    print(f"\n可用命令:")
+    print(f"   duan run {project_name}/src/main.duan")
+    print(f"   duan check {project_name}/src/main.duan")
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 主入口
 # ═══════════════════════════════════════════════════════════════════
@@ -353,8 +489,12 @@ def main():
     comp_p = subparsers.add_parser('compile', help='编译为 Python 文件')
     comp_p.add_argument('file', help='源文件路径')
     comp_p.add_argument('-o', '--output', help='输出文件路径（默认: 同名 .py）')
-    comp_p.add_argument('--backend', choices=['antlr', 'src', 'llvm'], default='antlr',
+    comp_p.add_argument('--backend', choices=['antlr', 'src', 'llvm', 'llvm-typed'], default='antlr',
                         help='使用的后端（默认: antlr，llvm=原生编译）')
+    comp_p.add_argument('--optimize', choices=['O0', 'O1', 'O2', 'O3'], default='O2',
+                        help='LLVM 优化级别（默认: O2）')
+    comp_p.add_argument('--debug', action='store_true',
+                        help='生成 DWARF 调试信息')
 
     # ── ast ──
     ast_p = subparsers.add_parser('ast', help='显示 AST')
@@ -365,6 +505,16 @@ def main():
     # ── tokens ──
     tok_p = subparsers.add_parser('tokens', help='显示 Token 流')
     tok_p.add_argument('file', help='源文件路径')
+
+    # ── check ──
+    check_p = subparsers.add_parser('check', help='语法检查')
+    check_p.add_argument('file', help='源文件路径')
+    check_p.add_argument('--backend', choices=['antlr', 'src'], default='antlr',
+                         help='使用的后端（默认: antlr）')
+
+    # ── init ──
+    init_p = subparsers.add_parser('init', help='初始化段言项目')
+    init_p.add_argument('name', help='项目名称')
 
     args = parser.parse_args()
 
@@ -380,6 +530,10 @@ def main():
         cmd_ast(args)
     elif args.command == 'tokens':
         cmd_tokens(args)
+    elif args.command == 'check':
+        cmd_check(args)
+    elif args.command == 'init':
+        cmd_init(args)
 
 
 if __name__ == '__main__':

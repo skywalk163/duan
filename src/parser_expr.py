@@ -122,7 +122,7 @@ class ParserExprMixin:
         tok = self._current()
         
         if tok is None:
-            raise ParseError(f"意外的输入结束")
+            return self._error(f"意外的输入结束")
         
         # 一元运算符：非（逻辑非）
         if tok.type == TokenType.KEYWORD and tok.value == '非':
@@ -244,7 +244,7 @@ class ParserExprMixin:
                 class_name = ''.join(class_name_parts)
                 
                 if not class_name:
-                    raise ParseError("期望类名")
+                    return self._error("期望类名")
                 
                 # 收集参数（支持括号式和无括号式）
                 args = []
@@ -426,16 +426,21 @@ class ParserExprMixin:
         # Self引用：己属性名
         if tok.type == TokenType.KEYWORD and tok.value == '己':
             self._consume()
-            # 收集属性名（可能多字）
+            # 收集属性名（可能多字，支持关键字作为属性名的一部分，如"余额"）
             name_parts = []
-            while self._current() and self._current().type == TokenType.IDENTIFIER:
+            while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                # 遇到赋值运算符或常见分隔符时停止
+                if self._current().value in ('等于', '为', '加', '减', '乘', '除', '模',
+                                              '大于', '小于', '大于等于', '小于等于', '不等于',
+                                              '与', '或', '非', '在', '到', '从'):
+                    break
                 name_parts.append(self._consume().value)
             if name_parts:
                 attr_name = ''.join(name_parts)
                 expr = Identifier(f"self.{attr_name}")
                 return self._parse_postfix(expr)
             else:
-                raise ParseError("己引用后应跟属性名", tok.line, tok.col)
+                return self._error("己引用后应跟属性名", tok.line, tok.col)
 
         # Super引用：父.方法名() → super().方法名()
         if tok.type == TokenType.KEYWORD and tok.value == '父':
@@ -443,7 +448,13 @@ class ParserExprMixin:
             expr = Identifier("super()")
             return self._parse_postfix(expr)
 
-        raise ParseError(f"意外的标记: {tok.type} = '{tok.value}'（附近: '{tok.value}'）", tok.line, tok.col)
+        # 其他关键字作为标识符处理（如参数名中的关键字部分）
+        if tok.type == TokenType.KEYWORD:
+            name = tok.value
+            self._consume()
+            return self._parse_postfix(Identifier(name))
+
+        return self._error(f"意外的标记: {tok.type} = '{tok.value}'（附近: '{tok.value}'）", tok.line, tok.col)
 
     def _collect_primary_arg(self) -> Optional[ASTNode]:
         """收集单个primary参数（不进行段落调用检测）"""
@@ -919,7 +930,7 @@ class ParserExprMixin:
                 elif var_tok and var_tok.type == TokenType.KEYWORD:
                     variable = self._consume(TokenType.KEYWORD).value
                 else:
-                    raise ParseError(f"字典推导期望变量名",
+                    return self._error(f"字典推导期望变量名",
                                      var_tok.line if var_tok else 0, var_tok.col if var_tok else 0)
 
                 # 之
@@ -929,7 +940,7 @@ class ParserExprMixin:
                     self._consume(TokenType.KEYWORD, '在')
                 else:
                     tok = self._current()
-                    raise ParseError(f"字典推导期望'之'或'在'",
+                    return self._error(f"字典推导期望'之'或'在'",
                                      tok.line if tok else 0, tok.col if tok else 0)
 
                 # 可迭代对象
@@ -968,7 +979,7 @@ class ParserExprMixin:
             elif var_tok and var_tok.type == TokenType.KEYWORD:
                 variable = self._consume(TokenType.KEYWORD).value
             else:
-                raise ParseError(f"列表推导期望变量名，但得到 {var_tok.type if var_tok else '输入结束'}",
+                return self._error(f"列表推导期望变量名，但得到 {var_tok.type if var_tok else '输入结束'}",
                                  var_tok.line if var_tok else 0, var_tok.col if var_tok else 0)
 
             # 之 / 在
@@ -978,7 +989,7 @@ class ParserExprMixin:
                 self._consume(TokenType.KEYWORD, '在')
             else:
                 tok = self._current()
-                raise ParseError(f"列表推导期望'之'或'在'，但得到 {tok.type if tok else '输入结束'}",
+                return self._error(f"列表推导期望'之'或'在'，但得到 {tok.type if tok else '输入结束'}",
                                  tok.line if tok else 0, tok.col if tok else 0) 
 
             # 可迭代对象
@@ -1026,7 +1037,7 @@ class ParserExprMixin:
                 elif isinstance(expr, str):
                     func_name = expr
                 else:
-                    raise ParseError(f"不支持在复杂表达式后进行括号调用: {type(expr).__name__}（可将'()'改为'。'或去掉括号）")
+                    return self._error(f"不支持在复杂表达式后进行括号调用: {type(expr).__name__}（可将'()'改为'。'或去掉括号）")
 
                 # 收集参数（直到右括号）- 使用比较表达式而非完整表达式
                 # 以避免逗号被当作管道操作符处理
@@ -1093,7 +1104,7 @@ class ParserExprMixin:
                             # 阻断符：句号、逗号、右括号、右中括号、关键字      
                             if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                                 break
-                            if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                            if next_tok.type == TokenType.KEYWORD and (next_tok.value in KEYWORDS_DOUBLE or next_tok.value in VERB_ARITY):
                                 break
 
                             # 收集参数
@@ -1108,7 +1119,7 @@ class ParserExprMixin:
                     expr = MemberAccess(expr, member_name, is_method_call, args)
                     continue
                 else:
-                    raise ParseError(f"期望成员名，但得到 {member_tok.type} = '{member_tok.value}'", member_tok.line, member_tok.col)
+                    return self._error(f"期望成员名，但得到 {member_tok.type} = '{member_tok.value}'", member_tok.line, member_tok.col)
 
             # 索引访问：[index] 或 【index】
             if tok.type == TokenType.LBRACKET:

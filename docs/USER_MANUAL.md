@@ -1,7 +1,7 @@
 # 段言（Duan）编程语言用户手册
 
-**版本：** v0.9.0  
-**更新时间：** 2026-06-17  
+**版本：** v1.7.0  
+**更新时间：** 2026-06-26  
 **适用人群：** 中文编程学习者、教育工作者、中文母语开发者
 
 ---
@@ -27,22 +27,24 @@
 
 ### 安装
 
+#### 从 PyPI 安装（推荐）
+
 ```bash
-# 克隆仓库
-git clone https://github.com/your-repo/duan.git
+pip install duan
+```
+
+安装后即可使用 `duan` 命令：
+```bash
+duan --version
+duan --help
+```
+
+#### 从源码安装
+
+```bash
+git clone https://github.com/skywalk163/duan.git
 cd duan
-
-# 运行全部测试（推荐）
-python tests/run_tests.py
-
-# 运行快速验证
-python tests/run_tests.py --quick
-
-# 仅运行边界测试
-python tests/run_tests.py --edge
-
-# 列出所有测试文件
-python tests/run_tests.py --list
+pip install -e .
 ```
 
 ### 第一个程序
@@ -50,19 +52,39 @@ python tests/run_tests.py --list
 创建 `hello.duan` 文件：
 
 ```段言
-打印"你好，世界！"。
+打印 "你好，世界！"
 ```
 
-编译并运行：
+运行：
 
 ```bash
-python cli/duanc.py hello.duan --run
+duan run hello.duan
 ```
 
 输出：
 ```
 你好，世界！
 ```
+
+### 编译为 Python 文件
+
+```bash
+duan compile hello.duan -o hello.py
+```
+
+### 编译为 Windows EXE
+
+```bash
+# 需要先安装 PyInstaller
+pip install pyinstaller
+
+# 编译为 exe
+duan compile hello.duan -o hello.exe
+```
+
+**原理：** 先将段言代码编译为 Python 代码，再使用 PyInstaller 打包为独立的 .exe 可执行文件。
+
+**注意：** 仅适用于 Windows 平台，生成的 exe 文件无需 Python 环境即可运行。
 
 ---
 
@@ -249,53 +271,98 @@ python cli/duanc.py hello.duan --run
 
 ## 类与对象
 
+### 类与对象
+
 ### 类定义
 
 **语法：**
 ```
 类 类名：
-  属性列表
-  方法定义
-类结束
+    属性 属性名。
+    段落 方法名：
+        # 方法体
 ```
 
 **示例：**
 ```段言
 类 学生：
-  属性 姓名
-  属性 年龄
-  
-  构造(姓名, 年龄)：
-    定义己姓名等于姓名。
-    定义己年龄等于年龄。
-  
-  介绍：
-    打印"我叫"加己姓名加"，今年"加己年龄加"岁。"。
-类结束
+    属性 姓名。
+    属性 年龄。
 
-定义学生等于创建学生参数"张三"，20。
-学生.介绍。
+    构造 接收 姓名, 年龄：
+        己姓名 为 姓名。
+        己年龄 为 年龄。
+
+    段落 介绍：
+        打印 "我叫" 加 己姓名 加 "，今年" 加 己年龄 加 "岁。".
+
+学生1 等于 新建 学生("张三", 20)。
+学生1.介绍()。
 ```
 
 ### 继承
 
 ```段言
 类 大学生 继承 学生：
-  属性 专业
-  
-  构造(姓名, 年龄, 专业)：
-    父类构造(姓名, 年龄)。
-    定义己专业等于专业。
-  
-  介绍：
-    打印"我叫"加己姓名加"，专业是"加己专业加"。"。
-类结束
+    属性 专业。
+
+    构造 接收 姓名, 年龄, 专业：
+        父.构造(姓名, 年龄)。
+        己专业 为 专业。
+
+    段落 介绍：
+        打印 "我叫" 加 己姓名 加 "，专业是" 加 己专业 加 "。"。
+```
+
+### 访问修饰符
+
+段言支持三种访问级别：
+
+| 修饰符 | 说明 | 生成代码 |
+|--------|------|----------|
+| `公有` (默认) | 任何地方可访问 | 无前缀 |
+| `私有` | 仅在类内部可访问 | 加 `_` 前缀 |
+| `保护` | 类及子类可访问 | 加 `_` 前缀（Python约定）|
+
+```段言
+类 账户：
+    公有 属性 用户名。
+    私有 属性 密码。
+    保护 属性 余额。
+
+    构造 接收 用户名, 密码：
+        己用户名 为 用户名。
+        己密码 为 密码。
+        己余额 为 零。
+
+    公有 段落 获取用户名：
+        返回 己用户名。
+
+    私有 段落 验证密码 接收 输入密码：
+        返回 己密码 等于 输入密码。
+```
+
+### 静态属性和方法
+
+使用 `静态` 修饰符定义类级别的属性和方法：
+
+```段言
+类 计数器：
+    静态 属性 总数 等于 零。
+
+    构造 接收 名称：
+        己名称 为 名称。
+        计数器.总数 等于 计数器.总数 加 一。
+
+    静态 段落 获取总数：
+        返回 计数器.总数。
 ```
 
 ### 属性访问
 
 - `己属性` - self.属性
 - `对象.属性` - 对象.属性
+- `类名.静态属性` - 类变量
 
 ---
 
@@ -407,50 +474,68 @@ python cli/duanc.py hello.duan --run
 
 **基本用法：**
 ```bash
-# 编译文件
-python cli/duanc.py file.duan
+# 解释执行
+duan run file.duan
 
-# 编译并运行
-python cli/duanc.py file.duan --run
+# 编译为 Python 文件
+duan compile file.duan
 
 # 指定输出文件
-python cli/duanc.py file.duan -o output.py
+duan compile file.duan -o output.py
+
+# 编译为 Windows EXE（需安装 PyInstaller）
+duan compile file.duan -o output.exe
 
 # 显示 Token 流
-python cli/duanc.py file.duan --tokens
+duan tokens file.duan
 
 # 显示 AST
-python cli/duanc.py file.duan --ast
+duan ast file.duan
+
+# 选择后端（antlr / src / llvm）
+duan run file.duan --backend antlr
+duan compile file.duan --backend src
 
 # 详细输出
-python cli/duanc.py file.duan -v
+duan run file.duan -v
 
-# 创建示例项目
-python cli/duanc.py --init
+# 启动 REPL
+duan repl
+
+# 查看版本
+duan --version
+
+# 查看帮助
+duan --help
 ```
+
+### 编译目标说明
+
+| 命令 | 输出格式 | 说明 |
+|------|---------|------|
+| `duan compile file.duan` | `file.py` | 编译为 Python 源代码 |
+| `duan compile file.duan -o file.exe` | `file.exe` | 编译为 Windows 可执行文件（需 PyInstaller） |
+| `duan compile file.duan --backend llvm` | LLVM IR | 编译为 LLVM 中间表示 |
 
 ### Python API
 
 ```python
-from lexer import Lexer
-from duan_parser_v3 import DuanParser
-from semantic_analyzer import SemanticAnalyzer
-from code_generator import PythonCodeGenerator
+import sys
+sys.path.insert(0, 'src')
+
+from compiler import DuanCompiler
+from code_generator_unified import UnifiedCodeGenerator
 
 # 编译流程
-lexer = Lexer()
-parser = DuanParser()
-analyzer = SemanticAnalyzer()
-generator = PythonCodeGenerator()
+compiler = DuanCompiler()
+result = compiler.compile(source)
 
-# 编译代码
-source = '定义甲等于123。'
-tokens = lexer.tokenize(source)
-module = parser.parse(source)
-analyzer.analyze(module)
-python_code = generator.generate(module)
-
-print(python_code)
+if result['success']:
+    code_gen = UnifiedCodeGenerator()
+    py_code = code_gen.generate(result['ast'])
+    print(py_code)
+else:
+    print("编译错误:", result['errors'])
 ```
 
 ---
@@ -636,6 +721,6 @@ python cli/duanc.py file.duan -v
 
 ---
 
-**文档版本：** v1.1  
-**最后更新：** 2026-06-17  
+**文档版本：** v1.7.0  
+**最后更新：** 2026-06-26  
 **反馈与建议：** 请提交 Issue 或 Pull Request
