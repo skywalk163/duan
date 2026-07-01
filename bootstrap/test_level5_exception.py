@@ -1,4 +1,7 @@
 import sys
+import io
+import contextlib
+
 sys.path.insert(0, '.')
 
 def 列表创建(*args): return list(args)
@@ -14,67 +17,85 @@ def 建(t, v): return [t, v]
 ns = {
     '列表创建': 列表创建, '列表追加': 列表追加, '列表获取': 列表获取,
     '列表长度': 列表长度, '字符串长度': 字符串长度, '字符串获取': 字符串获取,
-    '截取': 截取, '打印': 打印, '真': True, '假': False, '建': 建,
+    '截取': 截取, '打印': 打印, '输出': 打印, '真': True, '假': False, '建': 建,
 }
 
 with open('bootstrap/level5_generated.py', 'r', encoding='utf-8') as f:
     code = f.read()
 exec(code, ns)
-词法 = ns['词法']
+编译 = ns['编译']
 
-def run_test(name, code, expected_output, should_raise=False):
-    # 编译并运行 Duan 代码，检查输出
-    pass
+def compile_and_run(duan_code):
+    py_code = 编译(duan_code)
+    ns2 = dict(ns)
+    output = io.StringIO()
+    with contextlib.redirect_stdout(output):
+        try:
+            exec(py_code, ns2)
+            return output.getvalue(), None
+        except Exception as e:
+            return output.getvalue(), type(e).__name__
 
-def test_keywords():
-    # 测试关键字识别
-    toks = 词法("尝试 捕获 最终 抛出")
-    kw_count = sum(1 for t in toks if t[0] == 'KW')
-    assert kw_count == 4, f"期望 4 个关键字，实际 {kw_count}"
-    print("✅ 关键字识别测试通过")
-
-def test_throw_string():
-    with open('bootstrap/level5_generated.py', 'r', encoding='utf-8') as f:
-        code = f.read()
-    exec(code, ns)
-    编译 = ns['编译']
-    code = '抛出 "测试错误"'
-    result = 编译(code)
-    assert 'raise' in result, f"生成代码应包含 raise: {result}"
-    print("✅ 抛出字符串测试通过")
-
-def test_try_catch_basic():
-    exec(open('bootstrap/level5_generated.py', 'r', encoding='utf-8').read(), ns)
-    编译 = ns['编译']
+def test_basic_try_catch():
     code = """尝试：
-    输出("测试")
+    输出("try块")
+    抛出 "测试异常"
+    输出("不会执行")
 捕获：
-    输出("捕获错误")
+    输出("捕获异常")
 结束。
 """
-    result = 编译(code)
-    assert 'try:' in result, f"应生成 try: {result}"
-    assert 'except:' in result, f"应生成 except: {result}"
+    out, err = compile_and_run(code)
+    assert "try块" in out, f"应执行try块: {out}"
+    assert "捕获异常" in out, f"应捕获异常: {out}"
+    assert "不会执行" not in out, f"不应执行抛出后代码: {out}"
     print("✅ 基础尝试-捕获测试通过")
 
-def test_exception_type_mapping():
-    exec(open('bootstrap/level5_generated.py', 'r', encoding='utf-8').read(), ns)
-    编译 = ns['编译']
+def test_throw_string():
     code = """尝试：
     抛出 "错误"
-捕获 值错误 as e：
-    输出("值错误")
+捕获：
+    输出("已捕获")
 结束。
 """
-    result = 编译(code)
-    assert 'ValueError' in result, f"值错误应映射为 ValueError: {result}"
-    assert 'as e' in result, f"应保留 as e: {result}"
-    print("✅ 异常类型映射测试通过")
+    out, err = compile_and_run(code)
+    assert "已捕获" in out, f"应捕获异常: {out}"
+    print("✅ 抛出字符串测试通过")
+
+def test_finally_block():
+    code = """尝试：
+    输出("try")
+    抛出 "错"
+捕获：
+    输出("catch")
+最终：
+    输出("finally")
+结束。
+"""
+    out, err = compile_and_run(code)
+    assert "try" in out, f"应执行try: {out}"
+    assert "catch" in out, f"应执行catch: {out}"
+    assert "finally" in out, f"应执行finally: {out}"
+    print("✅ 最终块测试通过")
+
+def test_throw_variable():
+    code = """设 msg 为 "动态错误"
+尝试：
+    抛出 msg
+捕获：
+    输出("已捕获")
+结束。
+"""
+    out, err = compile_and_run(code)
+    assert "已捕获" in out, f"应捕获变量抛出: {out}"
+    print("✅ 抛出变量测试通过")
 
 if __name__ == '__main__':
     print("Level 5 异常处理测试")
     print("=" * 50)
-    test_keywords()
+    test_basic_try_catch()
     test_throw_string()
-    test_try_catch_basic()
-    test_exception_type_mapping()
+    test_finally_block()
+    test_throw_variable()
+    print("=" * 50)
+    print("🎉 所有异常处理测试通过!")

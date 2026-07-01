@@ -1164,7 +1164,7 @@ def compile_top(toks, p, out):
             p = np
             已处理 = 真
         if 已处理 == 假 and tv == '尝试':
-            结果 = comp_try(toks, p, '    ')
+            结果 = comp_try(toks, p, '')
             stmt = 列表获取(结果, 0)
             np = 列表获取(结果, 1)
             out = out + stmt
