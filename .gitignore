@@ -96,3 +96,6 @@ compile_*.py
 project/记账.py
 project/记账_简化版.duan
 test_output.bin
+
+# Git worktree
+.worktrees/
