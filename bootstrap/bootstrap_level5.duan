@@ -680,6 +680,43 @@
   返回 列表创建("", p)。
 结束。
 
+段 异常类型映射 接收 name：
+  如果 name 等于 "异常"：
+    返回 "Exception"。
+  结束。
+  如果 name 等于 "值错误"：
+    返回 "ValueError"。
+  结束。
+  如果 name 等于 "类型错误"：
+    返回 "TypeError"。
+  结束。
+  如果 name 等于 "键错误"：
+    返回 "KeyError"。
+  结束。
+  如果 name 等于 "索引错误"：
+    返回 "IndexError"。
+  结束。
+  如果 name 等于 "除零错误"：
+    返回 "ZeroDivisionError"。
+  结束。
+  如果 name 等于 "属性错误"：
+    返回 "AttributeError"。
+  结束。
+  如果 name 等于 "名称错误"：
+    返回 "NameError"。
+  结束。
+  如果 name 等于 "文件错误"：
+    返回 "FileNotFoundError"。
+  结束。
+  如果 name 等于 "运行错误"：
+    返回 "RuntimeError"。
+  结束。
+  如果 name 等于 "停止迭代"：
+    返回 "StopIteration"。
+  结束。
+  返回 name。
+结束。
+
 段 comp_try 接收 toks, p, indent：
   如果 p 小于 列表长度(toks)：
     设 tok 为 列表获取(toks, p)。
@@ -812,7 +849,8 @@
         结束。
         设 except_line 为 indent 加 "except"。
         如果 catch_type 不等于 ""：
-          设 except_line 为 except_line 加 " " 加 catch_type。
+          设 mapped_type 为 异常类型映射(catch_type)。
+          设 except_line 为 except_line 加 " " 加 mapped_type。
         结束。
         如果 catch_var 不等于 ""：
           设 except_line 为 except_line 加 " as " 加 catch_var。
