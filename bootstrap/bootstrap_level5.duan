@@ -673,7 +673,17 @@
       设 结果 为 表达式(toks, p 加 1)。
       设 expr 为 列表获取(结果, 0)。
       设 np 为 列表获取(结果, 1)。
-      设 stmt 为 "raise " 加 expr。
+      # 如果表达式是字符串字面量，包装成 Exception
+      如果 字符串长度(expr) 大于 0：
+        设 first 为 字符串获取(expr, 0)。
+        如果 first 等于 "'" 或 first 等于 '"'：
+          设 stmt 为 "raise Exception(" 加 expr 加 ")"。
+        否则：
+          设 stmt 为 "raise " 加 expr。
+        结束。
+      否则：
+        设 stmt 为 "raise " 加 expr。
+      结束。
       返回 列表创建(stmt, np)。
     结束。
   结束。
@@ -808,7 +818,8 @@
               设 catch_body_start 为 ctp 加 1。
             结束。
             设 找类型 为 假。
-          否则如果 找类型 且 (ctt 等于 "ID" 或 ctt 等于 "KW")：
+          结束。
+          如果 找类型 且 (ctt 等于 "ID" 或 ctt 等于 "KW")：
             如果 catch_type 等于 ""：
               如果 ctt 等于 "ID" 且 (ctp 加 1) 小于 next_pos：
                 设 ntok 为 列表获取(toks, ctp 加 1)。
@@ -1475,12 +1486,12 @@
       设 结果 为 comp_throw(toks, p)。
       设 stmt 为 列表获取(结果, 0)。
       设 np 为 列表获取(结果, 1)。
-      设 out 为 out 加 "    " 加 stmt 加 "\n"。
+      设 out 为 out 加 stmt 加 "\n"。
       设 p 为 np。
       设 已处理 为 真。
     结束。
     如果 已处理 等于 假 且 tv 等于 "尝试"：
-      设 结果 为 comp_try(toks, p, "    ")。
+      设 结果 为 comp_try(toks, p, "")。
       设 stmt 为 列表获取(结果, 0)。
       设 np 为 列表获取(结果, 1)。
       设 out 为 out 加 stmt。
