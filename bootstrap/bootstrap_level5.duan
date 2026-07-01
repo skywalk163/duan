@@ -666,6 +666,20 @@
   返回 列表创建("", p)。
 结束。
 
+段 comp_throw 接收 toks, p：
+  如果 p 小于 列表长度(toks)：
+    设 tok 为 列表获取(toks, p)。
+    如果 列表获取(tok, 1) 等于 "抛出"：
+      设 结果 为 表达式(toks, p 加 1)。
+      设 expr 为 列表获取(结果, 0)。
+      设 np 为 列表获取(结果, 1)。
+      设 stmt 为 "raise " 加 expr。
+      返回 列表创建(stmt, np)。
+    结束。
+  结束。
+  返回 列表创建("", p)。
+结束。
+
 段 find_matching_end 接收 toks, p, level：
   当 p 小于 列表长度(toks)：
     设 tok 为 列表获取(toks, p)。
@@ -746,6 +760,14 @@
       结束。
       如果 已处理 等于 假 且 tv 等于 "返回"：
         设 结果 为 find_ret(toks, p)。
+        设 stmt 为 列表获取(结果, 0)。
+        设 np 为 列表获取(结果, 1)。
+        设 out 为 out 加 indent 加 stmt 加 "\n"。
+        设 p 为 np。
+        设 已处理 为 真。
+      结束。
+      如果 已处理 等于 假 且 tv 等于 "抛出"：
+        设 结果 为 comp_throw(toks, p)。
         设 stmt 为 列表获取(结果, 0)。
         设 np 为 列表获取(结果, 1)。
         设 out 为 out 加 indent 加 stmt 加 "\n"。
@@ -955,6 +977,14 @@
     结束。
     如果 已处理 等于 假 且 tv 等于 "返回"：
       设 结果 为 find_ret(toks, p)。
+      设 stmt 为 列表获取(结果, 0)。
+      设 np 为 列表获取(结果, 1)。
+      设 out 为 out 加 "    " 加 stmt 加 "\n"。
+      设 p 为 np。
+      设 已处理 为 真。
+    结束。
+    如果 已处理 等于 假 且 tv 等于 "抛出"：
+      设 结果 为 comp_throw(toks, p)。
       设 stmt 为 列表获取(结果, 0)。
       设 np 为 列表获取(结果, 1)。
       设 out 为 out 加 "    " 加 stmt 加 "\n"。
@@ -1197,6 +1227,14 @@
       设 func_code 为 列表获取(结果, 0)。
       设 np 为 列表获取(结果, 1)。
       设 out 为 out 加 func_code。
+      设 p 为 np。
+      设 已处理 为 真。
+    结束。
+    如果 已处理 等于 假 且 tv 等于 "抛出"：
+      设 结果 为 comp_throw(toks, p)。
+      设 stmt 为 列表获取(结果, 0)。
+      设 np 为 列表获取(结果, 1)。
+      设 out 为 out 加 "    " 加 stmt 加 "\n"。
       设 p 为 np。
       设 已处理 为 真。
     结束。
