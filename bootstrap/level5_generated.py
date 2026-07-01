@@ -558,6 +558,31 @@ def comp_throw(toks, p):
             return 列表创建(stmt, np)
     return 列表创建('', p)
 
+def 异常类型映射(name):
+    if name == '异常':
+        return 'Exception'
+    if name == '值错误':
+        return 'ValueError'
+    if name == '类型错误':
+        return 'TypeError'
+    if name == '键错误':
+        return 'KeyError'
+    if name == '索引错误':
+        return 'IndexError'
+    if name == '除零错误':
+        return 'ZeroDivisionError'
+    if name == '属性错误':
+        return 'AttributeError'
+    if name == '名称错误':
+        return 'NameError'
+    if name == '文件错误':
+        return 'FileNotFoundError'
+    if name == '运行错误':
+        return 'RuntimeError'
+    if name == '停止迭代':
+        return 'StopIteration'
+    return name
+
 def comp_try(toks, p, indent):
     if p < 列表长度(toks):
         tok = 列表获取(toks, p)
@@ -665,7 +690,8 @@ def comp_try(toks, p, indent):
                         找类型 = 假
                 except_line = indent + 'except'
                 if catch_type != '':
-                    except_line = except_line + ' ' + catch_type
+                    mapped_type = 异常类型映射(catch_type)
+                    except_line = except_line + ' ' + mapped_type
                 if catch_var != '':
                     except_line = except_line + ' as ' + catch_var
                 except_line = except_line + ':\n'

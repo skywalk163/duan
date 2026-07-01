@@ -57,9 +57,24 @@ def test_try_catch_basic():
     assert 'except:' in result, f"应生成 except: {result}"
     print("✅ 基础尝试-捕获测试通过")
 
+def test_exception_type_mapping():
+    exec(open('bootstrap/level5_generated.py', 'r', encoding='utf-8').read(), ns)
+    编译 = ns['编译']
+    code = """尝试：
+    抛出 "错误"
+捕获 值错误 as e：
+    输出("值错误")
+结束。
+"""
+    result = 编译(code)
+    assert 'ValueError' in result, f"值错误应映射为 ValueError: {result}"
+    assert 'as e' in result, f"应保留 as e: {result}"
+    print("✅ 异常类型映射测试通过")
+
 if __name__ == '__main__':
     print("Level 5 异常处理测试")
     print("=" * 50)
     test_keywords()
     test_throw_string()
     test_try_catch_basic()
+    test_exception_type_mapping()
