@@ -680,6 +680,160 @@
   返回 列表创建("", p)。
 结束。
 
+段 comp_try 接收 toks, p, indent：
+  如果 p 小于 列表长度(toks)：
+    设 tok 为 列表获取(toks, p)。
+    如果 列表获取(tok, 1) 等于 "尝试"：
+      设 np 为 p 加 1。
+      设 out 为 indent 加 "try:\n"。
+      设 继续扫描 为 真。
+      设 try_end 为 9999。
+      设 catch_positions 为 列表创建()。
+      设 finally_pos 为 0。
+      设 level 为 1。
+      设 scan_p 为 np。
+      当 scan_p 小于 列表长度(toks) 且 继续扫描：
+        设 st 为 列表获取(toks, scan_p)。
+        如果 列表获取(st, 0) 等于 "KW"：
+          设 stv 为 列表获取(st, 1)。
+          如果 stv 等于 "尝试" 或 stv 等于 "如果" 或 stv 等于 "当" 或 stv 等于 "遍历" 或 stv 等于 "类" 或 stv 等于 "段落" 或 stv 等于 "段"：
+            设 level 为 level 加 1。
+          结束。
+          如果 stv 等于 "结束"：
+            设 level 为 level 减 1。
+            如果 level 等于 0：
+              设 try_end 为 scan_p。
+              设 继续扫描 为 假。
+            结束。
+          结束。
+          如果 level 等于 1 且 stv 等于 "捕获"：
+            列表追加(catch_positions, scan_p)。
+          结束。
+          如果 level 等于 1 且 stv 等于 "最终"：
+            设 finally_pos 为 scan_p。
+          结束。
+        结束。
+        如果 继续扫描：
+          设 scan_p 为 scan_p 加 1。
+        结束。
+      结束。
+      如果 try_end 等于 9999：
+        返回 列表创建("", p 加 1)。
+      结束。
+      设 body_indent 为 indent 加 "    "。
+      设 try_body_end 为 np。
+      如果 列表长度(catch_positions) 大于 0：
+        设 try_body_end 为 列表获取(catch_positions, 0)。
+      否则：
+        如果 finally_pos 不等于 0：
+          设 try_body_end 为 finally_pos。
+        否则：
+          设 try_body_end 为 try_end。
+        结束。
+      结束。
+      设 try_result 为 compile_block(toks, np, try_body_end, body_indent, "")。
+      设 out 为 out 加 try_result。
+      设 ci 为 0。
+      当 ci 小于 列表长度(catch_positions)：
+        设 cp 为 列表获取(catch_positions, ci)。
+        设 next_pos 为 try_end。
+        如果 ci 加 1 小于 列表长度(catch_positions)：
+          设 next_pos 为 列表获取(catch_positions, ci 加 1)。
+        结束。
+        设 需要用finally 为 假。
+        如果 finally_pos 不等于 0：
+          如果 finally_pos 大于 cp：
+            如果 ci 加 1 大于等于 列表长度(catch_positions)：
+              设 需要用finally 为 真。
+            否则：
+              设 next_catch 为 列表获取(catch_positions, ci 加 1)。
+              如果 next_catch 大于 finally_pos：
+                设 需要用finally 为 真。
+              结束。
+            结束。
+          结束。
+        结束。
+        如果 需要用finally 为 真：
+          设 next_pos 为 finally_pos。
+        结束。
+        设 catch_type 为 ""。
+        设 catch_var 为 ""。
+        设 catch_body_start 为 cp 加 1。
+        设 ctp 为 cp 加 1。
+        设 找类型 为 真。
+        当 ctp 小于 next_pos 且 找类型：
+          设 ct 为 列表获取(toks, ctp)。
+          设 ctt 为 列表获取(ct, 0)。
+          如果 ctt 等于 "LPAREN"：
+            如果 catch_type 等于 ""：
+              设 catch_body_start 为 ctp。
+            否则：
+              设 catch_body_start 为 ctp 加 1。
+            结束。
+            设 找类型 为 假。
+          否则如果 找类型 且 (ctt 等于 "ID" 或 ctt 等于 "KW")：
+            如果 catch_type 等于 ""：
+              如果 ctt 等于 "ID" 且 (ctp 加 1) 小于 next_pos：
+                设 ntok 为 列表获取(toks, ctp 加 1)。
+                如果 列表获取(ntok, 0) 等于 "LPAREN"：
+                  设 catch_body_start 为 ctp。
+                  设 找类型 为 假。
+                否则：
+                  设 catch_type 为 列表获取(ct, 1)。
+                  设 ctp 为 ctp 加 1。
+                结束。
+              否则：
+                设 catch_type 为 列表获取(ct, 1)。
+                设 ctp 为 ctp 加 1。
+              结束。
+            结束。
+          结束。
+          如果 找类型 且 catch_type 不等于 "" 且 ctt 等于 "ID"：
+            设 ctv 为 列表获取(ct, 1)。
+            如果 ctv 等于 "as"：
+              设 ctp 为 ctp 加 1。
+              如果 ctp 小于 next_pos：
+                设 vt 为 列表获取(toks, ctp)。
+                设 catch_var 为 列表获取(vt, 1)。
+                设 ctp 为 ctp 加 1。
+              结束。
+              设 catch_body_start 为 ctp。
+              设 找类型 为 假。
+            结束。
+          结束。
+          如果 找类型 且 catch_type 不等于 "" 且 ctt 不等于 "ID"：
+            设 catch_body_start 为 ctp。
+            设 找类型 为 假。
+          结束。
+          如果 找类型 且 ctt 不等于 "LPAREN" 且 ctt 不等于 "ID" 且 ctt 不等于 "KW"：
+            设 catch_body_start 为 ctp。
+            设 找类型 为 假。
+          结束。
+        结束。
+        设 except_line 为 indent 加 "except"。
+        如果 catch_type 不等于 ""：
+          设 except_line 为 except_line 加 " " 加 catch_type。
+        结束。
+        如果 catch_var 不等于 ""：
+          设 except_line 为 except_line 加 " as " 加 catch_var。
+        结束。
+        设 except_line 为 except_line 加 ":\n"。
+        设 out 为 out 加 except_line。
+        设 catch_result 为 compile_block(toks, catch_body_start, next_pos, body_indent, "")。
+        设 out 为 out 加 catch_result。
+        设 ci 为 ci 加 1。
+      结束。
+      如果 finally_pos 不等于 0：
+        设 out 为 out 加 indent 加 "finally:\n"。
+        设 fin_result 为 compile_block(toks, finally_pos 加 1, try_end, body_indent, "")。
+        设 out 为 out 加 fin_result。
+      结束。
+      返回 列表创建(out, try_end 加 1)。
+    结束。
+  结束。
+  返回 列表创建("", p)。
+结束。
+
 段 find_matching_end 接收 toks, p, level：
   当 p 小于 列表长度(toks)：
     设 tok 为 列表获取(toks, p)。
@@ -701,6 +855,9 @@
         设 level 为 level 加 1。
       结束。
       如果 tv 等于 "段"：
+        设 level 为 level 加 1。
+      结束。
+      如果 tv 等于 "尝试"：
         设 level 为 level 加 1。
       结束。
       如果 tv 等于 "否则"：
@@ -771,6 +928,14 @@
         设 stmt 为 列表获取(结果, 0)。
         设 np 为 列表获取(结果, 1)。
         设 out 为 out 加 indent 加 stmt 加 "\n"。
+        设 p 为 np。
+        设 已处理 为 真。
+      结束。
+      如果 已处理 等于 假 且 tv 等于 "尝试"：
+        设 结果 为 comp_try(toks, p, indent)。
+        设 stmt 为 列表获取(结果, 0)。
+        设 np 为 列表获取(结果, 1)。
+        设 out 为 out 加 stmt。
         设 p 为 np。
         设 已处理 为 真。
       结束。
@@ -988,6 +1153,14 @@
       设 stmt 为 列表获取(结果, 0)。
       设 np 为 列表获取(结果, 1)。
       设 out 为 out 加 "    " 加 stmt 加 "\n"。
+      设 p 为 np。
+      设 已处理 为 真。
+    结束。
+    如果 已处理 等于 假 且 tv 等于 "尝试"：
+      设 结果 为 comp_try(toks, p, "    ")。
+      设 stmt 为 列表获取(结果, 0)。
+      设 np 为 列表获取(结果, 1)。
+      设 out 为 out 加 stmt。
       设 p 为 np。
       设 已处理 为 真。
     结束。
@@ -1235,6 +1408,14 @@
       设 stmt 为 列表获取(结果, 0)。
       设 np 为 列表获取(结果, 1)。
       设 out 为 out 加 "    " 加 stmt 加 "\n"。
+      设 p 为 np。
+      设 已处理 为 真。
+    结束。
+    如果 已处理 等于 假 且 tv 等于 "尝试"：
+      设 结果 为 comp_try(toks, p, "    ")。
+      设 stmt 为 列表获取(结果, 0)。
+      设 np 为 列表获取(结果, 1)。
+      设 out 为 out 加 stmt。
       设 p 为 np。
       设 已处理 为 真。
     结束。
