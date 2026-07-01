@@ -554,7 +554,16 @@ def comp_throw(toks, p):
             结果 = 表达式(toks, p + 1)
             expr = 列表获取(结果, 0)
             np = 列表获取(结果, 1)
-            stmt = 'raise ' + expr
+            if 字符串长度(expr) > 0:
+                first = 字符串获取(expr, 0)
+                if first == "'" or first == '"':
+                    stmt = 'raise Exception(' + expr + ')'
+
+                else:
+                    stmt = 'raise ' + expr
+
+            else:
+                stmt = 'raise ' + expr
             return 列表创建(stmt, np)
     return 列表创建('', p)
 
@@ -660,6 +669,7 @@ def comp_try(toks, p, indent):
                         else:
                             catch_body_start = ctp + 1
                         找类型 = 假
+                    if 找类型 and ctt == 'ID' or ctt == 'KW':
                         if catch_type == '':
                             if ctt == 'ID' and ctp + 1 < next_pos:
                                 ntok = 列表获取(toks, ctp + 1)
@@ -1186,11 +1196,11 @@ def compile_top(toks, p, out):
             结果 = comp_throw(toks, p)
             stmt = 列表获取(结果, 0)
             np = 列表获取(结果, 1)
-            out = out + '    ' + stmt + '\n'
+            out = out + stmt + '\n'
             p = np
             已处理 = 真
         if 已处理 == 假 and tv == '尝试':
-            结果 = comp_try(toks, p, '    ')
+            结果 = comp_try(toks, p, '')
             stmt = 列表获取(结果, 0)
             np = 列表获取(结果, 1)
             out = out + stmt
