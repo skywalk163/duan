@@ -3,9 +3,9 @@
 ## 项目概述
 
 **项目名称：** 段言（Duan）编程语言编译器  
-**当前版本：** v2.0  
-**更新时间：** 2026-06-28  
-**项目状态：** v1.9.x 功能补全完成 + v2.0 中期目标第一阶段落地（内存管理、性能优化、标准库、模块系统、调试工具）
+**当前版本：** v2.3  
+**更新时间：** 2026-07-04  
+**项目状态：** v1.9.x 功能补全完成 + v2.0 中期目标 + Level 8 LLVM 后端完整支持 + Level 9 包管理与标准库完善 + Level 10 异步并发支持
 
 ---
 
@@ -563,6 +563,238 @@ examples/
 
 ---
 
+## Level 8 LLVM 后端完整支持完成记录 (2026-07-04)
+
+### Bug 修复
+
+1. **BooleanLiteral 类型错误修复**
+   - 问题：布尔字面量生成 INT 类型（type=1）而非 BOOL 类型（type=5）
+   - 修复：改用 `_create_bool_dv` 正确创建 BOOL 类型值
+   - 文件：`src/llvm/codegen_typed.py`
+
+2. **DuanValue 结构体布局不匹配修复**
+   - 问题：LLVM IR 端结构体缺少 list_size/list_capacity/list_data 字段，导致运行时函数写入越界
+   - 修复：更新 LLVM IR 结构体定义为 `{ i32, i64, double, ptr, i32, i32, i32, ptr }`
+   - 文件：`src/llvm/codegen_typed.py`
+
+3. **f64 字段操作类型错误修复**
+   - 问题：`_extract_f64` 将 double 字段当作指针处理，`_set_f64` 存储 i64 而非 double
+   - 修复：直接 extractvalue/store double
+   - 文件：`src/llvm/codegen_typed.py`
+
+4. **缺失的 codegen.py 创建**
+   - 问题：TypedLLVMCodeGen 导入的 LLVMCodeGen 父类文件不存在
+   - 修复：从 antlrparser/llvm_codegen.py 适配创建 `src/llvm/codegen.py`
+   - 文件：`src/llvm/codegen.py`
+
+5. **段落函数 ABI 问题修复**
+   - 问题：段落函数直接传递/返回 DuanValue 结构体，导致 C/LLVM ABI 不兼容
+   - 修复：改为指针传递调用约定：`void @_seg_xxx(ptr %result, ptr %args, i32 %num_args)`
+   - 文件：`src/llvm/codegen_typed.py`
+
+### Level 8 类型优化功能
+
+1. **类型追踪系统**
+   - 新增 `_var_types` 字典追踪变量类型
+   - 支持 Level 6 类型注解和初始化表达式推断
+   - 新增 `_map_type_name` 中英文类型名映射
+
+2. **表达式类型推断**
+   - `_infer_expr_type` 方法根据 AST 节点推断类型
+   - 支持 NumberLiteral/StringLiteral/BooleanLiteral/Identifier/BinaryOp
+
+3. **算术运算优化**
+   - INT + INT：直接使用 `add/sub/mul/sdiv` i64 指令
+   - FLOAT 运算：直接使用 `fadd/fsub/fmul/fdiv` double 指令
+   - 新增 `_create_int_dv_fast` / `_create_float_dv_fast` 快速构造函数
+
+4. **比较运算优化**
+   - INT 比较：直接使用 `icmp eq/ne/slt/sgt/sle/sge`
+   - FLOAT 比较：直接使用 `fcmp oeq/une/olt/ogt/ole/oge`
+
+5. **条件判断优化**
+   - `_gen_condition_i1` 统一处理条件判断
+   - BOOL 类型：直接提取布尔字段
+   - INT 类型：直接与 0 比较
+   - FLOAT 类型：直接与 0.0 比较
+   - 应用于 如果/否则如果/当 语句
+
+6. **其他改进**
+   - 新增 `转串` 内置函数别名
+   - 创建 Level 8 测试程序：`tests/test_level8_llvm.duan`
+
+### 影响文件
+
+| 文件 | 变更 |
+|------|------|
+| `src/llvm/codegen_typed.py` | 核心修复和优化 |
+| `src/llvm/codegen.py` | 新建（LLVMCodeGen 父类） |
+| `tests/test_level8_llvm.duan` | 新建（测试程序） |
+| `docs/llvm_backend_design.md` | 文档更新 |
+| `docs/superpowers/specs/2026-07-01-level6-type-annotation-design.md` | Level 8 状态更新 |
+
+---
+
+## Level 9 包管理与标准库完善完成记录 (2026-07-04)
+
+### 1. LLVM 后端模块系统支持
+
+**问题**：LLVM 后端对 `ImportStatement` 完全是 `pass`/`continue` 空实现，无法编译多文件项目。
+
+**修复与实现**：
+- `_process_imports()`：解析导入语句，记录符号映射表 `_imports`
+- `_emit_module_decls()`：为导入的段函数生成 `declare` 外部符号声明
+- `_gen_imported_segment_call()`：调用外部模块的段函数（通过 `@_seg_{模块名}_{函数名}` 别名）
+- `_gen_exported_aliases()`：为当前模块导出的段函数生成带模块前缀的 LLVM alias
+- `_gen_module_alias()`：生成单个段函数的模块前缀别名
+
+**多模块编译流水线**：
+- `compile_modules_typed()`：编译多个模块为合并的 LLVM IR
+- `compile_duan_project()`：递归收集依赖、编译合并、链接为原生可执行文件
+
+### 2. 核心标准库模块迁移为纯段言实现
+
+| 模块 | 导出函数 | 说明 |
+|------|---------|------|
+| `数学工具.duan` | 平方、绝对值、最大值、最小值、是奇数、是偶数、阶乘、是素数、最大公约数、最小公倍数、累加 | 11个纯段言实现 |
+| `字符串工具.duan` | 反转、重复、包含、开头是、结尾是、计数、去空格 | 7个纯段言实现 |
+| `列表工具.duan` | 求和、最大值、最小值、平均值、反转列表、包含、查找索引、计数、连接、范围 | 10个纯段言实现 |
+| `类型工具.duan` | 类型名、是整数、是布尔 | 3个纯段言实现 |
+
+### 3. 包管理器完善
+
+- `resolve_path_dependencies()`：解析 `package.toml` 中的 path 依赖
+- `build_project_native()`：使用 LLVM 后端编译项目为原生可执行文件
+  - 自动解析 path 依赖
+  - 递归收集所有模块源码
+  - 合并 IR 后编译链接
+
+### 4. AST 节点命名统一
+
+- `ExportStatement` 新增 `names: List[str]` 字段，支持多符号导出
+- `_convert_export_stmt()` 正确处理多符号导出
+- `_convert_module()` 收集 imports/exports 到 `module.imports`/`module.exports`
+- 添加兼容别名 `ImportStmt = ImportStatement`、`ExportStmt = ExportStatement`
+
+### 5. 影响文件
+
+| 文件 | 变更 |
+|------|------|
+| `src/llvm/codegen_typed.py` | 模块系统支持（导入/导出/别名/多模块） |
+| `src/llvm/compiler.py` | 新增 `compile_modules_typed`、`compile_duan_project` |
+| `src/package_manager.py` | 新增 `resolve_path_dependencies`、`build_project_native` |
+| `src/compiler.py` | `_convert_module` 收集 imports/exports、`_convert_export_stmt` 多符号 |
+| `src/ast_nodes.py` | `ExportStatement` 新增 `names` 字段、兼容别名 |
+| `stdlib/数学工具.duan` | 纯段言实现（11个函数） |
+| `stdlib/字符串工具.duan` | 新建（7个函数） |
+| `stdlib/列表工具.duan` | 新建（10个函数） |
+| `stdlib/类型工具.duan` | 新建（3个函数） |
+| `tests/test_level9_modules.duan` | 新建（模块系统测试） |
+| `tests/level9_project/` | 新建（包管理测试项目） |
+
+---
+
+## Level 10 异步并发支持完成记录 (2026-07-04)
+
+### 1. 协程运行时系统
+
+**核心数据结构**：
+- `DuanCoroutine`：协程句柄，包含 state、resume_point、func、result、args、locals、waiting_for、future、next
+- `DuanFuture`：Future/Promise，包含 ready、result、has_error、error_msg、waiters
+- `DuanScheduler`：协程调度器，包含 run_queue 可运行队列
+
+**运行时函数**：
+| 函数 | 说明 |
+|------|------|
+| `dv_coro_create()` | 创建协程，分配 DuanValue 类型的参数和局部变量槽位 |
+| `dv_coro_resume()` | 恢复协程执行（一步） |
+| `dv_coro_await()` | 挂起当前协程，等待另一个协程完成 |
+| `dv_coro_run_to_completion()` | 启动协程并运行到完成（阻塞式） |
+| `dv_coro_set_result()` | 设置协程返回值，同时完成关联的 future |
+| `dv_coro_get_await_result()` | 获取 await 的结果（从 waiting_for->result 复制） |
+| `dv_coro_get_local()` | 获取协程局部变量指针（跨 await 持久化） |
+| `dv_coro_get_arg()` | 获取协程参数指针 |
+| `dv_future_create()` | 创建 Future |
+| `dv_future_complete()` | 完成 Future，唤醒所有等待的协程 |
+| `dv_scheduler_run()` | 运行调度器直到无可运行协程 |
+
+### 2. 协程代码生成（LLVM 后端）
+
+**Duff's device 状态机模式**：
+- 使用 `switch(resume_point)` 实现协程挂起/恢复
+- 两阶段代码生成：预扫描统计 await 点数量 → 生成完整 switch 语句
+- 协程函数签名：`void @_coro_xxx(ptr %result, ptr %coro, ptr %args, i32 %num_args)`
+
+**关键实现**：
+| 方法 | 功能 |
+|------|------|
+| `_gen_typed_segment()` | 根据 modifiers 判断是否异步，分派到普通/异步生成 |
+| `_gen_async_segment()` | 生成包装函数，调用 dv_coro_create 创建协程 |
+| `_gen_coroutine_function()` | 两阶段法生成协程状态机函数 |
+| `_gen_await_expression()` | 生成挂起/恢复代码，设置 resume_point，调用 dv_coro_await |
+| `_gen_async_scope()` | 结构化并发代码生成，创建并串行执行多个协程 |
+| `_count_await_points()` | 预扫描统计 await 点数量 |
+| `_gen_coro_return()` | 协程返回：设置 DONE 状态 |
+
+**局部变量持久化**：
+- 使用 `coro->locals` 数组存储局部变量，跨 await 挂起点保持
+- 参数在协程入口处从 `coro->args` 复制到 `coro->locals`
+- 通过 `dv_coro_get_local()`/`dv_coro_get_arg()` 运行时辅助函数访问
+
+### 3. 异步语法支持
+
+**v3 AST 新增节点**：
+- `AwaitExpr`：等待表达式（`等待 异步操作`）
+- `AsyncScope`：异步作用域（`异步作用域 ... 结束`）
+
+**解析器支持**：
+- `异步 段落 段名()`：定义异步段落
+- `异步作用域 ... 结束`：结构化并发块
+- `等待 异步操作`：await 表达式
+- 支持 `=` 符号赋值（之前只支持 `等于`/`为` 关键字）
+
+**AstAdapter 支持**：
+- `_convert_await_expr()`：v3 AwaitExpr → ast.AwaitExpression
+- `_convert_async_scope()`：v3 AsyncScope → ast.AsyncScope
+- `_to_list_stmts()`：添加 AsyncScope 到允许的语句类型
+
+### 4. 修复的关键问题
+
+| 问题 | 原因 | 修复 |
+|------|------|------|
+| `=` 赋值不解析 | `_parse_assignment_stmt` 只检查 `等于`/`为` 关键字 | 添加 `TokenType.EQUALS` 支持 |
+| await 标签前缺少 terminator | LLVM 基本块必须以终止指令结尾 | 添加 `br label %await_label` |
+| await 点重复计数 | `hasattr` 检查导致 `value`/`body` 被重复统计 | 改用 `isinstance` 精确匹配 |
+| 局部变量跨 await 丢失 | `alloca` 在栈上，挂起恢复后栈帧不同 | 改用 `coro->locals` 数组存储 |
+| await 结果为 null | `dv_future_complete` 清除了 `waiting_for` | 保留 `waiting_for` 供 `dv_coro_get_await_result` 读取 |
+| dv_coro_await 参数类型 | 之前是 DuanFuture*，实际传入 DuanCoroutine* | 改为接收 DuanCoroutine*，从其 future 获取等待关系 |
+| next 指针冲突 | run_queue 和 all_coros 共享 next 指针 | 移除 all_coros 链表 |
+
+### 5. 测试覆盖
+
+| 测试 | 说明 | 状态 |
+|------|------|------|
+| `async_simple` | 异步段落创建（不执行） | ✅ 通过 |
+| `async_scope` | 异步作用域（多任务结构化并发） | ✅ 通过 |
+| `async_await` | await 获取协程结果 | ✅ 通过 |
+| `async_chain` | 链式 await（协程 await 协程） | ✅ 通过 |
+| `async_multiple_await` | 同一协程中多次 await，局部变量持久化 | ✅ 通过 |
+
+### 6. 影响文件
+
+| 文件 | 变更 |
+|------|------|
+| `src/llvm/runtime_typed.c` | 新增协程运行时（DuanCoroutine、DuanFuture、调度器、12个运行时函数） |
+| `src/llvm/codegen_typed.py` | 异步段落编译、await 代码生成、异步作用域、协程状态机 |
+| `src/ast_nodes_v3.py` | 新增 AwaitExpr、AsyncScope 节点 |
+| `src/ast_nodes.py` | 已有 AwaitExpression、AsyncScope（补充转换支持） |
+| `src/parser_stmt.py` | 异步段落、异步作用域、等待表达式、`=` 赋值支持 |
+| `src/parser_expr.py` | `等待` 表达式解析 |
+| `src/compiler.py` | AstAdapter 新增 await/async 转换，_to_list_stmts 添加 AsyncScope |
+| `tests/test_llvm_async.py` | 5 个异步测试用例 |
+
+---
+
 ## 文件清单
 
 ```
@@ -589,6 +821,6 @@ G:\dumategithub\duan\
 
 ---
 
-**报告版本：** v1.1  
-**生成时间：** 2026-06-17  
+**报告版本：** v1.3  
+**生成时间：** 2026-07-04  
 **下次更新：** 下一阶段功能扩展完成后

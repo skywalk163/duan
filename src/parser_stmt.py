@@ -122,6 +122,24 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '抛出':
             return self._parse_throw_stmt()
         
+        # 异步相关：异步 段落 / 异步作用域 / 等待
+        if tok.type == TokenType.KEYWORD and tok.value == '异步':
+            # 查看下一个 token 判断是异步段落还是异步作用域
+            next_tok = self._peek(1)
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('段落', '函数', '段'):
+                # 异步段落：异步 段落 段名 ...
+                return self._parse_async_paragraph()
+            elif next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '作用域':
+                # 异步作用域：异步作用域 ...
+                return self._parse_async_scope()
+            else:
+                # 默认为异步段落（向前兼容）
+                return self._parse_async_paragraph()
+        
+        # 等待表达式作为语句：等待 异步调用。
+        if tok.type == TokenType.KEYWORD and tok.value == '等待':
+            return self._parse_expr_stmt()
+        
         # 段落定义或类定义：《段名》段 或 《类名》类
         # 或段落调用：《段名》(参数)
         if tok.type == TokenType.LBOOK:
@@ -221,6 +239,8 @@ class ParserStmtMixin:
                     self._consume(TokenType.KEYWORD, '为')
                 elif self._match(TokenType.KEYWORD, '等于'):
                     self._consume(TokenType.KEYWORD, '等于')
+                elif self._match(TokenType.EQUALS):
+                    self._consume(TokenType.EQUALS)
                 else:
                     tok = self._current()
                     self._error(f"期望'为'或'等于'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
@@ -265,6 +285,8 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '为')
         elif self._match(TokenType.KEYWORD, '等于'):
             self._consume(TokenType.KEYWORD, '等于')
+        elif self._match(TokenType.EQUALS):
+            self._consume(TokenType.EQUALS)
         else:
             # 兼容其他赋值操作符
             self._error(f"期望'为'或'等于'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
@@ -312,12 +334,12 @@ class ParserStmtMixin:
                 # 暂不支持复合赋值
                 self._error(f"暂不支持索引复合赋值", name_tok.line, name_tok.col, name_tok.value)
             
-            # 检查等于/为
-            if not self._match(TokenType.KEYWORD, '等于') and not self._match(TokenType.KEYWORD, '为'):
+            # 检查等于/为/=
+            if not self._match(TokenType.KEYWORD, '等于') and not self._match(TokenType.KEYWORD, '为') and not self._match(TokenType.EQUALS):
                 self.pos -= 1  # 回退
                 return self._parse_expr_stmt()
             
-            # 消耗等于/为
+            # 消耗等于/为/=
             self._consume()
             
             value = self._parse_expr()
@@ -342,13 +364,13 @@ class ParserStmtMixin:
             
             return CompoundAssignment(name, operator, value)
         
-        # 等于或为
-        if not self._match(TokenType.KEYWORD, '等于') and not self._match(TokenType.KEYWORD, '为'):
+        # 等于或为或=
+        if not self._match(TokenType.KEYWORD, '等于') and not self._match(TokenType.KEYWORD, '为') and not self._match(TokenType.EQUALS):
             # 不是赋值语句，可能是表达式
             self.pos -= 1  # 回退标识符
             return self._parse_expr_stmt()
         
-        # 消耗等于/为
+        # 消耗等于/为/=
         self._consume()
         
         # 值
@@ -674,8 +696,9 @@ class ParserStmtMixin:
         # 表达式
         value = self._parse_expr()
 
-        # 句号
-        self._consume(TokenType.DOT)
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
 
         return VarDecl(name, value, type_annotation=type_annotation)
     
@@ -1512,6 +1535,65 @@ class ParserStmtMixin:
             self._consume(TokenType.DOT)
         
         return Paragraph(name, params, return_type, body, generic_params=generic_params)
+    
+    def _parse_async_paragraph(self) -> Paragraph:
+        """解析异步段落定义：异步 段落/函数/段 段名 ..."""
+        # 异步
+        self._consume(TokenType.KEYWORD, '异步')
+        
+        # 调用普通段落解析
+        para = self._parse_paragraph_v2()
+        
+        # 添加异步修饰符
+        if '异步' not in para.modifiers:
+            para.modifiers = list(para.modifiers) + ['异步']
+        
+        return para
+    
+    def _parse_async_scope(self) -> AsyncScope:
+        """解析异步作用域：异步作用域：
+            任务1
+            任务2
+        结束
+        """
+        # 异步
+        self._consume(TokenType.KEYWORD, '异步')
+        # 作用域
+        self._consume(TokenType.KEYWORD, '作用域')
+        
+        # 冒号（支持：或：）
+        if self._current() and self._current().type == TokenType.COLON:
+            self._consume(TokenType.COLON)
+        
+        # 消耗 NEWLINE 和 INDENT
+        if self._current() and self._current().type == TokenType.NEWLINE:
+            self._consume(TokenType.NEWLINE)
+        if self._current() and self._current().type == TokenType.INDENT:
+            self._consume(TokenType.INDENT)
+        
+        # 解析任务列表（每个语句是一个任务）
+        tasks = []
+        result_vars = []
+        
+        body = self._parse_body()
+        
+        # 消耗 DEDENT
+        if self._current() and self._current().type == TokenType.DEDENT:
+            self._consume(TokenType.DEDENT)
+        
+        # 消耗"结束"关键字
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+            # 消耗句号（可选）
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+        elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
+            self._consume(TokenType.IDENTIFIER, '结束')
+            # 消耗句号（可选）
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+        
+        return AsyncScope(tasks=body, result_vars=result_vars)
     
     def _parse_body(self) -> List[ASTNode]:
         """解析代码块

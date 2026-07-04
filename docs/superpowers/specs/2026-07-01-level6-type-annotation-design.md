@@ -361,5 +361,21 @@ Level 6 初始支持以下关键字的无空格分词（约 45 个）：
 ## 九、后续计划
 
 - Level 7：泛型、接口、模式匹配
-- Level 8：LLVM 后端完整支持（利用类型信息优化）
-- Level 9：包管理、标准库完善
+- Level 8：LLVM 后端完整支持（利用类型信息优化）✅ 已完成
+  - 类型注解集成到 LLVM 代码生成
+  - 变量类型追踪系统
+  - 表达式类型推断（NumberLiteral/StringLiteral/BooleanLiteral/BinaryOp）
+  - 算术运算优化：INT 直接 i64 运算，FLOAT 直接 double 运算
+  - 比较运算优化：直接 icmp/fcmp 替代运行时函数
+  - 条件判断优化：BOOL/INT/FLOAT 类型的直接判断
+  - 快速 DuanValue 构造：直接结构体字段操作
+  - DuanValue 结构体布局与 C 端完全匹配
+  - 段落函数统一使用指针传递调用约定
+- Level 9：包管理、标准库完善 ✅ 已完成
+  - LLVM 后端模块系统支持（导入解析、外部符号声明、多模块编译）
+  - 核心标准库模块迁移为纯段言实现（数学工具、字符串工具、列表工具、类型工具）
+  - 包管理器 path 依赖解析与 LLVM 原生编译支持
+  - AST 节点命名统一（兼容别名消除双轨制）
+  - ExportStatement 支持多符号导出
+  - 多模块编译流水线（compile_modules_typed / compile_duan_project）
+- Level 10：（未来）

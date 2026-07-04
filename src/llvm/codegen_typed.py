@@ -7,11 +7,17 @@ LLVM 代码生成器 - 类型版 (v3)
 from typing import Optional, Tuple, List
 import sys
 import ast_nodes as ast
-from .codegen import LLVMCodeGen
+try:
+    from .codegen import LLVMCodeGen
+except ImportError:
+    from codegen import LLVMCodeGen
 
 
-# LLVM 结构体类型：{ i32 type, i64 i64_val, double f64_val, ptr str_val }
-DUANVALUE_STRUCT = '{ i32, i64, double, ptr, i32, [4 x i8] }'
+# LLVM 结构体类型：与 C 端 DuanValue 布局匹配
+# C 结构: { int type, int64_t i64, double f64, char* str, int boolean,
+#           int list_size, int list_capacity, struct DuanValue** list_data }
+# 注意：为了安全起见，使用足够大的结构体（与 C sizeof(DuanValue) 匹配）
+DUANVALUE_STRUCT = '{ i32, i64, double, ptr, i32, i32, i32, ptr }'
 
 
 class TypedLLVMCodeGen(LLVMCodeGen):
@@ -22,8 +28,20 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._dv_struct_slots = {}  # 栈上分配的结构体槽位
         self._classes = {}  # 类定义收集：class_name -> ClassDefinition
         self._method_result_ptr = None  # 当前方法的 result 指针（None 表示不在方法中）
+        self._seg_result_ptr = None  # 当前段落函数的 result 指针（None 表示不在段落函数中）
         self._current_class = None  # 当前方法所属的类名（None 表示不在方法中）
         self._current_method_type = None  # 当前方法类型：'instance' / 'class' / 'static'
+        self._var_types = {}  # 变量类型追踪：var_name -> type_str (INT/FLOAT/BOOL/STRING/LIST/None)
+        self._enable_type_opt = True  # 启用类型优化
+        # 模块系统支持（Level 9）
+        self._imports = {}  # 导入符号表：符号名 -> (模块名, 原始符号名)
+        self._imported_modules = set()  # 已导入的模块名集合
+        self._module_decls = []  # 待生成的外部段函数声明
+        self._segment_modifiers = {}  # 段的修饰符（异步等）
+        # 协程支持（Level 10）
+        self._in_coroutine = False  # 当前是否在生成协程函数
+        self._coro_handle_ptr = None  # 协程句柄指针（DuanCoroutine*）
+        self._coro_resume_point = 0  # 下一个 await 点的编号
         # 目标平台：win32 / linux / darwin，默认根据当前系统判断
         self.target_platform = target_platform or sys.platform
 
@@ -167,6 +185,20 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             f'declare void @dv_dict_has(ptr, ptr, ptr)',
             f'declare void @dv_dict_keys(ptr, ptr)',
             f'declare void @dv_dict_values(ptr, ptr)',
+            # 协程/异步
+            f'declare ptr @dv_coro_create(ptr, ptr, i32, i32)',
+            f'declare void @dv_coro_await(ptr, ptr)',
+            f'declare void @dv_scheduler_run()',
+            f'declare void @dv_coro_run_to_completion(ptr)',
+            f'declare ptr @dv_coro_get_result(ptr)',
+            f'declare i32 @dv_coro_is_done(ptr)',
+            f'declare ptr @dv_future_create()',
+            f'declare void @dv_future_complete(ptr, ptr)',
+            f'declare ptr @dv_future_from_value(ptr)',
+            f'declare void @dv_coro_get_await_result(ptr, ptr)',
+            f'declare void @dv_coro_set_result(ptr, ptr)',
+            f'declare ptr @dv_coro_get_local(ptr, i32)',
+            f'declare ptr @dv_coro_get_arg(ptr, i32)',
         ]
         for f in funcs:
             self._func_decls.add(f)
@@ -205,7 +237,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         """设置 DuanValue 槽位的 f64 字段"""
         ptr = self.new_register()
         self.emit(f'{ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {slot}, i32 0, i32 2')
-        self.emit(f'store i64 {f64_val}, ptr {ptr}')
+        self.emit(f'store double {f64_val}, ptr {ptr}')
 
     def _set_str(self, slot: str, str_val: str):
         """设置 DuanValue 槽位的 str 字段"""
@@ -262,12 +294,104 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         return self._load_dv(result_slot)
 
     # ============================================================
+    # 类型推断与优化（Level 8）
+    # ============================================================
+
+    def _get_var_type(self, name: str) -> Optional[str]:
+        """获取变量的已知类型（INT/FLOAT/BOOL/STRING/LIST/None）"""
+        return self._var_types.get(name)
+
+    def _set_var_type(self, name: str, type_: Optional[str]):
+        """设置变量的类型"""
+        self._var_types[name] = type_
+
+    def _infer_expr_type(self, expr) -> Optional[str]:
+        """推断表达式的类型（基于 AST 节点）"""
+        if isinstance(expr, ast.NumberLiteral):
+            val = str(expr.value)
+            if '.' in val or 'e' in val.lower():
+                return 'FLOAT'
+            return 'INT'
+        elif isinstance(expr, ast.StringLiteral):
+            return 'STRING'
+        elif isinstance(expr, ast.BooleanLiteral):
+            return 'BOOL'
+        elif isinstance(expr, ast.NullLiteral):
+            return None
+        elif isinstance(expr, ast.ListLiteral):
+            return 'LIST'
+        elif isinstance(expr, ast.Identifier):
+            return self._get_var_type(expr.name)
+        elif isinstance(expr, ast.BinaryOp):
+            left_type = self._infer_expr_type(expr.left)
+            right_type = self._infer_expr_type(expr.right)
+            op = expr.operator
+            if op in ('+', '-', '*', '/', '加', '减', '乘', '除', '模', '幂'):
+                if left_type == 'FLOAT' or right_type == 'FLOAT':
+                    return 'FLOAT'
+                if left_type == 'INT' and right_type == 'INT':
+                    if op in ('/', '除'):
+                        return 'FLOAT'
+                    return 'INT'
+                return None
+            if op in ('==', '等于', '!=', '不等于', '<', '小于', '>', '大于',
+                     '<=', '小于等于', '>=', '大于等于'):
+                return 'BOOL'
+            return None
+        return None
+
+    def _extract_i64(self, dv_reg: str) -> str:
+        """从 DuanValue 中提取 i64 值"""
+        reg = self.new_register()
+        self.emit(f'{reg} = extractvalue {DUANVALUE_STRUCT} {dv_reg}, 1')
+        return reg
+
+    def _extract_f64(self, dv_reg: str) -> str:
+        """从 DuanValue 中提取 double 值"""
+        reg = self.new_register()
+        self.emit(f'{reg} = extractvalue {DUANVALUE_STRUCT} {dv_reg}, 2')
+        return reg
+
+    def _extract_bool(self, dv_reg: str) -> str:
+        """从 DuanValue 中提取 bool 值（返回 i1）"""
+        i32_reg = self.new_register()
+        self.emit(f'{i32_reg} = extractvalue {DUANVALUE_STRUCT} {dv_reg}, 4')
+        i1_reg = self.new_register()
+        self.emit(f'{i1_reg} = trunc i32 {i32_reg} to i1')
+        return i1_reg
+
+    def _create_int_dv_fast(self, i64_reg: str) -> str:
+        """快速创建 INT 类型 DuanValue（直接构造结构体）"""
+        slot = self._new_dv_slot()
+        type_ptr = self.new_register()
+        self.emit(f'{type_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {slot}, i32 0, i32 0')
+        self.emit(f'store i32 1, ptr {type_ptr}')
+        i64_ptr = self.new_register()
+        self.emit(f'{i64_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {slot}, i32 0, i32 1')
+        self.emit(f'store i64 {i64_reg}, ptr {i64_ptr}')
+        return self._load_dv(slot)
+
+    def _create_float_dv_fast(self, f64_reg: str) -> str:
+        """快速创建 FLOAT 类型 DuanValue（直接构造结构体）"""
+        slot = self._new_dv_slot()
+        type_ptr = self.new_register()
+        self.emit(f'{type_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {slot}, i32 0, i32 0')
+        self.emit(f'store i32 2, ptr {type_ptr}')
+        f64_ptr = self.new_register()
+        self.emit(f'{f64_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {slot}, i32 0, i32 2')
+        self.emit(f'store double {f64_reg}, ptr {f64_ptr}')
+        return self._load_dv(slot)
+
+    # ============================================================
     # 覆盖父类的表达式/语句生成
     # ============================================================
 
     def generate(self, module: ast.Module) -> str:
         self.declare_runtime()
         self._declare_typed_runtime()
+
+        # Level 9: 处理导入语句
+        self._process_imports(module)
 
         for stmt in module.statements:
             if isinstance(stmt, ast.ImportStatement):
@@ -279,16 +403,72 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         for seg in module.segments:
             self._collect_segment(seg)
 
+        # 生成导入的外部段函数声明
+        self._emit_module_decls()
+
         self._gen_global_init()
         for cls_name, cls_def in self._classes.items():
             self._gen_typed_class_methods(cls_name, cls_def)
         for seg_name in self._segment_order:
             params = self._segments[seg_name]
             body = self._segment_bodies.get(seg_name, [])
-            self._gen_typed_segment(seg_name, params, body)
+            modifiers = self._segment_modifiers.get(seg_name, [])
+            self._gen_typed_segment(seg_name, params, body, modifiers)
+
+        # Level 9: 为导出的段函数生成模块前缀别名
+        self._gen_exported_aliases(module)
 
         self._gen_typed_main()
         return self.finalize()
+
+    def _process_imports(self, module: ast.Module):
+        """处理模块导入语句，记录导入的符号"""
+        imports = getattr(module, 'imports', None) or []
+        for imp in imports:
+            if isinstance(imp, ast.ImportStatement):
+                module_name = imp.module
+                self._imported_modules.add(module_name)
+                if imp.names:
+                    for name in imp.names:
+                        self._imports[name] = (module_name, name)
+                        # 生成外部段函数声明
+                        safe_name = self._safe_func_name(f'{module_name}_{name}')
+                        if safe_name not in self._module_decls:
+                            self._module_decls.append(safe_name)
+
+    def _emit_module_decls(self):
+        """生成导入的外部段函数声明"""
+        for decl_name in self._module_decls:
+            self.emit(f'declare void @_seg_{decl_name}(ptr, ptr, i32)')
+
+    def _gen_exported_aliases(self, module: ast.Module):
+        """为当前模块导出的段函数生成带模块前缀的别名"""
+        module_name = getattr(module, 'name', None)
+        if not module_name:
+            return
+        exports = getattr(module, 'exports', None) or []
+        exported_names = set()
+        for exp in exports:
+            if isinstance(exp, ast.ExportStatement):
+                # 优先使用 names 列表
+                if exp.names:
+                    exported_names.update(exp.names)
+                elif exp.name:
+                    exported_names.add(exp.name)
+        # 如果没有显式导出，导出所有段函数
+        if not exported_names:
+            for seg_name in self._segment_order:
+                exported_names.add(seg_name)
+        for seg_name in exported_names:
+            if seg_name in self._segments:
+                safe = self._safe_func_name(seg_name)
+                alias_name = self._safe_func_name(f'{module_name}_{seg_name}')
+                if alias_name != safe:
+                    self.emit(f'@_seg_{alias_name} = alias void (ptr, ptr, i32), void (ptr, ptr, i32)* @_seg_{safe}')
+
+    def _is_imported_symbol(self, name: str) -> bool:
+        """检查符号是否来自导入的模块"""
+        return name in self._imports
 
     # ============================================================
     # 重写表达式生成：使用 DuanValue
@@ -311,9 +491,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
 
         if isinstance(expr, ast.BooleanLiteral):
             val_i1 = '1' if expr.value else '0'
-            reg = self.new_register()
-            self.emit(f'{reg} = zext i1 {val_i1} to i64')
-            return self._create_int_dv(reg), 'dv'
+            return self._create_bool_dv(val_i1), 'dv'
 
         if isinstance(expr, ast.NullLiteral):
             return self._call_dv_func('dv_null'), 'dv'
@@ -356,6 +534,10 @@ class TypedLLVMCodeGen(LLVMCodeGen):
 
         if hasattr(ast, 'NewExpression') and isinstance(expr, ast.NewExpression):
             return self._gen_typed_class_instantiation(expr)
+        
+        # 异步：等待表达式
+        if hasattr(ast, 'AwaitExpression') and isinstance(expr, ast.AwaitExpression):
+            return self._gen_await_expression(expr)
 
         return self._create_int_dv('0'), 'dv'
 
@@ -396,6 +578,57 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         right_dv, _ = self._gen_expression(expr.right)
         op = expr.operator
 
+        left_type = self._infer_expr_type(expr.left)
+        right_type = self._infer_expr_type(expr.right)
+
+        arith_ops = {
+            '+': ('add', 'fadd'), '-': ('sub', 'fsub'),
+            '*': ('mul', 'fmul'), '/': ('sdiv', 'fdiv'),
+            '加': ('add', 'fadd'), '减': ('sub', 'fsub'),
+            '乘': ('mul', 'fmul'), '除': ('sdiv', 'fdiv'),
+        }
+
+        if op in arith_ops:
+            if self._enable_type_opt and left_type == 'INT' and right_type == 'INT':
+                left_i64 = self._extract_i64(left_dv)
+                right_i64 = self._extract_i64(right_dv)
+                int_op, _ = arith_ops[op]
+                result = self.new_register()
+                self.emit(f'{result} = {int_op} i64 {left_i64}, {right_i64}')
+                return self._create_int_dv_fast(result), 'dv'
+            if self._enable_type_opt and (left_type == 'FLOAT' or right_type == 'FLOAT'):
+                left_f64 = self._extract_f64(left_dv) if left_type == 'FLOAT' else self._i64_to_f64(self._extract_i64(left_dv))
+                right_f64 = self._extract_f64(right_dv) if right_type == 'FLOAT' else self._i64_to_f64(self._extract_i64(right_dv))
+                _, float_op = arith_ops[op]
+                result = self.new_register()
+                self.emit(f'{result} = {float_op} double {left_f64}, {right_f64}')
+                return self._create_float_dv_fast(result), 'dv'
+
+        cmp_ops = {
+            '==': ('eq', 'oeq'), '等于': ('eq', 'oeq'),
+            '!=': ('ne', 'une'), '不等于': ('ne', 'une'),
+            '<': ('slt', 'olt'), '小于': ('slt', 'olt'),
+            '>': ('sgt', 'ogt'), '大于': ('sgt', 'ogt'),
+            '<=': ('sle', 'ole'), '小于等于': ('sle', 'ole'),
+            '>=': ('sge', 'oge'), '大于等于': ('sge', 'oge'),
+        }
+
+        if op in cmp_ops:
+            if self._enable_type_opt and left_type == 'INT' and right_type == 'INT':
+                left_i64 = self._extract_i64(left_dv)
+                right_i64 = self._extract_i64(right_dv)
+                int_pred, _ = cmp_ops[op]
+                cmp_reg = self.new_register()
+                self.emit(f'{cmp_reg} = icmp {int_pred} i64 {left_i64}, {right_i64}')
+                return self._create_bool_dv(cmp_reg), 'dv'
+            if self._enable_type_opt and (left_type == 'FLOAT' or right_type == 'FLOAT'):
+                left_f64 = self._extract_f64(left_dv) if left_type == 'FLOAT' else self._i64_to_f64(self._extract_i64(left_dv))
+                right_f64 = self._extract_f64(right_dv) if right_type == 'FLOAT' else self._i64_to_f64(self._extract_i64(right_dv))
+                _, float_pred = cmp_ops[op]
+                cmp_reg = self.new_register()
+                self.emit(f'{cmp_reg} = fcmp {float_pred} double {left_f64}, {right_f64}')
+                return self._create_bool_dv(cmp_reg), 'dv'
+
         type_map = {
             '+': 'dv_add', '-': 'dv_sub', '*': 'dv_mul', '/': 'dv_div',
             '加': 'dv_add', '减': 'dv_sub', '乘': 'dv_mul', '除': 'dv_div',
@@ -415,7 +648,6 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if op in cmp_map:
             cmp_name = cmp_map[op]
             if cmp_name is None:
-                # !=: 取反 dv_eq
                 left_slot = self._store_dv(left_dv)
                 right_slot = self._store_dv(right_dv)
                 eq = self.new_register()
@@ -434,8 +666,39 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if op == '连接':
             return self._call_dv_func('dv_concat', left_dv, right_dv), 'dv'
 
-        # 默认加法
         return self._call_dv_func('dv_add', left_dv, right_dv), 'dv'
+
+    def _i64_to_f64(self, i64_reg: str) -> str:
+        """将 i64 转换为 double"""
+        reg = self.new_register()
+        self.emit(f'{reg} = sitofp i64 {i64_reg} to double')
+        return reg
+
+    def _gen_condition_i1(self, cond_expr, cond_dv: str) -> str:
+        """根据条件表达式生成 i1 布尔值，尽可能使用类型优化"""
+        cond_type = self._infer_expr_type(cond_expr) if self._enable_type_opt else None
+
+        if cond_type == 'BOOL':
+            return self._extract_bool(cond_dv)
+        if cond_type == 'INT':
+            i64_val = self._extract_i64(cond_dv)
+            cmp_reg = self.new_register()
+            self.emit(f'{cmp_reg} = icmp ne i64 {i64_val}, 0')
+            return cmp_reg
+        if cond_type == 'FLOAT':
+            f64_val = self._extract_f64(cond_dv)
+            cmp_reg = self.new_register()
+            self.emit(f'{cmp_reg} = fcmp one double {f64_val}, 0.0')
+            return cmp_reg
+
+        zero_dv = self._create_int_dv('0')
+        cond_slot = self._store_dv(cond_dv)
+        zero_slot = self._store_dv(zero_dv)
+        eq = self.new_register()
+        self.emit(f'{eq} = call i32 @dv_eq(ptr {cond_slot}, ptr {zero_slot})')
+        final = self.new_register()
+        self.emit(f'{final} = icmp eq i32 {eq}, 0')
+        return final
 
     def _gen_typed_unary_op(self, expr: ast.UnaryOp) -> Tuple[str, str]:
         reg, _ = self._gen_expression(expr.operand)
@@ -469,11 +732,36 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if builtin is not None:
             return builtin
 
-        # 用户分段
+        # 当前模块的段函数
         if func_name in self._segments:
             return self._gen_typed_segment_call(func_name, args)
 
+        # Level 9: 导入的外部段函数
+        if func_name in self._imports:
+            return self._gen_imported_segment_call(func_name, args)
+
         return self._create_int_dv('0'), 'dv'
+
+    def _gen_imported_segment_call(self, name: str, args: List[str]) -> Tuple[str, str]:
+        """调用从其他模块导入的段函数"""
+        module_name, orig_name = self._imports[name]
+        safe = self._safe_func_name(f'{module_name}_{orig_name}')
+        result_slot = self._new_dv_slot()
+        num_args = len(args)
+        if num_args == 0:
+            args_arr_ptr = 'null'
+        else:
+            args_arr = self.new_register()
+            self.emit(f'{args_arr} = alloca {DUANVALUE_STRUCT}, i32 {num_args}')
+            for i, arg_dv in enumerate(args):
+                elem_ptr = self.new_register()
+                self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {args_arr}, i64 {i}')
+                self.emit(f'store {DUANVALUE_STRUCT} {arg_dv}, ptr {elem_ptr}')
+            args_arr_ptr = args_arr
+        self.emit(f'call void @_seg_{safe}(ptr {result_slot}, ptr {args_arr_ptr}, i32 {num_args})')
+        result = self.new_register()
+        self.emit(f'{result} = load {DUANVALUE_STRUCT}, ptr {result_slot}')
+        return result, 'dv'
 
     def _gen_typed_builtin(self, name: str, args: List[str]) -> Optional[Tuple[str, str]]:
         if name in ('输出', '打印'):
@@ -501,10 +789,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             if not args:
                 return self._create_int_dv('0'), 'dv'
             dbl = self.new_register()
-            # 从 DuanValue 提取 double
-            ptr = self.new_register()
-            self.emit(f'{ptr} = extractvalue {DUANVALUE_STRUCT} {args[0]}, 2')
-            self.emit(f'{dbl} = bitcast double* {ptr} to double')
+            self.emit(f'{dbl} = extractvalue {DUANVALUE_STRUCT} {args[0]}, 2')
             fmt_reg = self.gen_string_constant("%Y-%m-%d %H:%M:%S")
             out = self.new_register()
             self.emit(f'{out} = call ptr @dv_format_time(double {dbl}, ptr {fmt_reg})')
@@ -726,7 +1011,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 return self._call_dv_func('dv_list_get', args[0], f'i64 {idx_i64}'), 'dv'
             return self._create_int_dv('0'), 'dv'
 
-        if name == '转文本' or name == 'to_string' or name == '转字符串':
+        if name in ('转文本', 'to_string', '转字符串', '转串'):
             if args:
                 return self._call_dv_func('dv_value_to_string', args[0]), 'dv'
             return self._create_str_dv(self.gen_string_constant("")), 'dv'
@@ -1318,6 +1603,9 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._segments[raw_name] = params
         self._segment_order.append(raw_name)
         self._segment_bodies[raw_name] = seg.body
+        # 保存 modifiers（用于异步段落识别）
+        modifiers = getattr(seg, 'modifiers', None) or []
+        self._segment_modifiers[raw_name] = list(modifiers)
         # 预先注册到 _func_name_map，确保 f# 编号稳定
         self._safe_func_name(raw_name)
 
@@ -1348,10 +1636,22 @@ class TypedLLVMCodeGen(LLVMCodeGen):
 
     def _gen_typed_segment_call(self, name: str, args: List[str]) -> Tuple[str, str]:
         safe = self._safe_func_name(name)
-        arg_strs = [f'{DUANVALUE_STRUCT} {a}' for a in args]
-        reg = self.new_register()
-        self.emit(f'{reg} = call {DUANVALUE_STRUCT} @_seg_{safe}({", ".join(arg_strs)})')
-        return reg, 'dv'
+        result_slot = self._new_dv_slot()
+        num_args = len(args)
+        if num_args == 0:
+            args_arr_ptr = 'null'
+        else:
+            args_arr = self.new_register()
+            self.emit(f'{args_arr} = alloca {DUANVALUE_STRUCT}, i32 {num_args}')
+            for i, arg_dv in enumerate(args):
+                elem_ptr = self.new_register()
+                self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {args_arr}, i64 {i}')
+                self.emit(f'store {DUANVALUE_STRUCT} {arg_dv}, ptr {elem_ptr}')
+            args_arr_ptr = args_arr
+        self.emit(f'call void @_seg_{safe}(ptr {result_slot}, ptr {args_arr_ptr}, i32 {num_args})')
+        result = self.new_register()
+        self.emit(f'{result} = load {DUANVALUE_STRUCT}, ptr {result_slot}')
+        return result, 'dv'
 
     def _gen_typed_index_access(self, expr) -> Tuple[str, str]:
         obj_dv, _ = self._gen_expression(expr.obj)
@@ -1457,6 +1757,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             self._gen_expression(expr)
         elif isinstance(stmt, ast.ImportStatement):
             pass
+        elif hasattr(ast, 'AsyncScope') and isinstance(stmt, ast.AsyncScope):
+            self._gen_async_scope(stmt)
 
     def _gen_typed_var_decl(self, stmt: ast.VariableDeclaration):
         self.alloca_local(stmt.name)
@@ -1465,6 +1767,23 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         else:
             dv_val = self._create_int_dv('0')
         self.set_var(stmt.name, dv_val)
+        var_type = None
+        if stmt.type_annotation:
+            var_type = self._map_type_name(stmt.type_annotation)
+        elif stmt.value:
+            var_type = self._infer_expr_type(stmt.value)
+        self._set_var_type(stmt.name, var_type)
+
+    def _map_type_name(self, type_name: str) -> Optional[str]:
+        """将类型注解名称映射为内部类型常量"""
+        type_map = {
+            '数': 'INT', '整数': 'INT', 'int': 'INT', 'Int': 'INT',
+            '浮点数': 'FLOAT', '小数': 'FLOAT', 'float': 'FLOAT', 'Float': 'FLOAT', 'double': 'FLOAT',
+            '布尔': 'BOOL', 'bool': 'BOOL', 'Bool': 'BOOL',
+            '串': 'STRING', '字符串': 'STRING', 'str': 'STRING', 'String': 'STRING',
+            '列表': 'LIST', '数组': 'LIST', 'list': 'LIST', 'List': 'LIST',
+        }
+        return type_map.get(type_name)
 
     def _gen_typed_assignment(self, stmt: ast.Assignment):
         if isinstance(stmt.target, ast.PropertyAccess):
@@ -1510,10 +1829,25 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             name = self._get_var_name(stmt.target)
             dv_val, _ = self._gen_expression(stmt.value)
             self.set_var(name, dv_val)
+            if isinstance(stmt.target, ast.Identifier):
+                new_type = self._infer_expr_type(stmt.value)
+                if new_type is not None:
+                    old_type = self._get_var_type(name)
+                    if old_type is None or old_type == new_type:
+                        self._set_var_type(name, new_type)
+                    else:
+                        self._set_var_type(name, None)
         else:
             name = self._get_var_name(stmt.target)
             dv_val, _ = self._gen_expression(stmt.value)
             self.set_var(name, dv_val)
+            new_type = self._infer_expr_type(stmt.value)
+            if new_type is not None:
+                old_type = self._get_var_type(name)
+                if old_type is None or old_type == new_type:
+                    self._set_var_type(name, new_type)
+                else:
+                    self._set_var_type(name, None)
 
     def _gen_typed_self_assignment(self, stmt):
         """生成 SelfAssignment 语句（己.属性名 为 值）"""
@@ -1542,14 +1876,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
 
     def _gen_typed_if(self, stmt: ast.IfStatement):
         cond_dv, _ = self._gen_expression(stmt.condition)
-        # 条件为假/零 → 跳转 else
-        zero_dv = self._create_int_dv('0')
-        cond_slot = self._store_dv(cond_dv)
-        zero_slot = self._store_dv(zero_dv)
-        eq = self.new_register()
-        self.emit(f'{eq} = call i32 @dv_eq(ptr {cond_slot}, ptr {zero_slot})')
-        final = self.new_register()
-        self.emit(f'{final} = icmp ne i32 {eq}, 0')
+        final = self._gen_condition_i1(stmt.condition, cond_dv)
 
         then_lab = self.new_label('then')
         end_lab = self.new_label('endif')
@@ -1558,7 +1885,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         elseif_labs = [self.new_label('elseif') for _ in stmt.elseif_conditions]
 
         next_lab = elseif_labs[0] if elseif_labs else else_lab
-        self.emit(f'br i1 {final}, label %{next_lab}, label %{then_lab}')
+        self.emit(f'br i1 {final}, label %{then_lab}, label %{next_lab}')
 
         self.emit(f'{then_lab}:')
         for s in stmt.then_body:
@@ -1571,14 +1898,9 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             next_l = elseif_labs[idx + 1] if idx + 1 < len(elseif_labs) else else_lab
             self.emit(f'{eif_lab}:')
             c_dv, _ = self._gen_expression(eif_cond)
-            c_slot = self._store_dv(c_dv)
-            z_slot = self._store_dv(zero_dv)
-            z = self.new_register()
-            self.emit(f'{z} = call i32 @dv_eq(ptr {c_slot}, ptr {z_slot})')
-            f = self.new_register()
-            self.emit(f'{f} = icmp ne i32 {z}, 0')
+            f = self._gen_condition_i1(eif_cond, c_dv)
             e_then = self.new_label('eif_then')
-            self.emit(f'br i1 {f}, label %{next_l}, label %{e_then}')
+            self.emit(f'br i1 {f}, label %{e_then}, label %{next_l}')
             self.emit(f'{e_then}:')
             for s in eif_body:
                 self._gen_statement(s)
@@ -1646,14 +1968,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
 
         self.emit(f'{cond_lab}:')
         cond_dv, _ = self._gen_expression(stmt.condition)
-        zero_dv = self._create_int_dv('0')
-        cond_slot = self._store_dv(cond_dv)
-        zero_slot = self._store_dv(zero_dv)
-        eq = self.new_register()
-        self.emit(f'{eq} = call i32 @dv_eq(ptr {cond_slot}, ptr {zero_slot})')
-        final = self.new_register()
-        self.emit(f'{final} = icmp ne i32 {eq}, 0')
-        self.emit(f'br i1 {final}, label %{end_lab}, label %{body_lab}')
+        final = self._gen_condition_i1(stmt.condition, cond_dv)
+        self.emit(f'br i1 {final}, label %{body_lab}, label %{end_lab}')
 
         self.emit(f'{body_lab}:')
         for s in stmt.body:
@@ -1665,8 +1981,21 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._loop_continue_labels.pop()
 
     def _gen_typed_return(self, stmt: ast.ReturnStatement):
-        if self._method_result_ptr is not None:
-            # 把己变量写回 self（仅非静态方法）
+        if self._in_coroutine:
+            # 协程函数中的返回：存储结果到 coro->result，设置完成状态
+            if stmt.value:
+                dv_val, _ = self._gen_expression(stmt.value)
+                # 存储到 coro->result
+                # 假设 result 字段在 offset 16 (state 4 + resume_point 4 + padding 4 + func ptr 8 = 20? 不对)
+                # 让我们用运行时函数更安全
+                result_slot = self._store_dv(dv_val)
+                self.emit(f'call void @dv_coro_set_result(ptr %coro, ptr {result_slot})')
+            # 设置 state = DV_CORO_DONE (3)
+            state_ptr = self.new_register()
+            self.emit(f'{state_ptr} = getelementptr inbounds i8, ptr %coro, i32 0')
+            self.emit(f'store i32 3, ptr {state_ptr}')
+            self.emit(f'ret void')
+        elif self._method_result_ptr is not None:
             if self._current_method_type != 'static':
                 self_var_slot = self._local_vars.get('己')
                 if self_var_slot is not None:
@@ -1678,6 +2007,14 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 self.emit(f'store {DUANVALUE_STRUCT} {dv_val}, ptr {self._method_result_ptr}')
             else:
                 self.emit(f'call void @dv_null(ptr {self._method_result_ptr})')
+            self.emit('call void @dv_stack_pop()')
+            self.emit('ret void')
+        elif self._seg_result_ptr is not None:
+            if stmt.value:
+                dv_val, _ = self._gen_expression(stmt.value)
+                self.emit(f'store {DUANVALUE_STRUCT} {dv_val}, ptr {self._seg_result_ptr}')
+            else:
+                self.emit(f'call void @dv_null(ptr {self._seg_result_ptr})')
             self.emit('call void @dv_stack_pop()')
             self.emit('ret void')
         else:
@@ -1818,43 +2155,460 @@ class TypedLLVMCodeGen(LLVMCodeGen):
     # 段落函数生成
     # ============================================================
 
-    def _gen_typed_segment(self, name, params, body):
+    def _gen_typed_segment(self, name, params, body, modifiers=None):
+        modifiers = modifiers or []
+        is_async = '异步' in modifiers or 'async' in [m.lower() for m in modifiers]
+        
+        if is_async:
+            self._gen_async_segment(name, params, body)
+        else:
+            self._gen_normal_segment(name, params, body)
+    
+    def _gen_normal_segment(self, name, params, body):
+        """生成普通（非异步）段落函数"""
         self._current_func = name
         self._current_func_params = {}
         self._local_vars.clear()
         self._pending_allocas = []
         self._reg_counter = 0
+        self._seg_result_ptr = '%result'
         safe = self._safe_func_name(name)
 
-        param_strs = []
-        for i, (pname, default) in enumerate(params):
-            reg = f'%__param_{i}'
-            self._current_func_params[pname] = reg
-            param_strs.append(f'{DUANVALUE_STRUCT} {reg}')
-
-        self.emit(f'define {DUANVALUE_STRUCT} @_seg_{safe}({", ".join(param_strs)}) {{')
+        self.emit(f'define void @_seg_{safe}(ptr %result, ptr %args, i32 %num_args) {{')
         self.emit('entry:')
 
-        # 栈追踪：函数入口压栈
         func_name_ptr = self.gen_string_constant(name)
         file_name_ptr = self.gen_string_constant("")
         self.emit(f'call void @dv_stack_push(ptr {func_name_ptr}, ptr {file_name_ptr}, i32 0)')
 
         self._collect_vars_from_stmts(body)
+        for param_name, _ in params:
+            self._local_vars[param_name] = None
+
         for vname in self._local_vars.keys():
             reg = self.new_register()
             self.emit(f'{reg} = alloca {DUANVALUE_STRUCT}')
             self._local_vars[vname] = reg
 
+        for i, (pname, _) in enumerate(params):
+            param_slot = self._local_vars.get(pname)
+            if param_slot is not None:
+                idx_reg = self.new_register()
+                self.emit(f'{idx_reg} = sext i32 %num_args to i64')
+                i_reg = self.new_register()
+                self.emit(f'{i_reg} = add i64 0, {i}')
+                in_bounds = self.new_register()
+                self.emit(f'{in_bounds} = icmp slt i64 {i_reg}, {idx_reg}')
+                then_lab = self.new_label('param_valid')
+                else_lab = self.new_label('param_invalid')
+                end_lab = self.new_label('param_end')
+                self.emit(f'br i1 {in_bounds}, label %{then_lab}, label %{else_lab}')
+                self.emit(f'{then_lab}:')
+                elem_ptr = self.new_register()
+                self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr %args, i64 {i_reg}')
+                param_val = self.new_register()
+                self.emit(f'{param_val} = load {DUANVALUE_STRUCT}, ptr {elem_ptr}')
+                self.emit(f'store {DUANVALUE_STRUCT} {param_val}, ptr {param_slot}')
+                self.emit(f'br label %{end_lab}')
+                self.emit(f'{else_lab}:')
+                null_slot = self._new_dv_slot()
+                self.emit(f'call void @dv_null(ptr {null_slot})')
+                null_val = self.new_register()
+                self.emit(f'{null_val} = load {DUANVALUE_STRUCT}, ptr {null_slot}')
+                self.emit(f'store {DUANVALUE_STRUCT} {null_val}, ptr {param_slot}')
+                self.emit(f'br label %{end_lab}')
+                self.emit(f'{end_lab}:')
+
         for stmt in body:
             self._gen_statement(stmt)
 
         if not self._ends_with_terminator(body):
-            null_dv = self._call_dv_func('dv_null')
+            self.emit(f'call void @dv_null(ptr %result)')
             self.emit('call void @dv_stack_pop()')
-            self.emit(f'ret {DUANVALUE_STRUCT} {null_dv}')
+            self.emit('ret void')
         self.emit('}')
         self.emit_blank()
+        self._seg_result_ptr = None
+    
+    def _gen_async_segment(self, name, params, body):
+        """生成异步段落：包括协程函数和包装段函数
+        
+        生成两个函数：
+        1. _coro_xxx(ptr %coro) - 协程状态机函数（Duff's device 模式）
+        2. _seg_xxx(ptr %result, ptr %args, i32 %num_args) - 包装函数，创建协程
+        """
+        safe = self._safe_func_name(name)
+        coro_func_name = f'_coro_{safe}'
+        
+        # 第一步：生成协程状态机函数
+        self._gen_coroutine_function(name, params, body, coro_func_name)
+        
+        # 第二步：生成包装段函数（创建协程并返回）
+        self._current_func = name
+        self._current_func_params = {}
+        self._local_vars.clear()
+        self._pending_allocas = []
+        self._reg_counter = 0
+        self._seg_result_ptr = '%result'
+        self._in_coroutine = False
+        
+        self.emit(f'define void @_seg_{safe}(ptr %result, ptr %args, i32 %num_args) {{')
+        self.emit('entry:')
+        
+        func_name_ptr = self.gen_string_constant(name)
+        file_name_ptr = self.gen_string_constant("")
+        self.emit(f'call void @dv_stack_push(ptr {func_name_ptr}, ptr {file_name_ptr}, i32 0)')
+        
+        # 获取协程函数指针
+        coro_func_ptr = self.new_register()
+        self.emit(f'{coro_func_ptr} = ptrtoint ptr @{coro_func_name} to i64')
+        
+        # 计算局部变量数量
+        self._collect_vars_from_stmts(body)
+        num_locals = len(self._local_vars)
+        num_params = len(params)
+        
+        # 调用 dv_coro_create 创建协程
+        coro_handle = self.new_register()
+        self.emit(f'{coro_handle} = call ptr @dv_coro_create(ptr @{coro_func_name}, ptr %args, i32 %num_args, i32 {num_locals + num_params})')
+        
+        # 将协程句柄存储到 result 中（作为指针值存储在 DuanValue 中）
+        # 我们用 DuanValue 的 type=DV_COROUTINE, value.ptr_val = coro_handle
+        self._store_coro_to_result(coro_handle, '%result')
+        
+        self.emit('call void @dv_stack_pop()')
+        self.emit('ret void')
+        self.emit('}')
+        self.emit_blank()
+        self._seg_result_ptr = None
+    
+    def _store_coro_to_result(self, coro_ptr, result_ptr):
+        """将协程指针存储到 DuanValue result 中"""
+        # 设置 type = 100 (DV_TYPE_COROUTINE)
+        type_ptr = self.new_register()
+        self.emit(f'{type_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {result_ptr}, i32 0, i32 0')
+        self.emit(f'store i32 100, ptr {type_ptr}')
+        
+        # 设置 ptr_val = coro_ptr
+        ptr_val_ptr = self.new_register()
+        self.emit(f'{ptr_val_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {result_ptr}, i32 0, i32 3')
+        self.emit(f'store ptr {coro_ptr}, ptr {ptr_val_ptr}')
+    
+    def _gen_coroutine_function(self, name, params, body, coro_func_name):
+        """生成协程状态机函数（Duff's device 模式）
+        
+        函数签名: void @_coro_xxx(ptr %coro)
+        - %coro: 指向 DuanCoroutine 结构体的指针
+        
+        使用两阶段法：
+        1. 预扫描统计 await 点数量
+        2. 生成带完整 switch 的函数
+        """
+        # 第一阶段：预扫描统计 await 点
+        num_await = self._count_await_points(body)
+        
+        self._current_func = name + '$coro'
+        self._current_func_params = {}
+        self._local_vars.clear()
+        self._pending_allocas = []
+        self._reg_counter = 0
+        self._in_coroutine = True
+        self._coro_handle_ptr = '%coro'
+        self._coro_resume_point = 0
+        # 保存 await 点标签映射: point_num -> resume_label
+        self._coro_resume_labels = {}
+        
+        self.emit(f'define void @{coro_func_name}(ptr %result, ptr %coro, ptr %args, i32 %num_args) {{')
+        self.emit('entry:')
+        
+        # 收集变量
+        self._collect_vars_from_stmts(body)
+        for param_name, _ in params:
+            self._local_vars[param_name] = None
+        
+        # 为协程局部变量分配索引（使用 coro->locals 数组，跨 await 持久化）
+        var_names = list(self._local_vars.keys())
+        self._coro_local_indices = {}  # var_name -> index
+        for i, vname in enumerate(var_names):
+            # 参数也放在 locals 中（索引 0..num_params-1）
+            # 注意：dv_coro_create 的 num_locals 参数控制 locals 数组大小
+            local_ptr = self.new_register()
+            self.emit(f'{local_ptr} = call ptr @dv_coro_get_local(ptr %coro, i32 {i})')
+            self._local_vars[vname] = local_ptr
+            self._coro_local_indices[vname] = i
+        
+        # 将参数从 coro->args 复制到 coro->locals（每次调用都执行，确保参数可用）
+        for i, (pname, _) in enumerate(params):
+            local_ptr = self._local_vars.get(pname)
+            if local_ptr is not None:
+                arg_ptr = self.new_register()
+                self.emit(f'{arg_ptr} = call ptr @dv_coro_get_arg(ptr %coro, i32 {i})')
+                arg_val = self.new_register()
+                self.emit(f'{arg_val} = load {DUANVALUE_STRUCT}, ptr {arg_ptr}')
+                self.emit(f'store {DUANVALUE_STRUCT} {arg_val}, ptr {local_ptr}')
+        
+        # 加载 resume_point
+        # resume_point 在 DuanCoroutine 的 offset 4 (state 在 offset 0)
+        rp_ptr = self.new_register()
+        self.emit(f'{rp_ptr} = getelementptr inbounds i8, ptr %coro, i32 4')
+        rp_val = self.new_register()
+        self.emit(f'{rp_val} = load i32, ptr {rp_ptr}')
+        
+        # 预先生成所有 resume 标签名
+        resume_labels = []
+        for i in range(num_await + 1):
+            resume_labels.append(self.new_label(f'resume_{i}'))
+            self._coro_resume_labels[i] = resume_labels[i]
+        
+        # 生成 switch 语句
+        switch_end_label = self.new_label('coro_switch_end')
+        self.emit(f'switch i32 {rp_val}, label %{switch_end_label} [')
+        for i in range(num_await + 1):
+            self.emit(f'  i32 {i}, label %{resume_labels[i]}')
+        self.emit(f']')
+        
+        # 生成每个 resume 点和对应的代码
+        # 注意：我们只有一个 resume_0 作为入口，然后在生成 body 时遇到 await 再插入 resume_N
+        # 但 switch 已经引用了所有 resume_N 标签，所以它们必须存在
+        # 策略：先生成 resume_0:，然后生成 body
+        # 遇到 await 时，生成挂起代码 + ret void，然后生成下一个 resume_N:
+        # 这样所有的 resume_N 标签都会被定义
+        
+        # resume_0: 开始执行
+        self.emit(f'{resume_labels[0]}:')
+        
+        # 生成函数体语句
+        for stmt in body:
+            self._gen_statement(stmt)
+        
+        # 协程结束：设置 state = DONE
+        if not self._ends_with_terminator(body):
+            self._gen_coro_return()
+        
+        # switch_end: 无效 resume_point
+        self.emit(f'{switch_end_label}:')
+        self.emit(f'ret void')
+        
+        self.emit('}')
+        self.emit_blank()
+        
+        self._in_coroutine = False
+        self._coro_handle_ptr = None
+        self._coro_resume_point = 0
+        self._coro_resume_labels = None
+    
+    def _gen_coro_return(self):
+        """生成协程返回（设置完成状态）"""
+        # 设置 state = DV_CORO_DONE (3)
+        state_ptr = self.new_register()
+        self.emit(f'{state_ptr} = getelementptr inbounds i8, ptr %coro, i32 0')
+        self.emit(f'store i32 3, ptr {state_ptr}')
+        self.emit(f'ret void')
+    
+    def _count_await_points(self, stmts) -> int:
+        """预扫描语句块，统计 await 点数量"""
+        count = 0
+        for stmt in stmts:
+            count += self._count_await_in_node(stmt)
+        return count
+    
+    def _count_await_in_node(self, node) -> int:
+        """递归统计节点中的 await 点数量"""
+        if node is None:
+            return 0
+        
+        count = 0
+        
+        # AwaitExpression 本身是一个 await 点
+        if hasattr(ast, 'AwaitExpression') and isinstance(node, ast.AwaitExpression):
+            count += 1
+            # 还要统计 expression 内部的 await（嵌套 await）
+            count += self._count_await_in_node(node.expression)
+            return count
+        
+        # 语句块 / 段落 / 循环：body 是 list
+        if isinstance(node, (ast.SegmentDefinition, ast.ForeachStatement, ast.WhileStatement)) and hasattr(node, 'body') and isinstance(node.body, list):
+            for s in node.body:
+                count += self._count_await_in_node(s)
+            # WhileStatement 还有 condition
+            if isinstance(node, ast.WhileStatement):
+                count += self._count_await_in_node(getattr(node, 'condition', None))
+            # ForeachStatement 还有 iterable
+            if isinstance(node, ast.ForeachStatement):
+                count += self._count_await_in_node(getattr(node, 'iterable', None))
+            return count
+        
+        # if 语句
+        if isinstance(node, ast.IfStatement):
+            count += self._count_await_in_node(getattr(node, 'condition', None))
+            for s in (node.then_body or []):
+                count += self._count_await_in_node(s)
+            if node.else_body:
+                for s in node.else_body:
+                    count += self._count_await_in_node(s)
+            for cond, body in zip(getattr(node, 'elseif_conditions', []) or [], getattr(node, 'elseif_bodies', []) or []):
+                count += self._count_await_in_node(cond)
+                for s in (body or []):
+                    count += self._count_await_in_node(s)
+            return count
+        
+        # 变量声明 / 赋值 / 返回语句：都有 value
+        if isinstance(node, (ast.VariableDeclaration, ast.Assignment, ast.CompoundAssignment, ast.ReturnStatement)):
+            count += self._count_await_in_node(getattr(node, 'value', None))
+            if isinstance(node, ast.Assignment):
+                count += self._count_await_in_node(getattr(node, 'target', None))
+            return count
+        
+        # 表达式语句
+        if isinstance(node, ast.ExpressionStatement):
+            return self._count_await_in_node(node.expression)
+        
+        # 二元/一元运算
+        if isinstance(node, ast.BinaryOp):
+            count += self._count_await_in_node(node.left)
+            count += self._count_await_in_node(node.right)
+            return count
+        if isinstance(node, ast.UnaryOp):
+            return self._count_await_in_node(node.operand)
+        
+        # 函数调用
+        if isinstance(node, ast.FunctionCall):
+            for arg in (node.arguments or []):
+                count += self._count_await_in_node(arg)
+            return count
+        
+        return count
+    
+    def _gen_await_expression(self, expr) -> Tuple[str, str]:
+        """生成 await 表达式代码
+        
+        在协程函数中：
+        1. 计算子表达式得到 future/协程
+        2. 设置 resume_point = 当前点编号 + 1
+        3. 调用 dv_coro_await 挂起
+        4. ret void
+        5. 恢复标签已在 switch 中预定义，下次从这里继续
+        6. 返回 future 的结果
+        
+        不在协程中：直接返回子表达式结果（退化情况）
+        """
+        if not self._in_coroutine:
+            # 不在协程中，直接求值子表达式
+            return self._gen_expression(expr.expression)
+        
+        # 在协程中，生成挂起/恢复代码
+        # 第一步：计算子表达式（future/协程）
+        future_dv, _ = self._gen_expression(expr.expression)
+        
+        # 获取当前 await 点编号
+        point_num = self._coro_resume_point
+        self._coro_resume_point += 1
+        
+        # 生成 await 前的标签（用于调试）
+        await_label = self.new_label(f'await_{point_num}')
+        # 恢复标签已经在 switch 中预生成了
+        resume_label = self._coro_resume_labels.get(point_num + 1)
+        
+        # 跳转到 await 标签（前一个基本块需要 terminator）
+        self.emit(f'br label %{await_label}')
+        self.emit(f'{await_label}:')
+        
+        # 设置 resume_point = point_num + 1（下次恢复时跳到 resume_N）
+        # resume_point 在 coro 结构体的 offset 4
+        rp_ptr = self.new_register()
+        self.emit(f'{rp_ptr} = getelementptr inbounds i8, ptr %coro, i32 4')
+        self.emit(f'store i32 {point_num + 1}, ptr {rp_ptr}')
+        
+        # 从 future_dv 中提取 future 指针
+        future_ptr = self._extract_ptr_from_dv(future_dv)
+        
+        # 调用 dv_coro_await(coro, future)
+        self.emit(f'call void @dv_coro_await(ptr %coro, ptr {future_ptr})')
+        
+        # 挂起返回
+        self.emit(f'ret void')
+        
+        # 恢复点标签（必须定义，switch 引用了它）
+        if resume_label:
+            self.emit(f'{resume_label}:')
+        else:
+            # 理论上不应该发生，预扫描应该算准了
+            fallback_label = self.new_label(f'resume_fallback_{point_num}')
+            self.emit(f'{fallback_label}:')
+        
+        # 从 future 中获取结果
+        result_slot = self._new_dv_slot()
+        self.emit(f'call void @dv_coro_get_await_result(ptr %coro, ptr {result_slot})')
+        
+        # 加载结果
+        result_val = self._load_dv(result_slot)
+        return result_val, 'dv'
+    
+    def _extract_ptr_from_dv(self, dv_val: str) -> str:
+        """从 DuanValue 中提取 ptr_val 字段"""
+        # 需要先 store 到内存，然后用 GEP 取 ptr_val
+        slot = self._store_dv(dv_val)
+        ptr_val_ptr = self.new_register()
+        self.emit(f'{ptr_val_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {slot}, i32 0, i32 3')
+        ptr_val = self.new_register()
+        self.emit(f'{ptr_val} = load ptr, ptr {ptr_val_ptr}')
+        return ptr_val
+    
+    def _gen_async_scope(self, scope):
+        """生成异步作用域（结构化并发）
+        
+        伪代码:
+        1. 为每个任务创建协程
+        2. 将所有协程加入调度器
+        3. 运行调度器直到所有任务完成
+        4. 收集结果（如果有 result_vars）
+        """
+        tasks = scope.tasks or []
+        num_tasks = len(tasks)
+        
+        if num_tasks == 0:
+            return
+        
+        # 存储所有协程句柄
+        coro_handles = []
+        
+        for i, task in enumerate(tasks):
+            # 任务是一个表达式（通常是异步函数调用）
+            # 计算表达式得到协程句柄
+            coro_dv, _ = self._gen_expression(task)
+            coro_ptr = self._extract_ptr_from_dv(coro_dv)
+            coro_handles.append(coro_ptr)
+        
+        # 将所有协程加入调度器队列并运行
+        # 简化：逐个调用 dv_coro_run_to_completion
+        # 注意：这不是真正的并发，只是串行执行
+        # 真正的并发需要调度器队列
+        for i, coro_ptr in enumerate(coro_handles):
+            self.emit(f'call void @dv_coro_run_to_completion(ptr {coro_ptr})')
+        
+        # 如果有 result_vars，收集结果
+        result_vars = getattr(scope, 'result_vars', None) or []
+        for i, var_name in enumerate(result_vars):
+            if i >= len(coro_handles):
+                break
+            result_slot = self._new_dv_slot()
+            # 调用 dv_coro_get_result 获取结果指针
+            result_ptr = self.new_register()
+            self.emit(f'{result_ptr} = call ptr @dv_coro_get_result(ptr {coro_handles[i]})')
+            # 复制结果
+            result_val = self.new_register()
+            self.emit(f'{result_val} = load {DUANVALUE_STRUCT}, ptr {result_ptr}')
+            # 存储到变量
+            self.alloca_local(var_name)
+            var_slot = self._local_vars.get(var_name)
+            if var_slot:
+                self.emit(f'store {DUANVALUE_STRUCT} {result_val}, ptr {var_slot}')
+
+    def _gen_module_alias(self, module_name: str, seg_name: str, safe_name: str):
+        """为段函数生成模块前缀别名，使其他模块可通过 @_seg_{模块名}_{函数名} 引用"""
+        alias_name = self._safe_func_name(f'{module_name}_{seg_name}')
+        if alias_name != safe_name:
+            self.emit(f'@_seg_{alias_name} = alias void (ptr, ptr, i32), void (ptr, ptr, i32)* @_seg_{safe_name}')
 
     def _gen_typed_class_methods(self, class_name, cls_def):
         """生成类的所有方法"""

@@ -497,6 +497,186 @@ description = ""
             print(f"[PackageManager] 运行时错误: {e}")
             return 3
 
+    # ------------------------------------------------------------------
+    # Level 9: path 依赖解析与 LLVM 后端构建
+    # ------------------------------------------------------------------
+
+    def resolve_path_dependencies(self) -> Dict[str, Path]:
+        """解析 package.toml 中的 path 依赖。
+
+        支持格式：
+            [dependencies]
+            utils = { path = "../utils" }
+            mylib = { path = "./lib/mylib" }
+
+        返回：依赖名 -> 路径 的字典
+        """
+        if self.config is None:
+            self.load_config()
+        if self.config is None:
+            return {}
+
+        config_path = self.project_root / "package.toml"
+        if not config_path.exists():
+            return {}
+
+        path_deps: Dict[str, Path] = {}
+        try:
+            text = config_path.read_text(encoding="utf-8")
+            data = TomlParser().parse(text)
+            deps_section = data.get("dependencies", {}) or {}
+            for dep_key, dep_val in deps_section.items():
+                if isinstance(dep_val, dict) and "path" in dep_val:
+                    dep_path = Path(str(dep_val["path"]))
+                    if not dep_path.is_absolute():
+                        dep_path = (self.project_root / dep_path).resolve()
+                    if dep_path.exists():
+                        path_deps[dep_key] = dep_path
+                        # 添加到搜索路径
+                        dep_path_for_search = dep_path
+                        if dep_path_for_search not in self.search_paths:
+                            self.search_paths.append(dep_path_for_search)
+        except Exception as e:
+            print(f"[PackageManager] 解析 path 依赖失败: {e}")
+
+        return path_deps
+
+    def build_project_native(self, output_path: str = None, verbose: bool = False) -> str:
+        """使用 LLVM 后端编译项目为原生可执行文件。
+
+        自动解析 path 依赖，收集所有模块源码，编译合并为单一可执行文件。
+
+        Args:
+            output_path: 输出路径
+            verbose: 是否输出详细信息
+
+        Returns:
+            可执行文件路径
+        """
+        if self.config is None:
+            self.load_config()
+        if self.config is None:
+            raise RuntimeError("未找到 package.toml")
+
+        # 解析 path 依赖
+        path_deps = self.resolve_path_dependencies()
+        if verbose and path_deps:
+            print(f"[PackageManager] 发现 {len(path_deps)} 个 path 依赖:")
+            for name, path in path_deps.items():
+                print(f"  - {name}: {path}")
+
+        # 收集所有模块源码
+        entry_path = self.project_root / self.config.entry
+        if not entry_path.exists():
+            raise RuntimeError(f"入口文件不存在: {self.config.entry}")
+
+        sources: Dict[str, str] = {}
+        visited: Set[str] = set()
+
+        def collect(src: str, mod_name: str):
+            if mod_name in visited:
+                return
+            visited.add(mod_name)
+            sources[mod_name] = src
+
+            # 解析导入
+            try:
+                sys.path.insert(0, str(Path(__file__).resolve().parent))
+                from duan_parser_v3 import DuanParser
+                from compiler import AstAdapter
+                parser = DuanParser()
+                v3_mod = parser.parse(src)
+                if v3_mod is None:
+                    return
+                adapter = AstAdapter()
+                module = adapter.convert_module(v3_mod)
+                for imp in (getattr(module, 'imports', None) or []):
+                    dep_name = imp.module if hasattr(imp, 'module') else None
+                    if dep_name and dep_name not in visited:
+                        dep_file = self.find_module(dep_name)
+                        if dep_file and dep_file.exists():
+                            collect(dep_file.read_text(encoding='utf-8'), dep_name)
+            except Exception:
+                pass
+
+        entry_src = entry_path.read_text(encoding='utf-8')
+        main_name = Path(self.config.entry).stem
+        collect(entry_src, main_name)
+
+        if verbose:
+            print(f"[PackageManager] 收集到 {len(sources)} 个模块: {', '.join(sources.keys())}")
+
+        # 使用 LLVM 后端编译
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from llvm.compiler import compile_modules_typed, find_clang
+        import subprocess as _sp
+
+        ir = compile_modules_typed(sources, main_module=main_name, verbose=verbose)
+
+        base_path = output_path or str(entry_path).replace('.duan', '')
+        ll_path = base_path + '.ll'
+        with open(ll_path, 'w', encoding='utf-8') as f:
+            f.write(ir)
+
+        if verbose:
+            print(f"  IR 已写入: {ll_path} ({len(ir)} 字符)")
+
+        clang = find_clang()
+        runtime_dir = Path(__file__).resolve().parent / 'llvm'
+        runtime_c = runtime_dir / 'runtime_typed.c'
+        runtime_o = base_path + '_runtime.o'
+
+        if verbose:
+            print("[2/4] 编译 typed 运行时库...")
+
+        result = _sp.run(
+            [clang, '-c', '-O2', str(runtime_c), '-o', runtime_o],
+            capture_output=True, text=True, encoding='utf-8', errors='replace'
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"运行时库编译失败:\n{result.stderr}")
+
+        if verbose:
+            print("[3/4] 编译 LLVM IR...")
+
+        ir_o = base_path + '.o'
+        result = _sp.run(
+            [clang, '-c', '-O2', ll_path, '-o', ir_o],
+            capture_output=True, text=True, encoding='utf-8', errors='replace'
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"IR 编译失败:\n{result.stderr}")
+
+        exe_ext = '.exe' if sys.platform.startswith('win') else ''
+        exe_path = base_path + exe_ext
+        if verbose:
+            print(f"[4/4] 链接为可执行文件...")
+
+        link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+        if not sys.platform.startswith('win'):
+            link_args.append('-lm')
+
+        result = _sp.run(
+            link_args,
+            capture_output=True, text=True, encoding='utf-8', errors='replace'
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"链接失败:\n{result.stderr}")
+
+        # 清理临时文件
+        for f in [ir_o, runtime_o]:
+            try:
+                if os.path.exists(f):
+                    os.remove(f)
+            except Exception:
+                pass
+
+        if verbose:
+            size = os.path.getsize(exe_path)
+            print(f"编译成功: {exe_path} ({size} 字节)")
+
+        return exe_path
+
 
 # ---------------------------------------------------------------------------
 # 顶层便捷函数

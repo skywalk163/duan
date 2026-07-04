@@ -34,8 +34,8 @@
  * 类型定义
  * ================================================================ */
 
-typedef struct {
-    int type;          /* 0=NULL 1=INT 2=FLOAT 3=STR 4=LIST 5=BOOL */
+typedef struct DuanValue {
+    int type;          /* 0=NULL 1=INT 2=FLOAT 3=STR 4=LIST 5=BOOL 6=OBJ */
     int64_t i64;       /* INT */
     double f64;        /* FLOAT */
     char* str;         /* STR / LIST (序列化，仅用于 type=3) */
@@ -45,6 +45,15 @@ typedef struct {
     int list_capacity; /* 分配的数组容量 */
     struct DuanValue** list_data; /* 元素数组指针 */
 } DuanValue;
+
+/* ================================================================
+ * 前向声明（避免隐式函数声明）
+ * ================================================================ */
+
+void dv_clone(DuanValue* result, DuanValue* v);
+void dv_class_get_member(DuanValue* result, DuanValue* obj, const char* field_name);
+void dv_value_to_string(DuanValue* result, DuanValue* v);
+int dv_is_object(DuanValue* v);
 
 /* ================================================================
  * 内部工具
@@ -2758,7 +2767,7 @@ void dv_call_static_method(DuanValue* result, const char* class_name, const char
  * 运算符重载支持
  * ================================================================ */
 
-static int dv_is_object(DuanValue* v) {
+int dv_is_object(DuanValue* v) {
     if (!v || v->type != 3 || !v->str) return 0;
     return strncmp(v->str, OBJ_PREFIX, strlen(OBJ_PREFIX)) == 0;
 }
@@ -2893,4 +2902,344 @@ void dv_get_type_name(DuanValue* obj, char* buf, int buf_size) {
             buf[buf_size - 1] = '\0';
             break;
     }
+}
+
+/* ================================================================
+ * 协程/异步支持
+ * ================================================================ */
+
+/* 协程状态枚举 */
+#define DV_CORO_READY    0  /* 就绪，可运行 */
+#define DV_CORO_RUNNING  1  /* 运行中 */
+#define DV_CORO_SUSPENDED 2 /* 已挂起（等待中） */
+#define DV_CORO_DONE     3  /* 已完成 */
+#define DV_CORO_ERROR    4  /* 出错 */
+
+/* 协程函数指针类型：
+   void coro_func(DuanValue* result, void* coro_handle, DuanValue* args, int num_args)
+   
+   协程函数通过 coro_handle 中的 resume_point 控制执行位置（Duff's device）。
+*/
+typedef void (*DuanCoroFunc)(DuanValue*, void*, DuanValue*, int);
+
+/* 最大协程数 */
+#define DV_MAX_COROUTINES 256
+
+/* 协程句柄结构体 */
+typedef struct DuanCoroutine {
+    int state;             /* 协程状态：DV_CORO_* */
+    int resume_point;      /* 恢复点（Duff's device 的 case 标签） */
+    DuanCoroFunc func;     /* 协程函数指针 */
+    DuanValue result;      /* 返回值/当前结果 */
+    DuanValue* args;       /* 参数数组（堆分配） */
+    int num_args;          /* 参数数量 */
+    /* 局部变量槽位（用于保存挂起时的局部变量状态） */
+    DuanValue* locals;     /* 局部变量数组（堆分配） */
+    int num_locals;        /* 局部变量数量 */
+    /* 等待的 Future（如果在等待某个异步操作） */
+    struct DuanFuture* waiting_for;
+    /* 关联的 Future（当协程完成时自动完成此 future） */
+    struct DuanFuture* future;
+    /* 调度器链表指针 */
+    struct DuanCoroutine* next;
+} DuanCoroutine;
+
+/* Future/Promise 结构体 */
+typedef struct DuanFuture {
+    int ready;             /* 是否已完成 */
+    DuanValue result;      /* 结果值 */
+    int has_error;         /* 是否有错误 */
+    char error_msg[256];   /* 错误消息 */
+    /* 等待这个 future 的协程链表 */
+    DuanCoroutine* waiters;
+} DuanFuture;
+
+/* 协程调度器 */
+typedef struct DuanScheduler {
+    DuanCoroutine* run_queue;   /* 可运行队列 */
+    DuanCoroutine* all_coros;   /* 所有协程（用于清理） */
+    int num_coros;              /* 当前协程数 */
+} DuanScheduler;
+
+/* 全局调度器实例 */
+static DuanScheduler g_scheduler = { NULL, NULL, 0 };
+
+/* 前置声明 */
+DuanFuture* dv_future_create(void);
+void dv_future_complete(DuanFuture* f, DuanValue* result);
+
+/* 内部：创建协程 */
+DuanCoroutine* dv_coro_create(DuanCoroFunc func, DuanValue* args, int num_args, int num_locals) {
+    if (g_scheduler.num_coros >= DV_MAX_COROUTINES) {
+        return NULL;
+    }
+    DuanCoroutine* coro = (DuanCoroutine*)malloc(sizeof(DuanCoroutine));
+    if (!coro) return NULL;
+    
+    coro->state = DV_CORO_READY;
+    coro->resume_point = 0;
+    coro->func = func;
+    dv_null(&coro->result);
+    
+    /* 复制参数 */
+    coro->num_args = num_args;
+    if (num_args > 0 && args) {
+        coro->args = (DuanValue*)malloc(sizeof(DuanValue) * num_args);
+        if (coro->args) {
+            memcpy(coro->args, args, sizeof(DuanValue) * num_args);
+        }
+    } else {
+        coro->args = NULL;
+    }
+    
+    /* 分配局部变量槽位 */
+    coro->num_locals = num_locals;
+    if (num_locals > 0) {
+        coro->locals = (DuanValue*)malloc(sizeof(DuanValue) * num_locals);
+        if (coro->locals) {
+            for (int i = 0; i < num_locals; i++) {
+                dv_null(&coro->locals[i]);
+            }
+        }
+    } else {
+        coro->locals = NULL;
+    }
+    
+    coro->waiting_for = NULL;
+    coro->future = dv_future_create();
+    coro->next = NULL;
+    
+    /* 添加到调度器的可运行队列 */
+    if (g_scheduler.run_queue == NULL) {
+        g_scheduler.run_queue = coro;
+    } else {
+        DuanCoroutine* c = g_scheduler.run_queue;
+        while (c->next) c = c->next;
+        c->next = coro;
+    }
+    
+    g_scheduler.num_coros++;
+    
+    return coro;
+}
+
+/* 内部：恢复协程（执行一步） */
+static int dv_coro_resume(DuanCoroutine* coro) {
+    if (!coro || coro->state == DV_CORO_DONE || coro->state == DV_CORO_ERROR) {
+        return -1;
+    }
+    
+    coro->state = DV_CORO_RUNNING;
+    
+    /* 调用协程函数，它会根据 resume_point 从正确的位置继续 */
+    coro->func(&coro->result, coro, coro->args, coro->num_args);
+    
+    if (coro->state == DV_CORO_RUNNING) {
+        /* 函数返回了但没挂起，说明执行完毕 */
+        coro->state = DV_CORO_DONE;
+    }
+    
+    return 0;
+}
+
+/* 创建 Future */
+DuanFuture* dv_future_create() {
+    DuanFuture* f = (DuanFuture*)malloc(sizeof(DuanFuture));
+    if (!f) return NULL;
+    f->ready = 0;
+    dv_null(&f->result);
+    f->has_error = 0;
+    f->error_msg[0] = '\0';
+    f->waiters = NULL;
+    return f;
+}
+
+/* 完成 Future（设置结果） */
+void dv_future_complete(DuanFuture* f, DuanValue* result) {
+    if (!f || f->ready) return;
+    
+    dv_clone(&f->result, result);
+    f->ready = 1;
+    
+    /* 唤醒所有等待的协程 */
+    DuanCoroutine* c = f->waiters;
+    while (c) {
+        DuanCoroutine* next = c->next;
+        c->state = DV_CORO_READY;
+        /* 注意：不清除 waiting_for，因为 dv_coro_get_await_result 需要从中读取结果 */
+        c->next = NULL;
+        /* 添加回可运行队列 */
+        if (g_scheduler.run_queue == NULL) {
+            g_scheduler.run_queue = c;
+        } else {
+            DuanCoroutine* r = g_scheduler.run_queue;
+            while (r->next) r = r->next;
+            r->next = c;
+        }
+        c = next;
+    }
+    f->waiters = NULL;
+}
+
+/* 协程挂起自己，等待另一个协程完成
+ * 注意：第二个参数是目标协程（DuanCoroutine*），不是 DuanFuture*
+ * 这是为了支持 "await 另一个协程" 的常见模式
+ */
+void dv_coro_await(DuanCoroutine* coro, DuanCoroutine* target) {
+    if (!coro || !target) return;
+    
+    /* 获取目标协程关联的 future */
+    DuanFuture* future = target->future;
+    if (!future) return;
+    
+    if (future->ready) {
+        /* 目标已经完成，直接返回（不挂起） */
+        coro->waiting_for = future;
+        return;
+    }
+    
+    /* 如果目标还未运行，确保它会被加入 run_queue */
+    if (target->state == DV_CORO_READY) {
+        /* 检查是否已在 run_queue 中 */
+        int in_queue = 0;
+        DuanCoroutine* c = g_scheduler.run_queue;
+        while (c) {
+            if (c == target) {
+                in_queue = 1;
+                break;
+            }
+            c = c->next;
+        }
+        if (!in_queue) {
+            target->next = NULL;
+            if (g_scheduler.run_queue == NULL) {
+                g_scheduler.run_queue = target;
+            } else {
+                DuanCoroutine* last = g_scheduler.run_queue;
+                while (last->next) last = last->next;
+                last->next = target;
+            }
+        }
+    }
+    
+    /* 挂起当前协程，等待 future */
+    coro->state = DV_CORO_SUSPENDED;
+    coro->waiting_for = future;
+    
+    /* 添加到 future 的等待链表 */
+    coro->next = future->waiters;
+    future->waiters = coro;
+}
+
+/* 运行调度器（直到没有可运行的协程） */
+void dv_scheduler_run() {
+    while (g_scheduler.run_queue) {
+        /* 取出第一个协程 */
+        DuanCoroutine* coro = g_scheduler.run_queue;
+        g_scheduler.run_queue = coro->next;
+        coro->next = NULL;
+        
+        /* 恢复执行 */
+        dv_coro_resume(coro);
+    }
+}
+
+/* 启动协程并运行到完成（阻塞式，用于顶层异步调用） */
+void dv_coro_run_to_completion(DuanCoroutine* coro) {
+    if (!coro) return;
+    
+    /* 如果协程已经完成，直接返回 */
+    if (coro->state == DV_CORO_DONE || coro->state == DV_CORO_ERROR) {
+        return;
+    }
+    
+    /* 如果协程是 READY 状态且不在 run_queue 中，把它加进去 */
+    if (coro->state == DV_CORO_READY) {
+        /* 检查是否已经在 run_queue 中（简单检查：遍历队列） */
+        int in_queue = 0;
+        DuanCoroutine* c = g_scheduler.run_queue;
+        while (c) {
+            if (c == coro) {
+                in_queue = 1;
+                break;
+            }
+            c = c->next;
+        }
+        if (!in_queue) {
+            /* 添加到队列尾部 */
+            coro->next = NULL;
+            if (g_scheduler.run_queue == NULL) {
+                g_scheduler.run_queue = coro;
+            } else {
+                DuanCoroutine* last = g_scheduler.run_queue;
+                while (last->next) last = last->next;
+                last->next = coro;
+            }
+        }
+    }
+    
+    dv_scheduler_run();
+}
+
+/* 获取协程结果（必须在完成后调用） */
+DuanValue* dv_coro_get_result(DuanCoroutine* coro) {
+    if (!coro) return NULL;
+    return &coro->result;
+}
+
+/* 获取协程局部变量的指针（用于跨 await 持久化局部变量）
+ * 返回 coro->locals[index] 的指针
+ */
+DuanValue* dv_coro_get_local(DuanCoroutine* coro, int index) {
+    if (!coro || !coro->locals || index < 0 || index >= coro->num_locals) {
+        return NULL;
+    }
+    return &coro->locals[index];
+}
+
+/* 获取协程参数的指针
+ * 返回 coro->args[index] 的指针
+ */
+DuanValue* dv_coro_get_arg(DuanCoroutine* coro, int index) {
+    if (!coro || !coro->args || index < 0 || index >= coro->num_args) {
+        return NULL;
+    }
+    return &coro->args[index];
+}
+
+/* 获取 await 的结果：从 coro->waiting_for->result 复制到 out */
+void dv_coro_get_await_result(DuanCoroutine* coro, DuanValue* out) {
+    if (!coro || !out) return;
+    if (coro->waiting_for && coro->waiting_for->ready) {
+        dv_clone(out, &coro->waiting_for->result);
+    } else {
+        dv_null(out);
+    }
+    /* 清除 waiting_for 引用 */
+    coro->waiting_for = NULL;
+}
+
+/* 设置协程结果 */
+void dv_coro_set_result(DuanCoroutine* coro, DuanValue* val) {
+    if (!coro || !val) return;
+    dv_clone(&coro->result, val);
+    /* 同时完成关联的 future（唤醒等待者） */
+    if (coro->future && !coro->future->ready) {
+        dv_future_complete(coro->future, val);
+    }
+}
+
+/* 检查协程是否完成 */
+int dv_coro_is_done(DuanCoroutine* coro) {
+    return coro && (coro->state == DV_CORO_DONE || coro->state == DV_CORO_ERROR);
+}
+
+/* 把 DuanValue 包装成 Future（同步值 → 已完成的 Future） */
+DuanFuture* dv_future_from_value(DuanValue* val) {
+    DuanFuture* f = dv_future_create();
+    if (f && val) {
+        dv_clone(&f->result, val);
+        f->ready = 1;
+    }
+    return f;
 }

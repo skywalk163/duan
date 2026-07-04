@@ -86,15 +86,16 @@ class WhileStmt(ASTNode):
 
 
 class Paragraph(ASTNode):
-    __slots__ = ('name', 'params', 'return_type', 'body', 'generic_params')
+    __slots__ = ('name', 'params', 'return_type', 'body', 'generic_params', 'modifiers')
     """段落定义"""
     def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str], body: List[ASTNode],
-                 generic_params: List[str] = None):
+                 generic_params: List[str] = None, modifiers: List[str] = None):
         self.name = name
         self.params = params
         self.return_type = return_type
         self.body = body
         self.generic_params = generic_params or []
+        self.modifiers = modifiers or []
     
     def __repr__(self):
         return f"Paragraph({self.name})"
@@ -632,3 +633,28 @@ class RangeExpr(ASTNode):
     def __repr__(self):
         step_str = f"步{self.step}" if self.step else ""
         return f"RangeExpr({self.start}至{self.end}{step_str})"
+
+
+# =============================================================================
+# 异步/并发节点
+# =============================================================================
+
+class AwaitExpr(ASTNode):
+    __slots__ = ('expression',)
+    """等待表达式（等待 异步操作）"""
+    def __init__(self, expression: ASTNode):
+        self.expression = expression
+    
+    def __repr__(self):
+        return f"等待({self.expression})"
+
+
+class AsyncScope(ASTNode):
+    __slots__ = ('tasks', 'result_vars')
+    """并行作用域（结构化并发）"""
+    def __init__(self, tasks: List[ASTNode], result_vars: List[str] = None):
+        self.tasks = tasks
+        self.result_vars = result_vars or []
+    
+    def __repr__(self):
+        return f"异步作用域({len(self.tasks)}个任务)"

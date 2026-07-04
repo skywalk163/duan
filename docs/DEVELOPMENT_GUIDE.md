@@ -145,24 +145,26 @@ print(result.get_output())
 ### 3. 调试编译器
 
 ```python
-from antlrparser.duan_llvm import LLVMCodeGen, parse_source
+import sys
+sys.path.insert(0, 'src')
+from llvm.compiler import compile_source_typed
 
-module = parse_source("打印(100)。")
-gen = LLVMCodeGen()
-ir = gen.generate(module)
+# 编译段言源码为 LLVM IR
+ir = compile_source_typed('打印("hello")', verbose=True)
 print(ir)
 ```
 
+更多示例参见 `tests/test_level8_llvm.duan`。
+
 ## 开发流程
 
-1. **修改语法** → 更新 `DuanLang.g4`
-2. **生成解析器** → 运行 `scripts/generate.ps1`
-3. **更新 AST** → 修改 `duan_ast.py`
-4. **更新访问器** → 修改 `duan_visitor.py`
-5. **更新解释器** → 修改 `duan_interpreter.py`
-6. **更新编译器** → 修改 `duan_llvm.py`
-7. **编写测试** → 在 `tests/` 或 `antlrparser/test/` 添加测试
-8. **运行测试** → `pytest`
+1. **修改语法** → 更新 `src/duan_parser_v3.py`
+2. **更新 AST** → 修改 `src/ast_nodes.py`
+3. **更新适配器** → 修改 `src/compiler.py`（AstAdapter）
+4. **更新解释器** → 修改 `src/code_generator.py`
+5. **更新 LLVM 后端** → 修改 `src/llvm/codegen_typed.py`（TypedLLVMCodeGen）
+6. **编写测试** → 在 `tests/` 添加测试
+7. **运行测试** → `pytest`
 
 ## 发布流程
 

@@ -99,3 +99,14 @@ test_output.bin
 
 # Git worktree
 .worktrees/
+
+# 调试脚本
+tests/_debug_*.py
+tests/_test_*.py
+tests/_test_*.c
+tests/_test_*.ll
+tests/_test_*.exe
+
+# 下载的工具
+llvm-mingw-*.zip
+llvm-mingw-*/

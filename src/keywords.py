@@ -51,6 +51,11 @@ KEYWORDS_MODULE = {
     '模块', '标准库',
 }
 
+# 异步/并发（新增）
+KEYWORDS_ASYNC = {
+    '异步', '等待', '作用域',
+}
+
 # 模式匹配（新增）
 KEYWORDS_MATCH = {
     '匹配', '情况',
@@ -75,6 +80,7 @@ KEYWORDS_DOUBLE = (
     KEYWORDS_EXCEPTION |
     KEYWORDS_CLASS |
     KEYWORDS_MODULE |
+    KEYWORDS_ASYNC |
     KEYWORDS_MATCH |
     KEYWORDS_CONTEXT |
     KEYWORDS_DECORATOR

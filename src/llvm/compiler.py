@@ -14,13 +14,22 @@ import os
 import subprocess
 from pathlib import Path
 
-from .codegen import LLVMCodeGen
-from .codegen_typed import TypedLLVMCodeGen
-
-# SRC 解析器
-from ..lexer import Lexer
-from ..duan_parser_v3 import DuanParser
-from ..compiler import AstAdapter
+# 支持包内相对导入和直接导入两种方式
+try:
+    from .codegen import LLVMCodeGen
+    from .codegen_typed import TypedLLVMCodeGen
+    from ..lexer import Lexer
+    from ..duan_parser_v3 import DuanParser
+    from ..compiler import AstAdapter
+    import ast_nodes as ast
+except ImportError:
+    # 直接导入模式（sys.path 包含 src 目录）
+    from llvm.codegen import LLVMCodeGen
+    from llvm.codegen_typed import TypedLLVMCodeGen
+    from lexer import Lexer
+    from duan_parser_v3 import DuanParser
+    from compiler import AstAdapter
+    import ast_nodes as ast
 
 
 def get_exe_extension() -> str:
@@ -337,9 +346,13 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
 
 
 def find_clang():
-    """查找 clang 编译器"""
-    # 常见路径
+    """查找 clang 编译器（支持 MSVC 和 MinGW 两种模式）"""
+    import sys as _sys
+    
+    # 常见路径（优先 MinGW，因为它自带 C 标准库头文件）
     candidates = [
+        # MinGW-w64 LLVM 工具链（自带 C 标准库）
+        r'c:\traework\duan\llvm-mingw-20240619-ucrt-x86_64\bin\clang.exe',
         r'E:\Program Files\LLVM\bin\clang.exe',
         r'C:\Program Files\LLVM\bin\clang.exe',
         r'D:\Program Files\LLVM\bin\clang.exe',
@@ -351,10 +364,262 @@ def find_clang():
             return c
     # 从 PATH 查找
     for path in os.environ.get('PATH', '').split(os.pathsep):
-        clang_path = os.path.join(path, 'clang.exe' if sys.platform == 'win32' else 'clang')
+        clang_path = os.path.join(path, 'clang.exe' if _sys.platform == 'win32' else 'clang')
         if os.path.exists(clang_path):
             return clang_path
+        # 也查找 mingw 版本的 clang
+        mingw_clang = os.path.join(path, 'x86_64-w64-mingw32-clang.exe')
+        if os.path.exists(mingw_clang):
+            return mingw_clang
     raise RuntimeError("未找到 clang 编译器。请安装 LLVM:\n  Windows: https://github.com/llvm/llvm-project/releases\n  macOS: brew install llvm\n  Linux: sudo apt install clang")
+
+
+def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool = False, target_platform: str = None) -> str:
+    """
+    编译多个段言模块为合并的 LLVM IR（typed 模式）
+
+    使用单个 codegen 实例编译所有模块，避免全局常量和声明重复。
+
+    Args:
+        sources: 模块名 -> 源码字符串 的字典
+        main_module: 主模块名（生成 main 函数的模块），默认为第一个
+        verbose: 是否输出详细信息
+        target_platform: 目标平台
+
+    Returns:
+        合并的 LLVM IR 字符串
+    """
+    if not sources:
+        raise ValueError("没有源文件可编译")
+
+    if main_module is None:
+        main_module = list(sources.keys())[0]
+
+    if verbose:
+        print(f"[1/3] 多模块编译: {len(sources)} 个模块")
+        for mod_name, src in sources.items():
+            print(f"  - {mod_name}: {len(src)} 字符")
+
+    parser = DuanParser()
+    adapter = AstAdapter()
+
+    # 第一步：解析所有模块，收集 AST
+    modules = {}
+    for mod_name, source in sources.items():
+        if verbose:
+            print(f"[2/3] 解析模块: {mod_name}")
+
+        v3_module = parser.parse(source)
+        if v3_module is None:
+            errors = '\n'.join(parser.errors) if hasattr(parser, 'errors') and parser.errors else "未知解析错误"
+            raise RuntimeError(f"模块 {mod_name} 解析失败:\n{errors}")
+
+        module = adapter.convert_module(v3_module)
+        module.name = mod_name
+        modules[mod_name] = module
+
+    # 第二步：使用单个 codegen 实例编译所有模块
+    if verbose:
+        print(f"[3/3] 生成合并 IR（{len(modules)} 个模块）")
+
+    codegen = TypedLLVMCodeGen(target_platform=target_platform)
+
+    # 初始化运行时声明（只做一次）
+    codegen.declare_runtime()
+    codegen._declare_typed_runtime()
+
+    # 收集所有模块的导入和段落
+    all_module_list = list(modules.values())
+    main_mod = modules.get(main_module, all_module_list[0])
+
+    # 先处理所有模块的导入语句（记录导入映射）
+    for mod in all_module_list:
+        codegen._process_imports(mod)
+
+    # 收集所有模块的语句、类和段落（先收集，再生成）
+    for mod in all_module_list:
+        for stmt in mod.statements:
+            if isinstance(stmt, ast.ImportStatement):
+                continue
+            if isinstance(stmt, ast.ExportStatement):
+                continue
+            codegen._collect_statement(stmt)
+        if hasattr(mod, 'classes'):
+            for cls_def in mod.classes:
+                codegen._collect_class(cls_def)
+        for seg in mod.segments:
+            codegen._collect_segment(seg)
+
+    # 生成导入的外部段函数声明（仅声明那些不在本地定义的符号）
+    # 由于所有模块都在同一个 codegen 中，大部分导入符号都有本地定义
+    # 这里只生成真正外部的（不在 _segments 中的）
+    # 注意：_module_decls 中的名称是 "模块名_符号名" 经过 safe_func_name 转换的
+    # 我们需要跳过那些已经在本地有定义的符号
+    local_seg_safe_names = set()
+    for seg_name in codegen._segments:
+        safe = codegen._safe_func_name(seg_name)
+        local_seg_safe_names.add(safe)
+        # 同时把模块前缀的也加入（因为导出别名会生成这些名字）
+        # 但别名和 define 不会冲突，只有 declare 和 define/alias 会冲突
+        # 所以我们只需要从 _module_decls 中移除那些已经有本地定义的
+    
+    # 过滤 _module_decls：只保留真正外部的（不在本地段名中的）
+    # 注意：_module_decls 中的名称是 safe name（如 f2），我们需要反向映射
+    # 更简单的方法：直接清空 _module_decls，因为多模块编译时所有符号都有定义
+    codegen._module_decls = []
+    # 但为了未来支持真正的外部模块（如动态链接库），我们保留机制，只是当前清空
+
+    # 生成全局初始化
+    codegen._gen_global_init()
+
+    # 生成类方法
+    for cls_name, cls_def in codegen._classes.items():
+        codegen._gen_typed_class_methods(cls_name, cls_def)
+
+    # 生成所有段落函数
+    for seg_name in codegen._segment_order:
+        params = codegen._segments[seg_name]
+        body = codegen._segment_bodies.get(seg_name, [])
+        codegen._gen_typed_segment(seg_name, params, body)
+
+    # 为所有模块生成导出名别名
+    for mod in all_module_list:
+        codegen._gen_exported_aliases(mod)
+
+    # 生成 main 函数（主模块的顶层语句）
+    codegen._gen_typed_main()
+
+    return codegen.finalize()
+
+
+def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None):
+    """
+    编译段言项目为原生可执行文件（支持多模块）
+
+    自动解析导入语句，递归编译依赖的模块，合并 IR 后编译。
+
+    Args:
+        source_path: 主源文件路径
+        output_path: 输出路径
+        verbose: 是否输出详细信息
+        target_platform: 目标平台
+    """
+    try:
+        from ..module_resolver import ModuleResolver
+    except ImportError:
+        from module_resolver import ModuleResolver
+
+    with open(source_path, 'r', encoding='utf-8') as f:
+        source = f.read()
+
+    source_dir = os.path.dirname(os.path.abspath(source_path))
+    resolver = ModuleResolver(search_paths=[source_dir])
+
+    # 递归收集所有依赖的模块
+    sources = {}
+    visited = set()
+
+    def collect_modules(src, mod_name):
+        if mod_name in visited:
+            return
+        visited.add(mod_name)
+        sources[mod_name] = src
+
+        # 解析导入
+        parser = DuanParser()
+        v3_mod = parser.parse(src)
+        if v3_mod is None:
+            return
+        adapter = AstAdapter()
+        module = adapter.convert_module(v3_mod)
+        for imp in (getattr(module, 'imports', None) or []):
+            dep_name = imp.module if hasattr(imp, 'module') else None
+            if dep_name and dep_name not in visited:
+                dep_path = resolver.find_module(dep_name)
+                if dep_path and os.path.exists(dep_path):
+                    with open(dep_path, 'r', encoding='utf-8') as f:
+                        dep_src = f.read()
+                    collect_modules(dep_src, dep_name)
+
+    main_name = os.path.splitext(os.path.basename(source_path))[0]
+    collect_modules(source, main_name)
+
+    if verbose:
+        print(f"[1/4] 收集到 {len(sources)} 个模块: {', '.join(sources.keys())}")
+
+    # 编译所有模块
+    ir = compile_modules_typed(sources, main_module=main_name, verbose=verbose, target_platform=target_platform)
+
+    # 写入 .ll 文件
+    base_path = output_path or source_path.replace('.duan', '')
+    base_path = _strip_exe_ext(base_path)
+    ll_path = base_path + '.ll'
+
+    with open(ll_path, 'w', encoding='utf-8') as f:
+        f.write(ir)
+
+    if verbose:
+        print(f"  IR 已写入: {ll_path} ({len(ir)} 字符)")
+
+    clang = find_clang()
+    if verbose:
+        print(f"  使用编译器: {clang}")
+
+    # 编译 typed 运行时库
+    runtime_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    runtime_c = os.path.join(runtime_dir, 'runtime_typed.c')
+    runtime_o = base_path + '_runtime.o'
+
+    if verbose:
+        print("[2/4] 编译 typed 运行时库...")
+
+    result = subprocess.run(
+        [clang, '-c', '-O2', runtime_c, '-o', runtime_o],
+        capture_output=True, text=True, encoding='utf-8', errors='replace'
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"运行时库编译失败:\n{result.stderr}")
+
+    # 编译 .ll 为 .o
+    if verbose:
+        print("[3/4] 编译 LLVM IR...")
+
+    ir_o = base_path + '.o'
+    result = subprocess.run(
+        [clang, '-c', '-O2', ll_path, '-o', ir_o],
+        capture_output=True, text=True, encoding='utf-8', errors='replace'
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"IR 编译失败:\n{result.stderr}")
+
+    # 链接为可执行文件
+    exe_ext = get_exe_extension()
+    exe_path = base_path + exe_ext
+    if verbose:
+        print(f"[4/4] 链接为可执行文件...")
+
+    link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+    if not sys.platform.startswith('win'):
+        link_args.append('-lm')
+
+    result = subprocess.run(
+        link_args,
+        capture_output=True, text=True, encoding='utf-8', errors='replace'
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"链接失败:\n{result.stderr}")
+
+    if verbose:
+        for f in [ir_o, runtime_o]:
+            try:
+                if os.path.exists(f):
+                    os.remove(f)
+            except Exception:
+                pass
+        size = os.path.getsize(exe_path)
+        print(f"编译成功: {source_path} -> {exe_path} ({size} 字节)")
+
+    return exe_path
 
 
 if __name__ == '__main__':

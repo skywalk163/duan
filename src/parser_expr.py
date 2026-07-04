@@ -130,6 +130,12 @@ class ParserExprMixin:
             operand = self._parse_primary()
             return UnaryOp('非', operand)
         
+        # 等待表达式：等待 异步操作
+        if tok.type == TokenType.KEYWORD and tok.value == '等待':
+            self._consume(TokenType.KEYWORD, '等待')
+            expr = self._parse_expr()
+            return AwaitExpr(expr)
+        
         # 三元条件表达式：如果 条件 那么 值1 否则 值2
         if tok.type == TokenType.KEYWORD and tok.value == '如果':
             self._consume(TokenType.KEYWORD, '如果')

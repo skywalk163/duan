@@ -93,6 +93,8 @@ class AstAdapter:
             'LambdaExpression': self._convert_lambda_expression,
             'UnwrapExpression': self._convert_unwrap_expression,
             'RangeExpr': self._convert_range_expr,
+            'AwaitExpr': self._convert_await_expr,
+            'AsyncScope': self._convert_async_scope,
         }
 
     # ------------------------------------------------------------------
@@ -143,6 +145,7 @@ class AstAdapter:
                 ast.InterfaceDefinition, ast.TryStatement, ast.ThrowStatement,
                 ast.WithStatement, ast.MatchStatement, ast.DestructuringAssignment,
                 ast.ImportStatement, ast.ExportStatement, ast.CompoundAssignment,
+                ast.AsyncScope,
             )):
                 converted = ast.ExpressionStatement(expression=converted)
             result.append(converted)
@@ -156,6 +159,8 @@ class AstAdapter:
         classes = []
         interfaces = []
         statements = []
+        imports = []
+        exports = []
 
         other_stmts = []
         for stmt in node.statements or []:
@@ -166,6 +171,10 @@ class AstAdapter:
                 classes.append(converted)
             elif isinstance(converted, ast.InterfaceDefinition):
                 interfaces.append(converted)
+            elif isinstance(converted, ast.ImportStatement):
+                imports.append(converted)
+            elif isinstance(converted, ast.ExportStatement):
+                exports.append(converted)
             else:
                 other_stmts.append(stmt)
 
@@ -173,8 +182,8 @@ class AstAdapter:
 
         return ast.Module(
             name=None,
-            imports=[],
-            exports=[],
+            imports=imports,
+            exports=exports,
             segments=segments,
             classes=classes,
             interfaces=interfaces,
@@ -218,7 +227,7 @@ class AstAdapter:
             parameters=params,
             body=self._to_list_stmts(node.body),
             return_type=getattr(node, 'return_type', None),
-            modifiers=[],
+            modifiers=list(getattr(node, 'modifiers', []) or []),
             generic_params=list(getattr(node, 'generic_params', []) or []),
         )
 
@@ -285,6 +294,19 @@ class AstAdapter:
             arguments=args,
             column=0,
             line=0,
+        )
+    
+    def _convert_await_expr(self, node) -> ast.AwaitExpression:
+        """将 v3 AwaitExpr 转换为 AwaitExpression"""
+        return ast.AwaitExpression(
+            expression=self.convert(node.expression),
+        )
+    
+    def _convert_async_scope(self, node) -> ast.AsyncScope:
+        """将 v3 AsyncScope 转换为 AsyncScope"""
+        return ast.AsyncScope(
+            tasks=self._convert_list(node.tasks),
+            result_vars=list(node.result_vars or []),
         )
 
     def _convert_while_stmt(self, node) -> ast.WhileStatement:
@@ -439,14 +461,17 @@ class AstAdapter:
 
     def _convert_export_stmt(self, node) -> ast.ExportStatement:
         symbols = getattr(node, 'symbols', []) or []
-        first_name = symbols[0] if symbols else ''
-        if isinstance(first_name, str):
-            name = first_name
-        elif hasattr(first_name, 'name'):
-            name = first_name.name
-        else:
-            name = str(first_name) if first_name else ''
-        return ast.ExportStatement(name=name)
+        names = []
+        for s in symbols:
+            if isinstance(s, str):
+                names.append(s)
+            elif hasattr(s, 'name'):
+                names.append(s.name)
+            else:
+                names.append(str(s) if s else '')
+        names = [n for n in names if n]
+        first_name = names[0] if names else ''
+        return ast.ExportStatement(name=first_name, names=names)
 
     def _convert_conditional_expression(self, node) -> ast.ConditionalExpression:
         return ast.ConditionalExpression(

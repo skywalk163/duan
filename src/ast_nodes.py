@@ -599,6 +599,7 @@ class ImportStatement(ASTNode):
 class ExportStatement(ASTNode):
     """导出语句"""
     name: str = ""
+    names: List[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -638,3 +639,12 @@ def ast_to_dict(node: ASTNode) -> dict:
                 result[field_name] = value
         return result
     return node
+
+
+# =============================================================================
+# 兼容别名（统一双轨制：ast_nodes_v3.py 的命名 → ast_nodes.py 的命名）
+# 使旧代码可以用 ImportStmt 引用 ImportStatement 等
+# =============================================================================
+
+ImportStmt = ImportStatement
+ExportStmt = ExportStatement

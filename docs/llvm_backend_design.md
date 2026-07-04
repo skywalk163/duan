@@ -64,9 +64,9 @@
 
 ### 结构体定义
 
-**LLVM IR 定义**：
+**LLVM IR 定义**（与 C 端布局完全匹配）：
 ```llvm
-{ i32 type, i64 i64_val, double f64_val, ptr str_val, i32 bool_val, [4 x i8] padding }
+{ i32 type, i64 i64_val, double f64_val, ptr str_val, i32 bool_val, i32 list_size, i32 list_capacity, ptr list_data }
 ```
 
 **C 定义**：
@@ -75,10 +75,16 @@ typedef struct {
     int type;          /* 0=NULL 1=INT 2=FLOAT 3=STR 4=LIST 5=BOOL */
     int64_t i64;       /* INT */
     double f64;        /* FLOAT */
-    char* str;         /* STR / LIST (序列化) */
+    char* str;         /* STR / LIST (序列化，仅用于 type=3) */
     int boolean;       /* BOOL */
+    /* LIST 类型专用字段 (type=4) */
+    int list_size;     /* 当前元素数量 */
+    int list_capacity; /* 分配的数组容量 */
+    struct DuanValue** list_data; /* 元素数组指针 */
 } DuanValue;
 ```
+
+> **重要**：LLVM IR 端的结构体定义必须与 C 端完全匹配，包括 list 相关字段。否则运行时函数在操作 LIST 类型时会写入越界内存。
 
 ### 类型标记
 
@@ -102,6 +108,31 @@ typedef struct {
 declare void @dv_add(ptr result, ptr a, ptr b)
 declare void @dv_println(ptr value)
 ```
+
+### 段落函数调用约定
+
+段落函数（用户自定义函数）和类方法统一使用指针传递调用约定：
+
+```llvm
+; 段落函数签名
+define void @_seg_函数名(ptr %result, ptr %args, i32 %num_args) {
+    ...
+}
+
+; 类方法签名（实例方法）
+define void @_method_类名_方法名(ptr %result, ptr %self, ptr %args, i32 %num_args) {
+    ...
+}
+```
+
+**参数传递流程**：
+1. 调用方在栈上分配 `DuanValue` 数组存放参数
+2. 通过 `getelementptr` 计算每个参数的地址并写入
+3. 传递数组指针和参数数量给被调函数
+4. 被调函数从数组中按索引提取参数
+5. 结果写入 `%result` 指针，调用方从中读取返回值
+
+**参数越界保护**：被调函数检查 `i < num_args`，未提供的参数设为 null。
 
 ## 代码生成核心
 
@@ -136,6 +167,151 @@ self._pending_allocas.append(f'{reg} = alloca {DUANVALUE_STRUCT}')
 # 函数入口统一生成
 for alloca in self._pending_allocas:
     self.emit(alloca)
+```
+
+## 模块系统支持（Level 9）
+
+Level 9 实现了 LLVM 后端的模块系统，支持跨文件编译和符号导入导出。
+
+### 导入处理流程
+
+1. **解析导入语句**：`_process_imports()` 遍历 `module.imports`，记录符号映射表 `_imports`
+   - 键：本地符号名
+   - 值：(模块名, 原始符号名)
+2. **生成外部声明**：`_emit_module_decls()` 为每个导入的段函数生成 `declare` 声明
+3. **调用外部函数**：`_gen_imported_segment_call()` 通过模块前缀别名调用
+
+### 导出别名机制
+
+为使其他模块能引用当前模块的段函数，为导出的函数生成 LLVM alias：
+
+```llvm
+; 模块 "数学工具" 导出函数 "阶乘"
+@_seg__数学工具_阶乘 = alias void (ptr, ptr, i32), void (ptr, ptr, i32)* @_seg__阶乘
+```
+
+调用方通过 `@_seg_{模块名}_{函数名}` 引用，实现跨模块调用。
+
+### 多模块编译流水线
+
+```
+compile_duan_project(主文件路径)
+    ↓
+递归收集依赖模块（通过 ModuleResolver）
+    ↓
+compile_modules_typed(模块名→源码字典)
+    ↓
+逐模块编译为 IR（主模块生成 main 函数，依赖模块只生成段函数）
+    ↓
+合并 IR（依赖模块在前，主模块在后）
+    ↓
+clang 编译 → 链接 → 原生可执行文件
+```
+
+### 包管理器集成
+
+`PackageManager` 新增两个方法支持 LLVM 原生编译：
+
+- `resolve_path_dependencies()`：解析 `package.toml` 中的 path 依赖
+- `build_project_native()`：完整流水线，从 `package.toml` 到原生可执行文件
+
+## 类型信息优化（Level 8）
+
+Level 8 引入了基于类型注解和类型推断的代码生成优化。当编译器能确定操作数的类型时，直接使用原生 LLVM 指令替代运行时函数调用。
+
+### 类型追踪系统
+
+代码生成器维护变量类型映射表 `_var_types`，在以下时机记录变量类型：
+
+1. **显式类型注解**：`变量 甲：数 = 10` → 记录甲为 INT
+2. **初始化表达式推断**：`变量 x = 3.14` → 推断 x 为 FLOAT
+3. **赋值表达式推断**：`x = y + 1` → 根据y的类型推断x的类型
+
+类型映射支持中英文类型名：
+
+| 段言类型名 | 英文名 | 内部常量 |
+|-----------|--------|---------|
+| 数、整数 | int | INT |
+| 浮点数、小数 | float | FLOAT |
+| 布尔 | bool | BOOL |
+| 串、字符串 | str | STRING |
+| 列表、数组 | list | LIST |
+
+### 表达式类型推断
+
+`_infer_expr_type` 方法根据 AST 节点推断表达式类型：
+
+- **NumberLiteral**：含小数点 → FLOAT，否则 → INT
+- **StringLiteral** → STRING
+- **BooleanLiteral** → BOOL
+- **Identifier** → 查询变量类型表
+- **BinaryOp**：根据操作符和操作数类型推断
+  - 算术运算：INT ⊕ INT → INT（除法除外），含 FLOAT → FLOAT
+  - 比较运算 → BOOL
+
+### 算术运算优化
+
+当操作数类型已知时，直接使用 LLVM 原生算术指令：
+
+```llvm
+; INT + INT 优化（无需调用 dv_add）
+%left_i64 = extractvalue { i32, i64, ... } %left_dv, 1
+%right_i64 = extractvalue { i32, i64, ... } %right_dv, 1
+%result = add i64 %left_i64, %right_i64
+; 直接构造 DuanValue（无需调用 dv_int）
+store i32 1, ptr %type_ptr    ; type = INT
+store i64 %result, ptr %i64_ptr
+```
+
+| 操作符 | INT 指令 | FLOAT 指令 |
+|-------|---------|-----------|
+| + / 加 | `add` | `fadd` |
+| - / 减 | `sub` | `fsub` |
+| * / 乘 | `mul` | `fmul` |
+| / / 除 | `sdiv` | `fdiv` |
+
+当类型未知时，回退到运行时函数调用（`dv_add` 等）。
+
+### 比较运算优化
+
+```llvm
+; INT < INT 优化（无需调用 dv_lt）
+%cmp = icmp slt i64 %left, %right
+; 直接构造 BOOL DuanValue
+```
+
+| 操作符 | INT 谓词 | FLOAT 谓词 |
+|-------|---------|-----------|
+| == / 等于 | `eq` | `oeq` |
+| != / 不等于 | `ne` | `une` |
+| < / 小于 | `slt` | `olt` |
+| > / 大于 | `sgt` | `ogt` |
+| <= / 小于等于 | `sle` | `ole` |
+| >= / 大于等于 | `sge` | `oge` |
+
+### 条件判断优化
+
+`_gen_condition_i1` 方法根据条件类型选择最优判断策略：
+
+| 条件类型 | 判断方式 | 生成的指令 |
+|---------|---------|-----------|
+| BOOL | 直接提取布尔字段 | `extractvalue ... 4` → `trunc to i1` |
+| INT | 与0比较 | `extractvalue ... 1` → `icmp ne i64, 0` |
+| FLOAT | 与0.0比较 | `extractvalue ... 2` → `fcmp one double, 0.0` |
+| 未知 | 运行时比较 | `call @dv_eq` → `icmp ne` |
+
+此优化应用于 `如果`、`否则如果`、`当` 等控制流语句的条件判断。
+
+### 快速 DuanValue 构造
+
+`_create_int_dv_fast` 和 `_create_float_dv_fast` 方法直接通过 `getelementptr` + `store` 构造结构体，避免调用运行时构造函数 `dv_int` / `dv_float` 的开销：
+
+```llvm
+; 快速构造 INT（直接操作结构体字段）
+%type_ptr = getelementptr ... { ... }, ptr %slot, i32 0, i32 0
+store i32 1, ptr %type_ptr          ; type = INT
+%i64_ptr = getelementptr ... { ... }, ptr %slot, i32 0, i32 1
+store i64 %result, ptr %i64_ptr     ; i64 值
 ```
 
 ## 异常处理实现
@@ -275,20 +451,24 @@ finally 块:
 
 ## 列表实现
 
-列表内部使用序列化字符串存储，格式为：
+列表内部使用动态数组存储，DuanValue 结构体中的 `list_size`、`list_capacity`、`list_data` 字段专门用于 LIST 类型：
 
+```c
+typedef struct {
+    int type;          /* 4 = LIST */
+    ...
+    int list_size;     /* 当前元素数量 */
+    int list_capacity; /* 分配的数组容量 */
+    struct DuanValue** list_data; /* 元素指针数组 */
+} DuanValue;
 ```
-list:长度:元素1\x1f元素2\x1f元素3\x1f...
-```
 
-使用 `\x1f`（单元分隔符）作为元素分隔符，避免与普通字符串冲突。
+### 列表操作
 
-### 数字自动检测
-
-从列表中获取元素时，自动检测元素类型：
-- 纯数字字符串 → INT 类型
-- 含一个小数点的数字字符串 → FLOAT 类型
-- 其他 → STRING 类型
+- **创建**：`dv_list_new` 分配初始容量为 4 的数组
+- **追加**：`dv_list_append` 复制原列表并追加元素，容量不足时自动扩容
+- **访问**：`dv_list_get` 通过索引直接访问 `list_data[index]`，O(1) 复杂度
+- **长度**：`dv_list_len` 直接返回 `list_size` 字段
 
 ## 类与对象实现
 
@@ -352,12 +532,141 @@ exe_path = compile_duan_typed('hello.duan', verbose=True)
 print(f'编译成功: {exe_path}')
 ```
 
+## 异步并发支持（Level 10）
+
+### 设计思想
+
+采用 **Duff's device 协程** 模式，通过在生成的 LLVM IR 中嵌入 `switch(resume_point)` 状态机实现协程的挂起与恢复。每个 `await` 点对应一个 `case` 标签，挂起时记录 `resume_point` 并返回，恢复时从对应 `case` 继续执行。
+
+### 核心数据结构
+
+**DuanCoroutine 结构体**（`runtime_typed.c`）：
+```c
+typedef struct DuanCoroutine {
+    int state;             // 协程状态：DV_CORO_READY/SUSPENDED/DONE/ERROR
+    int resume_point;      // 恢复点（Duff's device 的 case 标签）
+    DuanCoroFunc func;     // 协程函数指针
+    DuanValue result;      // 返回值
+    DuanValue* args;       // 参数数组（堆分配）
+    int num_args;          // 参数数量
+    DuanValue* locals;     // 局部变量数组（堆分配，跨 await 持久化）
+    int num_locals;        // 局部变量数量
+    struct DuanFuture* waiting_for;  // 等待的 Future
+    struct DuanFuture* future;        // 关联的 Future（完成时自动触发）
+    struct DuanCoroutine* next;       // 调度器链表指针
+} DuanCoroutine;
+```
+
+**DuanFuture 结构体**：
+```c
+typedef struct DuanFuture {
+    int ready;             // 是否已完成
+    DuanValue result;      // 结果值
+    int has_error;         // 是否有错误
+    char error_msg[256];   // 错误消息
+    DuanCoroutine* waiters; // 等待这个 future 的协程链表
+} DuanFuture;
+```
+
+**协程函数签名**：
+```llvm
+define void @_coro_xxx(ptr %result, ptr %coro, ptr %args, i32 %num_args)
+```
+与运行时 `DuanCoroFunc` typedef 匹配。
+
+### 代码生成策略
+
+**两阶段法生成协程状态机**：
+
+```
+阶段1：预扫描 body，统计 await 点数量
+阶段2：生成完整函数
+  ├── entry: 分配局部变量（coro->locals）
+  ├── 加载 resume_point
+  ├── switch i32 %rp, label %end [
+  │     i32 0, label %resume_0
+  │     i32 1, label %resume_1
+  │     ...
+  │   ]
+  ├── resume_0: 执行前半段代码...
+  ├── await 点（设置 resume_point=1, 调用 dv_coro_await, ret void）
+  ├── resume_1: 继续执行...
+  ├── ...
+  └── coro_switch_end: ret void
+```
+
+**局部变量持久化**：
+- 不使用 `alloca`（栈上分配，跨调用不保持）
+- 使用 `coro->locals` 堆数组存储，通过 `dv_coro_get_local(coro, index)` 访问
+- 参数在入口处从 `coro->args` 复制到 `coro->locals`
+
+### 异步段落
+
+**包装函数模式**：每个异步段落生成两个函数：
+1. `_seg_xxx`（包装函数）：创建协程，返回协程句柄（DuanValue 指针值）
+2. `_coro_xxx`（协程函数）：实际的协程状态机
+
+**示例 IR**：
+```llvm
+define void @_seg_xxx(ptr %result, ptr %args, i32 %num_args) {
+  %coro = call ptr @dv_coro_create(ptr @_coro_xxx, ptr %args, i32 %num_args, i32 N)
+  ; 存储协程指针到 DuanValue result
+  ret void
+}
+```
+
+### async/await 实现
+
+**await 表达式代码生成**：
+1. 计算子表达式得到协程 DuanValue
+2. 提取 ptr_val 得到协程指针
+3. 设置 `resume_point = 当前点 + 1`
+4. 调用 `dv_coro_await(%coro, %target_coro)` 挂起
+5. `ret void` 返回到调度器
+6. 恢复标签：从 `dv_coro_get_await_result` 获取结果
+
+### 异步作用域（结构化并发）
+
+```段言
+异步作用域
+    任务1()
+    任务2()
+结束
+```
+
+**代码生成**：
+1. 为每个任务创建协程（调用异步段落函数）
+2. 逐个调用 `dv_coro_run_to_completion(coro_ptr)` 执行
+3. 当前是串行执行，未来可升级为并发调度
+
+### 调度器
+
+- **可运行队列**：`run_queue` 单链表
+- **调度循环**：从队列头部取出协程 → `dv_coro_resume` 执行一步 → 重复
+- **等待唤醒**：协程 await 时挂起到 future 的 waiters 链表，future 完成时批量唤醒
+
+### 运行时函数清单
+
+| 函数 | 说明 |
+|------|------|
+| `dv_coro_create(func, args, num_args, num_locals)` | 创建协程 |
+| `dv_coro_resume(coro)` | 恢复执行一步 |
+| `dv_coro_await(coro, target_coro)` | 挂起等待另一个协程 |
+| `dv_coro_run_to_completion(coro)` | 运行到完成（阻塞式） |
+| `dv_coro_set_result(coro, val)` | 设置结果并完成 future |
+| `dv_coro_get_await_result(coro, out)` | 获取 await 结果 |
+| `dv_coro_get_local(coro, index)` | 获取局部变量指针 |
+| `dv_coro_get_arg(coro, index)` | 获取参数指针 |
+| `dv_future_create()` | 创建 Future |
+| `dv_future_complete(f, result)` | 完成 Future，唤醒等待者 |
+| `dv_scheduler_run()` | 运行调度器到队列为空 |
+
 ## 已知限制
 
 ### 类型系统
 - **字符串编码**：当前使用 UTF-8 字符串，未完全支持 Unicode 字符串操作（如按字符索引、子串等）
 - **垃圾回收**：使用 malloc/free 手动管理内存，没有自动垃圾回收
-- **列表存储**：列表使用序列化字符串存储，访问元素需要解析，性能较低
+- ~~**列表存储**：列表使用序列化字符串存储，访问元素需要解析，性能较低~~ ✅ 已改为动态数组存储，O(1) 随机访问
 - **对象存储**：对象使用序列化字符串存储，字段访问需要线性查找
 
 ### 异常处理
@@ -377,8 +686,9 @@ print(f'编译成功: {exe_path}')
 - **待支持**：macOS、ARM64、WebAssembly
 
 ### 优化程度
-- **无 LLVM 优化**：未启用 LLVM 的 O1/O2/O3 优化 Pass
-- **无 SSA 优化**：代码生成未利用 LLVM 的 SSA 形式进行深度优化
+- **类型信息优化**：✅ Level 8 实现了基于类型注解和推断的直接原生类型运算
+- **LLVM 优化 Pass**：未启用 LLVM 的 O1/O2/O3 优化 Pass（但 clang 编译时使用 -O2）
+- **SSA 优化**：代码生成已使用 SSA 形式，但未利用 LLVM 的深度优化
 
 ## 未来规划
 
@@ -437,9 +747,9 @@ print(f'编译成功: {exe_path}')
 - [ ] **正则模块**：正则表达式支持（集成 PCRE 或 re2）
 
 #### 4. 模块系统支持
-- [ ] **导入/导出**：支持模块导入导出语法
-- [ ] **模块解析**：实现模块路径解析与缓存
-- [ ] **跨模块调用**：支持调用其他模块的函数和类
+- [x] **导入/导出**：支持模块导入导出语法 ✅ Level 9 已实现
+- [x] **模块解析**：实现模块路径解析与缓存 ✅ Level 9 已实现
+- [x] **跨模块调用**：支持调用其他模块的函数和类 ✅ Level 9 已实现
 - [ ] **标准库加载**：内置标准库模块的自动加载机制
 
 #### 5. 开发工具
@@ -463,7 +773,7 @@ print(f'编译成功: {exe_path}')
 - [ ] **分层编译**：解释执行 → 快速 JIT → 优化 JIT 的分层编译策略
 
 #### 3. 并发与并行
-- [ ] **协程**：支持 async/await 异步编程
+- [x] **协程**：支持 async/await 异步编程 ✅ Level 10 已实现
 - [ ] **多线程**：线程安全的运行时，支持多线程并行
 - [ ] **通道/消息传递**：CSP 风格的并发模型
 - [ ] **并行循环**：自动并行化的遍历循环
@@ -506,39 +816,65 @@ v1.9.x (短期)                    v2.0 (中期)                      v2.x+ (长
 | 类别 | 已实现 | 计划中 | 完成度 |
 |------|--------|--------|--------|
 | 基础类型（int/float/bool/str） | ✅ | - | 100% |
-| 列表类型 | ✅（序列化字符串） | 动态数组优化 | 60% |
+| 列表类型 | ✅（动态数组） | - | 100% |
 | 类与对象 | ✅（序列化字符串） | 字典优化 | 50% |
-| 算术运算 | ✅ | - | 100% |
-| 比较运算 | ⚠️（在函数内正常，顶级条件分支有问题） | 调试修复 | 90% |
-| 逻辑运算 | ⚠️（布尔条件判断有问题） | 调试修复 | 80% |
-| 条件分支（如果/否则） | ⚠️（布尔值条件有问题） | 调试修复 | 80% |
-| 循环（遍历/当） | ✅ | - | 100% |
-| 函数（段落） | ✅ | - | 100% |
+| 算术运算 | ✅（含类型优化） | - | 100% |
+| 比较运算 | ✅（含类型优化） | - | 100% |
+| 逻辑运算 | ✅ | - | 100% |
+| 条件分支（如果/否则） | ✅（含类型优化） | - | 100% |
+| 循环（遍历/当） | ✅（含类型优化） | - | 100% |
+| 函数（段落） | ✅（指针传递） | - | 100% |
 | 类与继承 | ✅ | - | 100% |
 | 异常处理（尝试/捕获/抛出/最终） | ✅（含自定义异常类型） | - | 100% |
+| 类型注解集成 | ✅ | - | 100% |
+| 类型推断优化 | ✅ | - | 100% |
+| 模块系统（导入/导出） | ✅（多模块编译） | - | 100% |
 | 打印/输入 | ✅ | - | 100% |
 | 字符串操作 | ✅ | 更多字符串操作 | 80% |
 | 文件读写 | ✅ | 更多文件操作 | 60% |
 | 时间函数 | ✅ | 日期时间模块 | 30% |
 | 垃圾回收 | ❌ | 引用计数 GC | 0% |
-| 模块系统 | ❌ | 导入/导出 | 0% |
+| 模块系统 | ✅（导入/导出/多模块编译） | Git/注册表依赖 | 60% |
 | LLVM 优化 | ❌ | O1/O2 优化 | 0% |
 | 调试信息 | ❌ | DWARF 支持 | 0% |
 | JIT 编译 | ❌ | ORC JIT | 0% |
 
 ### 已知问题
 
-1. **比较运算符在顶级条件分支中无效**
-   - 在函数内使用比较运算符正常
-   - 在顶级（模块作用域）使用 `如果 x > y：` 时程序行为异常
-   - 原因：可能是代码生成或运行时对顶级条件分支处理有误
+1. ~~**比较运算符在顶级条件分支中无效**~~ ✅ 已修复（Level 8 类型优化）
+2. ~~**布尔条件判断问题**~~ ✅ 已修复（BooleanLiteral 现正确生成 BOOL 类型）
+3. ~~**段落函数直接传递结构体导致 ABI 问题**~~ ✅ 已修复（改用指针传递）
+4. ~~**DuanValue 结构体布局不匹配**~~ ✅ 已修复（LLVM IR 与 C 端布局完全匹配）
+5. ~~**_extract_f64 / _set_f64 类型错误**~~ ✅ 已修复（double 字段不再当作指针处理）
 
-2. **布尔条件判断问题**
-   - `如果 flag：` 其中 flag 为真时，可能不执行 if 体
-   - 原因：布尔值的真值判断逻辑可能有问题
+### Level 8 已完成功能
+
+- [x] BooleanLiteral 生成正确的 BOOL 类型（type=5）
+- [x] DuanValue 结构体与 C 端布局完全匹配
+- [x] 段落函数统一使用指针传递（`ptr %result, ptr %args, i32 %num_args`）
+- [x] 集成 Level 6 类型注解到代码生成
+- [x] 类型追踪系统（变量类型映射表）
+- [x] 表达式类型推断
+- [x] 算术运算类型优化（直接 i64/double 运算）
+- [x] 比较运算类型优化（直接 icmp/fcmp）
+- [x] 条件判断类型优化（直接布尔/整数/浮点判断）
+- [x] 快速 DuanValue 构造（直接结构体字段操作）
+- [x] `转串` 内置函数别名支持
+
+### Level 9 已完成功能
+
+- [x] LLVM 后端导入解析（`_process_imports`、`_imports` 符号映射表）
+- [x] 外部段函数声明生成（`_emit_module_decls`）
+- [x] 导入函数调用（`_gen_imported_segment_call`，通过模块前缀别名）
+- [x] 导出别名生成（`_gen_exported_aliases`，`@_seg_{模块名}_{函数名}`）
+- [x] 多模块编译流水线（`compile_modules_typed`、`compile_duan_project`）
+- [x] 包管理器 path 依赖解析（`resolve_path_dependencies`）
+- [x] 包管理器原生编译（`build_project_native`）
+- [x] `ExportStatement` 多符号导出支持（`names: List[str]`）
+- [x] `_convert_module` 正确收集 imports/exports
+- [x] AST 节点命名兼容别名（`ImportStmt`/`ExportStmt`）
+- [x] 核心标准库纯段言实现（数学工具、字符串工具、列表工具、类型工具）
 
 ### 待修复
 
-- [ ] 比较运算符在顶级条件分支中的问题
-- [ ] 布尔条件真值判断问题
-- [ ] 条件分支 `如果 x > y：` 中 `>` 符号处理
+（Level 8 已修复之前所有已知问题，当前无待修复项）
