@@ -108,5 +108,5 @@ tests/_test_*.ll
 tests/_test_*.exe
 
 # 下载的工具
-llvm-mingw-*.zip
+llvm-mingw*.zip
 llvm-mingw-*/
