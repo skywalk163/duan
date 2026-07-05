@@ -35,16 +35,23 @@
  * ================================================================ */
 
 typedef struct DuanValue {
-    int type;          /* 0=NULL 1=INT 2=FLOAT 3=STR 4=LIST 5=BOOL 6=OBJ */
+    int type;          /* 0=NULL 1=INT 2=FLOAT 3=STR 4=LIST 5=BOOL 6=OBJ 7=DICT 8=REF */
     int64_t i64;       /* INT */
     double f64;        /* FLOAT */
-    char* str;         /* STR / LIST (序列化，仅用于 type=3) */
+    char* str;         /* STR / REF (type=8 时存储 DuanValue* 指针) */
     int boolean;       /* BOOL */
     /* LIST 类型专用字段 (type=4) */
     int list_size;     /* 当前元素数量 */
     int list_capacity; /* 分配的数组容量 */
     struct DuanValue** list_data; /* 元素数组指针 */
+    /* DICT 类型专用字段 (type=7) - 复用 list_data/list_size/list_capacity
+       list_data 存储键值对: [key1, val1, key2, val2, ...]
+       list_size = 键值对数量
+       list_capacity = 已分配容量（对数，list_data 有 2*list_capacity 个槽位） */
 } DuanValue;
+
+/* type=8 REF: 引用类型，str 字段存储被引用的 DuanValue* 指针
+   用于 dv_dict_get 返回对字典内部值的引用，使原地修改（如列表追加）能传播回字典 */
 
 /* ================================================================
  * 前向声明（避免隐式函数声明）
@@ -63,6 +70,14 @@ int dv_class_implements_interface(const char* class_name, const char* interface_
 /* ================================================================
  * 内部工具
  * ================================================================ */
+
+/* 跟随 REF 链，返回实际值指针（用于原地修改操作） */
+static DuanValue* dv_deref(DuanValue* v) {
+    while (v && v->type == 8 && v->str) {
+        v = (DuanValue*)v->str;
+    }
+    return v;
+}
 
 static char* dv_strdup(const char* s) {
     if (!s) return NULL;
@@ -148,6 +163,12 @@ void dv_bool(DuanValue* result, int b) {
 
 void dv_free(DuanValue* v) {
     if (!v) return;
+    if (v->type == 8) {
+        /* REF: 不释放引用目标，仅清空指针 */
+        v->str = NULL;
+        v->type = 0;
+        return;
+    }
     if (v->type == 3 && v->str) {
         free(v->str);
         v->str = NULL;
@@ -162,10 +183,34 @@ void dv_free(DuanValue* v) {
         v->list_data = NULL;
         v->list_size = 0;
         v->list_capacity = 0;
+    } else if (v->type == 7 && v->list_data) {
+        /* DICT: list_data 有 2*list_size 个条目 (key, val, key, val, ...) */
+        for (int i = 0; i < 2 * v->list_size; i++) {
+            if (v->list_data[i]) {
+                dv_free(v->list_data[i]);
+                free(v->list_data[i]);
+            }
+        }
+        free(v->list_data);
+        v->list_data = NULL;
+        v->list_size = 0;
+        v->list_capacity = 0;
     }
 }
 
 void dv_clone(DuanValue* result, DuanValue* v) {
+    if (v->type == 8) {
+        /* REF: 复制引用（浅拷贝，指向同一目标） */
+        result->type = 8;
+        result->str = v->str;
+        result->i64 = 0;
+        result->f64 = 0.0;
+        result->boolean = 0;
+        result->list_size = 0;
+        result->list_capacity = 0;
+        result->list_data = NULL;
+        return;
+    }
     *result = *v;
     if (v->type == 3 && v->str) {
         result->str = dv_strdup(v->str);
@@ -187,6 +232,9 @@ void dv_clone(DuanValue* result, DuanValue* v) {
             }
             result->list_size = v->list_size;
         }
+    } else if (v->type == 7) {
+        /* DICT: 浅拷贝 - 共享 list_data 指针，使字典值（如列表）可被原地修改 */
+        /* list_data 保持原指针，list_size/list_capacity 保持原值 */
     }
 }
 
@@ -195,6 +243,7 @@ void dv_clone(DuanValue* result, DuanValue* v) {
  * ================================================================ */
 
 int64_t dv_to_i64(DuanValue* v) {
+    v = dv_deref(v);
     switch (v->type) {
         case 1: return v->i64;
         case 2: return (int64_t)v->f64;
@@ -205,6 +254,7 @@ int64_t dv_to_i64(DuanValue* v) {
 }
 
 double dv_to_f64(DuanValue* v) {
+    v = dv_deref(v);
     switch (v->type) {
         case 1: return (double)v->i64;
         case 2: return v->f64;
@@ -215,6 +265,7 @@ double dv_to_f64(DuanValue* v) {
 }
 
 const char* dv_to_str(DuanValue* v) {
+    v = dv_deref(v);
     switch (v->type) {
         case 3: return v->str ? v->str : "";
         default: return "";
@@ -222,6 +273,7 @@ const char* dv_to_str(DuanValue* v) {
 }
 
 int dv_to_bool(DuanValue* v) {
+    v = dv_deref(v);
     switch (v->type) {
         case 0: return 0;
         case 1: return v->i64 != 0;
@@ -229,11 +281,13 @@ int dv_to_bool(DuanValue* v) {
         case 3: return v->str && v->str[0] != '\0';
         case 5: return v->boolean;
         case 4: return 1;  /* 非空列表为真 */
+        case 7: return 1;  /* 非空字典为真 */
         default: return 0;
     }
 }
 
 char* dv_to_string(DuanValue* v) {
+    v = dv_deref(v);
     /* 转换为可读字符串形式 */
     char buf[128];
     switch (v->type) {
@@ -243,6 +297,7 @@ char* dv_to_string(DuanValue* v) {
         case 3: return dv_strdup(v->str ? v->str : "");
         case 5: return dv_strdup(v->boolean ? "真" : "假");
         case 4: return dv_strdup(v->str ? v->str : "[]");
+        case 7: return dv_strdup("dict");  /* DICT 简化表示 */
         default: return dv_strdup("");
     }
 }
@@ -1218,6 +1273,7 @@ int64_t dv_list_len(DuanValue* v) {
 }
 
 int64_t dv_len(DuanValue* v) {
+    v = dv_deref(v);
     if (v->type == 3) {
         const char* s = v->str ? v->str : "";
         if (strncmp(s, "dict:", 5) == 0) {
@@ -1228,10 +1284,15 @@ int64_t dv_len(DuanValue* v) {
     if (v->type == 4) {
         return v->list_size;
     }
+    if (v->type == 7) {
+        /* DICT: list_size 是键值对数量 */
+        return v->list_size;
+    }
     return 0;
 }
 
 void dv_list_get(DuanValue* result, DuanValue* list, int64_t index) {
+    list = dv_deref(list);
     if (list->type != 4) {
         dv_null(result);
         return;
@@ -1248,46 +1309,60 @@ void dv_list_get(DuanValue* result, DuanValue* list, int64_t index) {
     }
 }
 
+void dv_str_get(DuanValue* result, DuanValue* str_val, int64_t index) {
+    if (str_val->type != 3) {
+        dv_null(result);
+        return;
+    }
+    const char* s = str_val->str ? str_val->str : "";
+    int64_t len = (int64_t)strlen(s);
+    if (index < 0 || index >= len) {
+        dv_null(result);
+        return;
+    }
+    char buf[2];
+    buf[0] = s[index];
+    buf[1] = '\0';
+    dv_str(result, buf);
+}
+
 /* 列表操作：基于动态数组实现 */
 
 void dv_list_append(DuanValue* result, DuanValue* list, DuanValue* elem) {
     if (!result) return;
-    
-    DuanValue* new_list;
-    if (list->type == 4) {
-        /* 复制原列表 */
-        new_list = (DuanValue*)malloc(sizeof(DuanValue));
-        if (!new_list) { dv_list_new(result); return; }
-        dv_list_init_internal(new_list, list->list_capacity + 1);
-        for (int i = 0; i < list->list_size; i++) {
-            DuanValue* copy = (DuanValue*)malloc(sizeof(DuanValue));
-            if (copy) {
-                dv_clone(copy, list->list_data[i]);
-                dv_list_add_internal(new_list, copy);
-            }
-        }
-    } else {
-        new_list = (DuanValue*)malloc(sizeof(DuanValue));
-        if (!new_list) { dv_list_new(result); return; }
-        dv_list_init_internal(new_list, 4);
+
+    /* 跟随 REF：如果 result 或 list 是 REF，找到实际目标 */
+    DuanValue* result_real = dv_deref(result);
+    DuanValue* list_real = dv_deref(list);
+
+    /* 选择修改目标：优先 result_real（原地修改） */
+    DuanValue* target = (result_real == list_real) ? result_real : list_real;
+
+    if (target->type != 4) {
+        dv_list_new(target);
     }
-    
-    /* 添加新元素 */
+
+    if (target->list_size >= target->list_capacity) {
+        int new_cap = target->list_capacity * 2;
+        if (new_cap < 4) new_cap = 4;
+        DuanValue** new_data = (DuanValue**)realloc(target->list_data, new_cap * sizeof(DuanValue*));
+        if (!new_data) return;
+        target->list_data = new_data;
+        target->list_capacity = new_cap;
+    }
+
     DuanValue* elem_copy = (DuanValue*)malloc(sizeof(DuanValue));
     if (elem_copy) {
         dv_clone(elem_copy, elem);
-        dv_list_add_internal(new_list, elem_copy);
+        target->list_data[target->list_size] = elem_copy;
+        target->list_size++;
     }
-    
-    result->type = 4;
-    result->i64 = 0;
-    result->f64 = 0.0;
-    result->str = NULL;
-    result->boolean = 0;
-    result->list_size = new_list->list_size;
-    result->list_capacity = new_list->list_capacity;
-    result->list_data = new_list->list_data;
-    free(new_list);
+
+    /* 如果 result 是 REF，不需要更新 result（REF 指向 target，已自动反映修改） */
+    /* 如果 result 不是 REF 且 != target，需要把结果复制到 result */
+    if (result->type != 8 && result != target) {
+        dv_clone(result, target);
+    }
 }
 
 void dv_list_clear(DuanValue* result, DuanValue* list) {
@@ -1556,286 +1631,218 @@ void dv_str_split(DuanValue* result, DuanValue* str, DuanValue* delim) {
 }
 
 /* ================================================================
- * 字典操作
- * 字典存储格式: "dict:N:key1\x1fvalue1\x1fkey2\x1fvalue2..."
- * 使用 \x1f (ASCII 31) 作为键值对分隔符
+ * 字典操作 (type=7 DICT)
+ * 字典存储格式: list_data = [key1*, val1*, key2*, val2*, ...]
+ * list_size = 键值对数量, list_capacity = 已分配容量（对数）
+ * 使用堆分配的 DuanValue* 存储键值，使字典值（如列表）可被原地修改
  * ================================================================ */
 
 void dv_dict_new(DuanValue* result) {
-    result->type = 3;  /* 复用 type=3，使用 str 字段存储 */
+    result->type = 7;  /* DICT 类型 */
     result->i64 = 0;
     result->f64 = 0.0;
-    result->str = dv_strdup("dict:0:");
+    result->str = NULL;
     result->boolean = 0;
+    result->list_size = 0;
+    result->list_capacity = 8;
+    result->list_data = (struct DuanValue**)calloc(result->list_capacity * 2, sizeof(DuanValue*));
 }
 
 int64_t dv_dict_len(DuanValue* v) {
-    if (v->type != 3 || !v->str) return 0;
-    if (strncmp(v->str, "dict:", 5) != 0) return 0;
-    return atoll(v->str + 5);
+    if (v->type != 7) return 0;
+    return v->list_size;
+}
+
+/* 内部：查找键的位置，返回键值对索引，-1 表示未找到 */
+static int64_t dv_dict_find(DuanValue* dict, DuanValue* key) {
+    if (dict->type != 7 || !dict->list_data) return -1;
+    DuanValue key_str;
+    dv_value_to_string(&key_str, key);
+    const char* key_cstr = key_str.str ? key_str.str : "";
+    int key_len = (int)strlen(key_cstr);
+    for (int64_t i = 0; i < dict->list_size; i++) {
+        DuanValue* stored_key = dict->list_data[2 * i];
+        if (!stored_key) continue;
+        DuanValue stored_key_str;
+        dv_value_to_string(&stored_key_str, stored_key);
+        const char* sk = stored_key_str.str ? stored_key_str.str : "";
+        int sklen = (int)strlen(sk);
+        if (sklen == key_len && strncmp(sk, key_cstr, key_len) == 0) {
+            dv_free(&stored_key_str);
+            dv_free(&key_str);
+            return i;
+        }
+        dv_free(&stored_key_str);
+    }
+    dv_free(&key_str);
+    return -1;
 }
 
 void dv_dict_set(DuanValue* result, DuanValue* dict, DuanValue* key, DuanValue* value) {
-    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+    /* 如果 result == dict（原地修改），直接修改 dict */
+    DuanValue* target = (result == dict) ? result : dict;
+
+    if (target->type != 7) {
+        /* 不是字典类型，创建新字典 */
         dv_dict_new(result);
-        return;
+        target = result;
     }
-    
-    /* 将值转换为字符串以便存储 */
-    DuanValue value_str;
-    dv_value_to_string(&value_str, value);
-    DuanValue key_str;
-    dv_value_to_string(&key_str, key);
-    
-    const char* orig = dict->str;
-    int64_t count = dv_dict_len(dict);
-    
-    /* 计算新字符串大小 */
-    int key_len = (int)strlen(key_str.str);
-    int val_len = (int)strlen(value_str.str);
-    int buf_size = (int)strlen(orig) + key_len + val_len + 8;
-    
-    char* new_str = (char*)malloc(buf_size);
-    if (!new_str) {
-        dv_free(&value_str);
-        dv_free(&key_str);
-        dv_dict_new(result);
-        return;
+
+    /* 跟随 REF，避免将 REF 存入字典 */
+    key = dv_deref(key);
+    value = dv_deref(value);
+
+    /* 查找键 */
+    int64_t idx = dv_dict_find(target, key);
+
+    if (idx >= 0) {
+        /* 键存在，替换值 */
+        DuanValue* old_val = target->list_data[2 * idx + 1];
+        if (old_val) {
+            dv_free(old_val);
+            free(old_val);
+        }
+        /* 堆分配新值并深拷贝（对于列表会复制 list_data） */
+        DuanValue* new_val = (DuanValue*)malloc(sizeof(DuanValue));
+        if (new_val) {
+            dv_clone(new_val, value);
+            target->list_data[2 * idx + 1] = new_val;
+        }
+    } else {
+        /* 键不存在，新增键值对 */
+        if (target->list_size >= target->list_capacity) {
+            int new_cap = target->list_capacity * 2;
+            if (new_cap < 8) new_cap = 8;
+            struct DuanValue** new_data = (struct DuanValue**)realloc(target->list_data, new_cap * 2 * sizeof(DuanValue*));
+            if (!new_data) {
+                if (result != target) dv_clone(result, target);
+                return;
+            }
+            /* 初始化新槽位为 NULL */
+            for (int i = target->list_capacity * 2; i < new_cap * 2; i++) {
+                new_data[i] = NULL;
+            }
+            target->list_data = new_data;
+            target->list_capacity = new_cap;
+        }
+        /* 堆分配键和值 */
+        DuanValue* new_key = (DuanValue*)malloc(sizeof(DuanValue));
+        DuanValue* new_val = (DuanValue*)malloc(sizeof(DuanValue));
+        if (new_key && new_val) {
+            dv_clone(new_key, key);
+            dv_clone(new_val, value);
+            target->list_data[2 * target->list_size] = new_key;
+            target->list_data[2 * target->list_size + 1] = new_val;
+            target->list_size++;
+        } else {
+            if (new_key) free(new_key);
+            if (new_val) free(new_val);
+        }
     }
-    
-    /* 构建新的字典字符串 */
-    int pos = 0;
-    pos += snprintf(new_str + pos, buf_size - pos, "dict:%lld:", (long long)(count + 1));
-    
-    /* 复制原有的键值对 */
-    const char* p = orig + 5;
-    p = strchr(p, ':');
-    if (p) p++;
-    for (int64_t i = 0; i < count; i++) {
-        const char* key_start = p;
-        const char* key_end = strstr(key_start, "\x1f");
-        if (!key_end) break;
-        int klen = (int)(key_end - key_start);
-        
-        const char* val_start = key_end + 1;
-        const char* val_end = strstr(val_start, "\x1f");
-        if (!val_end) val_end = val_start + strlen(val_start);
-        int vlen = (int)(val_end - val_start);
-        
-        memcpy(new_str + pos, key_start, key_end - key_start);
-        pos += key_end - key_start;
-        new_str[pos++] = '\x1f';
-        
-        memcpy(new_str + pos, val_start, val_end - val_start);
-        pos += val_end - val_start;
-        new_str[pos++] = '\x1f';
-        
-        p = val_end;
-        if (*p == '\x1f') p++;
+
+    /* 如果 result != target，需要把结果复制到 result */
+    if (result != target) {
+        dv_clone(result, target);
     }
-    
-    /* 添加新的键值对 */
-    memcpy(new_str + pos, key_str.str, key_len);
-    pos += key_len;
-    new_str[pos++] = '\x1f';
-    memcpy(new_str + pos, value_str.str, val_len);
-    pos += val_len;
-    new_str[pos] = '\0';
-    
-    dv_free(&value_str);
-    dv_free(&key_str);
-    
-    result->type = 3;
-    result->i64 = 0;
-    result->f64 = 0.0;
-    result->str = new_str;
-    result->boolean = 0;
 }
 
 void dv_dict_get(DuanValue* result, DuanValue* dict, DuanValue* key) {
-    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+    if (dict->type != 7) {
         dv_null(result);
         return;
     }
-    
-    DuanValue key_str;
-    dv_value_to_string(&key_str, key);
-    
-    const char* orig = dict->str;
-    int64_t count = dv_dict_len(dict);
-    
-    const char* p = orig + 5;
-    p = strchr(p, ':');
-    if (p) p++;
-    
-    for (int64_t i = 0; i < count; i++) {
-        const char* key_start = p;
-        const char* key_end = strstr(key_start, "\x1f");
-        if (!key_end) break;
-        int klen = (int)(key_end - key_start);
-        
-        const char* val_start = key_end + 1;
-        const char* val_end = strstr(val_start, "\x1f");
-        if (!val_end) val_end = val_start + strlen(val_start);
-        int vlen = (int)(val_end - val_start);
-        
-        if (klen == (int)strlen(key_str.str) && 
-            strncmp(key_start, key_str.str, klen) == 0) {
-            /* 找到匹配的键，返回值 */
-            char* val_copy = (char*)malloc(vlen + 1);
-            if (val_copy) {
-                memcpy(val_copy, val_start, vlen);
-                val_copy[vlen] = '\0';
-            }
-            dv_free(&key_str);
-            dv_str(result, val_copy ? val_copy : "");
-            if (val_copy) free(val_copy);
-            return;
-        }
-        
-        p = val_end;
-        if (*p == '\x1f') p++;
+    int64_t idx = dv_dict_find(dict, key);
+    if (idx < 0) {
+        dv_null(result);
+        return;
     }
-    
-    dv_free(&key_str);
-    dv_null(result);
+    DuanValue* stored_val = dict->list_data[2 * idx + 1];
+    if (!stored_val) {
+        dv_null(result);
+        return;
+    }
+    /* 返回 REF 引用，指向字典内部存储的值
+       使原地修改（如 dv_list_append）通过 dv_deref 直接作用于 stored_val */
+    result->type = 8;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = (char*)stored_val;
+    result->boolean = 0;
+    result->list_size = 0;
+    result->list_capacity = 0;
+    result->list_data = NULL;
 }
 
 void dv_dict_has(DuanValue* result, DuanValue* dict, DuanValue* key) {
-    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
+    if (dict->type != 7) {
         result->type = 5;
         result->i64 = 0;
         result->f64 = 0.0;
         result->boolean = 0;
         return;
     }
-    
-    DuanValue key_str;
-    dv_value_to_string(&key_str, key);
-    
-    const char* orig = dict->str;
-    int64_t count = dv_dict_len(dict);
-    
-    const char* p = orig + 5;
-    p = strchr(p, ':');
-    if (p) p++;
-    
-    int found = 0;
-    for (int64_t i = 0; i < count && !found; i++) {
-        const char* key_start = p;
-        const char* key_end = strstr(key_start, "\x1f");
-        if (!key_end) break;
-        int klen = (int)(key_end - key_start);
-        
-        const char* val_start = key_end + 1;
-        const char* val_end = strstr(val_start, "\x1f");
-        if (!val_end) val_end = val_start + strlen(val_start);
-        
-        if (klen == (int)strlen(key_str.str) && 
-            strncmp(key_start, key_str.str, klen) == 0) {
-            found = 1;
-        }
-        
-        p = val_end;
-        if (*p == '\x1f') p++;
-    }
-    
-    dv_free(&key_str);
+    int64_t idx = dv_dict_find(dict, key);
     result->type = 5;
     result->i64 = 0;
     result->f64 = 0.0;
-    result->boolean = found;
+    result->boolean = (idx >= 0) ? 1 : 0;
 }
 
 void dv_dict_keys(DuanValue* result, DuanValue* dict) {
     dv_list_new(result);
-    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
-        return;
-    }
-    
-    int64_t count = dv_dict_len(dict);
-    const char* orig = dict->str;
-    
-    const char* p = orig + 5;
-    p = strchr(p, ':');
-    if (p) p++;
-    
-    for (int64_t i = 0; i < count; i++) {
-        const char* key_start = p;
-        const char* key_end = strstr(key_start, "\x1f");
-        if (!key_end) break;
-        int klen = (int)(key_end - key_start);
-        
-        char* key_copy = (char*)malloc(klen + 1);
-        if (key_copy) {
-            memcpy(key_copy, key_start, klen);
-            key_copy[klen] = '\0';
-        }
-        
-        DuanValue key_val;
-        dv_str(&key_val, key_copy ? key_copy : "");
-        if (key_copy) free(key_copy);
-        
+    if (dict->type != 7 || !dict->list_data) return;
+    for (int64_t i = 0; i < dict->list_size; i++) {
+        DuanValue* stored_key = dict->list_data[2 * i];
+        if (!stored_key) continue;
+        DuanValue key_copy;
+        dv_clone(&key_copy, stored_key);
         DuanValue list_copy;
         dv_clone(&list_copy, result);
-        dv_list_append(result, &list_copy, &key_val);
+        dv_list_append(result, &list_copy, &key_copy);
         dv_free(&list_copy);
-        dv_free(&key_val);
-        
-        const char* val_start = key_end + 1;
-        const char* val_end = strstr(val_start, "\x1f");
-        if (!val_end) val_end = val_start + strlen(val_start);
-        p = val_end;
-        if (*p == '\x1f') p++;
+        dv_free(&key_copy);
     }
 }
 
 void dv_dict_values(DuanValue* result, DuanValue* dict) {
     dv_list_new(result);
-    if (dict->type != 3 || !dict->str || strncmp(dict->str, "dict:", 5) != 0) {
-        return;
-    }
-    
-    int64_t count = dv_dict_len(dict);
-    const char* orig = dict->str;
-    
-    const char* p = orig + 5;
-    p = strchr(p, ':');
-    if (p) p++;
-    
-    for (int64_t i = 0; i < count; i++) {
-        const char* key_start = p;
-        const char* key_end = strstr(key_start, "\x1f");
-        if (!key_end) break;
-        
-        const char* val_start = key_end + 1;
-        const char* val_end = strstr(val_start, "\x1f");
-        if (!val_end) val_end = val_start + strlen(val_start);
-        int vlen = (int)(val_end - val_start);
-        
-        char* val_copy = (char*)malloc(vlen + 1);
-        if (val_copy) {
-            memcpy(val_copy, val_start, vlen);
-            val_copy[vlen] = '\0';
-        }
-        
-        DuanValue val_val;
-        dv_str(&val_val, val_copy ? val_copy : "");
-        if (val_copy) free(val_copy);
-        
+    if (dict->type != 7 || !dict->list_data) return;
+    for (int64_t i = 0; i < dict->list_size; i++) {
+        DuanValue* stored_val = dict->list_data[2 * i + 1];
+        if (!stored_val) continue;
+        DuanValue val_copy;
+        dv_clone(&val_copy, stored_val);
         DuanValue list_copy;
         dv_clone(&list_copy, result);
-        dv_list_append(result, &list_copy, &val_val);
+        dv_list_append(result, &list_copy, &val_copy);
         dv_free(&list_copy);
-        dv_free(&val_val);
-        
-        p = val_end;
-        if (*p == '\x1f') p++;
+        dv_free(&val_copy);
     }
 }
 
 void dv_dict_remove(DuanValue* result, DuanValue* dict, DuanValue* key) {
-    /* 字典不支持删除操作，复制原字典 */
+    if (dict->type != 7) {
+        dv_clone(result, dict);
+        return;
+    }
+    int64_t idx = dv_dict_find(dict, key);
+    if (idx < 0) {
+        dv_clone(result, dict);
+        return;
+    }
+    /* 释放要删除的键值 */
+    DuanValue* old_key = dict->list_data[2 * idx];
+    DuanValue* old_val = dict->list_data[2 * idx + 1];
+    if (old_key) { dv_free(old_key); free(old_key); }
+    if (old_val) { dv_free(old_val); free(old_val); }
+    /* 将后续键值对前移 */
+    for (int64_t i = idx; i < dict->list_size - 1; i++) {
+        dict->list_data[2 * i] = dict->list_data[2 * (i + 1)];
+        dict->list_data[2 * i + 1] = dict->list_data[2 * (i + 1) + 1];
+    }
+    dict->list_data[2 * (dict->list_size - 1)] = NULL;
+    dict->list_data[2 * (dict->list_size - 1) + 1] = NULL;
+    dict->list_size--;
     dv_clone(result, dict);
 }
 

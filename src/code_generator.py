@@ -12,6 +12,7 @@ import ast_nodes as ast_nodes_module
 
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr
+from ast_nodes_v3 import Assignment
 
 
 # =============================================================================
@@ -129,6 +130,7 @@ class PythonCodeGenerator:
             
             # 文件I/O
             '读取文件': '_duan_builtin.读取文件',
+            '_读文件': '_duan_builtin._读文件',
             '写入文件': '_duan_builtin.写入文件',
             '追加文件': '_duan_builtin.追加文件',
             '文件存在': '_duan_builtin.文件存在',
@@ -187,6 +189,11 @@ class PythonCodeGenerator:
             '连接字符串': '_duan_builtin.连接字符串',
             '替换字符串': '_duan_builtin.替换字符串',
             '去除空白': '_duan_builtin.去除空白',
+            '转大写': '_duan_builtin.转大写',
+            '转小写': '_duan_builtin.转小写',
+            '截取': '_duan_builtin.截取',
+            '子串': '_duan_builtin.截取',
+            '字符串截取': '_duan_builtin.截取',
             
             # 列表工具
             '列': '_duan_builtin.列',
@@ -273,6 +280,7 @@ class PythonCodeGenerator:
         self._add_line("        import types")
         self._add_line("        _duan_builtin = types.ModuleType('_duan_builtin')")
         self._add_line("        _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
+        self._add_line("        _duan_builtin._读文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
         self._add_line("        _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content) or None")
         self._add_line("        _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
         self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
@@ -294,6 +302,9 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("        _duan_builtin.字符串长度 = len")
+        self._add_line("        _duan_builtin.截取 = lambda s, start, end: s[start:end]")
+        self._add_line("        _duan_builtin.转大写 = lambda s: s.upper()")
+        self._add_line("        _duan_builtin.转小写 = lambda s: s.lower()")
         self._add_line("        _duan_builtin.字典创建 = dict")
         self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
@@ -322,6 +333,9 @@ class PythonCodeGenerator:
         self._add_line("    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
         self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("    _duan_builtin.字符串长度 = len")
+        self._add_line("    _duan_builtin.截取 = lambda s, start, end: s[start:end]")
+        self._add_line("    _duan_builtin.转大写 = lambda s: s.upper()")
+        self._add_line("    _duan_builtin.转小写 = lambda s: s.lower()")
         self._add_line("    _duan_builtin.字典创建 = dict")
         self._add_line("    _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("    _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
@@ -429,6 +443,11 @@ class PythonCodeGenerator:
         elif isinstance(stmt, CompoundAssignment):
             # 复合赋值语句：甲 加上 1 → 甲 += 1
             self._generate_compound_assignment(stmt)
+        elif isinstance(stmt, Assignment):
+            # 普通赋值语句：甲 = 值
+            target = self._generate_expr(stmt.target)
+            value = self._generate_expr(stmt.value)
+            self._add_line(f"{target} = {value}")
         elif isinstance(stmt, IndexedAssignment):
             # 索引赋值语句：甲[丁] = 值
             self._generate_indexed_assignment(stmt)
@@ -492,11 +511,39 @@ class PythonCodeGenerator:
         self.indent_level -= 1
         
         if stmt.else_body:
-            self._add_line("else:")
-            self.indent_level += 1
-            for s in stmt.else_body:
+            # 处理否则如果链（else_body 是 IfStmt）
+            if isinstance(stmt.else_body, IfStmt):
+                self._generate_elif(stmt.else_body)
+            elif isinstance(stmt.else_body, list):
+                self._add_line("else:")
+                self.indent_level += 1
+                for s in stmt.else_body:
+                    self._generate_statement(s)
+                self.indent_level -= 1
+    
+    def _generate_elif(self, stmt: IfStmt):
+        """生成否则如果（elif）分支"""
+        condition = self._generate_expr(stmt.condition)
+        self._add_line(f"elif {condition}:")
+        
+        self.indent_level += 1
+        if stmt.then_body:
+            for s in stmt.then_body:
                 self._generate_statement(s)
-            self.indent_level -= 1
+        else:
+            self._add_line("pass")
+        self.indent_level -= 1
+        
+        if stmt.else_body:
+            # 进一步嵌套的否则如果链
+            if isinstance(stmt.else_body, IfStmt):
+                self._generate_elif(stmt.else_body)
+            elif isinstance(stmt.else_body, list):
+                self._add_line("else:")
+                self.indent_level += 1
+                for s in stmt.else_body:
+                    self._generate_statement(s)
+                self.indent_level -= 1
     
     def _generate_foreach_stmt(self, stmt: ForeachStmt):
         """生成遍历循环"""

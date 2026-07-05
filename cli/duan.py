@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-段言（Duan）编译器命令行工具 — 统一入口（默认使用 ANTLR 后端）
+段言（Duan）编译器命令行工具 — 统一入口（默认使用 SRC 后端）
 
 用法：
   duan run <源文件.duan>            解释执行
@@ -12,9 +12,9 @@
   duan --version
 
 示例：
-  duan run hello.duan                # 用 ANTLR 解释器执行
+  duan run hello.duan                # 用 SRC 后端执行（无需额外依赖）
+  duan run hello.duan --backend antlr  # 用 ANTLR 后端执行（需安装 antlr4-python3-runtime）
   duan compile hello.duan -o out.py  # 编译为 Python
-  duan compile hello.duan --src      # 用旧版 src 后端编译
 """
 
 import sys
@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
 
-VERSION = '段言编译器 v1.7.0'
+VERSION = '段言编译器 v1.9.0'
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -191,13 +191,21 @@ def cmd_compile(args):
     """编译段言源代码为 Python 文件或可执行文件"""
     source = _read_source(args.file)
 
+    # 解析优化级别（'O0' -> 0, 'O1' -> 1, etc.）
+    opt_level = 2
+    if args.optimize and args.optimize.startswith('O'):
+        try:
+            opt_level = int(args.optimize[1:])
+        except ValueError:
+            opt_level = 2
+
     # LLVM 后端（模式1：字符串模式）
     if args.backend == 'llvm':
         try:
             from src.llvm.compiler import compile_duan
             output = args.output or (Path(args.file).stem + '.exe')
             compile_duan(args.file, output, verbose=args.verbose,
-                         optimize_level=args.optimize, debug=args.debug)
+                         optimize_level=opt_level, debug=args.debug)
             return
         except ImportError:
             try:
@@ -206,7 +214,7 @@ def cmd_compile(args):
                 from ..llvm.compiler import compile_duan
             output = args.output or (Path(args.file).stem + '.exe')
             compile_duan(args.file, output, verbose=args.verbose,
-                         optimize_level=args.optimize, debug=args.debug)
+                         optimize_level=opt_level, debug=args.debug)
             return
         except Exception as e:
             print(f"LLVM (string) 编译错误: {e}", file=sys.stderr)
@@ -221,7 +229,7 @@ def cmd_compile(args):
             from src.llvm.compiler import compile_duan_typed
             output = args.output or (Path(args.file).stem + '.exe')
             compile_duan_typed(args.file, output, verbose=args.verbose,
-                               optimize_level=args.optimize, debug=args.debug)
+                               optimize_level=opt_level, debug=args.debug)
             return
         except ImportError:
             try:
@@ -230,7 +238,7 @@ def cmd_compile(args):
                 from ..llvm.compiler import compile_duan_typed
             output = args.output or (Path(args.file).stem + '.exe')
             compile_duan_typed(args.file, output, verbose=args.verbose,
-                               optimize_level=args.optimize, debug=args.debug)
+                               optimize_level=opt_level, debug=args.debug)
             return
         except Exception as e:
             print(f"LLVM (typed) 编译错误: {e}", file=sys.stderr)
@@ -432,9 +440,9 @@ def cmd_init(args):
     main_file.write_text("""# 段言项目入口
 
 段落 主函数：
-    打印 "你好，段言！"。
+    打印 "你好，段言！"
 
-主函数()。""", encoding='utf-8')
+主函数()""", encoding='utf-8')
 
     # 创建 duan.json 配置
     config_file = project_dir / 'duan.json'
@@ -482,15 +490,15 @@ def main():
     # ── run ──
     run_p = subparsers.add_parser('run', help='解释执行段言源代码')
     run_p.add_argument('file', help='源文件路径')
-    run_p.add_argument('--backend', choices=['antlr', 'src'], default='antlr',
-                       help='使用的后端（默认: antlr）')
+    run_p.add_argument('--backend', choices=['antlr', 'src'], default='src',
+                       help='使用的后端（默认: src，无需额外依赖；antlr 需安装 antlr4-python3-runtime）')
 
     # ── compile ──
     comp_p = subparsers.add_parser('compile', help='编译为 Python 文件')
     comp_p.add_argument('file', help='源文件路径')
     comp_p.add_argument('-o', '--output', help='输出文件路径（默认: 同名 .py）')
-    comp_p.add_argument('--backend', choices=['antlr', 'src', 'llvm', 'llvm-typed'], default='antlr',
-                        help='使用的后端（默认: antlr，llvm=原生编译）')
+    comp_p.add_argument('--backend', choices=['antlr', 'src', 'llvm', 'llvm-typed'], default='src',
+                        help='使用的后端（默认: src；antlr 需安装 antlr4-python3-runtime；llvm 需安装 LLVM）')
     comp_p.add_argument('--optimize', choices=['O0', 'O1', 'O2', 'O3'], default='O2',
                         help='LLVM 优化级别（默认: O2）')
     comp_p.add_argument('--debug', action='store_true',
@@ -499,8 +507,8 @@ def main():
     # ── ast ──
     ast_p = subparsers.add_parser('ast', help='显示 AST')
     ast_p.add_argument('file', help='源文件路径')
-    ast_p.add_argument('--backend', choices=['antlr', 'src'], default='antlr',
-                       help='使用的后端（默认: antlr）')
+    ast_p.add_argument('--backend', choices=['antlr', 'src'], default='src',
+                       help='使用的后端（默认: src）')
 
     # ── tokens ──
     tok_p = subparsers.add_parser('tokens', help='显示 Token 流')
@@ -509,8 +517,8 @@ def main():
     # ── check ──
     check_p = subparsers.add_parser('check', help='语法检查')
     check_p.add_argument('file', help='源文件路径')
-    check_p.add_argument('--backend', choices=['antlr', 'src'], default='antlr',
-                         help='使用的后端（默认: antlr）')
+    check_p.add_argument('--backend', choices=['antlr', 'src'], default='src',
+                         help='使用的后端（默认: src）')
 
     # ── init ──
     init_p = subparsers.add_parser('init', help='初始化段言项目')

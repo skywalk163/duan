@@ -23,6 +23,15 @@ from parser_core import ParseError
 class ParserExprMixin:
     """表达式解析混入类"""
     
+    def _is_expr_terminator(self) -> bool:
+        """检查当前 token 是否是表达式终止符"""
+        tok = self._current()
+        if tok is None:
+            return True
+        if tok.type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT, TokenType.DOT):
+            return True
+        return False
+    
     def _parse_expr(self) -> ASTNode:
         """解析表达式（支持管道操作符和逻辑运算符）"""
         left = self._parse_logical_expr()
@@ -48,7 +57,7 @@ class ParserExprMixin:
         """解析逻辑表达式（且/与, 或）"""
         left = self._parse_comparison()
         
-        while self._current():
+        while self._current() and not self._is_expr_terminator():
             tok = self._current()
             if tok.type == TokenType.KEYWORD and tok.value in self.LOGICAL_OP_MAP:
                 op = self._consume().value
@@ -63,7 +72,7 @@ class ParserExprMixin:
         """解析比较表达式"""
         left = self._parse_add_expr()
         
-        while self._current():
+        while self._current() and not self._is_expr_terminator():
             tok = self._current()
             # 遇到"那么"关键字，停止解析
             if tok.type == TokenType.KEYWORD and tok.value == '那么':
@@ -81,7 +90,7 @@ class ParserExprMixin:
         """解析加减表达式"""
         left = self._parse_mul_expr()
         
-        while self._current():
+        while self._current() and not self._is_expr_terminator():
             tok = self._current()
             # 支持：加、减、加上、减去
             if tok.type == TokenType.KEYWORD and tok.value in self.ADD_OP_MAP:
@@ -102,7 +111,7 @@ class ParserExprMixin:
         """解析乘除表达式"""
         left = self._parse_primary()
         
-        while self._current():
+        while self._current() and not self._is_expr_terminator():
             tok = self._current()
             # 支持：乘、除、乘以、除以
             if tok.type == TokenType.KEYWORD and tok.value in self.MUL_OP_MAP:
@@ -454,13 +463,36 @@ class ParserExprMixin:
             expr = Identifier("super()")
             return self._parse_postfix(expr)
 
+        # 段落调用：段落段名(参数)
+        if tok.type == TokenType.KEYWORD and tok.value == '段落':
+            self._consume()
+            name_parts = []
+            while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                name_parts.append(self._consume().value)
+            if not name_parts:
+                return self._error("段落调用后应跟段名", tok.line, tok.col)
+            name = ''.join(name_parts)
+            if self._current() and self._current().type == TokenType.LPAREN:
+                self._consume(TokenType.LPAREN)
+                args = []
+                while self._current() and self._current().type != TokenType.RPAREN:
+                    if self._current().type == TokenType.COMMA:
+                        self._consume(TokenType.COMMA)
+                        continue
+                    args.append(self._parse_expr())
+                self._consume(TokenType.RPAREN)
+                expr = ParagraphCall(name, args)
+            else:
+                expr = Identifier(name)
+            return self._parse_postfix(expr)
+        
         # 其他关键字作为标识符处理（如参数名中的关键字部分）
         if tok.type == TokenType.KEYWORD:
             name = tok.value
             self._consume()
             return self._parse_postfix(Identifier(name))
 
-        return self._error(f"意外的标记: {tok.type} = '{tok.value}'（附近: '{tok.value}'）", tok.line, tok.col)
+        raise ParseError(f"意外的标记: {tok.type} = '{tok.value}'（附近: '{tok.value}'）", tok.line, tok.col)
 
     def _collect_primary_arg(self) -> Optional[ASTNode]:
         """收集单个primary参数（不进行段落调用检测）"""

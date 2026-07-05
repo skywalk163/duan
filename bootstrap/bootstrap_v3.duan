@@ -1,16 +1,12 @@
-# ============================================================
-# 段言自举编译器 - 合并版本
-# 由 _merge_bootstrap.py 自动生成
-# ============================================================
+# bootstrap_v3.duan - v3.2 自举编译器（合并版）
+# 由 _merge_v3.py 自动生成
 
 
-# ==================== token.duan ====================
-
+# ===== token.duan =====
 # token.duan - Token 类型定义与构造函数
 # 用于自举编译器
-# 使用 ANTLR 规范语法：段落 段名 接收 参数：body结束。
+# 使用 v3.2 语法：段落 段名 接收 参数：body
 
-导出 创建令牌, 令牌种别集, 是关键字, 符号种别
 
 # =============================================================================
 # 创建令牌字典
@@ -95,44 +91,16 @@
   返回 符号字典
 
 
-# ==================== duan_ast.duan ====================
-
-# ast.duan - AST node constructors for bootstrap compiler
-# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+# ===== duan_ast.duan =====
+# duan_ast.duan - AST node constructors for bootstrap compiler
+# Uses v3.2 语法标准: 段落 段名 接收 参数：body
 #
 # Node format: list [type, data...]
 # e.g. number literal = ["number", "42"]
 #
 # NOTE: All identifiers use English to avoid ANTLR keyword conflicts
-# with single-character Chinese keywords (列=LIST, 段=SEGMENT, etc.)
+# with single-character Chinese keywords (列=LIST, 段落=SEGMENT, etc.)
 
-导出 make_program
-导出 make_paragraph_def
-导出 make_var_decl
-导出 make_assign
-导出 make_compound_assign
-导出 make_if_stmt
-导出 make_while_loop
-导出 make_for_each
-导出 make_return
-导出 make_break
-导出 make_continue
-导出 make_print
-导出 make_expr_stmt
-导出 make_identifier
-导出 make_number
-导出 make_string
-导出 make_boolean
-导出 make_null
-导出 make_binary_op
-导出 make_unary_op
-导出 make_func_call
-导出 make_member_access
-导出 make_list_literal
-导出 make_dict_literal
-导出 make_template_string
-导出 node_type
-导出 node_data
 
 # =============================================================================
 # Program node (root)
@@ -289,10 +257,10 @@
   列表追加(node, prop_name)
   返回 node
 
-段落 make_list_literal 接收 elements：
+段落 make_list_literal 接收 elems：
   定义 node 等于 列表创建()
   列表追加(node, "list_literal")
-  列表追加(node, elements)
+  列表追加(node, elems)
   返回 node
 
 段落 make_dict_literal 接收 pairs：
@@ -301,10 +269,10 @@
   列表追加(node, pairs)
   返回 node
 
-段落 make_template_string 接收 value：
+段落 make_template_string 接收 parts：
   定义 node 等于 列表创建()
   列表追加(node, "template_string")
-  列表追加(node, value)
+  列表追加(node, parts)
   返回 node
 
 # =============================================================================
@@ -317,11 +285,10 @@
   返回 列表获取(node, index)
 
 
-# ==================== lexer.duan ====================
-
+# ===== lexer.duan =====
 # 段言（Duan）自举词法分析器
 # Bootstrap 词法分析器 — 最大兼容版本
-# 使用 ANTLR 规范语法：段落 段名 接收 参数：body结束。
+# 使用 v3.2 语法标准：段落 段名 接收 参数：body（缩进控制块结束）
 #
 # 功能说明：
 # - 支持汉字标识符、英文字母标识符、数字和关键字
@@ -332,9 +299,7 @@
 # - 基于缩进的块结构（INDENT/DEDENT 令牌）
 # - 先匹配长关键字的智能关键字识别
 
-导出 词法分析
 
-# [已内联] 从 《字符串处理》 导入 《截取》。
 
 段落 创建关键字列表：
   定义 列表 等于 列表创建()
@@ -485,6 +450,29 @@
     索引 加上 1
   返回 最佳关键字
 
+段落 含插值模式 接收 文本：
+  # 检测字符串内是否含 {标识符} 模式（不嵌套花括号）
+  定义 长度 等于 字符串长度(文本)
+  定义 i 等于 0
+  当 i 小于 长度:
+    定义 ch 等于 字符串获取(文本, i)
+    如果 ch 等于 "{":
+      # 检查花括号后是否为合法标识符字符
+      如果 i 加 1 小于 长度:
+        定义 后字符 等于 字符串获取(文本, i 加 1)
+        如果 是字母(后字符) 或 是数字(后字符) 或 后字符 等于 "_":
+          # 找匹配的右花括号
+          定义 j 等于 i 加 1
+          当 j 小于 长度:
+            定义 c 等于 字符串获取(文本, j)
+            如果 c 等于 "}":
+              返回 真
+            否则 如果 c 等于 "{":
+              跳出
+            j 加上 1
+    i 加上 1
+  返回 假
+
 段落 收集标识符文本 接收 源码, 位置, 符号字典：
   定义 结果 等于 ""
   定义 源码长度 等于 字符串长度(源码)
@@ -602,39 +590,6 @@
       位置 加上 1
       列 加上 1
       跳过
-    # ── 模板字符串（f-string）处理 ──
-    如果 字符 等于 "f" 且 位置 加 1 小于 源码长度:
-      定义 下一个字符 等于 字符串获取(源码, 位置 加 1)
-      如果 下一个字符 等于 "\"" 或 下一个字符 等于 "'":
-        定义 模板结果 等于 ""
-        定义 分隔符 等于 下一个字符
-        位置 加上 2
-        当 位置 小于 源码长度:
-          定义 模板字符 等于 字符串获取(源码, 位置)
-          如果 模板字符 等于 分隔符:
-            位置 加上 1
-            跳出
-          否则 如果 模板字符 等于 "\\":
-            位置 加上 1
-            如果 位置 小于 源码长度:
-              定义 转义字符 等于 字符串获取(源码, 位置)
-              如果 转义字符 等于 "n":
-                定义 模板结果 等于 模板结果 加 "\n"
-              否则 如果 转义字符 等于 "t":
-                定义 模板结果 等于 模板结果 加 "\t"
-              否则 如果 转义字符 等于 "{":
-                定义 模板结果 等于 模板结果 加 "{"
-              否则 如果 转义字符 等于 "}":
-                定义 模板结果 等于 模板结果 加 "}"
-              否则:
-                定义 模板结果 等于 模板结果 加 转义字符
-              位置 加上 1
-          否则:
-            定义 模板结果 等于 模板结果 加 模板字符
-            位置 加上 1
-        列表追加(令牌列表, 创建令牌("模板字符串", 模板结果, 行, 列))
-        定义 列 等于 列 加 字符串长度(模板结果) 加 3
-        跳过
     # ── 字符串处理 ──
     如果 字符 等于 "\"" 或 字符 等于 "'":
       定义 字符串结果 等于 ""
@@ -659,9 +614,46 @@
         否则:
           定义 字符串结果 等于 字符串结果 加 字符串字符
           位置 加上 1
-      列表追加(令牌列表, 创建令牌("字符串", 字符串结果, 行, 列))
+      # 检查是否含 {标识符} 模式，若是则转为模板字符串
+      如果 含插值模式(字符串结果):
+        列表追加(令牌列表, 创建令牌("模板字符串", 字符串结果, 行, 列))
+      否则:
+        列表追加(令牌列表, 创建令牌("字符串", 字符串结果, 行, 列))
       定义 列 等于 列 加 字符串长度(字符串结果) 加 2
       跳过
+    # ── f-string 模板字符串处理 ──
+    如果 字符 等于 "f" 且 位置 加 1 小于 源码长度:
+      定义 下一个字符 等于 字符串获取(源码, 位置 加 1)
+      如果 下一个字符 等于 "\"" 或 下一个字符 等于 "'":
+        定义 模板内容 等于 ""
+        定义 分隔符 等于 下一个字符
+        位置 加上 2
+        当 位置 小于 源码长度:
+          定义 字符串字符 等于 字符串获取(源码, 位置)
+          如果 字符串字符 等于 分隔符:
+            位置 加上 1
+            跳出
+          否则 如果 字符串字符 等于 "\\":
+            位置 加上 1
+            如果 位置 小于 源码长度:
+              定义 转义字符 等于 字符串获取(源码, 位置)
+              如果 转义字符 等于 "n":
+                定义 模板内容 等于 模板内容 加 "\n"
+              否则 如果 转义字符 等于 "t":
+                定义 模板内容 等于 模板内容 加 "\t"
+              否则 如果 转义字符 等于 "{":
+                定义 模板内容 等于 模板内容 加 "{"
+              否则 如果 转义字符 等于 "}":
+                定义 模板内容 等于 模板内容 加 "}"
+              否则:
+                定义 模板内容 等于 模板内容 加 转义字符
+              位置 加上 1
+          否则:
+            定义 模板内容 等于 模板内容 加 字符串字符
+            位置 加上 1
+        列表追加(令牌列表, 创建令牌("模板字符串", 模板内容, 行, 列))
+        定义 列 等于 列 加 字符串长度(模板内容) 加 3
+        跳过
     # ── 数字处理 ──
     如果 是数字(字符):
       定义 数字字符串 等于 ""
@@ -712,18 +704,14 @@
   返回 令牌列表
 
 
-# ==================== parser.duan ====================
-
+# ===== parser.duan =====
 # parser.duan - Recursive descent parser for bootstrap compiler
-# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+# Uses v3.2 语法标准: 段落 段名 接收 参数：body
 #
 # Takes token list from lexer, produces AST using ast.duan constructors
 # All identifiers use English to avoid ANTLR keyword conflicts
 
-# [已内联] 导入 《token》。
-# [已内联] 导入 《duan_ast》。
 
-导出 parse
 
 # =============================================================================
 # Token type constants (match lexer output)
@@ -893,8 +881,8 @@
     定义 tok 等于 列表获取(tokens, p)
     定义 ttype 等于 字典获取(tok, "种别")
     定义 tval 等于 字典获取(tok, "值")
-    定义 is_add_op 等于 假
-    定义 op_name 等于 ""
+    定义 is_add_op 为 假
+    定义 op_name 为 ""
     # 关键字形式：加、加上、减、减去
     如果 ttype 等于 "关键字"：
       如果 tval 等于 "加" 或 tval 等于 "加上"：
@@ -928,8 +916,8 @@
     定义 tok 等于 列表获取(tokens, p)
     定义 ttype 等于 字典获取(tok, "种别")
     定义 tval 等于 字典获取(tok, "值")
-    定义 is_mul_op 等于 假
-    定义 op_name 等于 ""
+    定义 is_mul_op 为 假
+    定义 op_name 为 ""
     # 关键字形式：乘、乘以、除、除以、模、幂
     如果 ttype 等于 "关键字"：
       如果 tval 等于 "乘" 或 tval 等于 "乘以"：
@@ -993,7 +981,7 @@
   如果 ttype 等于 "字符串"：
     定义 node 等于 make_string(tval)
     返回 [node, pos 加 1]
-  # Template string literal
+  # Template string (f-string)
   如果 ttype 等于 "模板字符串"：
     定义 node 等于 make_template_string(tval)
     返回 [node, pos 加 1]
@@ -1006,6 +994,33 @@
     返回 [node, pos 加 1]
   # Identifier
   如果 ttype 等于 "标识符"：
+    定义 p 等于 pos 加 1
+    如果 p 小于 列表长度(tokens)：
+      定义 next_t 等于 列表获取(tokens, p)
+      如果 字典获取(next_t, "种别") 等于 "左括号"：
+        定义 name 等于 tval
+        定义 args 等于 列表创建()
+        p 加上 1
+        如果 p 小于 列表长度(tokens)：
+          定义 rp_tok 等于 列表获取(tokens, p)
+          如果 字典获取(rp_tok, "种别") 不等于 "右括号"：
+            当 真：
+              定义 arg_result 等于 parse_expr(tokens, p)
+              定义 arg 等于 列表获取(arg_result, 0)
+              定义 p 等于 列表获取(arg_result, 1)
+              列表追加(args, arg)
+              如果 p 小于 列表长度(tokens)：
+                定义 sep 等于 列表获取(tokens, p)
+                如果 字典获取(sep, "种别") 等于 "逗号"：
+                  p 加上 1
+                  跳过
+              跳出
+        如果 p 小于 列表长度(tokens)：
+          定义 rp 等于 列表获取(tokens, p)
+          如果 字典获取(rp, "种别") 等于 "右括号"：
+            p 加上 1
+        定义 node 等于 make_func_call(name, args)
+        返回 [node, p]
     定义 node 等于 make_identifier(tval)
     返回 [node, pos 加 1]
   # Function call: 《name》(args)
@@ -1033,55 +1048,108 @@
       p 加上 1
     定义 node 等于 make_func_call(name, args)
     返回 [node, p]
-  # List literal: [expr1, expr2, ...]
+  # List or Dict literal: [...] or ["a": 1, ...]
+  # 先 peek 看是否为字典（首元素后紧跟冒号）
   如果 ttype 等于 "左中括号"：
-    定义 elements 等于 列表创建()
+    定义 首元素后位置 等于 pos 加 1
+    定义 是不是字典 等于 假
+    如果 首元素后位置 小于 列表长度(tokens)：
+      定义 peek_t 等于 列表获取(tokens, 首元素后位置)
+      如果 字典获取(peek_t, "种别") 不等于 "右中括号"：
+        # 跳过首元素
+        定义 first_result 等于 parse_expr(tokens, 首元素后位置)
+        定义 after_first 等于 列表获取(first_result, 1)
+        如果 after_first 小于 列表长度(tokens)：
+          定义 next_after 等于 列表获取(tokens, after_first)
+          如果 字典获取(next_after, "种别") 等于 "冒号"：
+            定义 是不是字典 等于 真
+    如果 是不是字典：
+      # 字典字面量：["k1": v1, "k2": v2, ...]
+      定义 pairs 等于 列表创建()
+      定义 p 等于 pos 加 1
+      当 p 小于 列表长度(tokens)：
+        定义 next_t 等于 列表获取(tokens, p)
+        如果 字典获取(next_t, "种别") 等于 "右中括号"：
+          p 加上 1
+          跳出
+        定义 key_result 等于 parse_expr(tokens, p)
+        定义 key_node 等于 列表获取(key_result, 0)
+        定义 p 等于 列表获取(key_result, 1)
+        # 跳过冒号
+        如果 p 小于 列表长度(tokens)：
+          定义 colon_t 等于 列表获取(tokens, p)
+          如果 字典获取(colon_t, "种别") 等于 "冒号"：
+            p 加上 1
+        定义 val_result 等于 parse_expr(tokens, p)
+        定义 val_node 等于 列表获取(val_result, 0)
+        定义 p 等于 列表获取(val_result, 1)
+        定义 pair 等于 列表创建()
+        列表追加(pair, key_node)
+        列表追加(pair, val_node)
+        列表追加(pairs, pair)
+        如果 p 小于 列表长度(tokens)：
+          定义 sep 等于 列表获取(tokens, p)
+          如果 字典获取(sep, "种别") 等于 "逗号"：
+            p 加上 1
+          否则：
+            如果 字典获取(sep, "种别") 等于 "右中括号"：
+              p 加上 1
+            跳出
+      定义 node 等于 make_dict_literal(pairs)
+      返回 [node, p]
+    # 否则是列表字面量
+    定义 elems 等于 列表创建()
     定义 p 等于 pos 加 1
-    定义 rb_tok 等于 列表获取(tokens, p)
-    如果 字典获取(rb_tok, "种别") 不等于 "右中括号"：
-      当 真：
-        定义 elem_result 等于 parse_expr(tokens, p)
-        定义 elem 等于 列表获取(elem_result, 0)
-        定义 p 等于 列表获取(elem_result, 1)
-        列表追加(elements, elem)
+    当 p 小于 列表长度(tokens)：
+      定义 next_t 等于 列表获取(tokens, p)
+      如果 字典获取(next_t, "种别") 等于 "右中括号"：
+        p 加上 1
+        跳出
+      定义 elem_result 等于 parse_expr(tokens, p)
+      列表追加(elems, 列表获取(elem_result, 0))
+      定义 p 等于 列表获取(elem_result, 1)
+      如果 p 小于 列表长度(tokens)：
         定义 sep 等于 列表获取(tokens, p)
         如果 字典获取(sep, "种别") 等于 "逗号"：
           p 加上 1
-          跳过
-        跳出
-    定义 rb 等于 列表获取(tokens, p)
-    如果 字典获取(rb, "种别") 等于 "右中括号"：
-      p 加上 1
-    定义 node 等于 make_list_literal(elements)
+        否则：
+          如果 字典获取(sep, "种别") 等于 "右中括号"：
+            p 加上 1
+          跳出
+    定义 node 等于 make_list_literal(elems)
     返回 [node, p]
   # Dict literal: {key1: val1, key2: val2, ...}
   如果 ttype 等于 "左花括号"：
     定义 pairs 等于 列表创建()
     定义 p 等于 pos 加 1
-    定义 rb_tok 等于 列表获取(tokens, p)
-    如果 字典获取(rb_tok, "种别") 不等于 "右花括号"：
-      当 真：
-        定义 key_result 等于 parse_expr(tokens, p)
-        定义 key 等于 列表获取(key_result, 0)
-        定义 p 等于 列表获取(key_result, 1)
-        定义 colon_tok 等于 列表获取(tokens, p)
-        如果 字典获取(colon_tok, "种别") 等于 "冒号"：
+    当 p 小于 列表长度(tokens)：
+      定义 next_t 等于 列表获取(tokens, p)
+      如果 字典获取(next_t, "种别") 等于 "右花括号"：
+        p 加上 1
+        跳出
+      定义 key_result 等于 parse_expr(tokens, p)
+      定义 key_node 等于 列表获取(key_result, 0)
+      定义 p 等于 列表获取(key_result, 1)
+      # Skip colon
+      如果 p 小于 列表长度(tokens)：
+        定义 colon_t 等于 列表获取(tokens, p)
+        如果 字典获取(colon_t, "种别") 等于 "冒号"：
           p 加上 1
-        定义 val_result 等于 parse_expr(tokens, p)
-        定义 val 等于 列表获取(val_result, 0)
-        定义 p 等于 列表获取(val_result, 1)
-        定义 pair 等于 列表创建()
-        列表追加(pair, key)
-        列表追加(pair, val)
-        列表追加(pairs, pair)
+      定义 val_result 等于 parse_expr(tokens, p)
+      定义 val_node 等于 列表获取(val_result, 0)
+      定义 p 等于 列表获取(val_result, 1)
+      定义 pair 等于 列表创建()
+      列表追加(pair, key_node)
+      列表追加(pair, val_node)
+      列表追加(pairs, pair)
+      如果 p 小于 列表长度(tokens)：
         定义 sep 等于 列表获取(tokens, p)
         如果 字典获取(sep, "种别") 等于 "逗号"：
           p 加上 1
-          跳过
-        跳出
-    定义 rb 等于 列表获取(tokens, p)
-    如果 字典获取(rb, "种别") 等于 "右花括号"：
-      p 加上 1
+        否则：
+          如果 字典获取(sep, "种别") 等于 "右花括号"：
+            p 加上 1
+          跳出
     定义 node 等于 make_dict_literal(pairs)
     返回 [node, p]
   # Parenthesized expression: (expr)
@@ -1235,8 +1303,8 @@
   定义 elif_branches 等于 列表创建()
   当 p 小于 列表长度(tokens)：
     定义 elif_tok 等于 列表获取(tokens, p)
-    定义 is_elif 等于 假
-    定义 elif_p 等于 p
+    定义 is_elif 为 假
+    定义 elif_p 为 p
     # 检查 "否则若" 形式
     如果 字典获取(elif_tok, "种别") 等于 "关键字" 且 字典获取(elif_tok, "值") 等于 "否则若"：
       定义 is_elif 等于 真
@@ -1328,20 +1396,25 @@
         如果 pt_type 等于 "标识符"：
           定义 param_name 等于 字典获取(pt, "值")
           p 加上 1
-          定义 default_expr 等于 空
-          # Check for default value: = or 等于
+          # Check for default value: = expr
+          定义 default_val 等于 空
           如果 p 小于 列表长度(tokens)：
             定义 eq_tok 等于 列表获取(tokens, p)
             定义 eq_type 等于 字典获取(eq_tok, "种别")
             定义 eq_val 等于 字典获取(eq_tok, "值")
-            如果 eq_type 等于 "赋值" 或 (eq_type 等于 "关键字" 且 eq_val 等于 "等于")：
+            定义 has_default 为 假
+            如果 eq_type 等于 "赋值" 且 eq_val 等于 "="：
+              定义 has_default 等于 真
+            否则 如果 eq_type 等于 "关键字" 且 eq_val 等于 "等于"：
+              定义 has_default 等于 真
+            如果 has_default：
               p 加上 1
               定义 default_result 等于 parse_expr(tokens, p)
-              定义 default_expr 等于 列表获取(default_result, 0)
+              定义 default_val 等于 列表获取(default_result, 0)
               定义 p 等于 列表获取(default_result, 1)
           定义 param_pair 等于 列表创建()
           列表追加(param_pair, param_name)
-          列表追加(param_pair, default_expr)
+          列表追加(param_pair, default_val)
           列表追加(params, param_pair)
         否则：
           跳出
@@ -1392,7 +1465,7 @@
   如果 ttype 等于 "句号"：
     返回 parse_stmt(tokens, pos 加 1)
   # Paragraph definition: 段 name ... or 段落 name ...
-  如果 ttype 等于 "关键字" 且 (tval 等于 "段" 或 tval 等于 "段落")：
+  如果 ttype 等于 "关键字" 且 tval 等于 "段落"：
     定义 result 等于 parse_paragraph_def(tokens, pos)
     返回 result
   # Variable declaration: 定义 name 等于 expr。
@@ -1415,9 +1488,35 @@
   如果 ttype 等于 "关键字" 且 tval 等于 "当"：
     定义 result 等于 parse_while(tokens, pos)
     返回 result
-  # Print: 打印 expr。
+  # Print: 打印 expr。 或 打印(arg1, arg2, ...)。
   如果 ttype 等于 "关键字" 且 (tval 等于 "打印" 或 tval 等于 "输出")：
     定义 p 等于 pos 加 1
+    如果 p 小于 列表长度(tokens)：
+      定义 next_tok 等于 列表获取(tokens, p)
+      如果 字典获取(next_tok, "种别") 等于 "左括号"：
+        定义 name 等于 tval
+        定义 args 等于 列表创建()
+        p 加上 1
+        如果 p 小于 列表长度(tokens)：
+          定义 rp_tok 等于 列表获取(tokens, p)
+          如果 字典获取(rp_tok, "种别") 不等于 "右括号"：
+            当 真：
+              定义 arg_result 等于 parse_expr(tokens, p)
+              定义 arg 等于 列表获取(arg_result, 0)
+              定义 p 等于 列表获取(arg_result, 1)
+              列表追加(args, arg)
+              如果 p 小于 列表长度(tokens)：
+                定义 sep 等于 列表获取(tokens, p)
+                如果 字典获取(sep, "种别") 等于 "逗号"：
+                  p 加上 1
+                  跳过
+              跳出
+        如果 p 小于 列表长度(tokens)：
+          定义 rp 等于 列表获取(tokens, p)
+          如果 字典获取(rp, "种别") 等于 "右括号"：
+            p 加上 1
+        定义 node 等于 make_func_call(name, args)
+        返回 [node, p]
     定义 val_result 等于 parse_expr(tokens, p)
     定义 val 等于 列表获取(val_result, 0)
     定义 p 等于 列表获取(val_result, 1)
@@ -1439,6 +1538,36 @@
       如果 nttype 等于 "关键字"：
         如果 ntval 等于 "加上" 或 ntval 等于 "减去" 或 ntval 等于 "乘以" 或 ntval 等于 "除以" 或 ntval 等于 "模以" 或 ntval 等于 "幂以"：
           返回 parse_compound_assign(tokens, pos, ntval)
+        # 隐式变量声明: identifier 等于 expr。
+        如果 ntval 等于 "等于"：
+          定义 var_name 等于 tval
+          定义 p 等于 pos 加 2
+          定义 result 等于 parse_expr(tokens, p)
+          定义 node 等于 make_var_decl(var_name, 列表获取(result, 0))
+          返回 [node, 列表获取(result, 1)]
+    # 无括号函数调用: identifier expr1 expr2 ... 。
+    如果 pos 加 1 小于 列表长度(tokens)：
+      定义 next_tok 等于 列表获取(tokens, pos 加 1)
+      定义 nttype 等于 字典获取(next_tok, "种别")
+      # 如果下一个 token 是表达式起始 token（字符串/数字/标识符/左中括号/左书名号/模板字符串）
+      如果 nttype 等于 "字符串" 或 nttype 等于 "数字" 或 nttype 等于 "标识符" 或 nttype 等于 "左中括号" 或 nttype 等于 "左书名号" 或 nttype 等于 "模板字符串"：
+        定义 name 等于 tval
+        定义 args 等于 列表创建()
+        定义 p 等于 pos 加 1
+        当 真：
+          定义 arg_result 等于 parse_expr(tokens, p)
+          定义 arg 等于 列表获取(arg_result, 0)
+          定义 p 等于 列表获取(arg_result, 1)
+          列表追加(args, arg)
+          # 检查是否还有更多参数（必须也是表达式起始 token）
+          如果 p 小于 列表长度(tokens)：
+            定义 peek_tok 等于 列表获取(tokens, p)
+            定义 pt 等于 字典获取(peek_tok, "种别")
+            如果 pt 等于 "字符串" 或 pt 等于 "数字" 或 pt 等于 "标识符" 或 pt 等于 "左中括号" 或 pt 等于 "左书名号" 或 pt 等于 "模板字符串"：
+              跳过
+          跳出
+        定义 node 等于 make_func_call(name, args)
+        返回 [node, p]
   # Expression statement (function call, etc.)
   定义 result 等于 parse_expr(tokens, pos)
   定义 node 等于 make_expr_stmt(列表获取(result, 0))
@@ -1498,18 +1627,14 @@
   返回 program
 
 
-# ==================== codegen.duan ====================
-
+# ===== codegen.duan =====
 # codegen.duan - Python code generator for bootstrap compiler
-# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+# Uses v3.2 语法标准: 段落 段名 接收 参数：body
 #
 # Takes AST from parser, produces Python source code
 # All identifiers use English to avoid ANTLR keyword conflicts
 
-# [已内联] 导入 《duan_ast》。
-# [已内联] 导入 《token》。
 
-导出 generate, init_generator, get_output
 
 # =============================================================================
 # Generator state
@@ -1593,12 +1718,80 @@
     返回 "_duan_builtin.字典包含键"
   如果 name 等于 "字典键列表"：
     返回 "_duan_builtin.字典键列表"
+  如果 name 等于 "字典值列表" 或 name 等于 "字典值"：
+    返回 "_duan_builtin.字典值列表"
+  如果 name 等于 "字典项列表" 或 name 等于 "字典项"：
+    返回 "_duan_builtin.字典项列表"
+  如果 name 等于 "字典删除"：
+    返回 "_duan_builtin.字典删除"
   如果 name 等于 "字符串长度"：
     返回 "_duan_builtin.字符串长度"
   如果 name 等于 "字符串获取"：
     返回 "_duan_builtin.字符串获取"
   如果 name 等于 "截取"：
     返回 "_duan_builtin.截取"
+  如果 name 等于 "分割字符串" 或 name 等于 "分割"：
+    返回 "_duan_builtin.分割字符串"
+  如果 name 等于 "连接字符串" 或 name 等于 "连接"：
+    返回 "_duan_builtin.连接字符串"
+  如果 name 等于 "替换字符串" 或 name 等于 "替换"：
+    返回 "_duan_builtin.替换字符串"
+  如果 name 等于 "去除空白" 或 name 等于 "去空格"：
+    返回 "_duan_builtin.去除空白"
+  如果 name 等于 "转大写"：
+    返回 "_duan_builtin.转大写"
+  如果 name 等于 "转小写"：
+    返回 "_duan_builtin.转小写"
+  如果 name 等于 "列表排序" 或 name 等于 "排序"：
+    返回 "_duan_builtin.列表排序"
+  如果 name 等于 "列表反转" 或 name 等于 "反转"：
+    返回 "_duan_builtin.列表反转"
+  如果 name 等于 "列表创建" 或 name 等于 "列"：
+    返回 "_duan_builtin.列表创建"
+  如果 name 等于 "是整数"：
+    返回 "_duan_builtin.是整数"
+  如果 name 等于 "是浮点"：
+    返回 "_duan_builtin.是浮点"
+  如果 name 等于 "是字符串"：
+    返回 "_duan_builtin.是字符串"
+  如果 name 等于 "是列表"：
+    返回 "_duan_builtin.是列表"
+  如果 name 等于 "是字典"：
+    返回 "_duan_builtin.是字典"
+  如果 name 等于 "是空"：
+    返回 "_duan_builtin.是空"
+  如果 name 等于 "随机整数"：
+    返回 "_duan_builtin.随机整数"
+  如果 name 等于 "随机浮点"：
+    返回 "_duan_builtin.随机浮点"
+  如果 name 等于 "随机选择"：
+    返回 "_duan_builtin.随机选择"
+  如果 name 等于 "阶乘"：
+    返回 "_duan_builtin.阶乘"
+  如果 name 等于 "平均数"：
+    返回 "_duan_builtin.平均数"
+  如果 name 等于 "求和"：
+    返回 "_duan_builtin.求和"
+  如果 name 等于 "时间戳"：
+    返回 "_duan_builtin.时间戳"
+  如果 name 等于 "格式化时间"：
+    返回 "_duan_builtin.格式化时间"
+  如果 name 等于 "读取文件"：
+    返回 "_duan_builtin.读取文件"
+  如果 name 等于 "写入文件"：
+    返回 "_duan_builtin.写入文件"
+  如果 name 等于 "追加文件"：
+    返回 "_duan_builtin.追加文件"
+  如果 name 等于 "文件存在"：
+    返回 "_duan_builtin.文件存在"
+  如果 name 等于 "目录存在"：
+    返回 "_duan_builtin.目录存在"
+  如果 name 等于 "创建目录"：
+    返回 "_duan_builtin.创建目录"
+  如果 name 等于 "圆周率"：
+    返回 "_duan_builtin.圆周率"
+  如果 name 等于 "自然常数"：
+    返回 "_duan_builtin.自然常数"
   如果 name 等于 "创建令牌"：
     返回 "创建令牌"
   如果 name 等于 "_读文件":
@@ -1618,10 +1811,10 @@
     返回 列表获取(node, 1)
   # String: ["string", value]
   如果 node_type 等于 "string"：
-    定义 引号 等于 "'"
+    定义 引号 为 "'"
     定义 原始值 等于 列表获取(node, 1)
     # 转义字符串中的特殊字符
-    定义 转义值 等于 ""
+    定义 转义值 为 ""
     定义 k 等于 0
     当 k 小于 字符串长度(原始值)：
       定义 ch 等于 字符串获取(原始值, k)
@@ -1637,10 +1830,11 @@
         定义 转义值 等于 转义值 加 ch
       k 加上 1
     返回 引号 加 转义值 加 引号
-  # Template string: ["template_string", value]
+  # Template string (f-string): ["template_string", value]
   如果 node_type 等于 "template_string"：
     定义 原始值 等于 列表获取(node, 1)
-    定义 转义值 等于 ""
+    # 使用双引号包装 f-string，转义双引号和特殊字符
+    定义 转义值 为 ""
     定义 k 等于 0
     当 k 小于 字符串长度(原始值)：
       定义 ch 等于 字符串获取(原始值, k)
@@ -1650,12 +1844,12 @@
         定义 转义值 等于 转义值 加 "\\n"
       否则 如果 ch 等于 "\t"：
         定义 转义值 等于 转义值 加 "\\t"
-      否则 如果 ch 等于 "\""：
-        定义 转义值 等于 转义值 加 "\\\""
+      否则 如果 ch 等于 '"':
+        定义 转义值 等于 转义值 加 '\\"'
       否则：
         定义 转义值 等于 转义值 加 ch
       k 加上 1
-    返回 "f\"" 加 转义值 加 "\""
+    返回 'f"' 加 转义值 加 '"'
   # Boolean: ["boolean", value]
   如果 node_type 等于 "boolean"：
     定义 val 等于 列表获取(node, 1)
@@ -1728,21 +1922,20 @@
     返回 op 加 operand
   # List literal: ["list_literal", elements]
   如果 node_type 等于 "list_literal"：
-    定义 elements 等于 列表获取(node, 1)
-    定义 result 等于 "["
+    定义 elems 等于 列表获取(node, 1)
+    定义 result 为 "["
     定义 i 等于 0
-    当 i 小于 列表长度(elements)：
+    当 i 小于 列表长度(elems)：
       如果 i 大于 0：
         定义 result 等于 result 加 ", "
-      定义 elem_code 等于 gen_expr(state, 列表获取(elements, i))
+      定义 elem_code 等于 gen_expr(state, 列表获取(elems, i))
       定义 result 等于 result 加 elem_code
       i 加上 1
-    定义 result 等于 result 加 "]"
-    返回 result
+    返回 result 加 "]"
   # Dict literal: ["dict_literal", pairs]
   如果 node_type 等于 "dict_literal"：
     定义 pairs 等于 列表获取(node, 1)
-    定义 result 等于 "{"
+    定义 result 为 "{"
     定义 i 等于 0
     当 i 小于 列表长度(pairs)：
       如果 i 大于 0：
@@ -1752,8 +1945,7 @@
       定义 val_code 等于 gen_expr(state, 列表获取(pair, 1))
       定义 result 等于 result 加 key_code 加 ": " 加 val_code
       i 加上 1
-    定义 result 等于 result 加 "}"
-    返回 result
+    返回 result 加 "}"
   # Member access: ["member_access", object, prop]
   如果 node_type 等于 "member_access"：
     定义 obj 等于 gen_expr(state, 列表获取(node, 1))
@@ -1875,6 +2067,11 @@
     定义 val_code 等于 gen_expr(state, value)
     add_line(state, "print(" 加 val_code 加 ")")
     返回
+  # Function call as statement: ["func_call", name, args]
+  如果 node_type 等于 "func_call"：
+    定义 code 等于 gen_expr(state, node)
+    add_line(state, code)
+    返回
   # Break statement: ["break"]
   如果 node_type 等于 "break"：
     add_line(state, "break")
@@ -1884,6 +2081,7 @@
     add_line(state, "continue")
     返回
   # Paragraph (function) definition: ["paragraph_def", name, params, body]
+  # params 是 [name, default_expr] 对的列表，default_expr 为空表示无默认值
   如果 node_type 等于 "paragraph_def"：
     定义 name 等于 列表获取(node, 1)
     定义 params 等于 列表获取(node, 2)
@@ -1894,13 +2092,12 @@
       如果 i 大于 0：
         定义 param_str 等于 param_str 加 ", "
       定义 param_pair 等于 列表获取(params, i)
-      定义 param_name 等于 列表获取(param_pair, 0)
-      定义 default_expr 等于 列表获取(param_pair, 1)
-      如果 default_expr 等于 空：
-        定义 param_str 等于 param_str 加 param_name
-      否则：
-        定义 default_code 等于 gen_expr(state, default_expr)
-        定义 param_str 等于 param_str 加 param_name 加 "=" 加 default_code
+      定义 pname 等于 列表获取(param_pair, 0)
+      定义 pdefault 等于 列表获取(param_pair, 1)
+      定义 param_str 等于 param_str 加 pname
+      如果 pdefault 不等于 空：
+        定义 default_code 等于 gen_expr(state, pdefault)
+        定义 param_str 等于 param_str 加 "=" 加 default_code
       i 加上 1
     add_line(state, "def " 加 name 加 "(" 加 param_str 加 "):")
     indent_push(state)
@@ -1938,8 +2135,8 @@
   add_line(state, "_duan_builtin.列表弹出 = lambda lst: lst.pop()")
   add_line(state, "_duan_builtin.列表包含 = lambda lst, item: item in lst")
   add_line(state, "_duan_builtin.字典创建 = dict")
-  定义 左花 等于 "{"
-  定义 右花 等于 "}"
+  定义 左花 为 "{"
+  定义 右花 为 "}"
   add_line(state, "_duan_builtin.字典设置 = lambda d, k, v: d.update(" + 左花 + "k: v" + 右花 + ")")
   add_line(state, "_duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
   add_line(state, "_duan_builtin.字典包含键 = lambda d, k: k in d")
@@ -1947,6 +2144,39 @@
   add_line(state, "_duan_builtin.字符串长度 = len")
   add_line(state, "_duan_builtin.字符串获取 = lambda s, i: s[i]")
   add_line(state, "_duan_builtin.截取 = lambda s, start, end: s[start:end]")
+  add_line(state, "_duan_builtin.分割字符串 = lambda s, sep=' ': s.split(sep)")
+  add_line(state, "_duan_builtin.连接字符串 = lambda parts, sep='': sep.join(parts)")
+  add_line(state, "_duan_builtin.替换字符串 = lambda s, old, new: s.replace(old, new)")
+  add_line(state, "_duan_builtin.去除空白 = lambda s: s.strip()")
+  add_line(state, "_duan_builtin.转大写 = lambda s: s.upper()")
+  add_line(state, "_duan_builtin.转小写 = lambda s: s.lower()")
+  add_line(state, "_duan_builtin.列表排序 = lambda lst, reverse=False: lst.sort(reverse=reverse)")
+  add_line(state, "_duan_builtin.列表反转 = lambda lst: lst.reverse()")
+  add_line(state, "_duan_builtin.是整数 = lambda x: isinstance(x, int)")
+  add_line(state, "_duan_builtin.是浮点 = lambda x: isinstance(x, float)")
+  add_line(state, "_duan_builtin.是字符串 = lambda x: isinstance(x, str)")
+  add_line(state, "_duan_builtin.是列表 = lambda x: isinstance(x, list)")
+  add_line(state, "_duan_builtin.是字典 = lambda x: isinstance(x, dict)")
+  add_line(state, "_duan_builtin.是空 = lambda x: x is None")
+  add_line(state, "_duan_builtin.字典值列表 = lambda d: list(d.values())")
+  add_line(state, "_duan_builtin.字典项列表 = lambda d: list(d.items())")
+  add_line(state, "_duan_builtin.字典删除 = lambda d, k: d.pop(k, None)")
+  add_line(state, "_duan_builtin.随机整数 = lambda a, b: __import__('random').randint(a, b)")
+  add_line(state, "_duan_builtin.随机浮点 = lambda: __import__('random').random()")
+  add_line(state, "_duan_builtin.随机选择 = lambda lst: __import__('random').choice(lst)")
+  add_line(state, "_duan_builtin.阶乘 = lambda n: __import__('math').factorial(n)")
+  add_line(state, "_duan_builtin.平均数 = lambda data: sum(data) / len(data) if data else 0")
+  add_line(state, "_duan_builtin.求和 = lambda data: sum(data)")
+  add_line(state, "_duan_builtin.时间戳 = lambda: __import__('time').time()")
+  add_line(state, "_duan_builtin.格式化时间 = lambda ts, fmt='%Y-%m-%d %H:%M:%S': __import__('time').strftime(fmt, __import__('time').localtime(ts))")
+  add_line(state, "_duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
+  add_line(state, "_duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content)")
+  add_line(state, "_duan_builtin.追加文件 = lambda path, content: open(path, 'a', encoding='utf-8').write(content)")
+  add_line(state, "_duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
+  add_line(state, "_duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
+  add_line(state, "_duan_builtin.创建目录 = lambda path: __import__('os').makedirs(path, exist_ok=True)")
+  add_line(state, "_duan_builtin.圆周率 = lambda: __import__('math').pi")
+  add_line(state, "_duan_builtin.自然常数 = lambda: __import__('math').e")
   add_line(state, "_duan_builtin._读文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
   add_line(state, "")
   # 全局绑定：在模块级别设置内建函数别名（在所有函数定义之前）
@@ -1992,19 +2222,13 @@
   返回 header_result 加 "\n" 加 stmts_result
 
 
-# ==================== compiler.duan ====================
-
+# ===== compiler.duan =====
 # compiler.duan - Bootstrap compiler main entry point
-# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+# v3.2 语法标准
 #
 # Orchestrates lexer -> parser -> codegen pipeline
-# All identifiers use English to avoid ANTLR keyword conflicts
 
-# [已内联] 导入 《lexer》。
-# [已内联] 导入 《parser》。
-# [已内联] 导入 《codegen》。
 
-导出 compile_source, compile_file
 
 # =============================================================================
 # Compilation pipeline
@@ -2023,20 +2247,14 @@
   返回 compile_source(content)
 
 
-# ==================== main.duan ====================
-
+# ===== main.duan =====
 # main.duan - Bootstrap compiler CLI entry point
-# Uses ANTLR规范语法: 段落 段名 接收 参数：body结束。
+# v3.2 语法标准
 #
 # Entry point for the bootstrap compiler.
-# Can be invoked from run_compiler.py or directly from ANTLR interpreter.
-#
-# Usage (via run_compiler.py):
-#   python run_compiler.py <source.duan> [output.py]
+# Can be invoked from run_compiler.py or directly from interpreter.
 
-# [已内联] 导入 《compiler》。
 
-导出 main
 
 # main: invoked from Python wrapper (run_compiler.py)
 # Takes a filepath and optionally an output path

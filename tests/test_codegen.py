@@ -67,7 +67,7 @@ class TestExpressionGeneration:
 
     def test_comparison_expression(self, parser, generator):
         """测试比较表达式生成"""
-        module = parser.parse('如果 甲 大于 乙 那么 打印(甲)。')
+        module = parser.parse('如果 甲 大于 乙 那么：打印(甲)。')
         python_code = generator.generate(module)
         assert 'if' in python_code
         assert '>' in python_code or 'gt' in python_code.lower()
@@ -86,14 +86,14 @@ class TestConditionalGeneration:
 
     def test_simple_if(self, parser, generator):
         """测试简单if生成"""
-        module = parser.parse('如果 甲 大于 乙 那么 打印(甲)。')
+        module = parser.parse('如果 甲 大于 乙 那么：打印(甲)。')
         python_code = generator.generate(module)
         assert 'if' in python_code
         assert 'print' in python_code
 
     def test_if_else(self, parser, generator):
         """测试if-else生成"""
-        module = parser.parse('如果 甲 大于 乙 那么 打印(甲)。否则 打印(乙)。')
+        module = parser.parse('如果 甲 大于 乙 那么：打印(甲)。否则：打印(乙)。')
         python_code = generator.generate(module)
         assert 'if' in python_code
         assert 'else' in python_code

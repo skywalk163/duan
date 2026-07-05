@@ -640,6 +640,16 @@ class Lexer:
                         chars.append('\\')
                     elif next_ch == quote_char:
                         chars.append(quote_char)
+                    elif next_ch == 'x' and j + 3 < len(source):
+                        hex_str = source[j+2:j+4]
+                        try:
+                            chars.append(chr(int(hex_str, 16)))
+                            j += 4
+                            continue
+                        except ValueError:
+                            chars.append(next_ch)
+                    elif next_ch == '0':
+                        chars.append('\0')
                     else:
                         chars.append(next_ch)
                     j += 2
@@ -953,6 +963,13 @@ class Lexer:
                     _tokens_append(_Token(_TokenType.KEYWORD, keyword, line, current_col))
                     consumed += length
                     current_col += length
+                    # 更新 full_identifier 为剩余部分
+                    full_identifier = full_identifier[length:]
+                    # 如果还有剩余内容，进入下一个循环迭代处理
+                    if full_identifier:
+                        continue
+                    # 没有剩余内容，结束本次迭代
+                    break
             
             if not keyword:
                 # 未匹配到关键字（或单字动词被跳过），检查是否内嵌有关键字
@@ -963,8 +980,31 @@ class Lexer:
                 while scan_pos < len(full_identifier):
                     sub_kw, sub_len = self._match_keyword(source, i + consumed + scan_pos)
                     if sub_kw and sub_kw not in user_definitions:
-                        # 单字关键字 或 OPERATOR_VERBS 中的多字关键字都可能是内嵌的
-                        if sub_len == 1 or sub_kw in OPERATOR_VERBS:
+                        # 检查是否应该跳过这个关键字
+                        skip_kw = False
+                        if sub_len == 1 and sub_kw in OPERATOR_VERBS:
+                            # 单字运算符动词：检查后面是否是括号（可能是函数名的一部分，如"阶乘"）
+                            next_pos = i + consumed + scan_pos + sub_len
+                            if next_pos < len(source):
+                                next_char = source[next_pos]
+                                if next_char == '(':
+                                    # 后面跟着括号，作为复合词的一部分（如"阶乘"）
+                                    skip_kw = True
+                            # 否则作为运算符识别（不跳过）
+                            # 例如：甲加乙 -> [甲] [加] [乙]
+                        elif sub_len == 1 and sub_kw == '当':
+                            # "当"关键字：检查后面是否是冒号或空格
+                            next_pos = i + consumed + scan_pos + sub_len
+                            if next_pos < len(source):
+                                next_char = source[next_pos]
+                                if next_char != ':' and not next_char.isspace():
+                                    skip_kw = True
+                        elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
+                            # 单字 compound_safe 关键字：直接跳过
+                            skip_kw = True
+                        
+                        if not skip_kw:
+                            # 不是需要跳过的关键字，标记为内嵌关键字
                             embedded_found = True
                             break
                     scan_pos += 1
@@ -994,18 +1034,25 @@ class Lexer:
                             elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
                                 # 单字 compound_safe 关键字（非"当"）
                                 if sub_kw in OPERATOR_VERBS:
-                                    # 运算符动词：检查后面是否是普通汉字（不是数字或符号）
-                                    next_pos = abs_pos + sub_len
-                                    if next_pos < len(source):
-                                        next_char = source[next_pos]
-                                        # 如果后面是普通汉字，作为复合词一部分，跳过
-                                        if self._is_han(next_char) and next_char not in self.SIMPLE_CHINESE_NUMBERS:
-                                            scan_pos += sub_len
-                                            continue
-                                    # 否则作为运算符识别，不跳过
+                                    # 运算符动词：总是识别为关键字（不跳过）
+                                    # 例如：甲加乙 -> [甲] [加] [乙]
+                                    pass
                                 else:
                                     scan_pos += sub_len
                                     continue
+                            elif sub_len == 1 and sub_kw in OPERATOR_VERBS:
+                                # 单字运算符动词（不在 compound_safe 中）
+                                # 检查后面是否是括号（可能是函数名的一部分，如"阶乘"）
+                                next_pos = abs_pos + sub_len
+                                if next_pos < len(source):
+                                    next_char = source[next_pos]
+                                    if next_char == '(':
+                                        # 后面跟着括号，作为复合词的一部分（如"阶乘"）
+                                        scan_pos += sub_len
+                                        continue
+                                # 否则作为运算符识别（不跳过）
+                                # 例如：甲加乙 -> [甲] [加] [乙]
+                                pass
                             elif sub_len > 1 and sub_kw in OPERATOR_VERBS:
                                 # 多字运算符动词（大于、小于、等于等）
                                 # 检查前后是否都是普通汉字（组成复合词的情况）
@@ -1016,6 +1063,9 @@ class Lexer:
                                 # 如果前后都是普通汉字，可能是复合词的一部分，跳过
                                 # 但常见比较运算符（大于、小于、等于）在表达式中很常见，应该优先识别为运算符
                                 # 策略：多字比较运算符总是作为关键字识别
+                                pass  # 不跳过，继续输出为关键字
+                            elif sub_len > 1:
+                                # 其他多字关键字（如接收、段落等），直接输出
                                 pass  # 不跳过，继续输出为关键字
                             # 输出关键字前的标识符部分
                             if scan_pos > 0:
@@ -1033,8 +1083,25 @@ class Lexer:
                                 sub_kw, sub_len = self._match_keyword(source, abs_pos)
                                 if not (sub_kw and sub_kw not in user_definitions):
                                     break
-                                # 单字 compound_safe 关键字才需要跳过，多字运算符关键字直接输出
-                                if sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
+                                # 重新匹配后，再次检查是否需要跳过
+                                skip_after_rematch = False
+                                if sub_len == 1 and sub_kw == '当':
+                                    next_pos = abs_pos + sub_len
+                                    if next_pos < len(source):
+                                        next_char = source[next_pos]
+                                        if next_char != ':' and not next_char.isspace():
+                                            skip_after_rematch = True
+                                elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
+                                    skip_after_rematch = True
+                                elif sub_len == 1 and sub_kw in OPERATOR_VERBS:
+                                    # 单字运算符动词：检查后面是否是括号（可能是函数名的一部分，如"阶乘"）
+                                    next_pos = abs_pos + sub_len
+                                    if next_pos < len(source):
+                                        next_char = source[next_pos]
+                                        if next_char == '(':
+                                            # 后面跟着括号，作为复合词的一部分（如"阶乘"）
+                                            skip_after_rematch = True
+                                if skip_after_rematch:
                                     scan_pos += sub_len
                                     continue
                             # 输出关键字
@@ -1218,15 +1285,19 @@ class Lexer:
                 # 跳过空白
                 while j < n and _is_space_tab(source[j]):
                     j += 1
-                # 收集标识符（设 甲 为 值）
+                # 收集标识符（设 甲 为/等于 值）
                 k = j
                 collected_something = False
                 while k < n and _is_han(source[k]):
-                    # 只检查是否遇到"为"关键字（跳过空格），动词在开头时可跳过
+                    # 只检查是否遇到"为"或"等于"关键字（跳过空格），动词在开头时可跳过
                     lookahead = k
                     while lookahead < n and _is_space_tab(source[lookahead]):
                         lookahead += 1
                     if lookahead < n and source[lookahead] == '为':
+                        break
+                    # 检查"等于"关键字
+                    next_kw_lookahead, _ = self._match_keyword(source, k)
+                    if next_kw_lookahead == '等于':
                         break
                     # 在开头遇到动词（如"设阶乘结果为五"），跳过
                     next_kw, length = self._match_keyword(source, k)

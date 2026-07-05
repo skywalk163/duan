@@ -77,14 +77,14 @@ class TestEndToEndConditionals:
 
     def test_simple_if(self, compile_pipeline):
         """测试简单条件"""
-        duan_code = '如果 甲 大于 乙 那么 打印(甲)。'
+        duan_code = '如果 甲 大于 乙 那么：打印(甲)。'
         python_code = compile_pipeline(duan_code)
         assert python_code is not None
         assert 'if' in python_code
 
     def test_if_else(self, compile_pipeline):
         """测试条件分支"""
-        duan_code = '如果 甲 大于 乙 那么 打印(甲)。否则 打印(乙)。'
+        duan_code = '如果 甲 大于 乙 那么：打印(甲)。否则：打印(乙)。'
         python_code = compile_pipeline(duan_code)
         assert python_code is not None
         assert 'if' in python_code

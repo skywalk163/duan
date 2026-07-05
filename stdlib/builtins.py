@@ -44,6 +44,12 @@ def 读取文件(path: str, encoding: str = 'utf-8') -> str:
         raise RuntimeError(f"读取文件失败 '{path}': {e}")
 
 
+def _读文件(path: str) -> str:
+    """内部用：读取文件内容（简化版）"""
+    with open(path, 'r', encoding='utf-8') as f:
+        return f.read()
+
+
 def 写入文件(path: str, content: str, encoding: str = 'utf-8') -> None:
     """
     写入文件内容
@@ -419,6 +425,16 @@ def 替换字符串(text: str, old: str, new: str) -> str:
 def 去除空白(text: str) -> str:
     """去除首尾空白"""
     return text.strip()
+
+
+def 转大写(text: str) -> str:
+    """转换为大写"""
+    return text.upper()
+
+
+def 转小写(text: str) -> str:
+    """转换为小写"""
+    return text.lower()
 
 
 # =============================================================================

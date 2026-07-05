@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "duan"
-version = "1.7.0"
+version = "1.9.0"
 description = "段言（Duan）— 中文自然语言编程语言"
 readme = "README.md"
 license = {text = "MIT"}
@@ -30,6 +30,9 @@ requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
+antlr = [
+    "antlr4-python3-runtime>=4.13.0",
+]
 dev = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
@@ -61,12 +64,12 @@ duan = "cli.duan:main"
 duanc = "cli.duanc:main"
 
 [tool.setuptools.packages.find]
-include = ["src*", "cli*", "stdlib*"]
+include = ["src*", "cli*", "stdlib*", "antlrparser*"]
 exclude = [
     "tests*", "benchmarks*", "examples*", "project*", "bootstrap*",
     "docs*", "tools*", "lsp*", "debug-adapter*", "vscode-extension*", "scripts*",
     "**/test*", "**/*_test*", "**/self_hosted*", "**/duan_parser*", "**/duan_parser2*", "**/duan_parser_new*",
-    "**/antlrparser*", "**/web_playground*", "**/*_debug*", "**/ir.py", "**/codegen_x64.py", "**/linker.py"
+    "**/web_playground*", "**/*_debug*", "**/ir.py", "**/codegen_x64.py", "**/linker.py"
 ]
 
 [tool.setuptools.package-data]
