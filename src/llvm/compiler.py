@@ -153,7 +153,7 @@ def compile_source_to_ir(source: str, output_ll: str = None, verbose: bool = Fal
     return output_ll
 
 
-def compile_duan(source_path: str, output_path: str = None, verbose: bool = False):
+def compile_duan(source_path: str, output_path: str = None, verbose: bool = False, optimize_level: int = 2, debug: bool = False):
     """
     编译 .duan 文件为原生可执行文件
 
@@ -161,6 +161,8 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
         source_path: .duan 源文件路径
         output_path: 输出 .exe 路径（默认与源文件同名）
         verbose: 是否输出详细信息
+        optimize_level: 优化级别（0-3），默认 2
+        debug: 是否生成调试信息，默认 False
     """
     # 读取源码
     with open(source_path, 'r', encoding='utf-8') as f:
@@ -194,11 +196,14 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
     runtime_c = os.path.join(runtime_dir, 'runtime.c')
     runtime_o = base_path + '_runtime.o'
 
+    opt_flag = f'-O{optimize_level}'
+    debug_flags = ['-g'] if debug else []
+
     if verbose:
         print("[3/6] 编译运行时库...")
 
     result = subprocess.run(
-        [clang, '-c', '-O2', runtime_c, '-o', runtime_o],
+        [clang, '-c', opt_flag, *debug_flags, runtime_c, '-o', runtime_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -210,7 +215,7 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
 
     ir_o = base_path + '.o'
     result = subprocess.run(
-        [clang, '-c', '-O2', ll_path, '-o', ir_o],
+        [clang, '-c', opt_flag, *debug_flags, ll_path, '-o', ir_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -222,6 +227,8 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
         print(f"[5/6] 链接为 .exe...")
 
     link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+    if debug:
+        link_args.append('-g')
     if not sys.platform.startswith('win'):
         link_args.append('-lm')
 
@@ -250,7 +257,7 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
     return exe_path
 
 
-def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None):
+def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None, optimize_level: int = 2, debug: bool = False):
     """
     编译 .duan 文件为原生可执行文件（typed 模式）
 
@@ -261,6 +268,8 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
         output_path: 输出可执行文件路径（默认与源文件同名）
         verbose: 是否输出详细信息
         target_platform: 目标平台（win32/linux/darwin），默认自动检测
+        optimize_level: 优化级别（0-3），默认 2
+        debug: 是否生成调试信息，默认 False
     """
     with open(source_path, 'r', encoding='utf-8') as f:
         source = f.read()
@@ -284,16 +293,22 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     if verbose:
         print(f"  使用编译器: {clang}")
 
+    # IR 验证：用 clang 解析 .ll 文件检查语法和结构正确性
+    verify_ir_with_clang(ll_path, clang, verbose)
+
     # 编译 typed 运行时库
     runtime_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
     runtime_c = os.path.join(runtime_dir, 'runtime_typed.c')
     runtime_o = base_path + '_runtime.o'
 
+    opt_flag = f'-O{optimize_level}'
+    debug_flags = ['-g'] if debug else []
+
     if verbose:
-        print("[2/5] 编译 typed 运行时库...")
+        print("[3/6] 编译 typed 运行时库...")
 
     result = subprocess.run(
-        [clang, '-c', '-O2', runtime_c, '-o', runtime_o],
+        [clang, '-c', opt_flag, *debug_flags, runtime_c, '-o', runtime_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -301,11 +316,11 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
 
     # 编译 .ll 为 .o
     if verbose:
-        print("[3/5] 编译 LLVM IR...")
+        print("[4/6] 编译 LLVM IR...")
 
     ir_o = base_path + '.o'
     result = subprocess.run(
-        [clang, '-c', '-O2', ll_path, '-o', ir_o],
+        [clang, '-c', opt_flag, *debug_flags, ll_path, '-o', ir_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -315,9 +330,11 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     exe_ext = get_exe_extension()
     exe_path = base_path + exe_ext
     if verbose:
-        print(f"[4/5] 链接为可执行文件...")
+        print(f"[5/6] 链接为可执行文件...")
 
     link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+    if debug:
+        link_args.append('-g')
     if not sys.platform.startswith('win'):
         link_args.append('-lm')
 
@@ -329,7 +346,7 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
         raise RuntimeError(f"链接失败:\n{result.stderr}")
 
     if verbose:
-        print(f"[5/5] 清理临时文件...")
+        print(f"[6/6] 清理临时文件...")
 
     for f in [ir_o, runtime_o]:
         try:
@@ -343,6 +360,42 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
         print(f"编译成功: {source_path} -> {exe_path} ({size} 字节)")
 
     return exe_path
+
+
+def verify_ir_with_clang(ll_path: str, clang_path: str = None, verbose: bool = False) -> bool:
+    """使用 clang 验证 LLVM IR 文件的语法和结构正确性
+
+    通过 `clang -c -x ir file.ll -o NUL` 让 clang 解析 .ll 文件，
+    如果 IR 有语法错误或结构问题（如基本块未终止、类型不匹配等），
+    clang 会返回非零退出码并输出错误信息。
+
+    Args:
+        ll_path: .ll 文件路径
+        clang_path: clang 可执行文件路径（默认自动查找）
+        verbose: 是否输出详细信息
+
+    Returns:
+        True 表示验证通过
+
+    Raises:
+        RuntimeError: IR 验证失败时抛出，包含 clang 的错误信息
+    """
+    if clang_path is None:
+        clang_path = find_clang()
+
+    if verbose:
+        print("  验证 LLVM IR (clang -x ir)...")
+
+    result = subprocess.run(
+        [clang_path, '-c', '-x', 'ir', ll_path, '-o', os.devnull],
+        capture_output=True, text=True, encoding='utf-8', errors='replace'
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"LLVM IR 验证失败（clang -x ir）:\n{result.stderr}")
+
+    if verbose:
+        print("  IR 验证通过")
+    return True
 
 
 def find_clang():
@@ -489,10 +542,18 @@ def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool 
     # 生成 main 函数（主模块的顶层语句）
     codegen._gen_typed_main()
 
-    return codegen.finalize()
+    ir = codegen.finalize()
+
+    # IR 生成阶段验证
+    errors = codegen._verify_module_ir(codegen._lines)
+    if errors:
+        error_msg = '\n'.join(f"  - {e}" for e in errors)
+        raise RuntimeError(f"LLVM IR 验证失败，发现 {len(errors)} 个问题:\n{error_msg}")
+
+    return ir
 
 
-def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None):
+def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None, optimize_level: int = 2, debug: bool = False):
     """
     编译段言项目为原生可执行文件（支持多模块）
 
@@ -503,6 +564,8 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
         output_path: 输出路径
         verbose: 是否输出详细信息
         target_platform: 目标平台
+        optimize_level: 优化级别（0-3），默认 2
+        debug: 是否生成调试信息，默认 False
     """
     try:
         from ..module_resolver import ModuleResolver
@@ -565,16 +628,22 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     if verbose:
         print(f"  使用编译器: {clang}")
 
+    # IR 验证
+    verify_ir_with_clang(ll_path, clang, verbose)
+
     # 编译 typed 运行时库
     runtime_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
     runtime_c = os.path.join(runtime_dir, 'runtime_typed.c')
     runtime_o = base_path + '_runtime.o'
 
+    opt_flag = f'-O{optimize_level}'
+    debug_flags = ['-g'] if debug else []
+
     if verbose:
-        print("[2/4] 编译 typed 运行时库...")
+        print("[3/5] 编译 typed 运行时库...")
 
     result = subprocess.run(
-        [clang, '-c', '-O2', runtime_c, '-o', runtime_o],
+        [clang, '-c', opt_flag, *debug_flags, runtime_c, '-o', runtime_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -582,11 +651,11 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
 
     # 编译 .ll 为 .o
     if verbose:
-        print("[3/4] 编译 LLVM IR...")
+        print("[4/5] 编译 LLVM IR...")
 
     ir_o = base_path + '.o'
     result = subprocess.run(
-        [clang, '-c', '-O2', ll_path, '-o', ir_o],
+        [clang, '-c', opt_flag, *debug_flags, ll_path, '-o', ir_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -596,9 +665,11 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     exe_ext = get_exe_extension()
     exe_path = base_path + exe_ext
     if verbose:
-        print(f"[4/4] 链接为可执行文件...")
+        print(f"[5/5] 链接为可执行文件...")
 
     link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+    if debug:
+        link_args.append('-g')
     if not sys.platform.startswith('win'):
         link_args.append('-lm')
 

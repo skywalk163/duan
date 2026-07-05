@@ -40,10 +40,21 @@ class LLVMCodeGenCore:
         if s not in self._strings:
             self._str_counter += 1
             name = f'@.str.{self._str_counter}'
-            byte_len = len(s.encode('utf-8')) + 1  # 含 null 终止符
+            utf8_bytes = s.encode('utf-8')
+            byte_len = len(utf8_bytes) + 1
             self._strings[s] = (name, byte_len)
-            # 转义特殊字符
-            escaped = s.replace('\\', '\\5C').replace('"', '\\22').replace('\n', '\\0A').replace('\r', '\\0D').replace('\t', '\\09')
+            # 转义每个字节为 LLVM IR 格式
+            parts = []
+            for b in utf8_bytes:
+                if b == 0x5C:  # backslash
+                    parts.append('\\5C')
+                elif b == 0x22:  # double quote
+                    parts.append('\\22')
+                elif 0x20 <= b <= 0x7E:  # printable ASCII
+                    parts.append(chr(b))
+                else:
+                    parts.append(f'\\{b:02X}')
+            escaped = ''.join(parts)
             self._string_decls.append(f'{name} = private unnamed_addr constant [{byte_len} x i8] c"{escaped}\\00"')
         return self._strings[s]
 

@@ -82,7 +82,7 @@ class TestExpressions:
     
     def test_comparison_expression(self, parser):
         """测试比较表达式"""
-        module = parser.parse('如果甲大于乙那么打印甲。')
+        module = parser.parse('如果甲大于乙：打印甲。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -98,7 +98,7 @@ class TestConditionals:
     
     def test_simple_if(self, parser):
         """测试简单if语句"""
-        module = parser.parse('如果甲大于十那么打印甲。')
+        module = parser.parse('如果甲大于十：打印甲。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -107,7 +107,7 @@ class TestConditionals:
     
     def test_if_else(self, parser):
         """测试if-else语句"""
-        module = parser.parse('如果甲大于乙那么打印甲。否则打印乙。')
+        module = parser.parse('如果甲大于乙：打印甲。否则：打印乙。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -154,7 +154,7 @@ class TestFunctionDefinition:
     
     def test_simple_function(self, parser):
         """测试简单函数定义"""
-        module = parser.parse('《计算》段：返回甲加乙。')
+        module = parser.parse('段落 计算：返回甲加乙。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -163,7 +163,7 @@ class TestFunctionDefinition:
     
     def test_function_with_params(self, parser):
         """测试带参数的函数定义"""
-        module = parser.parse('《计算》段(甲, 乙)：返回甲加乙。')
+        module = parser.parse('段落 计算 接收 甲 乙：返回甲加乙。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -172,7 +172,7 @@ class TestFunctionDefinition:
     
     def test_function_with_body(self, parser):
         """测试带函数体的函数定义"""
-        code = '''《计算》段(甲, 乙)：
+        code = '''段落 计算 接收 甲, 乙：
   定义结果等于甲加乙。
   返回结果。'''
         
@@ -215,13 +215,13 @@ class TestFunctionCall:
     
     def test_simple_call(self, parser):
         """测试简单函数调用"""
-        module = parser.parse('定义结果等于《计算》(甲，乙)。')
+        module = parser.parse('定义结果等于段落计算(甲，乙)。')
         
         assert len(module.statements) >= 1
     
     def test_call_in_expression(self, parser):
         """测试表达式中的函数调用"""
-        module = parser.parse('定义结果等于《计算》(甲，乙)。')
+        module = parser.parse('定义结果等于段落计算(甲，乙)。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -237,11 +237,11 @@ class TestComplexPrograms:
     
     def test_factorial(self, parser):
         """测试阶乘程序"""
-        code = '''《阶乘》段(数)：
-  如果数小于等于1那么返回1。
-  返回数乘《阶乘》(数减1)。
+        code = '''段落 阶乘 接收 数：
+  如果数小于等于1：返回1。
+  返回数乘段落阶乘(数减1)。
 
-定义结果等于《阶乘》(5)。
+定义结果等于段落阶乘(5)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -250,11 +250,11 @@ class TestComplexPrograms:
     
     def test_fibonacci(self, parser):
         """测试斐波那契程序"""
-        code = '''《斐波那契》段(数)：
-  如果数小于等于2那么返回1。
-  返回《斐波那契》(数减1)加《斐波那契》(数减2)。
+        code = '''段落 斐波那契 接收 数：
+  如果数小于等于2：返回1。
+  返回段落斐波那契(数减1)加段落斐波那契(数减2)。
 
-定义结果等于《斐波那契》(10)。
+定义结果等于段落斐波那契(10)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -306,7 +306,7 @@ class TestNoSpaceCode:
     
     def test_no_space_condition(self, parser):
         """测试无空格条件语句"""
-        module = parser.parse('如果甲大于乙那么打印甲。')
+        module = parser.parse('如果甲大于乙：打印甲。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]

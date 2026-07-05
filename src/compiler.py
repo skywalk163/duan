@@ -265,12 +265,30 @@ class AstAdapter:
         )
 
     def _convert_if_stmt(self, node) -> ast.IfStatement:
+        # 处理 elif 链：else_body 可能是一个 IfStmt 对象
+        elseif_conditions = []
+        elseif_bodies = []
+        else_body = None
+        
+        current_else = node.else_body
+        while current_else is not None:
+            # 检查是不是 IfStmt（elif 链）
+            if type(current_else).__name__ == 'IfStmt':
+                # 这是一个 elif 分支
+                elseif_conditions.append(self.convert(current_else.condition))
+                elseif_bodies.append(self._to_list_stmts(current_else.then_body))
+                current_else = current_else.else_body
+            else:
+                # 这是最终的 else 体（语句列表）
+                else_body = self._to_list_stmts(current_else)
+                break
+        
         return ast.IfStatement(
             condition=self.convert(node.condition),
             then_body=self._to_list_stmts(node.then_body),
-            else_body=self._to_list_stmts(node.else_body) if node.else_body else None,
-            elseif_conditions=[],
-            elseif_bodies=[],
+            else_body=else_body,
+            elseif_conditions=elseif_conditions,
+            elseif_bodies=elseif_bodies,
         )
 
     def _convert_foreach_stmt(self, node) -> ast.ForeachStatement:

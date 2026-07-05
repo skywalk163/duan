@@ -169,7 +169,8 @@ class LLVMCodeGen(LLVMCodeGenCore):
         for stmt in body:
             self._gen_statement(stmt)
 
-        self.emit('ret i8* null')
+        if not self._ends_with_terminator(body):
+            self.emit('ret i8* null')
         self.emit('}')
         self.emit_blank()
 
@@ -413,7 +414,8 @@ class LLVMCodeGen(LLVMCodeGenCore):
         self.emit(f'{body_label}:')
         for s in stmt.body:
             self._gen_statement(s)
-        self.emit(f'br label %{cond_label}')
+        if not self._ends_with_terminator(stmt.body):
+            self.emit(f'br label %{cond_label}')
 
         self.emit(f'{end_label}:')
         self._loop_break_labels.pop()
