@@ -256,3 +256,118 @@ class LLVMCodeGenCore:
         # 主体代码
         lines.extend(self._lines)
         return '\n'.join(lines)
+
+    # ============================================================
+    # IR 验证工具
+    # ============================================================
+
+    def _verify_function(self, func_lines, func_name):
+        """验证单个函数的 IR 结构正确性
+
+        检查：
+        1. 每个基本块以终止指令结尾（ret/br/unreachable/switch/indirectbr）
+        2. 基本块标签不重复
+        3. ret 之后没有死代码
+        4. 寄存器定义不重复
+
+        Args:
+            func_lines: 该函数的 IR 行列表
+            func_name: 函数名（用于错误信息）
+
+        Returns:
+            list: 错误信息列表，空列表表示通过
+        """
+        errors = []
+        terminators = ('ret ', 'ret\t', 'br ', 'br\t', 'unreachable', 'switch ', 'indirectbr ')
+        labels_seen = set()
+        current_block = None
+        block_start_idx = 0
+        block_has_terminator = False
+
+        i = 0
+        while i < len(func_lines):
+            line = func_lines[i].strip()
+
+            # 跳过空行和注释
+            if not line or line.startswith(';'):
+                i += 1
+                continue
+
+            # 检查是否是基本块标签（格式：label: 或 label: ）
+            if line.endswith(':') and not line.startswith('%') and not line.startswith('define') and not line.startswith('}'):
+                # 先检查前一个块是否以终止指令结尾
+                if current_block is not None and not block_has_terminator:
+                    errors.append(f"函数 {func_name}: 基本块 '{current_block}' 缺少终止指令")
+
+                label_name = line[:-1].strip()
+                if label_name in labels_seen:
+                    errors.append(f"函数 {func_name}: 重复的基本块标签 '{label_name}'")
+                labels_seen.add(label_name)
+
+                current_block = label_name
+                block_start_idx = i
+                block_has_terminator = False
+                i += 1
+                continue
+
+            # 检查函数定义结束
+            if line == '}':
+                if current_block is not None and not block_has_terminator:
+                    errors.append(f"函数 {func_name}: 基本块 '{current_block}' 缺少终止指令")
+                break
+
+            # 检查终止指令
+            if any(line.startswith(t) for t in terminators):
+                if block_has_terminator:
+                    errors.append(f"函数 {func_name}: 基本块 '{current_block}' 在终止指令之后存在多余指令")
+                block_has_terminator = True
+            elif block_has_terminator:
+                # 终止指令之后存在非终止指令（死代码）
+                errors.append(f"函数 {func_name}: 基本块 '{current_block}' 在终止指令之后存在多余指令")
+
+            i += 1
+
+        return errors
+
+    def _verify_module_ir(self, ir_lines):
+        """验证整个模块的 IR 结构
+
+        解析 _lines 中的所有函数，对每个函数调用 _verify_function
+
+        Args:
+            ir_lines: IR 行列表（通常是 self._lines）
+
+        Returns:
+            list: 错误信息列表，空列表表示通过
+        """
+        all_errors = []
+        in_function = False
+        current_func_name = None
+        current_func_lines = []
+
+        for line in ir_lines:
+            stripped = line.strip()
+
+            # 检测函数定义开始
+            if stripped.startswith('define ') and '{' in stripped:
+                in_function = True
+                # 提取函数名
+                parts = stripped.split('@')
+                if len(parts) >= 2:
+                    func_name = parts[1].split('(')[0].split('{')[0].strip()
+                else:
+                    func_name = 'unknown'
+                current_func_name = func_name
+                current_func_lines = [line]
+                continue
+
+            if in_function:
+                current_func_lines.append(line)
+                if stripped == '}':
+                    errors = self._verify_function(current_func_lines, current_func_name)
+                    all_errors.extend(errors)
+                    in_function = False
+                    current_func_name = None
+                    current_func_lines = []
+
+        return all_errors

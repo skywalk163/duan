@@ -44,6 +44,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._coro_resume_point = 0  # 下一个 await 点的编号
         # 目标平台：win32 / linux / darwin，默认根据当前系统判断
         self.target_platform = target_platform or sys.platform
+        # IR 优化：SSA 值到 slot 指针的缓存，避免冗余 load/store
+        self._dv_ssa_to_slot = {}  # dv_ssa_reg -> slot_ptr
 
     @property
     def is_windows(self) -> bool:
@@ -249,12 +251,19 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         """加载整个 DuanValue 作为 SSA 值"""
         reg = self.new_register()
         self.emit(f'{reg} = load {DUANVALUE_STRUCT}, ptr {slot}')
+        self._dv_ssa_to_slot[reg] = slot
         return reg
 
     def _store_dv(self, dv_reg: str) -> str:
-        """将 DuanValue SSA 寄存器存入槽位，返回槽位指针"""
+        """将 DuanValue SSA 寄存器存入槽位，返回槽位指针
+
+        优化：如果该 SSA 值刚从某个 slot 加载过，直接返回那个 slot，避免冗余 store。
+        """
+        if dv_reg in self._dv_ssa_to_slot:
+            return self._dv_ssa_to_slot[dv_reg]
         slot = self._new_dv_slot()
         self.emit(f'store {DUANVALUE_STRUCT} {dv_reg}, ptr {slot}')
+        self._dv_ssa_to_slot[dv_reg] = slot
         return slot
 
     def _create_int_dv(self, i64_str: str) -> str:
@@ -287,8 +296,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 call_args.append(a)
             else:
                 # DuanValue SSA 寄存器 → 存入槽位后传 ptr
-                slot = self._new_dv_slot()
-                self.emit(f'store {DUANVALUE_STRUCT} {a}, ptr {slot}')
+                # 优化：如果 SSA 值刚从 slot 加载，直接用原 slot
+                slot = self._store_dv(a)
                 call_args.append(f'ptr {slot}')
         self.emit(f'call void @{func_name}({", ".join(call_args)})')
         return self._load_dv(result_slot)
@@ -326,7 +335,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             left_type = self._infer_expr_type(expr.left)
             right_type = self._infer_expr_type(expr.right)
             op = expr.operator
-            if op in ('+', '-', '*', '/', '加', '减', '乘', '除', '模', '幂'):
+            if op in ('+', '-', '*', '/', '%', '**', '加', '减', '乘', '除', '模', '幂'):
                 if left_type == 'FLOAT' or right_type == 'FLOAT':
                     return 'FLOAT'
                 if left_type == 'INT' and right_type == 'INT':
@@ -419,7 +428,16 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._gen_exported_aliases(module)
 
         self._gen_typed_main()
-        return self.finalize()
+        ir = self.finalize()
+        self._verify_ir(ir)
+        return ir
+
+    def _verify_ir(self, ir):
+        """在 finalize 后验证生成的 IR 结构正确性"""
+        errors = self._verify_module_ir(self._lines)
+        if errors:
+            error_msg = '\n'.join(f"  - {e}" for e in errors)
+            raise RuntimeError(f"LLVM IR 验证失败，发现 {len(errors)} 个问题:\n{error_msg}")
 
     def _process_imports(self, module: ast.Module):
         """处理模块导入语句，记录导入的符号"""
@@ -584,8 +602,10 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         arith_ops = {
             '+': ('add', 'fadd'), '-': ('sub', 'fsub'),
             '*': ('mul', 'fmul'), '/': ('sdiv', 'fdiv'),
+            '%': ('srem', 'frem'),
             '加': ('add', 'fadd'), '减': ('sub', 'fsub'),
             '乘': ('mul', 'fmul'), '除': ('sdiv', 'fdiv'),
+            '模': ('srem', 'frem'),
         }
 
         if op in arith_ops:
@@ -631,7 +651,9 @@ class TypedLLVMCodeGen(LLVMCodeGen):
 
         type_map = {
             '+': 'dv_add', '-': 'dv_sub', '*': 'dv_mul', '/': 'dv_div',
+            '%': 'dv_mod', '**': 'dv_pow',
             '加': 'dv_add', '减': 'dv_sub', '乘': 'dv_mul', '除': 'dv_div',
+            '模': 'dv_mod', '幂': 'dv_pow',
         }
         if op in type_map:
             dv_func = type_map[op]
@@ -1900,7 +1922,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if cur is None:
             return
         val_dv, _ = self._gen_expression(stmt.value)
-        op_map = {'加': 'dv_add', '减': 'dv_sub', '乘': 'dv_mul', '除': 'dv_div'}
+        op_map = {'加': 'dv_add', '减': 'dv_sub', '乘': 'dv_mul', '除': 'dv_div',
+                  '模': 'dv_mod', '幂': 'dv_pow'}
         func = op_map.get(stmt.operator, 'dv_add')
         result = self._call_dv_func(func, cur, val_dv)
         self.set_var(name, result)
@@ -1945,7 +1968,21 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             if not self._ends_with_terminator(stmt.else_body):
                 self.emit(f'br label %{end_lab}')
 
-        self.emit(f'{end_lab}:')
+        # 检查所有分支是否都以终止指令结束
+        all_term = self._ends_with_terminator(stmt.then_body)
+        for eif_body in (stmt.elseif_bodies or []):
+            all_term = all_term and self._ends_with_terminator(eif_body)
+        if stmt.else_body:
+            all_term = all_term and self._ends_with_terminator(stmt.else_body)
+        else:
+            all_term = False  # 没有 else 分支时 endif 可达
+
+        if all_term:
+            # 所有分支都终止，endif 块不可达，但仍需终止指令
+            self.emit(f'{end_lab}:')
+            self.emit('unreachable')
+        else:
+            self.emit(f'{end_lab}:')
 
     def _gen_typed_foreach(self, stmt: ast.ForeachStatement):
         var_name = stmt.variable if isinstance(stmt.variable, str) else str(stmt.variable)
@@ -2222,22 +2259,22 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             self.emit(f'{reg} = alloca {DUANVALUE_STRUCT}')
             self._local_vars[vname] = reg
 
+        if params:
+            num_args_sext = self.new_register()
+            self.emit(f'{num_args_sext} = sext i32 %num_args to i64')
+
         for i, (pname, _) in enumerate(params):
             param_slot = self._local_vars.get(pname)
             if param_slot is not None:
-                idx_reg = self.new_register()
-                self.emit(f'{idx_reg} = sext i32 %num_args to i64')
-                i_reg = self.new_register()
-                self.emit(f'{i_reg} = add i64 0, {i}')
                 in_bounds = self.new_register()
-                self.emit(f'{in_bounds} = icmp slt i64 {i_reg}, {idx_reg}')
+                self.emit(f'{in_bounds} = icmp slt i64 {i}, {num_args_sext}')
                 then_lab = self.new_label('param_valid')
                 else_lab = self.new_label('param_invalid')
                 end_lab = self.new_label('param_end')
                 self.emit(f'br i1 {in_bounds}, label %{then_lab}, label %{else_lab}')
                 self.emit(f'{then_lab}:')
                 elem_ptr = self.new_register()
-                self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr %args, i64 {i_reg}')
+                self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr %args, i64 {i}')
                 param_val = self.new_register()
                 self.emit(f'{param_val} = load {DUANVALUE_STRUCT}, ptr {elem_ptr}')
                 self.emit(f'store {DUANVALUE_STRUCT} {param_val}, ptr {param_slot}')
@@ -2708,23 +2745,23 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 self.emit(f'{self_dv} = load {DUANVALUE_STRUCT}, ptr %self')
                 self.emit(f'store {DUANVALUE_STRUCT} {self_dv}, ptr {self_var_slot}')
 
+        if params:
+            num_args_sext = self.new_register()
+            self.emit(f'{num_args_sext} = sext i32 %num_args to i64')
+
         for i, param in enumerate(params):
             pname = param.name if hasattr(param, 'name') else str(param)
             param_slot = self._local_vars.get(pname)
             if param_slot is not None:
-                idx_reg = self.new_register()
-                self.emit(f'{idx_reg} = sext i32 %num_args to i64')
-                i_reg = self.new_register()
-                self.emit(f'{i_reg} = add i64 0, {i}')
                 in_bounds = self.new_register()
-                self.emit(f'{in_bounds} = icmp slt i64 {i_reg}, {idx_reg}')
+                self.emit(f'{in_bounds} = icmp slt i64 {i}, {num_args_sext}')
                 then_lab = self.new_label('param_valid')
                 else_lab = self.new_label('param_invalid')
                 end_lab = self.new_label('param_end')
                 self.emit(f'br i1 {in_bounds}, label %{then_lab}, label %{else_lab}')
                 self.emit(f'{then_lab}:')
                 elem_ptr = self.new_register()
-                self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr %args, i64 {i_reg}')
+                self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr %args, i64 {i}')
                 param_val = self.new_register()
                 self.emit(f'{param_val} = load {DUANVALUE_STRUCT}, ptr {elem_ptr}')
                 self.emit(f'store {DUANVALUE_STRUCT} {param_val}, ptr {param_slot}')
@@ -2857,11 +2894,13 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             safe = self._safe_var_name(name)
             reg = self.new_register()
             self.emit(f'{reg} = load {DUANVALUE_STRUCT}, {DUANVALUE_STRUCT}* @__var_{safe}')
+            self._dv_ssa_to_slot[reg] = f'@__var_{safe}'
             return reg
         if name in self._local_vars:
             slot = self._local_vars[name]
             reg = self.new_register()
             self.emit(f'{reg} = load {DUANVALUE_STRUCT}, ptr {slot}')
+            self._dv_ssa_to_slot[reg] = slot
             return reg
         return None
 
