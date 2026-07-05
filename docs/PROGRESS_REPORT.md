@@ -795,6 +795,76 @@ examples/
 
 ---
 
+## Level 11 LLVM 后端自举编译完成记录 (2026-07-05)
+
+### 阶段目标：使用 LLVM 后端将自举编译器（bootstrap_v3.duan）编译为原生可执行文件。
+
+### 核心成果
+
+| 里程碑 | 状态 | 说明 |
+|--------|------|------|
+| 自举编译器编译为 LLVM IR | ✅ | 1,638,065 字符 / 27,000+ 行 |
+| LLVM IR 验证通过 | ✅ | clang 零错误 |
+| 链接为原生 EXE | ✅ | 525 KB 可执行文件 |
+| EXE 正常运行 | ✅ | 无段错误，无崩溃 |
+| 命令行参数传递 | ✅ | 支持向 main 段落传参 |
+
+### Bug 修复（5个）
+
+#### 1. elseif 分支变量未预分配（SSA 违反）
+- **问题**：`use of undefined value '%481'`
+- **根因**：`_collect_vars_from_stmts` 只收集了 `then_body` 和 `else_body`，漏掉了 `elseif_bodies`
+- **修复**：在变量收集时遍历所有 `elseif_bodies`
+- **文件**：`src/llvm/codegen.py`
+
+#### 2. while 循环双 Terminator（CFG 破坏）
+- **问题**：`instruction expected to be numbered '%475' or greater`
+- **根因**：`_gen_typed_while` 循环体末尾无条件添加 `br`，若循环体已有 terminator 则破坏基本块结构
+- **修复**：添加 `_ends_with_terminator` 检查
+- **文件**：`src/llvm/codegen_typed.py`
+
+#### 3. main 函数调用签名不匹配（段错误）
+- **问题**：运行时 0xC0000005 段错误
+- **根因**：段落函数签名为 `void @_seg_xxx(ptr %result, ptr %args, i32 %num_args)`，但 main 函数错误地认为返回结构体
+- **修复**：重写 main 函数段落调用逻辑，使用正确签名
+- **文件**：`src/llvm/codegen_typed.py`
+
+#### 4. main 函数无命令行参数传递
+- **问题**：main 段落参数始终为 null
+- **根因**：main 函数接收了 argc/argv 但未传递给 main 段落
+- **修复**：添加参数传递逻辑，跳过 argv[0]，从 argv[1] 开始传递
+- **文件**：`src/llvm/codegen_typed.py`
+
+#### 5. 缺失 v3 风格内置函数名
+- **问题**：自举编译器调用的函数未定义
+- **根因**：LLVM 后端使用 v4 风格命名，自举编译器使用 v3 风格命名
+- **修复**：添加 14 个 v3 风格函数名别名（字典创建/设置/获取、列表创建/追加/获取/包含、字符串长度/获取、_读文件等
+- **文件**：`src/llvm/codegen_typed.py`
+
+### 技术指标
+
+| 指标 | 数值 |
+|------|------|
+| 自举编译器源码 | 62,109 字符 / 95 个段落 |
+| LLVM IR 大小 | ~1.6 MB |
+| 生成 EXE 大小 | 525 KB |
+| 修复 Bug 数量 | 5 个 |
+| 基础功能测试 | 5/5 通过 |
+
+### 关键洞察
+
+这些问题都不是 LLVM 后端的局限，而是前端 IR 生成器的 SSA、CFG 和调用约定问题。通过严格遵循 LLVM IR 规范（SSA 支配关系、基本块单 terminator、函数签名一致），复杂的自举编译器也能成功编译。
+
+### 相关文件
+
+- **详细报告**：`docs/STAGE4_LLVM_BOOTSTRAP.md
+- **核心修改**：
+  - `src/llvm/codegen.py` - elseif 变量收集修复
+  - `src/llvm/codegen_typed.py` - 4 处修复
+- **自举编译器**：`bootstrap/bootstrap_v3.duan`
+
+---
+
 ## 文件清单
 
 ```
