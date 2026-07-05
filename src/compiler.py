@@ -348,7 +348,7 @@ class AstAdapter:
             name=node.name,
             generic_params=list(getattr(node, 'generic_params', []) or []),
             superclasses=list(getattr(node, 'base_classes', []) or []),
-            interfaces=[],
+            interfaces=list(getattr(node, 'interfaces', []) or []),
             fields=[
                 ast.AttributeDeclaration(name=a.name,
                                          type_annotation=getattr(a, 'type_annotation', None),
@@ -539,7 +539,7 @@ class AstAdapter:
         return ast.InterfaceDefinition(
             name=node.name,
             methods=methods,
-            interfaces=[],
+            superinterfaces=getattr(node, 'superinterfaces', []) or [],
         )
 
     def _convert_method_signature(self, node) -> ast.MethodDefinition:

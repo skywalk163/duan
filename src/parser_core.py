@@ -88,6 +88,10 @@ class DuanParserCore:
         self.lexer = Lexer()
         self.tokens: List[Token] = []
         self.pos = 0
+
+    def _error(self, message: str, line: int = 0, col: int = 0, token_value: str = None):
+        """报告解析错误（抛出 ParseError）"""
+        raise ParseError(message, line, col, token_value)
     
     def parse(self, source: str) -> Module:
         """解析段言代码"""

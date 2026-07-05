@@ -653,9 +653,10 @@ class PythonCodeGenerator:
         """生成类定义"""
         class_name = self._sanitize_name(stmt.name)
 
-        # 类定义行
-        if stmt.base_classes:
-            bases = ', '.join(self._sanitize_name(b) for b in stmt.base_classes)
+        # 类定义行（包含父类和实现的接口）
+        all_bases = list(stmt.base_classes) + list(getattr(stmt, 'interfaces', []) or [])
+        if all_bases:
+            bases = ', '.join(self._sanitize_name(b) for b in all_bases)
             self._add_line(f"class {class_name}({bases}):")
         else:
             self._add_line(f"class {class_name}:")

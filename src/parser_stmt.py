@@ -28,10 +28,10 @@ class ParserStmtMixin:
     def _parse_module(self) -> Module:
         """解析模块"""
         statements = []
-        
+
         while self._current():
             tok = self._current()
-            
+
             # 跳过外层的DEDENT（level=0）
             if tok.type == TokenType.DEDENT:
                 dedent_level = getattr(tok, 'value', None)
@@ -40,19 +40,24 @@ class ParserStmtMixin:
                 if dedent_level is None or dedent_level == 0:
                     self._consume(TokenType.DEDENT)
                     continue
-            
+
             # 跳过空行（NEWLINE）
             if tok.type == TokenType.NEWLINE:
                 self._consume(TokenType.NEWLINE)
                 continue
-            
+
+            # 跳过孤立的句号（结构定义结束后的可选终止符）
+            if tok.type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+                continue
+
             stmt = self._parse_statement()
             if stmt:
                 statements.append(stmt)
             else:
                 # 无法解析，跳出循环避免无限循环
                 break
-        
+
         return Module(statements)
     
     def _parse_statement(self) -> Optional[ASTNode]:
@@ -1905,9 +1910,9 @@ class ParserStmtMixin:
                 self._error(f"期望父类名，但得到 {base_tok.type if base_tok else '输入结束'}")
 
         # 实现接口（可选）
+        interfaces = []
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '实现':
             self._consume(TokenType.KEYWORD, '实现')
-            impl_interfaces = []
             while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 # 收集多 token 名称（如"可打印"被拆为"可"+"打印"）
                 parts = []
@@ -1916,15 +1921,11 @@ class ParserStmtMixin:
                         break
                     parts.append(self._consume().value)
                 if parts:
-                    impl_interfaces.append(''.join(parts))
+                    interfaces.append(''.join(parts))
                 if self._match(TokenType.COMMA):
                     self._consume(TokenType.COMMA)
                 else:
                     break
-            # 合并到 base_classes
-            if not base_classes:
-                base_classes = []
-            base_classes.extend(impl_interfaces)
 
         # 句号或冒号
         if self._current() and self._current().type == TokenType.DOT:
@@ -2016,6 +2017,7 @@ class ParserStmtMixin:
             methods=methods,
             base_classes=base_classes,
             generic_params=generic_params,
+            interfaces=interfaces,
         )
 
     def _parse_attribute_declaration(self) -> AttributeDeclaration:
@@ -2112,9 +2114,9 @@ class ParserStmtMixin:
             if self._current() and self._current().type == TokenType.RBRACKET:
                 self._consume(TokenType.RBRACKET)
 
-        # 参数列表（支持"参数"和"接收"两种写法）
+        # 参数列表（支持"参数"/"接收"关键字或括号形式）
         parameters = []
-        if self._current() and self._current().type == TokenType.KEYWORD:       
+        if self._current() and self._current().type == TokenType.KEYWORD:
             kw = self._current().value
             if kw == '参数' or kw == '接收':
                 self._consume(TokenType.KEYWORD)
@@ -2134,6 +2136,24 @@ class ParserStmtMixin:
                             self._consume(TokenType.COMMA)
                     else:
                         break
+        elif self._current() and self._current().type == TokenType.LPAREN:
+            # 括号参数形式：(参数1, 参数2, ...)
+            self._consume(TokenType.LPAREN)
+            while self._current() and self._current().type != TokenType.RPAREN:
+                if self._current().type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                    continue
+                # 收集多 token 参数名
+                param_parts = []
+                while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    param_parts.append(self._current().value)
+                    self._consume()
+                if param_parts:
+                    parameters.append(Parameter(name=''.join(param_parts)))
+                else:
+                    break
+            if self._current() and self._current().type == TokenType.RPAREN:
+                self._consume(TokenType.RPAREN)
 
         # 返回类型（可选）：返回 类型
         return_type = None

@@ -54,6 +54,11 @@ void dv_clone(DuanValue* result, DuanValue* v);
 void dv_class_get_member(DuanValue* result, DuanValue* obj, const char* field_name);
 void dv_value_to_string(DuanValue* result, DuanValue* v);
 int dv_is_object(DuanValue* v);
+/* 接口系统前向声明（Level 7） */
+int dv_register_interface(const char* name);
+int dv_register_interface_method(const char* interface_name, const char* method_name, const char* signature);
+int dv_register_class_implements(const char* class_name, const char* interface_name);
+int dv_class_implements_interface(const char* class_name, const char* interface_name);
 
 /* ================================================================
  * 内部工具
@@ -475,6 +480,241 @@ void dv_mod(DuanValue* result, DuanValue* a, DuanValue* b) {
     }
 }
 
+/* ----------------------------------------------------------------
+ * 数学扩展（第三批移植）
+ * ---------------------------------------------------------------- */
+
+void dv_tan(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = tan(x);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_asin(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = asin(x);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_acos(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = acos(x);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_atan(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = atan(x);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_atan2(DuanValue* result, DuanValue* a, DuanValue* b) {
+    double x = dv_to_f64(a);
+    double y = dv_to_f64(b);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = atan2(x, y);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_log(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = (x > 0) ? log(x) : 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_log2(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = (x > 0) ? log2(x) : 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_log10(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = (x > 0) ? log10(x) : 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_exp(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = exp(x);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_round(DuanValue* result, DuanValue* a) {
+    if (a->type == 1) {
+        dv_clone(result, a);
+        return;
+    }
+    double x = dv_to_f64(a);
+    result->type = 1;
+    result->i64 = (int64_t)round(x);
+    result->f64 = 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_trunc(DuanValue* result, DuanValue* a) {
+    if (a->type == 1) {
+        dv_clone(result, a);
+        return;
+    }
+    double x = dv_to_f64(a);
+    result->type = 1;
+    result->i64 = (int64_t)trunc(x);
+    result->f64 = 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_sign(DuanValue* result, DuanValue* a) {
+    if (a->type == 1) {
+        int64_t x = dv_to_i64(a);
+        int64_t s = (x > 0) - (x < 0);
+        result->type = 1;
+        result->i64 = s;
+        result->f64 = 0.0;
+        result->str = NULL;
+        result->boolean = 0;
+        return;
+    }
+    double x = dv_to_f64(a);
+    double s = (x > 0.0) - (x < 0.0);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = s;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_hypot(DuanValue* result, DuanValue* a, DuanValue* b) {
+    double x = dv_to_f64(a);
+    double y = dv_to_f64(b);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = hypot(x, y);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_degrees(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = x * (180.0 / 3.14159265358979323846);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_radians(DuanValue* result, DuanValue* a) {
+    double x = dv_to_f64(a);
+    result->type = 2;
+    result->i64 = 0;
+    result->f64 = x * (3.14159265358979323846 / 180.0);
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_min(DuanValue* result, DuanValue* a, DuanValue* b) {
+    if (dv_promote(a, b) == 2) {
+        double x = dv_to_f64(a);
+        double y = dv_to_f64(b);
+        result->type = 2;
+        result->i64 = 0;
+        result->f64 = (x < y) ? x : y;
+        result->str = NULL;
+        result->boolean = 0;
+        return;
+    }
+    int64_t x = dv_to_i64(a);
+    int64_t y = dv_to_i64(b);
+    result->type = 1;
+    result->i64 = (x < y) ? x : y;
+    result->f64 = 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_max(DuanValue* result, DuanValue* a, DuanValue* b) {
+    if (dv_promote(a, b) == 2) {
+        double x = dv_to_f64(a);
+        double y = dv_to_f64(b);
+        result->type = 2;
+        result->i64 = 0;
+        result->f64 = (x > y) ? x : y;
+        result->str = NULL;
+        result->boolean = 0;
+        return;
+    }
+    int64_t x = dv_to_i64(a);
+    int64_t y = dv_to_i64(b);
+    result->type = 1;
+    result->i64 = (x > y) ? x : y;
+    result->f64 = 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+/* 辗转相除法求最大公约数 */
+static int64_t _i64_gcd(int64_t a, int64_t b) {
+    if (a < 0) a = -a;
+    if (b < 0) b = -b;
+    while (b != 0) {
+        int64_t t = a % b;
+        a = b;
+        b = t;
+    }
+    return a;
+}
+
+void dv_gcd(DuanValue* result, DuanValue* a, DuanValue* b) {
+    int64_t x = dv_to_i64(a);
+    int64_t y = dv_to_i64(b);
+    result->type = 1;
+    result->i64 = _i64_gcd(x, y);
+    result->f64 = 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
+void dv_lcm(DuanValue* result, DuanValue* a, DuanValue* b) {
+    int64_t x = dv_to_i64(a);
+    int64_t y = dv_to_i64(b);
+    int64_t g = _i64_gcd(x, y);
+    int64_t m = (g == 0) ? 0 : (x / g) * y;
+    if (m < 0) m = -m;
+    result->type = 1;
+    result->i64 = m;
+    result->f64 = 0.0;
+    result->str = NULL;
+    result->boolean = 0;
+}
+
 /* ================================================================
  * 比较运算
  * ================================================================ */
@@ -727,6 +967,193 @@ void dv_str_replace(DuanValue* result, DuanValue* str, DuanValue* old_s, DuanVal
         dst += new_len;
         p = found + old_len;
     }
+    result->type = 3;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = out;
+    result->boolean = 0;
+}
+
+/* ----------------------------------------------------------------
+ * 字符串扩展（第三批移植）
+ * ---------------------------------------------------------------- */
+
+void dv_str_repeat(DuanValue* result, DuanValue* str, DuanValue* times) {
+    if (str->type != 3 || !str->str) {
+        dv_str(result, "");
+        return;
+    }
+    int64_t n = dv_to_i64(times);
+    if (n <= 0) {
+        dv_str(result, "");
+        return;
+    }
+    size_t len = strlen(str->str);
+    if (len == 0) {
+        dv_str(result, "");
+        return;
+    }
+    /* 防止溢出：单次最大 64MB */
+    if (n > (64 * 1024 * 1024) / (int64_t)len) {
+        n = (64 * 1024 * 1024) / (int64_t)len;
+    }
+    size_t out_len = len * (size_t)n;
+    char* out = (char*)malloc(out_len + 1);
+    if (!out) {
+        dv_str(result, "");
+        return;
+    }
+    out[0] = '\0';
+    for (int64_t i = 0; i < n; i++) {
+        strcat(out, str->str);
+    }
+    result->type = 3;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = out;
+    result->boolean = 0;
+}
+
+int dv_str_contains(DuanValue* str, DuanValue* sub) {
+    if (str->type != 3 || sub->type != 3 || !str->str || !sub->str) {
+        return 0;
+    }
+    return strstr(str->str, sub->str) != NULL;
+}
+
+int dv_str_starts_with(DuanValue* str, DuanValue* prefix) {
+    if (str->type != 3 || prefix->type != 3 || !str->str || !prefix->str) {
+        return 0;
+    }
+    size_t plen = strlen(prefix->str);
+    if (plen == 0) return 1;
+    return strncmp(str->str, prefix->str, plen) == 0;
+}
+
+int dv_str_ends_with(DuanValue* str, DuanValue* suffix) {
+    if (str->type != 3 || suffix->type != 3 || !str->str || !suffix->str) {
+        return 0;
+    }
+    size_t slen = strlen(str->str);
+    size_t flen = strlen(suffix->str);
+    if (flen == 0) return 1;
+    if (flen > slen) return 0;
+    return strcmp(str->str + (slen - flen), suffix->str) == 0;
+}
+
+int64_t dv_str_count(DuanValue* str, DuanValue* sub) {
+    if (str->type != 3 || sub->type != 3 || !str->str || !sub->str) {
+        return 0;
+    }
+    size_t sub_len = strlen(sub->str);
+    if (sub_len == 0) return 0;
+    int64_t count = 0;
+    const char* p = str->str;
+    while ((p = strstr(p, sub->str)) != NULL) {
+        count++;
+        p += sub_len;
+    }
+    return count;
+}
+
+void dv_str_rjust(DuanValue* result, DuanValue* str, DuanValue* width, DuanValue* fill) {
+    if (str->type != 3 || !str->str) {
+        dv_str(result, "");
+        return;
+    }
+    int64_t w = dv_to_i64(width);
+    size_t len = strlen(str->str);
+    if ((int64_t)len >= w) {
+        dv_str(result, str->str);
+        return;
+    }
+    char fc = ' ';
+    if (fill && fill->type == 3 && fill->str && fill->str[0]) {
+        fc = fill->str[0];
+    }
+    int64_t pad = w - (int64_t)len;
+    char* out = (char*)malloc((size_t)w + 1);
+    if (!out) { dv_str(result, str->str); return; }
+    memset(out, fc, (size_t)pad);
+    strcpy(out + pad, str->str);
+    result->type = 3;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = out;
+    result->boolean = 0;
+}
+
+void dv_str_ljust(DuanValue* result, DuanValue* str, DuanValue* width, DuanValue* fill) {
+    if (str->type != 3 || !str->str) {
+        dv_str(result, "");
+        return;
+    }
+    int64_t w = dv_to_i64(width);
+    size_t len = strlen(str->str);
+    if ((int64_t)len >= w) {
+        dv_str(result, str->str);
+        return;
+    }
+    char fc = ' ';
+    if (fill && fill->type == 3 && fill->str && fill->str[0]) {
+        fc = fill->str[0];
+    }
+    int64_t pad = w - (int64_t)len;
+    char* out = (char*)malloc((size_t)w + 1);
+    if (!out) { dv_str(result, str->str); return; }
+    strcpy(out, str->str);
+    memset(out + len, fc, (size_t)pad);
+    out[w] = '\0';
+    result->type = 3;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = out;
+    result->boolean = 0;
+}
+
+void dv_str_center(DuanValue* result, DuanValue* str, DuanValue* width, DuanValue* fill) {
+    if (str->type != 3 || !str->str) {
+        dv_str(result, "");
+        return;
+    }
+    int64_t w = dv_to_i64(width);
+    size_t len = strlen(str->str);
+    if ((int64_t)len >= w) {
+        dv_str(result, str->str);
+        return;
+    }
+    char fc = ' ';
+    if (fill && fill->type == 3 && fill->str && fill->str[0]) {
+        fc = fill->str[0];
+    }
+    int64_t total = w - (int64_t)len;
+    int64_t left = total / 2;
+    int64_t right = total - left;
+    char* out = (char*)malloc((size_t)w + 1);
+    if (!out) { dv_str(result, str->str); return; }
+    memset(out, fc, (size_t)left);
+    strcpy(out + left, str->str);
+    memset(out + left + len, fc, (size_t)right);
+    out[w] = '\0';
+    result->type = 3;
+    result->i64 = 0;
+    result->f64 = 0.0;
+    result->str = out;
+    result->boolean = 0;
+}
+
+void dv_str_reverse(DuanValue* result, DuanValue* str) {
+    if (str->type != 3 || !str->str) {
+        dv_str(result, "");
+        return;
+    }
+    size_t len = strlen(str->str);
+    char* out = (char*)malloc(len + 1);
+    if (!out) { dv_str(result, ""); return; }
+    for (size_t i = 0; i < len; i++) {
+        out[i] = str->str[len - 1 - i];
+    }
+    out[len] = '\0';
     result->type = 3;
     result->i64 = 0;
     result->f64 = 0.0;
@@ -1542,6 +1969,497 @@ void dv_list_dir(DuanValue* result, const char* path) {
 }
 
 /* ================================================================
+ * 文件系统扩展
+ * ================================================================ */
+
+int dv_mkdir(const char* path) {
+    if (!path) return -1;
+#ifdef _WIN32
+    return _mkdir(path);
+#else
+    return mkdir(path, 0755);
+#endif
+}
+
+int dv_rmdir(const char* path) {
+    if (!path) return -1;
+#ifdef _WIN32
+    return _rmdir(path);
+#else
+    return rmdir(path);
+#endif
+}
+
+int dv_rename_file(const char* old_path, const char* new_path) {
+    if (!old_path || !new_path) return -1;
+    return rename(old_path, new_path);
+}
+
+int dv_copy_file(const char* src, const char* dst) {
+    if (!src || !dst) return -1;
+    FILE* fin = fopen(src, "rb");
+    if (!fin) return -1;
+    FILE* fout = fopen(dst, "wb");
+    if (!fout) { fclose(fin); return -1; }
+    char buf[8192];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof(buf), fin)) > 0) {
+        fwrite(buf, 1, n, fout);
+    }
+    fclose(fin);
+    fclose(fout);
+    return 0;
+}
+
+int dv_is_file(const char* path) {
+    if (!path) return 0;
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (st.st_mode & S_IFREG) ? 1 : 0;
+}
+
+int dv_is_dir(const char* path) {
+    if (!path) return 0;
+    struct stat st;
+    if (stat(path, &st) != 0) return 0;
+    return (st.st_mode & S_IFDIR) ? 1 : 0;
+}
+
+/* ================================================================
+ * Base64 编码/解码
+ * ================================================================ */
+
+static const char b64_enc_table[] =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static int b64_dec_val(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+char* dv_base64_encode(const char* data, int len) {
+    if (!data || len <= 0) return dv_strdup("");
+    int out_len = 4 * ((len + 2) / 3);
+    char* out = (char*)malloc(out_len + 1);
+    if (!out) return dv_strdup("");
+    int i = 0, j = 0;
+    while (i < len) {
+        unsigned int octet_a = (i < len) ? (unsigned char)data[i++] : 0;
+        unsigned int octet_b = (i < len) ? (unsigned char)data[i++] : 0;
+        unsigned int octet_c = (i < len) ? (unsigned char)data[i++] : 0;
+        unsigned int triple = (octet_a << 16) | (octet_b << 8) | octet_c;
+        out[j++] = b64_enc_table[(triple >> 18) & 0x3F];
+        out[j++] = b64_enc_table[(triple >> 12) & 0x3F];
+        out[j++] = b64_enc_table[(triple >> 6) & 0x3F];
+        out[j++] = b64_enc_table[triple & 0x3F];
+    }
+    int mod = len % 3;
+    if (mod >= 1) out[out_len - 1] = '=';
+    if (mod == 1) out[out_len - 2] = '=';
+    out[out_len] = '\0';
+    return out;
+}
+
+char* dv_base64_decode(const char* str, int* out_len) {
+    if (!str) { if (out_len) *out_len = 0; return dv_strdup(""); }
+    int in_len = (int)strlen(str);
+    while (in_len > 0 && str[in_len - 1] == '=') in_len--;
+    int decoded_len = (in_len * 3) / 4;
+    char* out = (char*)malloc(decoded_len + 1);
+    if (!out) { if (out_len) *out_len = 0; return dv_strdup(""); }
+    int i = 0, j = 0;
+    while (i < in_len) {
+        int v0 = b64_dec_val(str[i++]);
+        int v1 = (i < in_len) ? b64_dec_val(str[i++]) : 0;
+        int v2 = (i < in_len) ? b64_dec_val(str[i++]) : 0;
+        int v3 = (i < in_len) ? b64_dec_val(str[i++]) : 0;
+        if (v0 < 0 || v1 < 0 || v2 < 0 || v3 < 0) break;
+        unsigned int triple = ((unsigned int)v0 << 18) | ((unsigned int)v1 << 12) | ((unsigned int)v2 << 6) | (unsigned int)v3;
+        if (j < decoded_len) out[j++] = (char)((triple >> 16) & 0xFF);
+        if (j < decoded_len) out[j++] = (char)((triple >> 8) & 0xFF);
+        if (j < decoded_len) out[j++] = (char)(triple & 0xFF);
+    }
+    out[j] = '\0';
+    if (out_len) *out_len = j;
+    return out;
+}
+
+/* ================================================================
+ * MD5 算法
+ * ================================================================ */
+
+typedef struct {
+    uint32_t state[4];
+    uint32_t count[2];
+    unsigned char buffer[64];
+} md5_ctx_t;
+
+static void md5_transform(uint32_t state[4], const unsigned char block[64]);
+static void md5_encode(unsigned char* output, const uint32_t* input, int len);
+static void md5_decode(uint32_t* output, const unsigned char* input, int len);
+
+static const unsigned char md5_padding[64] = {
+    0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+};
+
+#define F(x, y, z) (((x) & (y)) | ((~x) & (z)))
+#define G(x, y, z) (((x) & (z)) | ((y) & (~z)))
+#define H(x, y, z) ((x) ^ (y) ^ (z))
+#define I(x, y, z) ((y) ^ ((x) | (~z)))
+#define ROTATE_LEFT(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
+#define FF(a, b, c, d, x, s, ac) { (a) += F((b), (c), (d)) + (x) + (uint32_t)(ac); (a) = ROTATE_LEFT((a), (s)); (a) += (b); }
+#define GG(a, b, c, d, x, s, ac) { (a) += G((b), (c), (d)) + (x) + (uint32_t)(ac); (a) = ROTATE_LEFT((a), (s)); (a) += (b); }
+#define HH(a, b, c, d, x, s, ac) { (a) += H((b), (c), (d)) + (x) + (uint32_t)(ac); (a) = ROTATE_LEFT((a), (s)); (a) += (b); }
+#define II(a, b, c, d, x, s, ac) { (a) += I((b), (c), (d)) + (x) + (uint32_t)(ac); (a) = ROTATE_LEFT((a), (s)); (a) += (b); }
+
+static void md5_init(md5_ctx_t* ctx) {
+    ctx->count[0] = ctx->count[1] = 0;
+    ctx->state[0] = 0x67452301;
+    ctx->state[1] = 0xefcdab89;
+    ctx->state[2] = 0x98badcfe;
+    ctx->state[3] = 0x10325476;
+}
+
+static void md5_update(md5_ctx_t* ctx, const unsigned char* input, unsigned int input_len) {
+    unsigned int i, index, part_len;
+    index = (unsigned int)((ctx->count[0] >> 3) & 0x3F);
+    if ((ctx->count[0] += ((uint32_t)input_len << 3)) < ((uint32_t)input_len << 3))
+        ctx->count[1]++;
+    ctx->count[1] += ((uint32_t)input_len >> 29);
+    part_len = 64 - index;
+    if (input_len >= part_len) {
+        memcpy(&ctx->buffer[index], input, part_len);
+        md5_transform(ctx->state, ctx->buffer);
+        for (i = part_len; i + 63 < input_len; i += 64)
+            md5_transform(ctx->state, &input[i]);
+        index = 0;
+    } else { i = 0; }
+    memcpy(&ctx->buffer[index], &input[i], input_len - i);
+}
+
+static void md5_final(unsigned char digest[16], md5_ctx_t* ctx) {
+    unsigned char bits[8];
+    unsigned int index, pad_len;
+    md5_encode(bits, ctx->count, 8);
+    index = (unsigned int)((ctx->count[0] >> 3) & 0x3f);
+    pad_len = (index < 56) ? (56 - index) : (120 - index);
+    md5_update(ctx, md5_padding, pad_len);
+    md5_update(ctx, bits, 8);
+    md5_encode(digest, ctx->state, 16);
+    memset(ctx, 0, sizeof(*ctx));
+}
+
+static void md5_transform(uint32_t state[4], const unsigned char block[64]) {
+    uint32_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
+    md5_decode(x, block, 64);
+    FF(a, b, c, d, x[ 0],  7, 0xd76aa478);
+    FF(d, a, b, c, x[ 1], 12, 0xe8c7b756);
+    FF(c, d, a, b, x[ 2], 17, 0x242070db);
+    FF(b, c, d, a, x[ 3], 22, 0xc1bdceee);
+    FF(a, b, c, d, x[ 4],  7, 0xf57c0faf);
+    FF(d, a, b, c, x[ 5], 12, 0x4787c62a);
+    FF(c, d, a, b, x[ 6], 17, 0xa8304613);
+    FF(b, c, d, a, x[ 7], 22, 0xfd469501);
+    FF(a, b, c, d, x[ 8],  7, 0x698098d8);
+    FF(d, a, b, c, x[ 9], 12, 0x8b44f7af);
+    FF(c, d, a, b, x[10], 17, 0xffff5bb1);
+    FF(b, c, d, a, x[11], 22, 0x895cd7be);
+    FF(a, b, c, d, x[12],  7, 0x6b901122);
+    FF(d, a, b, c, x[13], 12, 0xfd987193);
+    FF(c, d, a, b, x[14], 17, 0xa679438e);
+    FF(b, c, d, a, x[15], 22, 0x49b40821);
+    GG(a, b, c, d, x[ 1],  5, 0xf61e2562);
+    GG(d, a, b, c, x[ 6],  9, 0xc040b340);
+    GG(c, d, a, b, x[11], 14, 0x265e5a51);
+    GG(b, c, d, a, x[ 0], 20, 0xe9b6c7aa);
+    GG(a, b, c, d, x[ 5],  5, 0xd62f105d);
+    GG(d, a, b, c, x[10],  9, 0x02441453);
+    GG(c, d, a, b, x[15], 14, 0xd8a1e681);
+    GG(b, c, d, a, x[ 4], 20, 0xe7d3fbc8);
+    GG(a, b, c, d, x[ 9],  5, 0x21e1cde6);
+    GG(d, a, b, c, x[14],  9, 0xc33707d6);
+    GG(c, d, a, b, x[ 3], 14, 0xf4d50d87);
+    GG(b, c, d, a, x[ 8], 20, 0x455a14ed);
+    GG(a, b, c, d, x[13],  5, 0xa9e3e905);
+    GG(d, a, b, c, x[ 2],  9, 0xfcefa3f8);
+    GG(c, d, a, b, x[ 7], 14, 0x676f02d9);
+    GG(b, c, d, a, x[12], 20, 0x8d2a4c8a);
+    HH(a, b, c, d, x[ 5],  4, 0xfffa3942);
+    HH(d, a, b, c, x[ 8], 11, 0x8771f681);
+    HH(c, d, a, b, x[11], 16, 0x6d9d6122);
+    HH(b, c, d, a, x[14], 23, 0xfde5380c);
+    HH(a, b, c, d, x[ 1],  4, 0xa4beea44);
+    HH(d, a, b, c, x[ 4], 11, 0x4bdecfa9);
+    HH(c, d, a, b, x[ 7], 16, 0xf6bb4b60);
+    HH(b, c, d, a, x[10], 23, 0xbebfbc70);
+    HH(a, b, c, d, x[13],  4, 0x289b7ec6);
+    HH(d, a, b, c, x[ 0], 11, 0xeaa127fa);
+    HH(c, d, a, b, x[ 3], 16, 0xd4ef3085);
+    HH(b, c, d, a, x[ 6], 23, 0x04881d05);
+    HH(a, b, c, d, x[ 9],  4, 0xd9d4d039);
+    HH(d, a, b, c, x[12], 11, 0xe6db99e5);
+    HH(c, d, a, b, x[15], 16, 0x1fa27cf8);
+    HH(b, c, d, a, x[ 2], 23, 0xc4ac5665);
+    II(a, b, c, d, x[ 0],  6, 0xf4292244);
+    II(d, a, b, c, x[ 7], 10, 0x432aff97);
+    II(c, d, a, b, x[14], 15, 0xab9423a7);
+    II(b, c, d, a, x[ 5], 21, 0xfc93a039);
+    II(a, b, c, d, x[12],  6, 0x655b59c3);
+    II(d, a, b, c, x[ 3], 10, 0x8f0ccc92);
+    II(c, d, a, b, x[10], 15, 0xffeff47d);
+    II(b, c, d, a, x[ 1], 21, 0x85845dd1);
+    II(a, b, c, d, x[ 8],  6, 0x6fa87e4f);
+    II(d, a, b, c, x[15], 10, 0xfe2ce6e0);
+    II(c, d, a, b, x[ 6], 15, 0xa3014314);
+    II(b, c, d, a, x[13], 21, 0x4e0811a1);
+    II(a, b, c, d, x[ 4],  6, 0xf7537e82);
+    II(d, a, b, c, x[11], 10, 0xbd3af235);
+    II(c, d, a, b, x[ 2], 15, 0x2ad7d2bb);
+    II(b, c, d, a, x[ 9], 21, 0xeb86d391);
+    state[0] += a; state[1] += b; state[2] += c; state[3] += d;
+    memset(x, 0, sizeof(x));
+}
+
+static void md5_encode(unsigned char* output, const uint32_t* input, int len) {
+    int i, j;
+    for (i = 0, j = 0; j < len; i++, j += 4) {
+        output[j] = (unsigned char)(input[i] & 0xff);
+        output[j + 1] = (unsigned char)((input[i] >> 8) & 0xff);
+        output[j + 2] = (unsigned char)((input[i] >> 16) & 0xff);
+        output[j + 3] = (unsigned char)((input[i] >> 24) & 0xff);
+    }
+}
+
+static void md5_decode(uint32_t* output, const unsigned char* input, int len) {
+    int i, j;
+    for (i = 0, j = 0; j < len; i++, j += 4) {
+        output[i] = ((uint32_t)input[j]) | (((uint32_t)input[j + 1]) << 8) |
+                    (((uint32_t)input[j + 2]) << 16) | (((uint32_t)input[j + 3]) << 24);
+    }
+}
+
+static char* hex_encode(const unsigned char* data, int len) {
+    static const char hex[] = "0123456789abcdef";
+    char* out = (char*)malloc(len * 2 + 1);
+    if (!out) return dv_strdup("");
+    for (int i = 0; i < len; i++) {
+        out[i * 2] = hex[(data[i] >> 4) & 0xF];
+        out[i * 2 + 1] = hex[data[i] & 0xF];
+    }
+    out[len * 2] = '\0';
+    return out;
+}
+
+char* dv_md5(const char* data, int len) {
+    if (!data || len <= 0) return dv_strdup("d41d8cd98f00b204e9800998ecf8427e");
+    md5_ctx_t ctx;
+    unsigned char digest[16];
+    md5_init(&ctx);
+    md5_update(&ctx, (const unsigned char*)data, (unsigned int)len);
+    md5_final(digest, &ctx);
+    return hex_encode(digest, 16);
+}
+
+/* ================================================================
+ * SHA-1 算法
+ * ================================================================ */
+
+typedef struct {
+    uint32_t state[5];
+    uint32_t count[2];
+    unsigned char buffer[64];
+} sha1_ctx_t;
+
+static void sha1_transform(uint32_t state[5], const unsigned char buffer[64]);
+
+#define SHA1_ROTATE_LEFT(value, bits) (((value) << (bits)) | ((value) >> (32 - (bits))))
+#define SHA1_BLOCK_DATA(i) (block[i] = (SHA1_ROTATE_LEFT(block[i - 3] ^ block[i - 8] ^ block[i - 14] ^ block[i - 16], 1)))
+
+static void sha1_init(sha1_ctx_t* ctx) {
+    ctx->count[0] = ctx->count[1] = 0;
+    ctx->state[0] = 0x67452301;
+    ctx->state[1] = 0xEFCDAB89;
+    ctx->state[2] = 0x98BADCFE;
+    ctx->state[3] = 0x10325476;
+    ctx->state[4] = 0xC3D2E1F0;
+}
+
+static void sha1_update(sha1_ctx_t* ctx, const unsigned char* data, uint32_t len) {
+    uint32_t i, j;
+    j = (ctx->count[0] >> 3) & 0x3F;
+    if ((ctx->count[0] += len << 3) < (len << 3)) ctx->count[1]++;
+    ctx->count[1] += len >> 29;
+    if ((j + len) > 63) {
+        memcpy(&ctx->buffer[j], data, (i = 64 - j));
+        sha1_transform(ctx->state, ctx->buffer);
+        for (; i + 63 < len; i += 64)
+            sha1_transform(ctx->state, &data[i]);
+        j = 0;
+    } else { i = 0; }
+    memcpy(&ctx->buffer[j], &data[i], len - i);
+}
+
+static void sha1_final(unsigned char digest[20], sha1_ctx_t* ctx) {
+    uint32_t i, j;
+    unsigned char bits[8];
+    for (i = 0; i < 8; i++)
+        bits[i] = (unsigned char)((ctx->count[(i >= 4 ? 0 : 1)] >> ((3 - (i & 3)) * 8)) & 255);
+    unsigned char c = 0200;
+    sha1_update(ctx, &c, 1);
+    while ((ctx->count[0] & 504) != 448) {
+        c = 0;
+        sha1_update(ctx, &c, 1);
+    }
+    sha1_update(ctx, bits, 8);
+    for (i = 0; i < 20; i++)
+        digest[i] = (unsigned char)((ctx->state[i >> 2] >> ((3 - (i & 3)) * 8)) & 255);
+    memset(ctx, 0, sizeof(*ctx));
+}
+
+static void sha1_transform(uint32_t state[5], const unsigned char buffer[64]) {
+    uint32_t a, b, c, d, e;
+    uint32_t block[80];
+    int i;
+    for (i = 0; i < 16; i++)
+        block[i] = ((uint32_t)buffer[i * 4] << 24) | ((uint32_t)buffer[i * 4 + 1] << 16) |
+                   ((uint32_t)buffer[i * 4 + 2] << 8) | (uint32_t)buffer[i * 4 + 3];
+    for (i = 16; i < 80; i++)
+        block[i] = SHA1_ROTATE_LEFT(block[i - 3] ^ block[i - 8] ^ block[i - 14] ^ block[i - 16], 1);
+    a = state[0]; b = state[1]; c = state[2]; d = state[3]; e = state[4];
+    for (i = 0; i < 20; i++) {
+        uint32_t tmp = SHA1_ROTATE_LEFT(a, 5) + ((b & c) | (~b & d)) + e + block[i] + 0x5A827999;
+        e = d; d = c; c = SHA1_ROTATE_LEFT(b, 30); b = a; a = tmp;
+    }
+    for (i = 20; i < 40; i++) {
+        uint32_t tmp = SHA1_ROTATE_LEFT(a, 5) + (b ^ c ^ d) + e + block[i] + 0x6ED9EBA1;
+        e = d; d = c; c = SHA1_ROTATE_LEFT(b, 30); b = a; a = tmp;
+    }
+    for (i = 40; i < 60; i++) {
+        uint32_t tmp = SHA1_ROTATE_LEFT(a, 5) + ((b & c) | (b & d) | (c & d)) + e + block[i] + 0x8F1BBCDC;
+        e = d; d = c; c = SHA1_ROTATE_LEFT(b, 30); b = a; a = tmp;
+    }
+    for (i = 60; i < 80; i++) {
+        uint32_t tmp = SHA1_ROTATE_LEFT(a, 5) + (b ^ c ^ d) + e + block[i] + 0xCA62C1D6;
+        e = d; d = c; c = SHA1_ROTATE_LEFT(b, 30); b = a; a = tmp;
+    }
+    state[0] += a; state[1] += b; state[2] += c; state[3] += d; state[4] += e;
+}
+
+char* dv_sha1(const char* data, int len) {
+    if (!data || len <= 0) return dv_strdup("da39a3ee5e6b4b0d3255bfef95601890afd80709");
+    sha1_ctx_t ctx;
+    unsigned char digest[20];
+    sha1_init(&ctx);
+    sha1_update(&ctx, (const unsigned char*)data, (uint32_t)len);
+    sha1_final(digest, &ctx);
+    return hex_encode(digest, 20);
+}
+
+/* ================================================================
+ * SHA-256 算法
+ * ================================================================ */
+
+typedef struct {
+    uint32_t state[8];
+    uint32_t count[2];
+    unsigned char buffer[64];
+} sha256_ctx_t;
+
+static const uint32_t sha256_k[64] = {
+    0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,
+    0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,
+    0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,
+    0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,
+    0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,
+    0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,
+    0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
+    0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
+};
+
+#define SHA256_ROTR(x,n) (((x) >> (n)) | ((x) << (32 - (n))))
+#define SHA256_S0(x) (SHA256_ROTR(x, 7) ^ SHA256_ROTR(x, 18) ^ ((x) >> 3))
+#define SHA256_S1(x) (SHA256_ROTR(x, 17) ^ SHA256_ROTR(x, 19) ^ ((x) >> 10))
+#define SHA256_E0(x) (SHA256_ROTR(x, 2) ^ SHA256_ROTR(x, 13) ^ SHA256_ROTR(x, 22))
+#define SHA256_E1(x) (SHA256_ROTR(x, 6) ^ SHA256_ROTR(x, 11) ^ SHA256_ROTR(x, 25))
+#define SHA256_CH(x,y,z) (((x) & (y)) ^ (~(x) & (z)))
+#define SHA256_MAJ(x,y,z) (((x) & (y)) ^ ((x) & (z)) ^ ((y) & (z)))
+
+static void sha256_transform(sha256_ctx_t* ctx, const unsigned char data[64]) {
+    uint32_t a, b, c, d, e, f, g, h, t1, t2, m[64];
+    int i, j;
+    for (i = 0, j = 0; i < 16; i++, j += 4)
+        m[i] = ((uint32_t)data[j] << 24) | ((uint32_t)data[j + 1] << 16) |
+               ((uint32_t)data[j + 2] << 8) | (uint32_t)data[j + 3];
+    for (; i < 64; i++)
+        m[i] = SHA256_S1(m[i - 2]) + m[i - 7] + SHA256_S0(m[i - 15]) + m[i - 16];
+    a = ctx->state[0]; b = ctx->state[1]; c = ctx->state[2]; d = ctx->state[3];
+    e = ctx->state[4]; f = ctx->state[5]; g = ctx->state[6]; h = ctx->state[7];
+    for (i = 0; i < 64; i++) {
+        t1 = h + SHA256_E1(e) + SHA256_CH(e, f, g) + sha256_k[i] + m[i];
+        t2 = SHA256_E0(a) + SHA256_MAJ(a, b, c);
+        h = g; g = f; f = e; e = d + t1; d = c; c = b; b = a; a = t1 + t2;
+    }
+    ctx->state[0] += a; ctx->state[1] += b; ctx->state[2] += c; ctx->state[3] += d;
+    ctx->state[4] += e; ctx->state[5] += f; ctx->state[6] += g; ctx->state[7] += h;
+}
+
+static void sha256_init(sha256_ctx_t* ctx) {
+    ctx->count[0] = ctx->count[1] = 0;
+    ctx->state[0] = 0x6a09e667; ctx->state[1] = 0xbb67ae85;
+    ctx->state[2] = 0x3c6ef372; ctx->state[3] = 0xa54ff53a;
+    ctx->state[4] = 0x510e527f; ctx->state[5] = 0x9b05688c;
+    ctx->state[6] = 0x1f83d9ab; ctx->state[7] = 0x5be0cd19;
+}
+
+static void sha256_update(sha256_ctx_t* ctx, const unsigned char* data, uint32_t len) {
+    uint32_t i;
+    for (i = 0; i < len; i++) {
+        ctx->buffer[(ctx->count[0] >> 3) & 0x3F] = data[i];
+        ctx->count[0] += 8;
+        if ((ctx->count[0] & 0x1FF) == 0) {
+            sha256_transform(ctx, ctx->buffer);
+            ctx->count[1]++;
+            ctx->count[0] = 0;
+        }
+    }
+}
+
+static void sha256_final(unsigned char digest[32], sha256_ctx_t* ctx) {
+    uint32_t i;
+    unsigned char bits[8];
+    for (i = 0; i < 4; i++) {
+        bits[i] = (unsigned char)((ctx->count[1] >> (24 - i * 8)) & 0xFF);
+        bits[i + 4] = (unsigned char)((ctx->count[0] >> (24 - i * 8)) & 0xFF);
+    }
+    unsigned char pad = 0x80;
+    sha256_update(ctx, &pad, 1);
+    while ((ctx->count[0] & 0x1FF) != 448) {
+        pad = 0;
+        sha256_update(ctx, &pad, 1);
+    }
+    sha256_update(ctx, bits, 8);
+    for (i = 0; i < 32; i++)
+        digest[i] = (unsigned char)((ctx->state[i >> 2] >> (24 - (i & 3) * 8)) & 0xFF);
+}
+
+char* dv_sha256(const char* data, int len) {
+    if (!data || len <= 0) return dv_strdup("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+    sha256_ctx_t ctx;
+    unsigned char digest[32];
+    sha256_init(&ctx);
+    sha256_update(&ctx, (const unsigned char*)data, (uint32_t)len);
+    sha256_final(digest, &ctx);
+    return hex_encode(digest, 32);
+}
+
+/* ================================================================
  * JSON 操作
  * ================================================================ */
 
@@ -2338,6 +3256,15 @@ void dv_class_get_member(DuanValue* result, DuanValue* obj, const char* field_na
 #define MAX_CLASSES 128
 #define MAX_METHODS_PER_CLASS 64
 #define MAX_ATTRS_PER_CLASS 128
+#define MAX_INTERFACES 64
+#define MAX_METHODS_PER_INTERFACE 32
+
+typedef struct {
+    char name[MAX_CLASS_NAME_LEN];
+    int num_methods;
+    char method_names[MAX_METHODS_PER_INTERFACE][MAX_CLASS_NAME_LEN];
+    char method_signatures[MAX_METHODS_PER_INTERFACE][MAX_CLASS_NAME_LEN];
+} DuanInterfaceInfo;
 
 typedef struct {
     char name[MAX_CLASS_NAME_LEN];
@@ -2348,10 +3275,14 @@ typedef struct {
     int method_flags[MAX_METHODS_PER_CLASS];  /* 0=实例方法, 1=类方法, 2=静态方法 */
     int num_attrs;
     char attr_names[MAX_ATTRS_PER_CLASS][MAX_CLASS_NAME_LEN];
+    int num_implemented_interfaces;
+    char implemented_interfaces[MAX_INTERFACES][MAX_CLASS_NAME_LEN];
 } DuanClassInfo;
 
 static DuanClassInfo __dv_classes[MAX_CLASSES];
 static int __dv_num_classes = 0;
+static DuanInterfaceInfo __dv_interfaces[MAX_INTERFACES];
+static int __dv_num_interfaces = 0;
 
 /* 前置声明 */
 DuanClassInfo* dv_find_class(const char* name);
@@ -2479,6 +3410,113 @@ int dv_register_attr(const char* class_name, const char* attr_name) {
     strncpy(cls->attr_names[cls->num_attrs], attr_name, MAX_CLASS_NAME_LEN - 1);
     cls->attr_names[cls->num_attrs][MAX_CLASS_NAME_LEN - 1] = '\0';
     cls->num_attrs++;
+    return 0;
+}
+
+/* ================================================================
+ * 接口系统（Level 7）
+ * ================================================================ */
+
+/* 查找接口，找不到返回 NULL */
+static DuanInterfaceInfo* dv_find_interface(const char* name) {
+    if (!name) return NULL;
+    for (int i = 0; i < __dv_num_interfaces; i++) {
+        if (strcmp(__dv_interfaces[i].name, name) == 0) {
+            return &__dv_interfaces[i];
+        }
+    }
+    return NULL;
+}
+
+/* 注册接口，返回 0 表示成功，-1 表示失败 */
+int dv_register_interface(const char* name) {
+    if (!name) return -1;
+
+    /* 已存在则跳过 */
+    if (dv_find_interface(name)) return 0;
+
+    if (__dv_num_interfaces >= MAX_INTERFACES) return -1;
+
+    DuanInterfaceInfo* iface = &__dv_interfaces[__dv_num_interfaces];
+    memset(iface, 0, sizeof(DuanInterfaceInfo));
+    strncpy(iface->name, name, MAX_CLASS_NAME_LEN - 1);
+    iface->name[MAX_CLASS_NAME_LEN - 1] = '\0';
+    __dv_num_interfaces++;
+    return 0;
+}
+
+/* 注册接口方法，返回 0 表示成功，-1 表示失败
+ * signature 格式："方法名/参数个数"
+ */
+int dv_register_interface_method(const char* interface_name, const char* method_name, const char* signature) {
+    if (!interface_name || !method_name) return -1;
+
+    DuanInterfaceInfo* iface = dv_find_interface(interface_name);
+    if (!iface) return -1;
+
+    if (iface->num_methods >= MAX_METHODS_PER_INTERFACE) return -1;
+
+    /* 检查是否已注册 */
+    for (int i = 0; i < iface->num_methods; i++) {
+        if (strcmp(iface->method_names[i], method_name) == 0) {
+            return 0;
+        }
+    }
+
+    strncpy(iface->method_names[iface->num_methods], method_name, MAX_CLASS_NAME_LEN - 1);
+    iface->method_names[iface->num_methods][MAX_CLASS_NAME_LEN - 1] = '\0';
+    if (signature) {
+        strncpy(iface->method_signatures[iface->num_methods], signature, MAX_CLASS_NAME_LEN - 1);
+        iface->method_signatures[iface->num_methods][MAX_CLASS_NAME_LEN - 1] = '\0';
+    }
+    iface->num_methods++;
+    return 0;
+}
+
+/* 检查类是否实现指定接口，返回 1 表示实现，0 表示未实现
+ * 注意：当前实现仅基于显式声明，未来可扩展为基于方法签名检查
+ */
+/* 注册类实现的接口，返回 0 表示成功，-1 表示失败 */
+int dv_register_class_implements(const char* class_name, const char* interface_name) {
+    if (!class_name || !interface_name) return -1;
+
+    DuanClassInfo* cls = dv_find_class(class_name);
+    if (!cls) return -1;
+
+    if (cls->num_implemented_interfaces >= MAX_INTERFACES) return -1;
+
+    /* 检查是否已注册 */
+    for (int i = 0; i < cls->num_implemented_interfaces; i++) {
+        if (strcmp(cls->implemented_interfaces[i], interface_name) == 0) {
+            return 0;
+        }
+    }
+
+    strncpy(cls->implemented_interfaces[cls->num_implemented_interfaces],
+            interface_name, MAX_CLASS_NAME_LEN - 1);
+    cls->implemented_interfaces[cls->num_implemented_interfaces][MAX_CLASS_NAME_LEN - 1] = '\0';
+    cls->num_implemented_interfaces++;
+    return 0;
+}
+
+int dv_class_implements_interface(const char* class_name, const char* interface_name) {
+    if (!class_name || !interface_name) return 0;
+
+    DuanClassInfo* cls = dv_find_class(class_name);
+    if (!cls) return 0;
+
+    /* 显式声明检查 */
+    for (int i = 0; i < cls->num_implemented_interfaces; i++) {
+        if (strcmp(cls->implemented_interfaces[i], interface_name) == 0) {
+            return 1;
+        }
+    }
+
+    /* 递归检查父类 */
+    if (cls->super_name[0] != '\0') {
+        return dv_class_implements_interface(cls->super_name, interface_name);
+    }
+
     return 0;
 }
 

@@ -20,13 +20,36 @@ except ImportError:
 DUANVALUE_STRUCT = '{ i32, i64, double, ptr, i32, i32, i32, ptr }'
 
 
+# DWARF 调试信息标记
+_DEBUG_METADATA_KINDS = {
+    'DW_TAG': {
+        'compile_unit': 0x11,
+        'subprogram': 0x2e,
+        'variable': 0x34,
+        'structure_type': 0x13,
+    },
+    'DW_ATE': {
+        'signed': 0x05,
+        'unsigned': 0x07,
+        'boolean': 0x02,
+        'float': 0x04,
+    },
+    'DW_LANG': {
+        'C': 0x0002,
+        'C_plus_plus': 0x0004,
+        'Python': 0x1007,
+    },
+}
+
+
 class TypedLLVMCodeGen(LLVMCodeGen):
     """类型版 LLVM 代码生成器"""
 
-    def __init__(self, target_platform: str = None):
+    def __init__(self, target_platform: str = None, debug: bool = False):
         super().__init__()
         self._dv_struct_slots = {}  # 栈上分配的结构体槽位
         self._classes = {}  # 类定义收集：class_name -> ClassDefinition
+        self._interfaces = {}  # 接口定义收集：interface_name -> InterfaceDefinition
         self._method_result_ptr = None  # 当前方法的 result 指针（None 表示不在方法中）
         self._seg_result_ptr = None  # 当前段落函数的 result 指针（None 表示不在段落函数中）
         self._current_class = None  # 当前方法所属的类名（None 表示不在方法中）
@@ -46,6 +69,19 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self.target_platform = target_platform or sys.platform
         # IR 优化：SSA 值到 slot 指针的缓存，避免冗余 load/store
         self._dv_ssa_to_slot = {}  # dv_ssa_reg -> slot_ptr
+        # 调试信息生成（DWARF）
+        self._debug = debug
+        self._debug_meta_idx = 0  # 元数据索引计数器
+        self._debug_types = {}  # 缓存的调试类型
+        self._current_debug_loc = None  # 当前调试位置 (line, col)
+        self._debug_file_id = None  # DIFile 元数据 ID
+        self._debug_cu_id = None  # DICompileUnit 元数据 ID
+        self._debug_scope_id = None  # 当前调试作用域 ID
+        self._debug_func_id = None  # 当前函数 DISubprogram ID
+        self._debug_dv_struct_id = None  # DuanValue 结构体类型 ID
+        # 调试元数据行：单独收集，在 finalize 时追加到 IR 末尾
+        # 因为 LLVM 要求所有 !N = !DIxxx 必须出现在文件末尾，不能在函数体中间
+        self._debug_metadata_lines = []
 
     @property
     def is_windows(self) -> bool:
@@ -66,6 +102,120 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             line = f'{reg} = alloca {DUANVALUE_STRUCT}'
             self._pending_allocas.append(line)
             self._local_vars[name] = reg
+
+    # ============================================================
+    # 调试信息生成（DWARF）
+    # ============================================================
+
+    def _new_debug_id(self) -> int:
+        """生成新的调试元数据 ID"""
+        self._debug_meta_idx += 1
+        return self._debug_meta_idx
+
+    def _get_debug_location(self, node) -> Tuple[int, int]:
+        """从 AST 节点获取调试位置（行号，列号）"""
+        line = getattr(node, 'lineno', 0) if node else 0
+        col = getattr(node, 'col_offset', 0) if node else 0
+        return (line, col)
+
+    def _set_debug_location(self, line: int, col: int = 0):
+        """设置当前调试位置"""
+        self._current_debug_loc = (line, col)
+
+    def _emit_debug_loc(self) -> str:
+        """生成 !dbg 调试位置元数据引用，返回后缀字符串
+
+        若未启用调试或未设置位置，返回空字符串；
+        否则生成 !DILocation 元数据并返回 ", !dbg !N" 后缀。
+        """
+        if not self._debug or self._current_debug_loc is None:
+            return ""
+        line, col = self._current_debug_loc
+        dbg_id = self._new_debug_id()
+        self._emit_debug_metadata(f"!{dbg_id} = !DILocation(line: {line}, column: {col}, scope: !{self._debug_scope_id})")
+        return f", !dbg !{dbg_id}"
+
+    def _emit_debug_var(self, name: str, slot: str, line: int) -> str:
+        """为局部变量生成调试信息（!DILocalVariable）
+
+        返回 ", !dbg !N" 后缀用于附加到 store 指令。
+        """
+        if not self._debug:
+            return ""
+        var_id = self._new_debug_id()
+        self._emit_debug_metadata(f'!{var_id} = !DILocalVariable(name: "{name}", arg: 0, scope: !{self._debug_scope_id}, file: !{self._debug_file_id}, line: {line})')
+        return f", !dbg !{var_id}"
+
+    def _gen_debug_types(self):
+        """生成调试类型元数据（DuanValue 结构体及基础类型）"""
+        if not self._debug:
+            return
+        # DuanValue 结构体类型定义
+        self._debug_dv_struct_id = self._new_debug_id()
+        self._debug_types['DuanValue'] = self._debug_dv_struct_id
+        # 内部类型 - i64
+        self._debug_type_i64 = self._new_debug_id()
+        self._emit_debug_metadata(f"!{self._debug_type_i64} = !DIBasicType(name: \"i64\", size: 64, align: 64, encoding: DW_ATE_unsigned)")
+        # 内部类型 - i32
+        self._debug_type_i32 = self._new_debug_id()
+        self._emit_debug_metadata(f"!{self._debug_type_i32} = !DIBasicType(name: \"i32\", size: 32, align: 32, encoding: DW_ATE_unsigned)")
+        # 内部类型 - double
+        self._debug_type_double = self._new_debug_id()
+        self._emit_debug_metadata(f"!{self._debug_type_double} = !DIBasicType(name: \"double\", size: 64, align: 64, encoding: DW_ATE_float)")
+        # 指针类型
+        self._debug_type_ptr = self._new_debug_id()
+        self._emit_debug_metadata(f"!{self._debug_type_ptr} = !DIBasicType(name: \"ptr\", size: 64, align: 64)")
+        # 结构体成员列表（DuanValue 包含 i32, i64, double, ptr, i32, i32, i32, ptr）
+        elements_id = self._new_debug_id()
+        self._emit_debug_metadata(f"!{elements_id} = !{{!{self._debug_type_i32}, !{self._debug_type_i64}, !{self._debug_type_double}, !{self._debug_type_ptr}, !{self._debug_type_i32}, !{self._debug_type_i32}, !{self._debug_type_i32}, !{self._debug_type_ptr}}}")
+        # DICompositeType 用于 DuanValue 结构体
+        self._emit_debug_metadata(f"!{self._debug_dv_struct_id} = !DICompositeType(tag: DW_TAG_structure_type, name: \"DuanValue\", size: 384, align: 64, elements: !{elements_id})")
+
+    def _gen_debug_compile_unit(self, source_file: str = ""):
+        """生成调试编译单元信息（DICompileUnit + DIFile）"""
+        if not self._debug:
+            return
+        self._debug_file_id = self._new_debug_id()
+        self._debug_cu_id = self._new_debug_id()
+        file_name = source_file or "input.duan"
+        self._emit_debug_metadata(f'!{self._debug_file_id} = !DIFile(filename: "{file_name}", directory: ".")')
+        self._emit_debug_metadata(f'!{self._debug_cu_id} = distinct !DICompileUnit(language: DW_LANG_Python, file: !{self._debug_file_id}, producer: "段言编译器 v3", isOptimized: true, flags: "", runtimeVersion: 0, splitDebugInlining: false, emissionKind: FullDebug)')
+        self._debug_scope_id = self._debug_cu_id
+
+    def _gen_debug_function(self, name: str, line: int, param_names: List[str] = None):
+        """生成函数调试信息（DISubprogram）
+
+        调用后会切换当前调试作用域到该函数。
+        """
+        if not self._debug:
+            return
+        self._debug_func_id = self._new_debug_id()
+        # 函数类型元数据（DISubroutineType）
+        func_type_id = self._new_debug_id()
+        # 返回类型列表（简化：返回 DuanValue）
+        ret_types_id = self._new_debug_id()
+        self._emit_debug_metadata(f"!{ret_types_id} = !{{!{self._debug_dv_struct_id}}}")
+        self._emit_debug_metadata(f"!{func_type_id} = !DISubroutineType(types: !{ret_types_id})")
+        # 简化处理：使用 DuanValue 作为所有参数和返回类型
+        self._emit_debug_metadata(f'!{self._debug_func_id} = distinct !DISubprogram(name: "{name}", scope: !{self._debug_file_id}, file: !{self._debug_file_id}, line: {line}, type: !{func_type_id}, scopeLine: {line}, flags: DIFlagPrototyped, spFlags: DISPFlagDefinition, unit: !{self._debug_cu_id})')
+        self._debug_scope_id = self._debug_func_id
+
+    def _end_debug_function(self):
+        """结束当前函数的调试作用域，恢复到编译单元作用域"""
+        if self._debug:
+            self._debug_scope_id = self._debug_cu_id
+
+    def _emit_debug_metadata(self, line: str):
+        """将调试元数据行收集到单独列表，在 finalize 时追加到 IR 末尾"""
+        self._debug_metadata_lines.append(line)
+
+    def finalize(self) -> str:
+        """覆写父类方法：在生成 IR 时追加调试元数据"""
+        # 先把调试元数据追加到 _lines 末尾
+        if self._debug and self._debug_metadata_lines:
+            self._lines.append('')
+            self._lines.extend(self._debug_metadata_lines)
+        return super().finalize()
 
     # ============================================================
     # 类型控制
@@ -117,12 +267,42 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             f'declare void @dv_floor(ptr, ptr)',
             f'declare void @dv_ceil(ptr, ptr)',
             f'declare void @dv_mod(ptr, ptr, ptr)',
+            # 数学扩展（第三批）
+            f'declare void @dv_tan(ptr, ptr)',
+            f'declare void @dv_asin(ptr, ptr)',
+            f'declare void @dv_acos(ptr, ptr)',
+            f'declare void @dv_atan(ptr, ptr)',
+            f'declare void @dv_atan2(ptr, ptr, ptr)',
+            f'declare void @dv_log(ptr, ptr)',
+            f'declare void @dv_log2(ptr, ptr)',
+            f'declare void @dv_log10(ptr, ptr)',
+            f'declare void @dv_exp(ptr, ptr)',
+            f'declare void @dv_round(ptr, ptr)',
+            f'declare void @dv_trunc(ptr, ptr)',
+            f'declare void @dv_sign(ptr, ptr)',
+            f'declare void @dv_hypot(ptr, ptr, ptr)',
+            f'declare void @dv_degrees(ptr, ptr)',
+            f'declare void @dv_radians(ptr, ptr)',
+            f'declare void @dv_min(ptr, ptr, ptr)',
+            f'declare void @dv_max(ptr, ptr, ptr)',
+            f'declare void @dv_gcd(ptr, ptr, ptr)',
+            f'declare void @dv_lcm(ptr, ptr, ptr)',
             f'declare void @dv_substr(ptr, ptr, i64, i64)',
             f'declare i64 @dv_str_find(ptr, ptr)',
             f'declare void @dv_upper(ptr, ptr)',
             f'declare void @dv_lower(ptr, ptr)',
             f'declare void @dv_trim(ptr, ptr)',
             f'declare void @dv_str_replace(ptr, ptr, ptr, ptr)',
+            # 字符串扩展（第三批）
+            f'declare void @dv_str_repeat(ptr, ptr, ptr)',
+            f'declare i32 @dv_str_contains(ptr, ptr)',
+            f'declare i32 @dv_str_starts_with(ptr, ptr)',
+            f'declare i32 @dv_str_ends_with(ptr, ptr)',
+            f'declare i64 @dv_str_count(ptr, ptr)',
+            f'declare void @dv_str_rjust(ptr, ptr, ptr, ptr)',
+            f'declare void @dv_str_ljust(ptr, ptr, ptr, ptr)',
+            f'declare void @dv_str_center(ptr, ptr, ptr, ptr)',
+            f'declare void @dv_str_reverse(ptr, ptr)',
             f'declare void @dv_str_split(ptr, ptr, ptr)',
             f'declare void @dv_to_int(ptr, ptr)',
             f'declare void @dv_to_float(ptr, ptr)',
@@ -163,6 +343,11 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             f'declare i32 @dv_register_class(ptr, ptr)',
             f'declare i32 @dv_register_method(ptr, ptr, ptr)',
             f'declare i32 @dv_register_attr(ptr, ptr)',
+            # 接口系统（Level 7）
+            f'declare i32 @dv_register_interface(ptr)',
+            f'declare i32 @dv_register_interface_method(ptr, ptr, ptr)',
+            f'declare i32 @dv_register_class_implements(ptr, ptr)',
+            f'declare i32 @dv_class_implements_interface(ptr, ptr)',
             f'declare ptr @dv_find_method(ptr, ptr)',
             f'declare void @dv_class_new_named(ptr, ptr)',
             f'declare void @dv_get_class_name(ptr, ptr, i32)',
@@ -187,6 +372,19 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             f'declare void @dv_dict_has(ptr, ptr, ptr)',
             f'declare void @dv_dict_keys(ptr, ptr)',
             f'declare void @dv_dict_values(ptr, ptr)',
+            # 文件系统扩展
+            f'declare i32 @dv_mkdir(ptr)',
+            f'declare i32 @dv_rmdir(ptr)',
+            f'declare i32 @dv_rename_file(ptr, ptr)',
+            f'declare i32 @dv_copy_file(ptr, ptr)',
+            f'declare i32 @dv_is_file(ptr)',
+            f'declare i32 @dv_is_dir(ptr)',
+            # 哈希/编码
+            f'declare ptr @dv_md5(ptr, i32)',
+            f'declare ptr @dv_sha1(ptr, i32)',
+            f'declare ptr @dv_sha256(ptr, i32)',
+            f'declare ptr @dv_base64_encode(ptr, i32)',
+            f'declare ptr @dv_base64_decode(ptr, ptr)',
             # 协程/异步
             f'declare ptr @dv_coro_create(ptr, ptr, i32, i32)',
             f'declare void @dv_coro_await(ptr, ptr)',
@@ -399,6 +597,11 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self.declare_runtime()
         self._declare_typed_runtime()
 
+        # 初始化调试信息（DWARF）
+        if self._debug:
+            self._gen_debug_compile_unit()
+            self._gen_debug_types()
+
         # Level 9: 处理导入语句
         self._process_imports(module)
 
@@ -409,6 +612,10 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if hasattr(module, 'classes'):
             for cls_def in module.classes:
                 self._collect_class(cls_def)
+        # 收集接口定义（Level 7）
+        if hasattr(module, 'interfaces'):
+            for iface_def in module.interfaces:
+                self._collect_interface(iface_def)
         for seg in module.segments:
             self._collect_segment(seg)
 
@@ -1670,6 +1877,10 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         """收集类定义"""
         self._classes[cls_def.name] = cls_def
 
+    def _collect_interface(self, iface_def):
+        """收集接口定义（Level 7）"""
+        self._interfaces[iface_def.name] = iface_def
+
     def _get_method_type(self, method_def) -> str:
         """判断方法类型：'instance' | 'class' | 'static'
         
@@ -1769,6 +1980,11 @@ class TypedLLVMCodeGen(LLVMCodeGen):
     def _gen_statement(self, stmt):
         if stmt is None:
             return
+        # 设置调试位置（用于 !dbg 元数据）
+        if self._debug:
+            line = getattr(stmt, 'lineno', 0) if stmt else 0
+            col = getattr(stmt, 'col_offset', 0) if stmt else 0
+            self._set_debug_location(line, col)
         if isinstance(stmt, ast.VariableDeclaration):
             self._gen_typed_var_decl(stmt)
         elif isinstance(stmt, ast.Assignment):
@@ -2159,6 +2375,19 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         # 注册内置异常类
         self._gen_builtin_exception_classes()
 
+        # 注册所有接口（Level 7）
+        for iface_name, iface_def in self._interfaces.items():
+            name_reg = self.gen_string_constant(iface_name)
+            _ = self.new_register()
+            self.emit(f'{_} = call i32 @dv_register_interface(ptr {name_reg})')
+
+            for method in iface_def.methods:
+                method_name_reg = self.gen_string_constant(method.name)
+                param_count = len(method.parameters)
+                sig_reg = self.gen_string_constant(f"{method.name}/{param_count}")
+                _ = self.new_register()
+                self.emit(f'{_} = call i32 @dv_register_interface_method(ptr {name_reg}, ptr {method_name_reg}, ptr {sig_reg})')
+
         # 注册所有类
         for cls_name, cls_def in self._classes.items():
             name_reg = self.gen_string_constant(cls_name)
@@ -2187,7 +2416,14 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                     self.emit(f'{_} = call i32 @dv_register_static_method(ptr {name_reg}, ptr {method_name_reg}, ptr @{method_safe_name})')
                 else:
                     self.emit(f'{_} = call i32 @dv_register_method(ptr {name_reg}, ptr {method_name_reg}, ptr @{method_safe_name})')
-            
+
+            # 注册类实现的接口（Level 7）
+            implements = getattr(cls_def, 'interfaces', []) or []
+            for iface_name in implements:
+                iface_reg = self.gen_string_constant(iface_name)
+                _ = self.new_register()
+                self.emit(f'{_} = call i32 @dv_register_class_implements(ptr {name_reg}, ptr {iface_reg})')
+
             # 注册构造函数（方法名与类名相同）
             constructor = getattr(cls_def, 'constructor', None)
             if constructor is not None:
@@ -2246,6 +2482,10 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self.emit(f'define void @_seg_{safe}(ptr %result, ptr %args, i32 %num_args) {{')
         self.emit('entry:')
 
+        # 生成函数调试信息（DISubprogram）
+        if self._debug:
+            self._gen_debug_function(name, line=1, param_names=[p[0] for p in params])
+
         func_name_ptr = self.gen_string_constant(name)
         file_name_ptr = self.gen_string_constant("")
         self.emit(f'call void @dv_stack_push(ptr {func_name_ptr}, ptr {file_name_ptr}, i32 0)')
@@ -2298,7 +2538,9 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self.emit('}')
         self.emit_blank()
         self._seg_result_ptr = None
-    
+        # 结束函数调试作用域
+        self._end_debug_function()
+
     def _gen_async_segment(self, name, params, body):
         """生成异步段落：包括协程函数和包装段函数
         
@@ -2714,6 +2956,14 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             self.emit(f'define void @{method_safe_name}(ptr %result, ptr %self, ptr %args, i32 %num_args) {{')
         self.emit('entry:')
 
+        # 生成函数调试信息（DISubprogram）
+        if self._debug:
+            method_name_dbg = f'{class_name}.{method_def.name}'
+            params_dbg = [p.name if hasattr(p, 'name') else str(p) for p in (getattr(method_def, 'parameters', []) or [])]
+            if method_type != 'static':
+                params_dbg = ['己'] + params_dbg
+            self._gen_debug_function(method_name_dbg, line=getattr(method_def, 'lineno', 1), param_names=params_dbg)
+
         # 栈追踪：方法入口压栈
         method_name = f'{class_name}.{method_def.name}'
         func_name_ptr = self.gen_string_constant(method_name)
@@ -2794,6 +3044,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._method_result_ptr = None
         self._current_class = None
         self._current_method_type = None
+        # 结束函数调试作用域
+        self._end_debug_function()
 
     def _gen_typed_constructor(self, class_name, constructor_def):
         """生成构造函数
@@ -2810,6 +3062,11 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._reg_counter = 0
         self.emit(f'define i32 @main(i32 %argc, ptr %argv) {{')
         self.emit('entry:')
+
+        # 生成 main 函数调试信息（DISubprogram）
+        if self._debug:
+            self._gen_debug_function('main', line=1, param_names=['argc', 'argv'])
+
         self.emit('call void @dv_init_args(i32 %argc, ptr %argv)')
         self.emit('call void @__duan_init()')
 
@@ -2881,6 +3138,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self.emit('ret i32 0')
         self.emit('}')
         self.emit_blank()
+        # 结束 main 函数调试作用域
+        self._end_debug_function()
 
     # ============================================================
     # 变量管理（存储/加载 DuanValue）
@@ -2935,4 +3194,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         if self._globals:
             lines.append('')
         lines.extend(self._lines)
+        # 追加 DWARF 调试元数据（必须出现在 IR 末尾）
+        if self._debug and self._debug_metadata_lines:
+            lines.append('')
+            lines.extend(self._debug_metadata_lines)
         return '\n'.join(lines)

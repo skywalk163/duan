@@ -88,7 +88,7 @@ def compile_source(source: str, verbose: bool = False) -> str:
     return ir
 
 
-def compile_source_typed(source: str, verbose: bool = False, target_platform: str = None) -> str:
+def compile_source_typed(source: str, verbose: bool = False, target_platform: str = None, debug: bool = False) -> str:
     """
     编译段言源码为 LLVM IR 字符串（typed 模式）
 
@@ -96,6 +96,7 @@ def compile_source_typed(source: str, verbose: bool = False, target_platform: st
         source: 段言源码字符串
         verbose: 是否输出详细信息
         target_platform: 目标平台（win32/linux/darwin），默认自动检测
+        debug: 是否生成 DWARF 调试信息
 
     Returns:
         LLVM IR 字符串
@@ -118,7 +119,7 @@ def compile_source_typed(source: str, verbose: bool = False, target_platform: st
     if verbose:
         print(f"[3/3] 生成 LLVM IR (typed)...")
 
-    codegen = TypedLLVMCodeGen(target_platform=target_platform)
+    codegen = TypedLLVMCodeGen(target_platform=target_platform, debug=debug)
     ir = codegen.generate(module)
 
     if verbose:
@@ -153,7 +154,7 @@ def compile_source_to_ir(source: str, output_ll: str = None, verbose: bool = Fal
     return output_ll
 
 
-def compile_duan(source_path: str, output_path: str = None, verbose: bool = False):
+def compile_duan(source_path: str, output_path: str = None, verbose: bool = False, optimize_level: str = None, debug: bool = False):
     """
     编译 .duan 文件为原生可执行文件
 
@@ -161,6 +162,8 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
         source_path: .duan 源文件路径
         output_path: 输出 .exe 路径（默认与源文件同名）
         verbose: 是否输出详细信息
+        optimize_level: LLVM 优化级别（O0/O1/O2/O3，当前保留，未来实现）
+        debug: 是否生成 DWARF 调试信息（字符串模式暂未实现）
     """
     # 读取源码
     with open(source_path, 'r', encoding='utf-8') as f:
@@ -250,7 +253,7 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
     return exe_path
 
 
-def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None):
+def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None, optimize_level: str = None, debug: bool = False):
     """
     编译 .duan 文件为原生可执行文件（typed 模式）
 
@@ -261,6 +264,8 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
         output_path: 输出可执行文件路径（默认与源文件同名）
         verbose: 是否输出详细信息
         target_platform: 目标平台（win32/linux/darwin），默认自动检测
+        optimize_level: LLVM 优化级别（O0/O1/O2/O3，当前保留，未来实现）
+        debug: 是否生成 DWARF 调试信息
     """
     with open(source_path, 'r', encoding='utf-8') as f:
         source = f.read()
@@ -268,7 +273,7 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     if verbose:
         print(f"[1/5] 读取源码: {len(source)} 字符")
 
-    ir = compile_source_typed(source, verbose=verbose, target_platform=target_platform)
+    ir = compile_source_typed(source, verbose=verbose, target_platform=target_platform, debug=debug)
 
     base_path = output_path or source_path.replace('.duan', '')
     base_path = _strip_exe_ext(base_path)
@@ -374,7 +379,7 @@ def find_clang():
     raise RuntimeError("未找到 clang 编译器。请安装 LLVM:\n  Windows: https://github.com/llvm/llvm-project/releases\n  macOS: brew install llvm\n  Linux: sudo apt install clang")
 
 
-def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool = False, target_platform: str = None) -> str:
+def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool = False, target_platform: str = None, debug: bool = False) -> str:
     """
     编译多个段言模块为合并的 LLVM IR（typed 模式）
 
@@ -385,6 +390,7 @@ def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool 
         main_module: 主模块名（生成 main 函数的模块），默认为第一个
         verbose: 是否输出详细信息
         target_platform: 目标平台
+        debug: 是否生成 DWARF 调试信息
 
     Returns:
         合并的 LLVM IR 字符串
@@ -422,11 +428,16 @@ def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool 
     if verbose:
         print(f"[3/3] 生成合并 IR（{len(modules)} 个模块）")
 
-    codegen = TypedLLVMCodeGen(target_platform=target_platform)
+    codegen = TypedLLVMCodeGen(target_platform=target_platform, debug=debug)
 
     # 初始化运行时声明（只做一次）
     codegen.declare_runtime()
     codegen._declare_typed_runtime()
+
+    # 初始化调试信息（DWARF）
+    if debug:
+        codegen._gen_debug_compile_unit()
+        codegen._gen_debug_types()
 
     # 收集所有模块的导入和段落
     all_module_list = list(modules.values())
@@ -447,6 +458,10 @@ def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool 
         if hasattr(mod, 'classes'):
             for cls_def in mod.classes:
                 codegen._collect_class(cls_def)
+        # 收集接口定义（Level 7）
+        if hasattr(mod, 'interfaces'):
+            for iface_def in mod.interfaces:
+                codegen._collect_interface(iface_def)
         for seg in mod.segments:
             codegen._collect_segment(seg)
 
@@ -492,7 +507,7 @@ def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool 
     return codegen.finalize()
 
 
-def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None):
+def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None, optimize_level: str = None, debug: bool = False):
     """
     编译段言项目为原生可执行文件（支持多模块）
 
@@ -503,6 +518,8 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
         output_path: 输出路径
         verbose: 是否输出详细信息
         target_platform: 目标平台
+        optimize_level: LLVM 优化级别（O0/O1/O2/O3，当前保留，未来实现）
+        debug: 是否生成 DWARF 调试信息
     """
     try:
         from ..module_resolver import ModuleResolver
@@ -548,7 +565,8 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
         print(f"[1/4] 收集到 {len(sources)} 个模块: {', '.join(sources.keys())}")
 
     # 编译所有模块
-    ir = compile_modules_typed(sources, main_module=main_name, verbose=verbose, target_platform=target_platform)
+    ir = compile_modules_typed(sources, main_module=main_name, verbose=verbose, target_platform=target_platform, debug=debug)
+    _ = optimize_level  # 当前未实现，预留参数
 
     # 写入 .ll 文件
     base_path = output_path or source_path.replace('.duan', '')

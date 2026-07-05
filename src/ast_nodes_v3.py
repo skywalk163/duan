@@ -380,16 +380,17 @@ class SelfAssignment(ASTNode):
 
 
 class ClassDefinition(ASTNode):
-    __slots__ = ('name', 'attributes', 'methods', 'base_classes', 'generic_params')
+    __slots__ = ('name', 'attributes', 'methods', 'base_classes', 'generic_params', 'interfaces')
     """类定义"""
     def __init__(self, name: str, attributes: List[AttributeDeclaration], 
                  methods: List[MethodDefinition], base_classes: List[str] = None,
-                 generic_params: List[str] = None):
+                 generic_params: List[str] = None, interfaces: List[str] = None):
         self.name = name
         self.attributes = attributes
         self.methods = methods
         self.base_classes = base_classes or []
         self.generic_params = generic_params or []
+        self.interfaces = interfaces or []
     
     def __repr__(self):
         return f"ClassDefinition({self.name})"

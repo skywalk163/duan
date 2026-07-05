@@ -1,0 +1,61 @@
+段 主：
+  # 测试 MD5
+  打印 "MD5 测试:"
+  结果1 = 调用原生 "dv_md5", "hello", 5
+  输出结果 结果1
+
+  # 测试 SHA1
+  打印 "SHA1 测试:"
+  结果2 = 调用原生 "dv_sha1", "hello", 5
+  输出结果 结果2
+
+  # 测试 SHA256
+  打印 "SHA256 测试:"
+  结果3 = 调用原生 "dv_sha256", "hello", 5
+  输出结果 结果3
+
+  # 测试 Base64 编码
+  打印 "Base64 编码测试:"
+  结果4 = 调用原生 "dv_base64_encode", "hello", 5
+  输出结果 结果4
+
+  # 测试 Base64 解码
+  打印 "Base64 解码测试:"
+  解码长度 = 0
+  结果5 = 调用原生 "dv_base64_decode", "aGVsbG8=", 解码长度
+  输出结果 结果5
+
+  # 测试文件系统
+  打印 "文件系统测试:"
+  r1 = 调用原生 "dv_mkdir", "_test_dir"
+  打印 "mkdir 结果: " + 转字符串 r1
+  r2 = 调用原生 "dv_is_dir", "_test_dir"
+  打印 "is_dir: " + 转字符串 r2
+  r3 = 调用原生 "dv_is_file", "_test_dir"
+  打印 "is_file (dir): " + 转字符串 r3
+  r4 = 调用原生 "dv_rmdir", "_test_dir"
+  打印 "rmdir 结果: " + 转字符串 r4
+  r5 = 调用原生 "dv_is_dir", "_test_dir"
+  打印 "is_dir after rm: " + 转字符串 r5
+
+  # 测试 copy_file
+  写入文件 "_src_test.txt", "hello world"
+  r6 = 调用原生 "dv_copy_file", "_src_test.txt", "_dst_test.txt"
+  打印 "copy 结果: " + 转字符串 r6
+  内容 = 读取文件 "_dst_test.txt"
+  打印 "复制后内容: " + 内容
+  r7 = 调用原生 "dv_is_file", "_dst_test.txt"
+  打印 "is_file: " + 转字符串 r7
+
+  # 测试 rename
+  r8 = 调用原生 "dv_rename_file", "_src_test.txt", "_renamed.txt"
+  打印 "rename 结果: " + 转字符串 r8
+  r9 = 调用原生 "dv_is_file", "_renamed.txt"
+  打印 "is_file (renamed): " + 转字符串 r9
+
+  # 清理
+  删除文件 "_dst_test.txt"
+  删除文件 "_renamed.txt"
+。
+
+主()
