@@ -64,6 +64,9 @@ class PythonCodeGenerator:
         # 当前方法参数名追踪（避免将参数名误判为类属性）
         self._current_method_params: set = set()
         
+        # 是否在函数/段落内部（控制 return 生成）
+        self._in_function: bool = False
+        
         # 方法名映射（中文到英文）
         self.method_name_map = {
             '追加': 'append',
@@ -618,6 +621,8 @@ class PythonCodeGenerator:
         # 函数定义
         self._add_line(f"def {name}({params_str}):")
         
+        old_in_function = self._in_function
+        self._in_function = True
         self.indent_level += 1
         if body_without_params:
             for s in body_without_params:
@@ -625,16 +630,29 @@ class PythonCodeGenerator:
         else:
             self._add_line("pass")
         self.indent_level -= 1
+        self._in_function = old_in_function
         
         self._add_line("")
     
     def _generate_return_stmt(self, stmt: ReturnStmt):
-        """生成返回语句"""
-        if stmt.value:
-            value = self._generate_expr(stmt.value)
-            self._add_line(f"return {value}")
+        """生成返回语句
+
+        模块级 return 在 Python 中非法，仅在函数/段落内部生成 return。
+        否则将返回值作为裸表达式输出（用于 REPL 或模块级执行）。
+        """
+        if self._in_function:
+            if stmt.value:
+                value = self._generate_expr(stmt.value)
+                self._add_line(f"return {value}")
+            else:
+                self._add_line("return")
         else:
-            self._add_line("return")
+            # 模块级：将返回值作为表达式输出，不生成 return
+            if stmt.value:
+                value = self._generate_expr(stmt.value)
+                self._add_line(f"print({value})")
+            else:
+                self._add_line("pass")
     
     def _generate_try_stmt(self, stmt: TryStmt):
         """生成异常捕获语句"""
@@ -988,10 +1006,11 @@ class PythonCodeGenerator:
             self._add_line(f"@staticmethod")
         self._add_line(f"def {method_name}({params_str}):")
 
-        self.indent_level += 1
-
-        # 设置类方法上下文，用于自动添加 self. 前缀
+        old_in_function = self._in_function
+        old_in_class = self._in_class_method
+        self._in_function = True
         self._in_class_method = not is_static
+        self.indent_level += 1
 
         # 如果是构造函数且有类属性，为未在构造函数体中初始化的属性生成默认值
         attr_init_lines = []
@@ -1045,8 +1064,9 @@ class PythonCodeGenerator:
         self.indent_level -= 1
         self._add_line("")
         
-        # 重置类方法上下文和参数追踪
-        self._in_class_method = False
+        # 重置上下文
+        self._in_function = old_in_function
+        self._in_class_method = old_in_class
         self._current_method_params = set()
     
     def _generate_expr(self, expr: ASTNode) -> str:

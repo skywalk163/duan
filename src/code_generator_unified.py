@@ -47,6 +47,7 @@ class UnifiedCodeGenerator:
         self.type_inferencer = TypeInferencer()
         self.type_cache: Dict[int, 'Type'] = {}  # 存储推断的类型
         self.user_functions = set()  # 用户定义的函数名
+        self._in_function = False  # 是否在函数/段落内部（控制 return 生成）
         
         # 运算符映射
         self.operator_map = {
@@ -614,12 +615,17 @@ class UnifiedCodeGenerator:
         self.indent_level -= 1
     
     def _generate_return_stmt(self, stmt):
-        """生成返回语句"""
-        if stmt.value is not None:
-            value_code = self._generate_expr(stmt.value)
-            self._add_line(f"return {value_code}")
-        else:
-            self._add_line("return")
+        """生成返回语句
+
+        模块级 return 在 Python 中非法，仅在函数/段落内部生成 return。
+        否则将返回值作为裸表达式输出（用于 REPL 或模块级执行）。
+        """
+        if self._in_function:
+            if stmt.value is not None:
+                value_code = self._generate_expr(stmt.value)
+                self._add_line(f"return {value_code}")
+            else:
+                self._add_line("return")
     
     def _generate_print_stmt(self, stmt):
         """生成打印语句"""
@@ -849,6 +855,8 @@ class UnifiedCodeGenerator:
         
         # 函数定义
         self._add_line(f"{def_keyword} {name}({params_str}):")
+        old_in_function = self._in_function
+        self._in_function = True
         
         self.indent_level += 1
         if hasattr(segment, 'body') and segment.body:
@@ -857,6 +865,7 @@ class UnifiedCodeGenerator:
         else:
             self._add_line("pass")
         self.indent_level -= 1
+        self._in_function = old_in_function
         
         self._add_line("")
     
@@ -1037,6 +1046,8 @@ class UnifiedCodeGenerator:
         # 方法定义
         self._add_line(f"def {name}({params_str}):")
         
+        old_in_function = self._in_function
+        self._in_function = True
         self.indent_level += 1
         if hasattr(method, 'body') and method.body:
             for s in method.body:
@@ -1044,6 +1055,7 @@ class UnifiedCodeGenerator:
         else:
             self._add_line("pass")
         self.indent_level -= 1
+        self._in_function = old_in_function
     
     def _generate_expr(self, expr):
         """生成表达式"""
