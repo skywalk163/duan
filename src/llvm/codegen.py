@@ -182,6 +182,9 @@ class LLVMCodeGen(LLVMCodeGenCore):
                     self._local_vars[stmt.name] = None
             elif isinstance(stmt, ast.IfStatement):
                 self._collect_vars_from_stmts(stmt.then_body)
+                if stmt.elseif_bodies:
+                    for body in stmt.elseif_bodies:
+                        self._collect_vars_from_stmts(body)
                 if stmt.else_body:
                     self._collect_vars_from_stmts(stmt.else_body)
             elif isinstance(stmt, ast.ForeachStatement):

@@ -806,7 +806,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 return self._create_bool_dv(cmp), 'dv'
             return self._create_bool_dv('false'), 'dv'
 
-        if name in ('读取文件', 'read_file', 'load_file'):
+        if name in ('读取文件', 'read_file', 'load_file', '_读文件'):
             if args:
                 path_ptr = self.new_register()
                 self.emit(f'{path_ptr} = extractvalue {DUANVALUE_STRUCT} {args[0]}, 3')
@@ -933,7 +933,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 return self._call_dv_func('dv_float', 'double 0.0'), 'dv'
             return self._call_dv_func('dv_to_float', args[0]), 'dv'
 
-        if name == '长度' or name == 'len':
+        if name == '长度' or name == 'len' or name == '列表长度' or name == '字符串长度':
             if not args:
                 return self._create_int_dv('0'), 'dv'
             slot = self._store_dv(args[0])
@@ -941,13 +941,24 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             self.emit(f'{i64_val} = call i64 @dv_len(ptr {slot})')
             return self._create_int_dv(i64_val), 'dv'
 
-        if name in ('新建', '新建列表', 'new_list'):
+        if name in ('新建', '新建列表', 'new_list', '列表创建'):
             return self._call_dv_func('dv_list_new'), 'dv'
 
-        if name in ('追加', 'append'):
+        if name in ('追加', 'append', '列表追加'):
             if len(args) >= 2:
                 return self._call_dv_func('dv_list_append', args[0], args[1]), 'dv'
             return self._create_int_dv('0'), 'dv'
+
+        if name in ('包含', 'contains', '列表包含'):
+            if len(args) >= 2:
+                slot0 = self._store_dv(args[0])
+                slot1 = self._store_dv(args[1])
+                i64_val = self.new_register()
+                self.emit(f'{i64_val} = call i64 @dv_list_contains(ptr {slot0}, ptr {slot1})')
+                cmp = self.new_register()
+                self.emit(f'{cmp} = icmp ne i64 {i64_val}, 0')
+                return self._create_bool_dv(cmp), 'dv'
+            return self._create_bool_dv('false'), 'dv'
 
         if name in ('插入', 'insert', 'list_insert'):
             if len(args) >= 3:
@@ -1004,7 +1015,7 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 return self._call_dv_func('dv_list_sort', args[0]), 'dv'
             return self._call_dv_func('dv_list_new'), 'dv'
 
-        if name in ('获取', 'get', '索引'):
+        if name in ('获取', 'get', '索引', '列表获取', '字符串获取'):
             if len(args) >= 2:
                 idx_i64 = self.new_register()
                 self.emit(f'{idx_i64} = extractvalue {DUANVALUE_STRUCT} {args[1]}, 1')
@@ -1155,9 +1166,29 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             return self._gen_typed_list_from_builtin_args(args)
 
         # 字典操作
-        if name in ('dict', '字典', '新建字典', '创建字典'):
+        if name in ('dict', '字典', '新建字典', '创建字典', '字典创建'):
             dict_dv = self._call_dv_func('dv_dict_new')
             return dict_dv, 'dv'
+
+        if name in ('字典设置', '字典添加'):
+            if len(args) >= 3:
+                return self._call_dv_func('dv_dict_set', args[0], args[1], args[2]), 'dv'
+            return self._create_int_dv('0'), 'dv'
+
+        if name in ('字典获取',):
+            if len(args) >= 2:
+                return self._call_dv_func('dv_dict_get', args[0], args[1]), 'dv'
+            return self._call_dv_func('dv_null'), 'dv'
+
+        if name in ('字典包含键', '字典有键'):
+            if len(args) >= 2:
+                return self._call_dv_func('dv_dict_has', args[0], args[1]), 'dv'
+            return self._create_bool_dv('false'), 'dv'
+
+        if name in ('字典键列表', '字典键'):
+            if args:
+                return self._call_dv_func('dv_dict_keys', args[0]), 'dv'
+            return self._call_dv_func('dv_list_new'), 'dv'
 
         # 可空类型操作
         if name in ('是空', 'is_null', 'null?'):
@@ -1974,7 +2005,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self.emit(f'{body_lab}:')
         for s in stmt.body:
             self._gen_statement(s)
-        self.emit(f'br label %{cond_lab}')
+        if not self._ends_with_terminator(stmt.body):
+            self.emit(f'br label %{cond_lab}')
 
         self.emit(f'{end_lab}:')
         self._loop_break_labels.pop()
@@ -2768,14 +2800,44 @@ class TypedLLVMCodeGen(LLVMCodeGen):
                 if name in self._segments:
                     params = self._segments[name]
                     safe = self._safe_func_name(name)
-                    if params:
-                        slot = self._new_dv_slot()
-                        self.emit(f'call void @dv_null(ptr {slot})')
-                        obj_val = self.new_register()
-                        self.emit(f'{obj_val} = load {DUANVALUE_STRUCT}, ptr {slot}')
-                        self.emit(f'call {DUANVALUE_STRUCT} @_seg_{safe}({DUANVALUE_STRUCT} {obj_val})')
+                    num_params = len(params)
+                    result_slot = self._new_dv_slot()
+                    if num_params == 0:
+                        self.emit(f'call void @_seg_{safe}(ptr {result_slot}, ptr null, i32 0)')
                     else:
-                        self.emit(f'call {DUANVALUE_STRUCT} @_seg_{safe}()')
+                        args_arr = self.new_register()
+                        self.emit(f'{args_arr} = alloca {DUANVALUE_STRUCT}, i32 {num_params}')
+                        for i in range(num_params):
+                            elem_ptr = self.new_register()
+                            self.emit(f'{elem_ptr} = getelementptr inbounds {DUANVALUE_STRUCT}, ptr {args_arr}, i64 {i}')
+                            arg_idx = self.new_register()
+                            self.emit(f'{arg_idx} = add i32 1, {i}')
+                            has_arg = self.new_register()
+                            self.emit(f'{has_arg} = icmp slt i32 {arg_idx}, %argc')
+                            arg_then = self.new_label('arg_then')
+                            arg_else = self.new_label('arg_else')
+                            arg_end = self.new_label('arg_end')
+                            self.emit(f'br i1 {has_arg}, label %{arg_then}, label %{arg_else}')
+                            self.emit(f'{arg_then}:')
+                            argv_ptr = self.new_register()
+                            self.emit(f'{argv_ptr} = getelementptr inbounds ptr, ptr %argv, i32 {arg_idx}')
+                            arg_str = self.new_register()
+                            self.emit(f'{arg_str} = load ptr, ptr {argv_ptr}')
+                            arg_slot = self._new_dv_slot()
+                            self.emit(f'call void @dv_str(ptr {arg_slot}, ptr {arg_str})')
+                            arg_val = self.new_register()
+                            self.emit(f'{arg_val} = load {DUANVALUE_STRUCT}, ptr {arg_slot}')
+                            self.emit(f'store {DUANVALUE_STRUCT} {arg_val}, ptr {elem_ptr}')
+                            self.emit(f'br label %{arg_end}')
+                            self.emit(f'{arg_else}:')
+                            null_slot = self._new_dv_slot()
+                            self.emit(f'call void @dv_null(ptr {null_slot})')
+                            null_val = self.new_register()
+                            self.emit(f'{null_val} = load {DUANVALUE_STRUCT}, ptr {null_slot}')
+                            self.emit(f'store {DUANVALUE_STRUCT} {null_val}, ptr {elem_ptr}')
+                            self.emit(f'br label %{arg_end}')
+                            self.emit(f'{arg_end}:')
+                        self.emit(f'call void @_seg_{safe}(ptr {result_slot}, ptr {args_arr}, i32 {num_params})')
                     main_called = True
                     break
 
