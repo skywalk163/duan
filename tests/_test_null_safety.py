@@ -77,10 +77,10 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
     def test_func_non_nullable_param_with_nullable_arg(self):
         """测试点 4：形参非可空，传入可空实参 → 应报错"""
         src = (
-            '段落打印数(数)：\n'
-            '    打印数。\n'
+            '段落展示内容接收内容:数：\n'
+            '    打印内容。\n'
             '定义值等于空。\n'
-            '打印数(值)。\n'
+            '展示内容(值)。\n'
         )
         c = compile_source(src)
         # 应有与可空相关的错误
@@ -93,7 +93,7 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
     def test_func_non_nullable_param_with_unwrapped_arg(self):
         """形参非可空，传入 unwrap 后的值 → 不应有可空错误"""
         src = (
-            '段落打印数(数)：\n'
+            '段落打印数接收数：\n'
             '    打印数。\n'
             '定义值等于42。\n'
             '打印数(值!)。\n'
@@ -106,7 +106,7 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
     def test_func_nullable_param_with_nullable_arg(self):
         """测试点 5：形参可空，传入可空实参 → 正常"""
         src = (
-            '段落打印值(值)：\n'
+            '段落打印值接收值：\n'
             '    打印值。\n'
             '定义空值等于空。\n'
             '打印值(空值)。\n'

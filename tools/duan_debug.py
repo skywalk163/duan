@@ -284,30 +284,31 @@ class DebuggerContext:
     
     def _trace_func(self, frame, event, arg):
         """跟踪函数"""
+        filename = frame.f_code.co_filename
+        lineno = frame.f_lineno
+
         if event == 'line':
-            filename = frame.f_code.co_filename
-            lineno = frame.f_lineno
             self.debugger.on_line_change(filename, lineno, frame)
-            
-            # 更新调用栈
-            if event == 'call':
-                self.debugger.call_stack.append(StackFrame(
-                    name=frame.f_code.co_name,
-                    filename=filename,
-                    lineno=lineno,
-                    locals=dict(frame.f_locals),
-                    globals=dict(frame.f_globals)
-                ))
-            elif event == 'return' and self.debugger.call_stack:
-                self.debugger.call_stack.pop()
-            
-            # 如果调试器停止，恢复正常跟踪
+
+            # 如果调试器停止，等待恢复
             if not self.debugger.running:
                 return None
-        
+
+        elif event == 'call':
+            self.debugger.call_stack.append(StackFrame(
+                name=frame.f_code.co_name,
+                filename=filename,
+                lineno=lineno,
+                locals=dict(frame.f_locals),
+                globals=dict(frame.f_globals)
+            ))
+
+        elif event == 'return' and self.debugger.call_stack:
+            self.debugger.call_stack.pop()
+
         elif event == 'exception':
             self.debugger.last_exception = arg[1]
-        
+
         return self._trace_func
 
 

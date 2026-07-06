@@ -139,6 +139,24 @@ class ParserStmtMixin:
                 # 默认为异步段落（向前兼容）
                 return self._parse_async_paragraph()
         
+        # 严格段落：严格 段落 段名 ...
+        if tok.type == TokenType.KEYWORD and tok.value == '严格':
+            next_tok = self._peek(1)
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '段落':
+                return self._parse_strict_paragraph()
+            # 否则作为普通标识符处理（严格可能作为变量名）
+        
+        # 松散段落：松散 段落 段名 ...（显式声明为松散模式）
+        if tok.type == TokenType.KEYWORD and tok.value == '松散':
+            next_tok = self._peek(1)
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '段落':
+                self._consume(TokenType.KEYWORD, '松散')
+                para = self._parse_paragraph_v2()
+                if '松散' not in para.modifiers:
+                    para.modifiers = list(para.modifiers) + ['松散']
+                return para
+            # 否则作为普通标识符处理
+        
         # 等待表达式作为语句：等待 异步调用。
         if tok.type == TokenType.KEYWORD and tok.value == '等待':
             return self._parse_expr_stmt()
@@ -1246,6 +1264,17 @@ class ParserStmtMixin:
         # 添加异步修饰符
         if '异步' not in para.modifiers:
             para.modifiers = list(para.modifiers) + ['异步']
+        
+        return para
+    
+    def _parse_strict_paragraph(self) -> Paragraph:
+        """解析严格段落定义：严格 段落 段名 ..."""
+        self._consume(TokenType.KEYWORD, '严格')
+        
+        para = self._parse_paragraph_v2()
+        
+        if '严格' not in para.modifiers:
+            para.modifiers = list(para.modifiers) + ['严格']
         
         return para
     

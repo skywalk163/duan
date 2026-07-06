@@ -30,6 +30,11 @@ KEYWORDS_FUNCTION = {
     '段落', '接收', '返回',
 }
 
+# 类型系统修饰符
+KEYWORDS_TYPE = {
+    '严格', '松散',
+}
+
 # 异常处理
 KEYWORDS_EXCEPTION = {
     '尝试', '捕获', '抛出', '最终',
@@ -77,6 +82,7 @@ KEYWORDS_DOUBLE = (
     KEYWORDS_CONDITION |
     KEYWORDS_LOOP |
     KEYWORDS_FUNCTION |
+    KEYWORDS_TYPE |
     KEYWORDS_EXCEPTION |
     KEYWORDS_CLASS |
     KEYWORDS_MODULE |

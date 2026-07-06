@@ -660,11 +660,14 @@ class DuanCompiler:
     VERSION = "1.0.0"
 
     def __init__(self, project_root: Optional[str] = None):
+        from core.config import DuanConfig
         self._lexer = Lexer()
         self._parser = DuanParser()
         self._adapter = AstAdapter()
         self._inferencer = None  # 延迟初始化（会创建 TypeInferencer）
+        self._config = DuanConfig()
         self.errors: List[str] = []
+        self.warnings: List[str] = []
         # 项目级扩展
         self.project_root: Optional[Path] = Path(project_root) if project_root else None
         # 跨模块符号缓存：module_name -> { symbol_name: symbol_info }
@@ -706,7 +709,7 @@ class DuanCompiler:
             our_ast = self.optimize_ast(our_ast)
 
         # 5) 类型检查
-        self.type_check(our_ast)
+        self.type_check(our_ast, source)
 
         return {
             'source': source,
@@ -931,16 +934,44 @@ class DuanCompiler:
             module = optimizer.optimize(module)
         return module
 
-    def type_check(self, module: ast.Module) -> Any:
+    def type_check(self, module: ast.Module, source: str = '') -> Any:
         """对适配后的 AST 进行类型推断与检查。返回 inferencer 实例。"""
-        # 延迟导入避免循环依赖
         from type_inferencer import TypeInferencer
+        from type_checker import create_checker_from_source, create_checker_from_config
+
         self._inferencer = TypeInferencer()
         self._inferencer.infer(module)
-        # 聚合错误
+
+        # 聚合类型推断错误
         if hasattr(self._inferencer, 'errors'):
             self.errors.extend(self._inferencer.errors)
+
+        # 分级类型检查
+        if source:
+            checker = create_checker_from_source(source, self._config)
+        else:
+            checker = create_checker_from_config(self._config)
+
+        if checker.config.check_level.value > 0:
+            check_results = checker.check(module, self._inferencer)
+            self._collect_type_check_results(checker)
+
         return self._inferencer
+
+    def _collect_type_check_results(self, checker) -> None:
+        """收集类型检查结果并格式化输出"""
+        for result in checker.results:
+            if result.severity.value == 'error':
+                self.errors.append(f"[类型错误] {result.message}")
+            elif result.severity.value == 'warning':
+                if hasattr(self, 'warnings'):
+                    self.warnings.append(f"[类型警告] {result.message}")
+
+        if checker.has_errors():
+            self.errors.append(f"类型检查发现 {len(checker.get_errors())} 个错误")
+
+        if checker.get_warnings():
+            self.errors.append(f"类型检查发现 {len(checker.get_warnings())} 个警告")
 
     # ------------------------------------------------------------------
     # 跨模块符号链接

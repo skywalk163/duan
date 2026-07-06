@@ -23,6 +23,20 @@ class OptimizationLevel(Enum):
     AGGRESSIVE = 3  # 激进优化
 
 
+class TypeCheckLevel(Enum):
+    """类型检查级别"""
+    NONE = 0      # 不检查（默认）
+    SIGNATURE = 1  # 签名级：仅检查段落参数和返回值类型
+    VARIABLE = 2   # 变量级：签名级 + 变量声明类型检查
+    EXPRESSION = 3  # 表达式级：变量级 + 表达式运算类型检查
+
+
+class SegmentTypeMode(Enum):
+    """段落类型模式"""
+    LOOSE = 'loose'    # 松散模式：无类型标注的段落不做类型检查
+    STRICT = 'strict'  # 严格模式：段落强制类型检查
+
+
 @dataclass
 class DuanConfig:
     """段言编译器配置"""
@@ -60,6 +74,11 @@ class DuanConfig:
     # 运行时选项
     runtime_checks: bool = True
     bounds_checking: bool = True
+
+    # 类型系统选项
+    type_check_level: TypeCheckLevel = TypeCheckLevel.NONE
+    default_segment_mode: SegmentTypeMode = SegmentTypeMode.LOOSE
+    type_inference_mode: str = '渐进'  # 渐进 / 全局 / 禁用
     
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> 'DuanConfig':
@@ -76,6 +95,10 @@ class DuanConfig:
                         value = OptimizationLevel[value.upper()]
                     else:
                         value = OptimizationLevel(value)
+                elif key == 'type_check_level' and isinstance(value, str):
+                    value = TypeCheckLevel[value.upper()]
+                elif key == 'default_segment_mode' and isinstance(value, str):
+                    value = SegmentTypeMode(value)
                 
                 setattr(config, key, value)
         

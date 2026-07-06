@@ -16,7 +16,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from lexer import Lexer
 from duan_parser_v3 import DuanParser
-from code_generator_unified import UnifiedCodeGenerator
 from keywords import ALL_KEYWORDS, VERB_ARITY
 
 
@@ -155,47 +154,95 @@ class DocumentManager:
         self.documents: Dict[str, Document] = {}
         self.symbols: Dict[str, List] = {}  # uri -> symbols
         self.definitions: Dict[str, Dict] = {}  # uri -> {name: location}
-        
+        self.type_info: Dict[str, Dict] = {}  # uri -> {name: type_str}
+
     def open_document(self, uri: str, text: str):
         """打开文档"""
         doc = Document(uri, text)
         self.documents[uri] = doc
         self._analyze_document(doc)
-        
+
     def update_document(self, uri: str, changes: List[Dict]):
         """更新文档"""
         if uri in self.documents:
             self.documents[uri].update(changes)
             self._analyze_document(self.documents[uri])
-            
+
     def close_document(self, uri: str):
         """关闭文档"""
-        if uri in self.documents:
-            del self.documents[uri]
-        if uri in self.symbols:
-            del self.symbols[uri]
-        if uri in self.definitions:
-            del self.definitions[uri]
+        self.documents.pop(uri, None)
+        self.symbols.pop(uri, None)
+        self.definitions.pop(uri, None)
+        self.type_info.pop(uri, None)
     
     def get_document(self, uri: str) -> Optional[Document]:
         """获取文档"""
         return self.documents.get(uri)
     
     def _analyze_document(self, doc: Document):
-        """分析文档，提取符号和定义"""
+        """分析文档，提取符号、定义和类型信息"""
         try:
             lexer = Lexer()
             tokens = lexer.tokenize(doc.text)
-            
+
             parser = DuanParser()
             ast = parser.parse_tokens(tokens)
-            
-            # 提取符号和定义
+
             self.symbols[doc.uri] = self._extract_symbols(ast)
             self.definitions[doc.uri] = self._extract_definitions(ast, doc)
-            
-        except Exception as e:
+
+            # 类型推断
+            try:
+                from type_inferencer import TypeInferencer
+                inferencer = TypeInferencer()
+                inferencer.infer(ast)
+                self.type_info[doc.uri] = self._extract_type_info(ast, inferencer)
+            except Exception:
+                self.type_info[doc.uri] = {}
+
+        except Exception:
             pass
+
+    def _extract_type_info(self, ast, inferencer) -> Dict:
+        """提取变量/函数的类型信息"""
+        info = {}
+
+        def walk(node):
+            if node is None:
+                return
+            node_type = type(node).__name__
+            name = getattr(node, 'name', None)
+            if name and node_type in ('VarDecl', 'VariableDeclaration', 'VarDef',
+                                       'FuncDef', 'FunctionDef', 'SegmentDefinition',
+                                       'Paragraph'):
+                # 检查类型标注
+                ta = getattr(node, 'type_annotation', None)
+                if ta:
+                    info[str(name)] = str(ta)
+                else:
+                    # 尝试从推断器获取
+                    value = getattr(node, 'value', None)
+                    if value and inferencer:
+                        inferred = inferencer.type_cache.get(id(value))
+                        if inferred:
+                            info[str(name)] = str(inferred)
+
+            for child_name in dir(node):
+                if child_name.startswith('_'):
+                    continue
+                try:
+                    child = getattr(node, child_name)
+                    if isinstance(child, list):
+                        for item in child:
+                            if hasattr(item, '__class__') and hasattr(item, '__dict__'):
+                                walk(item)
+                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and hasattr(child, 'line'):
+                        walk(child)
+                except Exception:
+                    pass
+
+        walk(ast)
+        return info
     
     def _extract_symbols(self, ast) -> List[Dict]:
         """提取文档符号"""
@@ -270,12 +317,13 @@ class DocumentManager:
                     child = getattr(node, child_name)
                     if isinstance(child, list):
                         for item in child:
-                            walk(item)
-                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and 'line' in dir(child):
+                            if hasattr(item, '__class__') and hasattr(item, '__dict__'):
+                                walk(item)
+                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and hasattr(child, 'line'):
                         walk(child)
-                except:
+                except Exception:
                     pass
-        
+
         walk(ast)
         return symbols
     
@@ -323,12 +371,13 @@ class DocumentManager:
                     child = getattr(node, child_name)
                     if isinstance(child, list):
                         for item in child:
-                            walk(item)
-                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and 'line' in dir(child):
+                            if hasattr(item, '__class__') and hasattr(item, '__dict__'):
+                                walk(item)
+                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and hasattr(child, 'line'):
                         walk(child)
-                except:
+                except Exception:
                     pass
-        
+
         walk(ast)
         return definitions
 
@@ -368,8 +417,8 @@ class DuanLanguageServer:
             'textDocument/completion': self._handle_completion,
             'textDocument/hover': self._handle_hover,
             'textDocument/definition': self._handle_definition,
+            'textDocument/references': self._handle_references,
             'textDocument/documentSymbol': self._handle_document_symbol,
-            'textDocument/publishDiagnostics': self._handle_publish_diagnostics,
         }
         
         handler = handlers.get(method)
@@ -391,29 +440,13 @@ class DuanLanguageServer:
             }
         }
     
-    def _handle_did_open(self, params: Dict):
-        """处理文档打开"""
-        text_doc = params.get('textDocument', {})
-        uri = text_doc.get('uri')
-        text = text_doc.get('text', '')
-        self.doc_manager.open_document(uri, text)
-        return None  # 通知不需要响应
-    
-    def _handle_did_change(self, params: Dict):
-        """处理文档更改"""
-        text_doc = params.get('textDocument', {})
-        uri = text_doc.get('uri')
-        changes = params.get('contentChanges', [])
-        self.doc_manager.update_document(uri, changes)
-        return None
-    
     def _handle_did_close(self, params: Dict):
         """处理文档关闭"""
         text_doc = params.get('textDocument', {})
         uri = text_doc.get('uri')
         self.doc_manager.close_document(uri)
         return None
-    
+
     def _handle_completion(self, params: Dict) -> Dict:
         """处理代码补全"""
         doc = self.doc_manager.get_document(params.get('textDocument', {}).get('uri', ''))
@@ -537,11 +570,17 @@ class DuanLanguageServer:
                 if info['type'] == '函数':
                     params_str = ', '.join(info['params'])
                     contents.append(f"**函数**: `{word}({params_str})`")
-            
+
             if word in self.doc_manager.definitions[doc.uri]:
                 def_info = self.doc_manager.definitions[doc.uri][word]
                 def_line = def_info['range']['start']['line'] + 1
                 contents.append(f"定义于第 {def_line} 行")
+
+        # 类型信息
+        if doc.uri in self.doc_manager.type_info:
+            t = self.doc_manager.type_info[doc.uri].get(word)
+            if t:
+                contents.append(f"**类型**: `{t}`")
         
         if not contents:
             return None
@@ -599,11 +638,55 @@ class DuanLanguageServer:
         uri = params.get('textDocument', {}).get('uri', '')
         return self.doc_manager.symbols.get(uri, [])
     
-    def _handle_publish_diagnostics(self, params: Dict):
-        """处理诊断发布"""
-        # TODO: 实现诊断
-        return None
-    
+    def _handle_references(self, params: Dict) -> List[Dict]:
+        """处理查找引用请求"""
+        doc = self.doc_manager.get_document(params.get('textDocument', {}).get('uri', ''))
+        if not doc:
+            return []
+
+        position = params.get('position', {})
+        line = position.get('line', 0)
+        character = position.get('character', 0)
+
+        line_text = doc.get_line(line)
+        start = character
+        end = character
+        while start > 0:
+            ch = line_text[start - 1]
+            if ch.isalnum() or '\u4e00' <= ch <= '\u9fff':
+                start -= 1
+            else:
+                break
+        while end < len(line_text):
+            ch = line_text[end]
+            if ch.isalnum() or '\u4e00' <= ch <= '\u9fff':
+                end += 1
+            else:
+                break
+
+        word = line_text[start:end]
+        if not word:
+            return []
+
+        references = []
+        for uri, doc_obj in self.doc_manager.documents.items():
+            for i, line_text in enumerate(doc_obj.lines):
+                pos = 0
+                while True:
+                    idx = line_text.find(word, pos)
+                    if idx == -1:
+                        break
+                    references.append({
+                        'uri': uri,
+                        'range': {
+                            'start': {'line': i, 'character': idx},
+                            'end': {'line': i, 'character': idx + len(word)}
+                        }
+                    })
+                    pos = idx + len(word)
+
+        return references
+
     def _handle_did_open(self, params: Dict):
         """处理文档打开"""
         text_doc = params.get('textDocument', {})
@@ -643,23 +726,23 @@ class DuanLanguageServer:
         return notifications
     
     def get_diagnostics(self, uri: str) -> List[Dict]:
-        """获取文档诊断信息"""
+        """获取文档诊断信息（语法错误 + 类型错误）"""
         doc = self.doc_manager.get_document(uri)
         if not doc:
             return []
-        
+
         diagnostics = []
-        
+
         # 语法分析错误
         try:
             parser = DuanParser()
-            parser.parse(doc.text)
+            ast = parser.parse(doc.text)
         except Exception as e:
             if hasattr(e, 'line') and hasattr(e, 'col'):
                 line = max(0, e.line - 1)
                 col = max(0, e.col - 1)
                 diagnostics.append({
-                    'severity': 1,  # Error
+                    'severity': 1,
                     'range': {
                         'start': {'line': line, 'character': col},
                         'end': {'line': line, 'character': col + 1}
@@ -677,7 +760,45 @@ class DuanLanguageServer:
                     'message': f'错误: {str(e)}',
                     'source': '段言'
                 })
-        
+            return diagnostics
+
+        # 类型检查诊断
+        try:
+            from type_inferencer import TypeInferencer
+            from type_checker import create_checker_from_source
+
+            inferencer = TypeInferencer()
+            inferencer.infer(ast)
+
+            for err in getattr(inferencer, 'errors', []):
+                diagnostics.append({
+                    'severity': 1,
+                    'range': {
+                        'start': {'line': 0, 'character': 0},
+                        'end': {'line': 0, 'character': 1}
+                    },
+                    'message': err,
+                    'source': '段言类型'
+                })
+
+            checker = create_checker_from_source(doc.text)
+            if checker.config.check_level.value > 0:
+                check_results = checker.check(ast, inferencer)
+                for r in check_results:
+                    severity = 1 if r.is_error() else 2
+                    line = max(0, getattr(r, 'line', 0) - 1)
+                    diagnostics.append({
+                        'severity': severity,
+                        'range': {
+                            'start': {'line': line, 'character': 0},
+                            'end': {'line': line, 'character': 1}
+                        },
+                        'message': r.message,
+                        'source': '段言类型'
+                    })
+        except Exception:
+            pass
+
         return diagnostics
 
 

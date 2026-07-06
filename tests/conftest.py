@@ -12,8 +12,10 @@ import pytest
 import os
 _project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _src_dir = os.path.join(_project_root, 'src')
+_tools_dir = os.path.join(_project_root, 'tools')
 sys.path.insert(0, _project_root)
 sys.path.insert(0, _src_dir)
+sys.path.insert(0, _tools_dir)
 
 
 @pytest.fixture(autouse=True)

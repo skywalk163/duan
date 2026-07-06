@@ -421,9 +421,57 @@ def cmd_check(args):
     else:
         print(f"\n✅ 语法检查通过，未发现错误。")
 
+    # 类型检查
+    if args.type_check:
+        _run_type_check(source, args.type_check, args.file)
+
+
+def _run_type_check(source: str, level_str: str, file_path: str):
+    """运行类型检查并输出结果"""
+    from compiler import DuanCompiler
+    from core.config import TypeCheckLevel
+
+    level_map = {
+        '签名': TypeCheckLevel.SIGNATURE, 'signature': TypeCheckLevel.SIGNATURE,
+        '变量': TypeCheckLevel.VARIABLE, 'variable': TypeCheckLevel.VARIABLE,
+        '表达式': TypeCheckLevel.EXPRESSION, 'expression': TypeCheckLevel.EXPRESSION,
+    }
+    level = level_map.get(level_str, TypeCheckLevel.EXPRESSION)
+
+    # 创建编译器实例并配置类型检查级别
+    compiler = DuanCompiler()
+    compiler._config.type_check_level = level
+
+    # 解析并运行类型检查
+    result = compiler.compile(source, optimize=False)
+
+    print(f"\n━━━ 类型检查（级别: {level_str}）━━━")
+
+    if compiler.warnings:
+        print(f"\n⚠ 警告 ({len(compiler.warnings)} 个):")
+        for w in compiler.warnings:
+            print(f"  {w}")
+
+    type_errors = [e for e in compiler.errors if '类型错误' in e]
+    if type_errors:
+        print(f"\n❌ 类型错误 ({len(type_errors)} 个):")
+        for e in type_errors:
+            print(f"  {e}")
+        sys.exit(1)
+    else:
+        print("✅ 类型检查通过")
+
+
+def cmd_type_check(args):
+    """独立类型检查命令"""
+    source = _read_source(args.file)
+    _run_type_check(source, args.level, args.file)
+
 
 def cmd_init(args):
-    """初始化段言项目"""
+    """初始化段言项目（创建 package.toml 配置）"""
+    from package_manager import PackageManager
+
     project_name = args.name
     project_dir = Path(project_name)
 
@@ -435,31 +483,90 @@ def cmd_init(args):
     (project_dir / 'src').mkdir()
     (project_dir / 'tests').mkdir()
 
-    # 创建示例主文件
-    main_file = project_dir / 'src' / 'main.duan'
-    main_file.write_text("""# 段言项目入口
-
-段落 主函数：
-    打印 "你好，段言！"
-
-主函数()""", encoding='utf-8')
-
-    # 创建 duan.json 配置
-    config_file = project_dir / 'duan.json'
-    config_content = f'''{{
-  "name": "{project_name}",
-  "version": "0.1.0",
-  "entry": "src/main.duan",
-  "backend": "antlr"
-}}'''
-    config_file.write_text(config_content, encoding='utf-8')
+    # 使用 PackageManager 创建 package.toml 与 主.duan
+    pm = PackageManager(project_root=project_dir)
+    if not pm.init_project(name=project_name):
+        print("错误: 项目初始化失败", file=sys.stderr)
+        sys.exit(1)
 
     print(f"✅ 项目 '{project_name}' 初始化完成")
     print(f"   目录: {project_dir.resolve()}")
-    print(f"   入口: src/main.duan")
+    print(f"   配置: package.toml")
+    print(f"   入口: 主.duan")
     print(f"\n可用命令:")
-    print(f"   duan run {project_name}/src/main.duan")
-    print(f"   duan check {project_name}/src/main.duan")
+    print(f"   duan pkg run                  运行项目")
+    print(f"   duan pkg build                编译项目")
+    print(f"   duan run {project_name}/主.duan      直接运行入口")
+
+
+def cmd_pkg(args):
+    """包管理子命令（统一入口：init/build/run/native）"""
+    from package_manager import PackageManager
+
+    project_root = Path(getattr(args, 'project', None) or '.').resolve()
+
+    if args.pkg_command == 'init':
+        name = args.name
+        if name:
+            # 在 ./name/ 子目录下初始化
+            target_root = project_root / name
+            if target_root.exists():
+                print(f"错误: 目录已存在: {target_root}", file=sys.stderr)
+                sys.exit(1)
+            target_root.mkdir(parents=True)
+            pkg_name = name
+        else:
+            target_root = project_root
+            pkg_name = project_root.name
+        pm = PackageManager(project_root=target_root)
+        if pm.init_project(name=pkg_name):
+            print(f"✅ 包 '{pkg_name}' 初始化完成")
+            print(f"   配置: {target_root / 'package.toml'}")
+            if pm.config:
+                print(f"   入口: {target_root / pm.config.entry}")
+        else:
+            print("❌ 初始化失败", file=sys.stderr)
+            sys.exit(1)
+
+    elif args.pkg_command == 'build':
+        pm = PackageManager(project_root=project_root)
+        result = pm.build_project()
+        if result.get('success'):
+            print(f"✅ 构建成功")
+            print(f"   入口: {result.get('entry', '')}")
+            order = result.get('order', [])
+            if order:
+                print(f"   模块拓扑顺序: {' -> '.join(order)}")
+        else:
+            print("❌ 构建失败:", file=sys.stderr)
+            for err in result.get('errors', []):
+                print(f"   - {err}", file=sys.stderr)
+            sys.exit(1)
+
+    elif args.pkg_command == 'run':
+        pm = PackageManager(project_root=project_root)
+        ret = pm.run_project()
+        if ret != 0:
+            sys.exit(ret)
+
+    elif args.pkg_command == 'native':
+        pm = PackageManager(project_root=project_root)
+        try:
+            output = pm.build_project_native(
+                output_path=args.output,
+                verbose=args.verbose
+            )
+            print(f"✅ 原生编译成功: {output}")
+        except Exception as e:
+            print(f"❌ 原生编译失败: {e}", file=sys.stderr)
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+            sys.exit(1)
+
+    else:
+        print(f"未知子命令: {args.pkg_command}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -519,10 +626,34 @@ def main():
     check_p.add_argument('file', help='源文件路径')
     check_p.add_argument('--backend', choices=['antlr', 'src'], default='src',
                          help='使用的后端（默认: src）')
+    check_p.add_argument('--type-check', choices=['签名', '变量', '表达式', 'signature', 'variable', 'expression'],
+                         default=None, help='启用类型检查并指定级别')
+
+    # ── type-check ──
+    tc_p = subparsers.add_parser('type-check', help='独立类型检查')
+    tc_p.add_argument('file', help='源文件路径')
+    tc_p.add_argument('--level', choices=['签名', '变量', '表达式', 'signature', 'variable', 'expression'],
+                      default='表达式', help='类型检查级别（默认: 表达式）')
 
     # ── init ──
     init_p = subparsers.add_parser('init', help='初始化段言项目')
     init_p.add_argument('name', help='项目名称')
+
+    # ── pkg ──
+    pkg_p = subparsers.add_parser('pkg', help='包管理（init/build/run/native）')
+    pkg_p.add_argument('--project', '-p', default='.', help='项目根目录（默认: 当前目录）')
+    pkg_sub = pkg_p.add_subparsers(dest='pkg_command', help='包管理子命令')
+
+    pkg_init = pkg_sub.add_parser('init', help='初始化新包（创建 package.toml 与 主.duan）')
+    pkg_init.add_argument('name', nargs='?', default=None, help='包名（默认: 目录名）')
+
+    pkg_sub.add_parser('build', help='编译整个项目')
+
+    pkg_sub.add_parser('run', help='运行项目入口')
+
+    pkg_native = pkg_sub.add_parser('native', help='使用 LLVM 后端编译为原生可执行文件')
+    pkg_native.add_argument('-o', '--output', default=None, help='输出文件路径')
+    pkg_native.add_argument('-v', '--verbose', action='store_true', help='详细输出')
 
     args = parser.parse_args()
 
@@ -540,8 +671,15 @@ def main():
         cmd_tokens(args)
     elif args.command == 'check':
         cmd_check(args)
+    elif args.command == 'type-check':
+        cmd_type_check(args)
     elif args.command == 'init':
         cmd_init(args)
+    elif args.command == 'pkg':
+        if not getattr(args, 'pkg_command', None):
+            parser.parse_args(['pkg', '--help'])
+        else:
+            cmd_pkg(args)
 
 
 if __name__ == '__main__':

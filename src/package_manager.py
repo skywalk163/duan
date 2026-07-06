@@ -232,9 +232,10 @@ description = ""
 [dependencies]
 """
 
-    DEFAULT_MAIN_SOURCE = """段 主():
+    DEFAULT_MAIN_SOURCE = """段落 主 接收：
     打印("你好，段言！")
-结束。
+
+主()
 """
 
     def __init__(self, project_root: Optional[Path] = None):

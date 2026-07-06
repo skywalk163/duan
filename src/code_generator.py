@@ -305,6 +305,8 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.截取 = lambda s, start, end: s[start:end]")
         self._add_line("        _duan_builtin.转大写 = lambda s: s.upper()")
         self._add_line("        _duan_builtin.转小写 = lambda s: s.lower()")
+        self._add_line("        _duan_builtin.结尾 = lambda s, suffix: s.endswith(suffix)")
+        self._add_line("        _duan_builtin.开头 = lambda s, prefix: s.startswith(prefix)")
         self._add_line("        _duan_builtin.字典创建 = dict")
         self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")

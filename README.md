@@ -95,8 +95,8 @@ duan run examples/hello.duan
 ### 变量
 
 ```段言
-定义 姓名 等于 "张三"
-定义 年龄 等于 25
+设 姓名 为 "张三"
+设 年龄 为 25
 打印 姓名
 打印 年龄
 ```
@@ -105,7 +105,7 @@ duan run examples/hello.duan
 
 ```段言
 段落 加法 接收 a, b：
-  返回 a 加 b
+    返回 a 加 b
 
 打印 加法(3, 5)    # 输出：8
 ```
@@ -113,34 +113,34 @@ duan run examples/hello.duan
 ### 条件语句
 
 ```段言
-定义 分数 等于 85
+设 分数 为 85
 
 如果 分数 大于等于 90：
-  打印 "优秀"
+    打印 "优秀"
 否则如果 分数 大于等于 60：
-  打印 "及格"
+    打印 "及格"
 否则：
-  打印 "不及格"
+    打印 "不及格"
 ```
 
 ### 循环
 
 ```段言
 # 当循环
-定义 计数 等于 0
+设 计数 为 0
 当 计数 小于 5：
-  打印 计数
-  计数 等于 计数 加 1
+    打印 计数
+    设 计数 为 计数 加 1
 
 # 遍历循环
 遍历 项 于 1至5：
-  打印 项
+    打印 项
 ```
 
 ### 字符串
 
 ```段言
-定义 名字 等于 "段言"
+设 名字 为 "段言"
 打印 "你好，" 加 名字 加 "！"
 ```
 
@@ -156,6 +156,12 @@ duan compile hello.duan -o hello.py
 # 语法检查
 duan check hello.duan
 
+# 类型检查（三级：签名/变量/表达式）
+duan check hello.duan --type-check 表达式
+
+# 独立类型检查
+duan type-check hello.duan --level 变量
+
 # 查看 Token 流
 duan tokens hello.duan
 
@@ -164,6 +170,22 @@ duan ast hello.duan
 
 # 初始化新项目
 duan init myproject
+```
+
+### 包管理
+
+```bash
+# 初始化新包（创建 package.toml 与 主.duan）
+duan pkg init myproject
+
+# 编译项目
+duan pkg -p myproject build
+
+# 运行项目
+duan pkg -p myproject run
+
+# LLVM 原生编译
+duan pkg -p myproject native -o output.exe
 ```
 
 ### 后端选择
@@ -200,20 +222,42 @@ duan compile hello.duan --backend llvm-typed -o hello.exe
 打印 阶乘(10)
 ```
 
-常用模块：数学工具、字符串工具、列表工具、JSON、CSV、文件系统、日志、日期时间等。
+常用模块：
+
+| 模块 | 说明 |
+|------|------|
+| 数学 | 绝对值、三角函数、阶乘、统计（平均数/标准差/线性回归） |
+| 字符串处理 | 分割、拼接、替换、查找、截取 |
+| 列表工具 | 排序、遍历、追加、包含 |
+| 字典工具 | 创建、获取、设置、键列表 |
+| 文件系统 | 读写文件、目录操作、路径处理 |
+| JSON | 解析与序列化 |
+| CSV | CSV 文件读写 |
+| 日期时间 | 日期格式化、时间戳 |
+| 正则 | 正则表达式匹配 |
+| 网络HTTP | GET/POST 请求 |
+| 队列栈 | 栈、队列、双端队列 |
+| 测试 | 断言框架（相等/为真/近似等） |
+| 数据验证 | 类型判断、邮箱/URL格式验证 |
+| 日志 | 日志记录 |
+| 缓存 | 内存键值缓存 |
+| 编码 | 字符编码转换 |
+| 终端颜色 | 彩色终端输出 |
+| 随机数据 | 随机数生成 |
 
 ## 语法参考（v3.2）
 
 | 语法 | 说明 | 示例 |
 |------|------|------|
-| `定义 X 等于 Y` | 变量声明 | `定义 年龄 等于 25` |
-| `X 等于 Y` | 变量赋值 | `年龄 等于 26` |
+| `设 X 为 Y` | 变量声明 | `设 年龄 为 25` |
+| `设 X 为 Y` | 变量赋值 | `设 年龄 为 26` |
 | `段落 名 接收 参数：` | 函数定义 | `段落 加法 接收 a, b：` |
 | `如果 条件：` | 条件语句 | `如果 年龄 大于 18：` |
 | `否则如果 条件：` | 否则如果 | `否则如果 年龄 大于 12：` |
 | `否则：` | 否则 | `否则：` |
 | `当 条件：` | 当循环 | `当 计数 小于 10：` |
 | `遍历 变量 于 列表：` | 遍历循环 | `遍历 i 于 1至10：` |
+| `遍历 变量 在 列表：` | 遍历循环 | `遍历 项 在 列表：` |
 | `返回 X` | 返回值 | `返回 a 加 b` |
 | `打印 X` | 打印输出 | `打印 "你好"` |
 | `从 模块 导入 符号` | 从模块导入 | `从 数学工具 导入 阶乘` |
@@ -241,19 +285,37 @@ duan compile hello.duan --backend llvm-typed -o hello.exe
 
 ```段言
 类 动物：
-  属性 名字
-  构造 接收 名字：
-    己名字 为 名字
-  段落 介绍：
-    打印 "我叫" 加 己名字
+    属性 名字
+    构造 接收 名字：
+        己名字 为 名字
+    段落 介绍 接收：
+        打印 "我叫" 加 己名字
 
 类 狗 继承 动物：
-  段落 叫声：
-    打印 "汪汪汪"
+    段落 叫声 接收：
+        打印 "汪汪汪"
 
-定义 小狗 等于 新建 狗("旺财")
+设 小狗 为 狗("旺财")
 小狗.介绍()
 小狗.叫声()
+```
+
+### 类型注解与检查
+
+段言支持三级类型检查（签名级/变量级/表达式级）：
+
+```段言
+段落 加法 接收 甲:数, 乙:数 -> 数：
+    返回 甲 加 乙
+
+严格 段落 计算接收 输入:字符串 -> 字典：
+    ...
+```
+
+```bash
+# 类型检查
+duan check hello.duan --type-check 签名
+duan type-check hello.duan --level 表达式
 ```
 
 ## 项目结构
@@ -269,16 +331,21 @@ duan/
 │   ├── code_generator.py     # Python 代码生成
 │   ├── code_generator_unified.py  # 统一代码生成
 │   ├── compiler.py      # 编译器主体
+│   ├── type_checker.py  # 三级类型检查器
+│   ├── type_inferencer.py   # HM 类型推断
+│   ├── package_manager.py   # 包管理器
+│   ├── module_resolver.py   # 模块解析器
 │   ├── llvm/            # LLVM 后端
 │   │   ├── codegen_typed.py  # LLVM 代码生成（typed 模式）
 │   │   └── compiler.py       # LLVM 编译入口
 │   └── optimizer/       # 代码优化器
 ├── cli/                 # 命令行工具
-│   ├── duan.py          # 主入口（duan 命令）
-│   └── duanc.py         # SRC 后端入口（duanc 命令）
-├── stdlib/              # 标准库（27 个模块）
-├── stdlib_v3/           # v3.2 标准库
-├── antlrparser/         # ANTLR 后端（可选，需安装 antlr4-python3-runtime）
+│   └── duan.py          # 主入口（duan 命令，含 pkg 子命令）
+├── stdlib/              # 标准库（30 个模块）
+├── lsp/                 # LSP 语言服务器
+├── debug-adapter/       # DAP 调试适配器
+├── tools/               # 调试器等工具
+├── demos/               # 示范项目
 ├── examples/            # 示例程序
 ├── tests/               # 测试
 │   ├── unit/            # 单元测试

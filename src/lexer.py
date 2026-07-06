@@ -1218,9 +1218,13 @@ class Lexer:
                 # 跳过空白
                 while j < n and _is_space_tab(source[j]):
                     j += 1
-                # 收集段名
+                # 收集段名（遇到段落语法关键字或冒号停止）
                 k = j
                 while k < n and _is_han(source[k]):
+                    # 检查当前位置是否匹配段落语法关键字（接收、返回）
+                    kw, kw_len = self._match_keyword(source, k)
+                    if kw and kw_len > 0 and kw in ('接收', '返回'):
+                        break
                     k += 1
                 if k > j:
                     segment_name = source[j:k]

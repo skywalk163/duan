@@ -88,6 +88,39 @@ def compile_source(source: str, verbose: bool = False) -> str:
     return ir
 
 
+def _run_type_check_on_ast(source: str, module, verbose: bool = False):
+    """在 LLVM 编译管线中运行类型检查"""
+    try:
+        from core.config import DuanConfig, TypeCheckLevel
+        from type_checker import create_checker_from_source
+
+        config = DuanConfig()
+        config.type_check_level = TypeCheckLevel.SIGNATURE
+        checker = create_checker_from_source(source, config)
+
+        if checker.config.check_level != TypeCheckLevel.NONE:
+            from type_inferencer import TypeInferencer
+            inferencer = TypeInferencer()
+            inferencer.infer(module)
+            checker.check(module, inferencer)
+
+            if checker.has_errors():
+                errors = checker.get_errors()
+                error_msgs = '\n'.join(str(r) for r in errors)
+                raise RuntimeError(f"类型检查失败:\n{error_msgs}")
+
+            if checker.get_warnings() and verbose:
+                for w in checker.get_warnings():
+                    print(f"  [类型警告] {w.message}")
+    except ImportError:
+        pass  # 类型检查器不可用时跳过
+    except RuntimeError:
+        raise
+    except Exception as e:
+        if verbose:
+            print(f"  [类型检查] 跳过: {e}")
+
+
 def compile_source_typed(source: str, verbose: bool = False, target_platform: str = None, debug: bool = False) -> str:
     """
     编译段言源码为 LLVM IR 字符串（typed 模式）
@@ -115,6 +148,9 @@ def compile_source_typed(source: str, verbose: bool = False, target_platform: st
 
     adapter = AstAdapter()
     module = adapter.convert_module(v3_module)
+
+    # 类型检查（如果配置了检查级别）
+    _run_type_check_on_ast(source, module, verbose)
 
     if verbose:
         print(f"[3/3] 生成 LLVM IR (typed)...")

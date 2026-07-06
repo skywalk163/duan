@@ -13,15 +13,17 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'tools'))
 
 from compiler import DuanCompiler
 from code_generator_unified import UnifiedCodeGenerator
 from errors import format_exception
+from duan_debug import DuanDebugger, DebuggerContext, StackFrame
 
 
 class DebugAdapter:
     """调试适配器基类"""
-    
+
     def __init__(self):
         self.seq = 0
         self.running = False
@@ -29,6 +31,13 @@ class DebugAdapter:
         self.variables: Dict[str, Any] = {}
         self.current_line = 0
         self.call_stack: List[Dict] = []
+        self.debugger = DuanDebugger()
+        self._pause_event = threading.Event()
+        self._pause_event.set()  # 初始为可运行
+        self._program_thread: Optional[threading.Thread] = None
+        self._current_frame = None
+        self._source_code = ''
+        self._program_path = ''
         
     def send_response(self, request_seq: int, success: bool, body: Dict = None, command: str = '', message: str = ''):
         """发送响应"""
@@ -251,35 +260,48 @@ class DebugAdapter:
     
     def _handle_pause(self, args: Dict) -> Dict:
         """处理暂停请求"""
-        self.running = False
+        self.debugger.set_step(DuanDebugger.STEP_OVER)
         return {}
-    
+
     def _handle_continue(self, args: Dict) -> Dict:
         """处理继续请求"""
-        self.running = True
+        self.debugger.set_step(DuanDebugger.STEP_NONE)
+        self.debugger.start()
+        self._pause_event.set()
         return {
             'allThreadsContinued': True
         }
-    
+
     def _handle_next(self, args: Dict) -> Dict:
-        """处理单步执行请求"""
+        """处理单步跳过请求"""
+        self.debugger.set_step(DuanDebugger.STEP_OVER)
+        self.debugger.start()
+        self._pause_event.set()
         return {}
-    
+
     def _handle_step_in(self, args: Dict) -> Dict:
         """处理步入请求"""
+        self.debugger.set_step(DuanDebugger.STEP_INTO)
+        self.debugger.start()
+        self._pause_event.set()
         return {}
-    
+
     def _handle_step_out(self, args: Dict) -> Dict:
         """处理步出请求"""
+        self.debugger.set_step(DuanDebugger.STEP_OUT)
+        self.debugger.start()
+        self._pause_event.set()
         return {}
-    
+
     def _handle_disconnect(self, args: Dict) -> Dict:
         """处理断开连接请求"""
         self.running = False
+        self.debugger.stop()
+        self._pause_event.set()
         return {}
     
     def _run_program(self, program_path: str):
-        """运行程序"""
+        """运行程序（在线程中，带调试跟踪）"""
         if not os.path.exists(program_path):
             self.send_event('output', {
                 'category': 'stderr',
@@ -288,11 +310,12 @@ class DebugAdapter:
             self.send_event('terminated')
             return
 
+        self._program_path = program_path
         try:
             with open(program_path, 'r', encoding='utf-8') as f:
                 source = f.read()
+            self._source_code = source
 
-            # 编译
             compiler = DuanCompiler()
             result = compiler.compile(source)
 
@@ -305,36 +328,56 @@ class DebugAdapter:
                 self.send_event('terminated')
                 return
 
-            # 生成代码（带行号映射注释）
             codegen = UnifiedCodeGenerator()
             python_code = codegen.generate(result['ast'])
-
-            # 在生成代码前添加行号映射表注释
             python_code = self._inject_line_mapping(source, python_code)
 
-            # 查找断点对应的行
-            breakpoints_to_check = []
+            # 同步断点到调试器
             for file_path, lines in self.breakpoints.items():
-                breakpoints_to_check.extend(lines)
+                for line in lines:
+                    self.debugger.set_breakpoint(file_path, line)
 
-            # 执行
-            old_stdout = sys.stdout
-            sys.stdout = DuanOutputCapture(self)
-            try:
-                compiled = compile(python_code, program_path, 'exec')
-                exec_globals = {'__name__': '__main__', '__file__': program_path}
-                exec(compiled, exec_globals)
-            except Exception as e:
-                # 转换 Python 异常 traceback 为段言源码行号
-                duan_error = self._format_duan_error(e, source, python_code)
-                self.send_event('output', {
-                    'category': 'stderr',
-                    'output': duan_error
+            # 设置回调：命中断点或单步停止时发送 stopped 事件
+            def on_stop(file, line, frame):
+                self._current_frame = frame
+                self.current_line = line
+                self.variables = dict(frame.f_locals) if frame else {}
+                self.call_stack = [
+                    {'name': f.f_code.co_name, 'file': f.f_code.co_filename, 'line': f.f_lineno}
+                    for f in self._get_frames(frame)
+                ]
+                self.send_event('stopped', {
+                    'reason': 'breakpoint' if self.debugger.check_breakpoint(file, line) else 'step',
+                    'threadId': 1,
+                    'allThreadsStopped': True
                 })
-            finally:
-                sys.stdout = old_stdout
+                self._pause_event.clear()
+                self._pause_event.wait()
 
-            self.send_event('terminated')
+            self.debugger.frame_callback = on_stop
+
+            # 在线程中运行程序
+            def run_thread():
+                old_stdout = sys.stdout
+                sys.stdout = DuanOutputCapture(self)
+                try:
+                    self.debugger.start()
+                    with DebuggerContext(self.debugger):
+                        compiled = compile(python_code, program_path, 'exec')
+                        exec_globals = {'__name__': '__main__', '__file__': program_path}
+                        exec(compiled, exec_globals)
+                except Exception as e:
+                    duan_error = self._format_duan_error(e, source, python_code)
+                    self.send_event('output', {
+                        'category': 'stderr',
+                        'output': duan_error
+                    })
+                finally:
+                    sys.stdout = old_stdout
+                    self.send_event('terminated')
+
+            self._program_thread = threading.Thread(target=run_thread, daemon=True)
+            self._program_thread.start()
 
         except Exception as e:
             self.send_event('output', {
@@ -342,6 +385,16 @@ class DebugAdapter:
                 'output': format_exception(type(e), e, e.__traceback__)
             })
             self.send_event('terminated')
+
+    @staticmethod
+    def _get_frames(frame):
+        """从当前帧向上遍历调用栈"""
+        frames = []
+        f = frame
+        while f is not None:
+            frames.append(f)
+            f = f.f_back
+        return frames
 
     def _inject_line_mapping(self, source: str, python_code: str) -> str:
         """在生成代码前注入源码行号映射表"""

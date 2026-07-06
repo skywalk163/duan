@@ -54,6 +54,10 @@ class BuiltinsMixin:
             DuanBuiltinFunction('join', self._builtin_join, min_args=2, max_args=2),
             DuanBuiltinFunction('indexOf', self._builtin_index_of, min_args=2, max_args=2),
             DuanBuiltinFunction('contains', self._builtin_contains, min_args=2, max_args=2),
+            DuanBuiltinFunction('结尾', self._builtin_endswith, min_args=2, max_args=2),
+            DuanBuiltinFunction('startswith', self._builtin_endswith, min_args=2, max_args=2),
+            DuanBuiltinFunction('开头', self._builtin_startswith, min_args=2, max_args=2),
+            DuanBuiltinFunction('endswith', self._builtin_endswith, min_args=2, max_args=2),
             # 列表函数
             DuanBuiltinFunction('列表长度', self._builtin_list_len, min_args=1, max_args=1),
             DuanBuiltinFunction('listLen', self._builtin_list_len, min_args=1, max_args=1),
@@ -446,6 +450,22 @@ class BuiltinsMixin:
         if isinstance(s, str) and isinstance(substr, str):
             return DuanValue(substr in s, '布尔')
         raise RuntimeError("contains 参数类型错误")
+    
+    def _builtin_endswith(self, args: List[DuanValue]) -> DuanValue:
+        """字符串结尾检查"""
+        s = args[0].value
+        suffix = args[1].value
+        if isinstance(s, str) and isinstance(suffix, str):
+            return DuanValue(s.endswith(suffix), '布尔')
+        raise RuntimeError("结尾 参数类型错误")
+    
+    def _builtin_startswith(self, args: List[DuanValue]) -> DuanValue:
+        """字符串开头检查"""
+        s = args[0].value
+        prefix = args[1].value
+        if isinstance(s, str) and isinstance(prefix, str):
+            return DuanValue(s.startswith(prefix), '布尔')
+        raise RuntimeError("开头 参数类型错误")
     
     # ----- 列表函数 -----
     
