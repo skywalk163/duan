@@ -17,9 +17,11 @@
   duan compile hello.duan -o out.py  # 编译为 Python
 """
 
+import re
 import sys
 import os
 import argparse
+import subprocess
 from pathlib import Path
 
 # ── 路径设置 ──────────────────────────────────────────────────────
@@ -570,6 +572,165 @@ def cmd_pkg(args):
 
 
 # ═══════════════════════════════════════════════════════════════════
+# AI Copilot 子命令
+# ═══════════════════════════════════════════════════════════════════
+
+def _ensure_utf8():
+    """确保 stdout 使用 UTF-8 编码"""
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+
+
+def _cmd_ai(args):
+    """AI Copilot 入口"""
+    _ensure_utf8()
+
+    # 动态导入，避免影响非 AI 命令的启动速度
+    _AI_DIR = os.path.join(_PROJECT_DIR, 'tools', 'ai_copilot')
+    sys.path.insert(0, _AI_DIR)
+
+    ai_cmd = getattr(args, 'ai_command', None)
+    if not ai_cmd:
+        print('用法: duan ai <子命令> [选项]')
+        print('子命令: prompt, card, snippets, examples, check')
+        return
+
+    if ai_cmd == 'prompt':
+        from prompt_generator import generate_prompt
+        mode = args.mode or 'auto'
+        compact = not args.full
+        user_input = args.input
+        if os.path.isfile(user_input):
+            with open(user_input, encoding='utf-8') as f:
+                user_input = f.read()
+        prompt = generate_prompt(user_input, mode=mode, compact=compact)
+        print(prompt)
+
+    elif ai_cmd == 'card':
+        from syntax_card import generate_syntax_card
+        compact = not args.full
+        card = generate_syntax_card(compact=compact, include_verbs=args.verbs)
+        print(card)
+
+    elif ai_cmd == 'snippets':
+        from snippets import list_snippets, get_snippet
+        if args.name:
+            snippet = get_snippet(args.name)
+            if not snippet:
+                print(f"片段不存在: {args.name}")
+                return
+            print(f"名称：{args.name}")
+            print(f"用途：{snippet['desc']}")
+            print(f"模板：\n{snippet['code']}")
+            if 'example' in snippet:
+                print(f"示例：\n{snippet['example']}")
+            if 'pitfall' in snippet:
+                print(f"⚠暗坑：{snippet['pitfall']}")
+        else:
+            print(list_snippets())
+
+    elif ai_cmd == 'examples':
+        from syntax_card import generate_example_pairs
+        print(generate_example_pairs())
+
+    elif ai_cmd == 'check':
+        filepath = args.file
+        if not os.path.isfile(filepath):
+            print(f"文件不存在: {filepath}")
+            return
+
+        # ── 后端感知检测 ──
+        with open(filepath, 'r', encoding='utf-8') as f:
+            source = f.read()
+
+        _LLVM_KEYWORDS = {
+            '类': 'class 定义',
+            '继承': '类继承',
+            '构造': '构造函数',
+            '属性': '类属性',
+            '方法': '类方法',
+            '静态方法': '静态方法',
+            '抽象': '抽象类/方法',
+        }
+        detected = []
+        for kw, desc in _LLVM_KEYWORDS.items():
+            # 匹配独立关键字：前面不是标识符字符，后面是空格/冒号/换行/括号
+            if re.search(r'(?<![a-zA-Z0-9_\u4e00-\u9fff])' + re.escape(kw) + r'(?![a-zA-Z0-9_\u4e00-\u9fff])', source):
+                detected.append((kw, desc))
+
+        if detected:
+            print(f"[0/2] ⚠ 后端感知检测")
+            for kw, desc in detected:
+                print(f"  · 检测到「{kw}」({desc})")
+            print(f"  → 类系统在 SRC 后端下运行无输出，建议使用 LLVM 后端：")
+            print(f"     duan compile {filepath} --backend llvm-typed")
+            print()
+
+        # 语法检查
+        print(f"[1/2] 语法检查: {filepath}")
+        result = subprocess.run(
+            [sys.executable, '-X', 'utf8', '-m', 'cli.duan', 'check', filepath],
+            capture_output=True, text=True, encoding='utf-8', errors='replace',
+            cwd=_PROJECT_DIR,
+        )
+        if result.returncode != 0:
+            print(f"  ✗ 语法检查失败:")
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+        else:
+            print(f"  ✓ 语法检查通过")
+
+        if args.run:
+            print(f"[2/2] 运行测试: {filepath}")
+            try:
+                result = subprocess.run(
+                    [sys.executable, '-X', 'utf8', '-m', 'cli.duan', 'run', filepath],
+                    capture_output=True, text=True, encoding='utf-8', errors='replace',
+                    cwd=_PROJECT_DIR,
+                    timeout=args.timeout,
+                )
+                if result.returncode != 0:
+                    print(f"  ✗ 运行失败:")
+                    if result.stdout:
+                        print(result.stdout)
+                    if result.stderr:
+                        print(result.stderr)
+                else:
+                    print(f"  ✓ 运行成功")
+                    if result.stdout and result.stdout.strip():
+                        print(f"  输出:")
+                        for line in result.stdout.strip().split('\n'):
+                            print(f"    {line}")
+            except subprocess.TimeoutExpired:
+                print(f"  ✗ 运行超时（{args.timeout}秒）")
+        else:
+            print("[2/2] 跳过运行检查（使用 --run 启用）")
+
+    elif ai_cmd == 'generate':
+        from pipeline import generate_pipeline
+        prompt = generate_pipeline(
+            requirement=args.requirement,
+            model_size=args.model_size,
+            mode=args.mode,
+        )
+        print(prompt)
+
+    elif ai_cmd == 'fix':
+        from pipeline import fix_pipeline
+        if not os.path.isfile(args.file):
+            print(f"文件不存在: {args.file}")
+            return
+        prompt = fix_pipeline(
+            filepath=args.file,
+            error=args.error,
+            model_size=args.model_size,
+        )
+        print(prompt)
+
+
+# ═══════════════════════════════════════════════════════════════════
 # 主入口
 # ═══════════════════════════════════════════════════════════════════
 
@@ -655,6 +816,43 @@ def main():
     pkg_native.add_argument('-o', '--output', default=None, help='输出文件路径')
     pkg_native.add_argument('-v', '--verbose', action='store_true', help='详细输出')
 
+    # ── ai ──
+    ai_p = subparsers.add_parser('ai', help='AI Copilot 辅助工具（算力不足场景下的段言代码生成）')
+    ai_sub = ai_p.add_subparsers(dest='ai_command', help='AI 子命令')
+
+    ai_prompt = ai_sub.add_parser('prompt', help='生成让 AI 写段言代码的 prompt')
+    ai_prompt.add_argument('input', help='需求描述或 Python 代码（也支持文件路径）')
+    ai_prompt.add_argument('--mode', choices=['auto', 'translate', 'create', 'paragraph'],
+                           default='auto', help='生成模式（默认 auto 自动检测）')
+    ai_prompt.add_argument('--full', action='store_true', help='使用完整语法卡（默认精简卡）')
+
+    ai_card = ai_sub.add_parser('card', help='输出段言语法速查卡')
+    ai_card.add_argument('--full', action='store_true', help='完整版（默认精简版）')
+    ai_card.add_argument('--verbs', action='store_true', help='包含动词参数参照表')
+
+    ai_snippets = ai_sub.add_parser('snippets', help='列出代码片段库')
+    ai_snippets.add_argument('name', nargs='?', help='查看指定片段详情')
+
+    ai_sub.add_parser('examples', help='Python→段言对照示例')
+
+    ai_check = ai_sub.add_parser('check', help='校验段言代码（语法+运行+后端感知）')
+    ai_check.add_argument('file', help='段言代码文件路径')
+    ai_check.add_argument('--run', action='store_true', help='同时运行测试')
+    ai_check.add_argument('--timeout', type=int, default=10, help='运行超时秒数（默认10）')
+
+    ai_gen = ai_sub.add_parser('generate', help='★ 一键生成：需求→完整prompt（推荐）')
+    ai_gen.add_argument('requirement', help='代码需求描述，如"写一个冒泡排序"')
+    ai_gen.add_argument('--model-size', choices=['small', 'medium', 'large'],
+                        default='medium', help='目标模型大小（默认medium）：small≤7B / medium7-14B / large≥14B')
+    ai_gen.add_argument('--mode', choices=['auto', 'translate', 'create', 'paragraph'],
+                        default='auto', help='生成模式（默认auto）')
+
+    ai_fix = ai_sub.add_parser('fix', help='★ 一键修复：出错代码→修复prompt')
+    ai_fix.add_argument('file', help='出错的段言代码文件路径')
+    ai_fix.add_argument('error', help='错误信息（可用引号包裹）')
+    ai_fix.add_argument('--model-size', choices=['small', 'medium', 'large'],
+                        default='medium', help='目标模型大小（默认medium）')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -675,6 +873,8 @@ def main():
         cmd_type_check(args)
     elif args.command == 'init':
         cmd_init(args)
+    elif args.command == 'ai':
+        _cmd_ai(args)
     elif args.command == 'pkg':
         if not getattr(args, 'pkg_command', None):
             parser.parse_args(['pkg', '--help'])

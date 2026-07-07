@@ -153,3 +153,8 @@ run_debug.py
 src/test_*.py
 *.log
 *.txt
+
+# AI Copilot 训练产物
+tools/ai_copilot/output/
+tools/ai_copilot/model_cache/
+tools/ai_copilot/benchmark/

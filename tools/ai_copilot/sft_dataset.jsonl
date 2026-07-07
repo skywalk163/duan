@@ -1,0 +1,881 @@
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "print(f'Result: {x}')", "output": "打印(f\"Result: {x}\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "a != b", "output": "a 不等于 b", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "print(f'{nm} is {age} years old')", "output": "打印(f\"{nm} is {age} years old\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n-1)", "output": "段落 阶乘 接收 n：\n    如果 n 小于等于 1：\n        返回 1\n    返回 n 乘 阶乘(n 减 1)", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for i in range(5):\n    if i == 3:\n        continue\n    print(i)", "output": "遍历 i 于 0至4：\n    如果 i 等于 3：\n        跳过\n    打印(i)", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def linear_search(lst, target):\n    for i in range(len(lst)):\n        if lst[i] == target:\n            return i\n    return -1", "output": "段落 线性查找 接收 lst, target：\n    遍历 i 于 0至len(lst)减1：\n        如果 lst[i] 等于 target：\n            返回 i\n    返回 减 1", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def negate(n):\n    return -n", "output": "段落 取反 接收 n：\n    返回 0 减 n", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "for i in range(1, 11):\n    print(i)", "output": "遍历 i 于 1至10：\n    打印(i)", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def fib(num):\n    if num <= 2:\n        return 1\n    return fib(num-1) + fib(num-2)", "output": "段落 斐波那契 接收 num：\n    如果 num 小于等于 2：\n        返回 1\n    返回 斐波那契(num 减 1) 加 斐波那契(num 减 2)", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "a += 1", "output": "a 加上 1", "category": "暗坑"}
+{"instruction": "将Python代码转为段言代码：", "input": "for k, v in d.items():\n    print(k, v)", "output": "遍历 k 于 d：\n    打印(k)\n    打印(d[k])", "category": "字典"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "while True:\n    if x == 0:\n        break\n    x -= 1", "output": "当 真：\n    如果 x 等于 0：\n        跳出\n    x 减去 1", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "x = 100\nx += 5", "output": "设 x 为 100\nx 加上 5", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def clamp(val, lo, hi):\n    if val < lo:\n        return lo\n    if val > hi:\n        return hi\n    return val", "output": "段落 限值 接收 val, lo, hi：\n    如果 val 小于 lo：\n        返回 lo\n    如果 val 大于 hi：\n        返回 hi\n    返回 val", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "active = False", "output": "设 active 为 假", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "import random\na = random.randint(1, 10)", "output": "导入 随机数据\n设 a 为 随机整数(1, 10)", "category": "导入"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "计数 = 列表.计数(5)", "output": "设 计数 为 0\n遍历 x 于 列表：\n    如果 x 等于 5：\n        计数 加上 1", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr", "output": "段落 冒泡排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 0至n减1：\n        遍历 j 于 0至n减i减2：\n            如果 arr[j] 大于 arr[j 加 1]：\n                设 tmp 为 arr[j]\n                arr[j] = arr[j 加 1]\n                arr[j 加 1] = tmp\n    返回 arr", "category": "复合"}
+{"instruction": "Python→段言翻译：", "input": "def fib(n):\n    if n <= 2:\n        return 1\n    return fib(n-1) + fib(n-2)", "output": "段落 斐波那契 接收 n：\n    如果 n 小于等于 2：\n        返回 1\n    返回 斐波那契(n 减 1) 加 斐波那契(n 减 2)", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "del d['key']", "output": "d.删除(\"key\")", "category": "字典"}
+{"instruction": "请将以下代码翻译为段言：", "input": "i = 0\nwhile i < 10:\n    print(i)\n    i += 1", "output": "设 i 为 0\n当 i 小于 10：\n    打印(i)\n    i 加上 1", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "print(f'{name} is {age} years old')", "output": "打印(f\"{name} is {age} years old\")", "category": "字符串"}
+{"instruction": "将Python翻译成段言。", "input": "upper_s = 文.upper()", "output": "设 upper_s 为 字符串转大写(文)", "category": "字符串"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "结果 = 文.replace('old', 'new')", "output": "设 结果 为 字符串替换(文, \"old\", \"new\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if 甲 == 0:\n    print('zero')", "output": "如果 甲 等于 0：\n    打印(\"zero\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "return a", "output": "返回 a", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def is_even(n):\n    return n % 2 == 0", "output": "段落 是偶数 接收 n：\n    返回 n 取余 2 等于 0", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if x != 0:\n    print('not zero')", "output": "如果 x 不等于 0：\n    打印(\"not zero\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "lower_s = s.lower()", "output": "设 lower_s 为 字符串转小写(s)", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "from math import sqrt", "output": "从 数学工具 导入 平方", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "count = 0\ncount += 1", "output": "设 count 为 0\ncount 加上 1", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if a > 0:\n    print('yes')\nelse:\n    print('no')", "output": "如果 a 大于 0：\n    打印(\"yes\")\n否则：\n    打印(\"no\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "a - b", "output": "a 减 b", "category": "暗坑"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for x in lst:", "output": "遍历 x 于 lst：", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def double(n):\n    return n * 2", "output": "段落 双倍 接收 n：\n    返回 n 乘 2", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "a < b", "output": "a 小于 b", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "list_.insert(0, 10)", "output": "设 new_lst 为 [10]\n遍历 x 于 list_：\n    new_lst.追加(x)\n设 list_ 为 new_lst", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "from typing import List", "output": "从 类型工具 导入 列表类型", "category": "导入"}
+{"instruction": "将Python翻译成段言。", "input": "def sign(num):\n    if num > 0:\n        return 1\n    elif num < 0:\n        return -1\n    return 0", "output": "段落 符号 接收 num：\n    如果 num 大于 0：\n        返回 1\n    否则如果 num 小于 0：\n        返回 减 1\n    返回 0", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr", "output": "段落 冒泡排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 0至n减1：\n        遍历 j 于 0至n减i减2：\n            如果 arr[j] 大于 arr[j 加 1]：\n                设 tmp 为 arr[j]\n                arr[j] = arr[j 加 1]\n                arr[j 加 1] = tmp\n    返回 arr", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "if 甲 > 0 and 甲 < 10:\n    print('in range')", "output": "如果 甲 大于 0 且 甲 小于 10：\n    打印(\"in range\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "数 = len(文)", "output": "设 数 为 len(文)", "category": "字符串"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def temperature_report(celsius):\n    if celsius < 0:\n        return 'freezing'\n    elif celsius < 15:\n        return 'cold'\n    elif celsius < 25:\n        return 'comfortable'\n    elif celsius < 35:\n        return 'warm'\n    else:\n        return 'hot'", "output": "段落 温度报告 接收 celsius：\n    如果 celsius 小于 0：\n        返回 \"freezing\"\n    否则如果 celsius 小于 15：\n        返回 \"cold\"\n    否则如果 celsius 小于 25：\n        返回 \"comfortable\"\n    否则如果 celsius 小于 35：\n        返回 \"warm\"\n    否则：\n        返回 \"hot\"", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "evens = [x for x in lst if x % 2 == 0]", "output": "设 evens 为 []\n遍历 x 于 lst：\n    如果 x 取余 2 等于 0：\n        evens.追加(x)", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "for 序 in range(5):\n    if 序 == 3:\n        continue\n    print(序)", "output": "遍历 序 于 0至4：\n    如果 序 等于 3：\n        跳过\n    打印(序)", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "def remove_duplicates(列表):\n    seen = []\n    结果 = []\n    for 项 in 列表:\n        if 项 not in seen:\n            seen.append(项)\n            结果.append(项)\n    return 结果", "output": "段落 去重 接收 列表：\n    设 seen 为 []\n    设 结果 为 []\n    遍历 项 于 列表：\n        设 found 为 假\n        遍历 s 于 seen：\n            如果 s 等于 项：\n                设 found 为 真\n                跳出\n        如果 非 found：\n            seen.追加(项)\n            结果.追加(项)\n    返回 结果", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def collatz(n):\n    steps = 0\n    while n != 1:\n        if n % 2 == 0:\n            n = n // 2\n        else:\n            n = 3 * n + 1\n        steps += 1\n    return steps", "output": "段落 考拉兹 接收 n：\n    设 steps 为 0\n    当 n 不等于 1：\n        如果 n 取余 2 等于 0：\n            设 n 为 n 除以 2\n        否则：\n            设 n 为 3 乘 n 加 1\n        steps 加上 1\n    返回 steps", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "class Cat(Dog):\n    def speak(self):\n        print(f'{self.nm}: meow!')", "output": "类 猫 继承 狗：\n    段落 说话：\n        打印(f\"{己.名字}: meow!\")", "category": "类"}
+{"instruction": "将Python翻译成段言。", "input": "for i in range(1, 11):\n    print(i)", "output": "遍历 i 于 1至10：\n    打印(i)", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "if 甲 > 0:\n    print('yes')\nelse:\n    print('no')", "output": "如果 甲 大于 0：\n    打印(\"yes\")\n否则：\n    打印(\"no\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def fizzbuzz(n):\n    for i in range(1, n+1):\n        if i % 15 == 0:\n            print('FizzBuzz')\n        elif i % 3 == 0:\n            print('Fizz')\n        elif i % 5 == 0:\n            print('Buzz')\n        else:\n            print(i)", "output": "段落 FizzBuzz 接收 n：\n    遍历 i 于 1至n：\n        如果 i 取余 15 等于 0：\n            打印(\"FizzBuzz\")\n        否则如果 i 取余 3 等于 0：\n            打印(\"Fizz\")\n        否则如果 i 取余 5 等于 0：\n            打印(\"Buzz\")\n        否则：\n            打印(i)", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def find_max(lst):\n    max_val = lst[0]\n    for item in lst[1:]:\n        if item > max_val:\n            max_val = item\n    return max_val", "output": "段落 求最大值 接收 lst：\n    设 max_val 为 lst[0]\n    遍历 item 于 lst：\n        如果 item 大于 max_val：\n            设 max_val 为 item\n    返回 max_val", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def sign(n):\n    if n > 0:\n        return 1\n    elif n < 0:\n        return -1\n    return 0", "output": "段落 符号 接收 n：\n    如果 n 大于 0：\n        返回 1\n    否则如果 n 小于 0：\n        返回 减 1\n    返回 0", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def f(a, b):", "output": "段落 f 接收 a, b：", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if len(s) > 0:\n    print('not empty')", "output": "如果 len(s) 大于 0：\n    打印(\"not empty\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "while True:\n    cmd = input()\n    if cmd == 'quit':\n        break", "output": "当 真：\n    设 cmd 为 输入()\n    如果 cmd 等于 \"quit\"：\n        跳出", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def power2(n):\n    return 2 ** n", "output": "段落 二的幂 接收 n：\n    返回 2 的 n 次方", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "break", "output": "跳出", "category": "暗坑"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "a / b", "output": "a 除以 b", "category": "暗坑"}
+{"instruction": "将Python代码转为段言代码：", "input": "s = \"world\"", "output": "定义 s 等于 \"world\"", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "n = 5\nn *= 3", "output": "设 n 为 5\nn 乘以 3", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def matrix_sum(matrix):\n    total = 0\n    for row in matrix:\n        for val in row:\n            total += val\n    return total", "output": "段落 矩阵求和 接收 matrix：\n    设 total 为 0\n    遍历 row 于 matrix：\n        遍历 val 于 row：\n            total 加上 val\n    返回 total", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if x > 0:\n    print('yes')\nelse:\n    print('no')", "output": "如果 x 大于 0：\n    打印(\"yes\")\n否则：\n    打印(\"no\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "甲 = 10", "output": "设 甲 为 10", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "doubled = [x * 2 for x in lst]", "output": "设 doubled 为 []\n遍历 x 于 lst：\n    doubled.追加(x 乘 2)", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if s.endswith('.txt'):", "output": "如果 字符串结尾是(s, \".txt\")：", "category": "字符串"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "while x > 0:\n    x -= 1", "output": "当 x 大于 0：\n    x 减去 1", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def matrix_sum(matrix):\n    sum_ = 0\n    for row in matrix:\n        for v in row:\n            sum_ += v\n    return sum_", "output": "段落 矩阵求和 接收 matrix：\n    设 sum_ 为 0\n    遍历 row 于 matrix：\n        遍历 v 于 row：\n            sum_ 加上 v\n    返回 sum_", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "def rock_paper_scissors(p1, p2):\n    if p1 == p2:\n        return 'draw'\n    if (p1 == 'rock' and p2 == 'scissors') or (p1 == 'scissors' and p2 == 'paper') or (p1 == 'paper' and p2 == 'rock'):\n        return 'p1 wins'\n    return 'p2 wins'", "output": "段落 石头剪刀布 接收 p1, p2：\n    如果 p1 等于 p2：\n        返回 \"draw\"\n    如果 (p1 等于 \"rock\" 且 p2 等于 \"scissors\") 或 (p1 等于 \"scissors\" 且 p2 等于 \"paper\") 或 (p1 等于 \"paper\" 且 p2 等于 \"rock\")：\n        返回 \"p1 wins\"\n    返回 \"p2 wins\"", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "y = 50\ny -= 10", "output": "设 y 为 50\ny 减去 10", "category": "变量"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "x = 5\ny = 3", "output": "设 x 为 5\n设 y 为 3", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "empty = None", "output": "设 empty 为 空", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "parts = 文.split(',')", "output": "设 parts 为 字符串分割(文, \",\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "d['name'] = 'test'", "output": "d[\"name\"] = \"test\"", "category": "字典"}
+{"instruction": "请将以下代码翻译为段言：", "input": "lst[2] = 99", "output": "lst[2] = 99", "category": "列表"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if 分数 > 60:\n    print('pass')\nelse:\n    print('fail')", "output": "如果 分数 大于 60：\n    打印(\"pass\")\n否则：\n    打印(\"fail\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if x > 0 and x < 10:\n    print('in range')", "output": "如果 x 大于 0 且 x 小于 10：\n    打印(\"in range\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "def divide(a, b):\n    return a / b", "output": "段落 除法 接收 a, b：\n    返回 a 除以 b", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "for i in range(10):\n    print(i)", "output": "遍历 i 于 0至9：\n    打印(i)", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "try:\n    甲 = int(input())\nexcept ValueError:\n    甲 = 0\n    print('invalid')", "output": "尝试：\n    设 甲 为 int(输入())\n捕获 异常：\n    设 甲 为 0\n    打印(\"invalid\")", "category": "异常"}
+{"instruction": "Python→段言翻译：", "input": "def caesar_cipher(text, shift):\n    result = ''\n    for c in text:\n        if c.isalpha():\n            base = ord('a') if c.islower() else ord('A')\n            result += chr((ord(c) - base + shift) % 26 + base)\n        else:\n            result += c\n    return result", "output": "段落 凯撒加密 接收 text, shift：\n    定义 result 等于 \"\"\n    遍历 c 于 text：\n        如果 字符串包含(小写字母表, c) 或 字符串包含(大写字母表, c)：\n            定义 shifted 等于 字符偏移(c, shift)\n            定义 result 等于 result 加 shifted\n        否则：\n            定义 result 等于 result 加 c\n    返回 result", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "for 序 in range(100, 0, -1):\n    print(序)", "output": "遍历 序 于 100至1步1：\n    打印(序)", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "num = len(list_)", "output": "设 num 为 len(list_)", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "new_lst = list_[1:3]", "output": "设 new_lst 为 []\n设 i 为 1\n当 i 小于 3：\n    new_lst.追加(list_[i])\n    i 加上 1", "category": "列表"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "ratio = 2.5", "output": "设 ratio 为 2.5", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "not a", "output": "非 a", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "while True:\n    if x == 0:\n        break\n    x -= 1", "output": "当 真：\n    如果 x 等于 0：\n        跳出\n    x 减去 1", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "class Counter:\n    def __init__(self):\n        self.计数 = 0\n    def increment(self):\n        self.计数 += 1\n    def get(self):\n        return self.计数", "output": "类 计数器：\n    属性 计数值\n    构造：\n        己.计数值 为 0\n    段落 增加：\n        己.计数值 加上 1\n    段落 获取：\n        返回 己.计数值", "category": "类"}
+{"instruction": "将Python翻译成段言。", "input": "def subtract(a, b):\n    return a - b", "output": "段落 减法 接收 a, b：\n    返回 a 减 b", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "sum_ = 0\nfor num in numbers:\n    sum_ += num", "output": "设 sum_ 为 0\n遍历 num 于 numbers：\n    sum_ 加上 num", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "class Counter:\n    def __init__(self):\n        self.count = 0\n    def increment(self):\n        self.count += 1\n    def get(self):\n        return self.count", "output": "类 计数器：\n    属性 计数值\n    构造：\n        己.计数值 为 0\n    段落 增加：\n        己.计数值 加上 1\n    段落 获取：\n        返回 己.计数值", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if a == 0:\n    print('zero')", "output": "如果 a 等于 0：\n    打印(\"zero\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "序 = 序 + 1", "output": "设 序 为 序 加 1", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "for i in range(n):", "output": "遍历 i 于 0至n减1：", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def celsius_to_fahrenheit(c):\n    return c * 9 / 5 + 32", "output": "段落 摄氏转华氏 接收 c：\n    返回 c 乘 9 除以 5 加 32", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "from collections import Counter", "output": "从 集合操作 导入 计数", "category": "导入"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "try:\n    f = open('data.txt')\n    content = f.read()\nexcept:\n    content = ''", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    定义 content 等于 \"\"", "category": "异常"}
+{"instruction": "将Python翻译成段言。", "input": "lst.pop()", "output": "设 last 为 lst[len(lst) 减 1]\n设 new_lst 为 []\n遍历 i 于 0至len(lst)减2：\n    new_lst.追加(lst[i])\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "Python→段言翻译：", "input": "b = 50\nb -= 10", "output": "设 b 为 50\nb 减去 10", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "if score >= 90:\n    grade = 'A'\nelif score >= 80:\n    grade = 'B'\nelse:\n    grade = 'C'", "output": "如果 score 大于等于 90：\n    设 grade 为 \"A\"\n否则如果 score 大于等于 80：\n    设 grade 为 \"B\"\n否则：\n    设 grade 为 \"C\"", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "列表.reverse()", "output": "设 n 为 len(列表)\n设 i 为 0\n设 j 为 n 减 1\n当 i 小于 j：\n    设 tmp 为 列表[i]\n    列表[i] = 列表[j]\n    列表[j] = tmp\n    i 加上 1\n    j 减去 1", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "first = list_[0]\nlast = list_[-1]", "output": "设 first 为 list_[0]\n设 last 为 list_[len(list_) 减 1]", "category": "列表"}
+{"instruction": "请将以下代码翻译为段言：", "input": "列表 = [1, 2, 3]", "output": "设 列表 为 [1, 2, 3]", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def histogram(data, bins):\n    counts = [0] * bins\n    for val in data:\n        idx = min(int(val * bins), bins - 1)\n        counts[idx] += 1\n    return counts", "output": "段落 直方图 接收 data, bins：\n    设 counts 为 []\n    遍历 _ 于 0至bins减1：\n        counts.追加(0)\n    遍历 val 于 data：\n        设 idx 为 int(val 乘 bins)\n        如果 idx 大于等于 bins：\n            设 idx 为 bins 减 1\n        counts[idx] = counts[idx] 加 1\n    返回 counts", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "列表.insert(0, 10)", "output": "设 new_lst 为 [10]\n遍历 x 于 列表：\n    new_lst.追加(x)\n设 列表 为 new_lst", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "total = 100\ntotal -= 20", "output": "设 total 为 100\ntotal 减去 20", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "cnt = list_.cnt(5)", "output": "设 cnt 为 0\n遍历 x 于 list_：\n    如果 x 等于 5：\n        cnt 加上 1", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if 5 in 列表:\n    print('找到')", "output": "设 找到 为 假\n遍历 x 于 列表：\n    如果 x 等于 5：\n        设 找到 为 真\n        跳出\n如果 找到：\n    打印(\"找到\")", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "def clamp(val, lo, hi):\n    if val < lo:\n        return lo\n    if val > hi:\n        return hi\n    return val", "output": "段落 限值 接收 val, lo, hi：\n    如果 val 小于 lo：\n        返回 lo\n    如果 val 大于 hi：\n        返回 hi\n    返回 val", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "clean = s.replace(' ', '_')", "output": "设 clean 为 字符串替换(s, \" \", \"_\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if a == b and b == c:\n    print('all equal')", "output": "如果 a 等于 b 且 b 等于 c：\n    打印(\"all equal\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "if 5 in list_:\n    print('hit')", "output": "设 hit 为 假\n遍历 x 于 list_：\n    如果 x 等于 5：\n        设 hit 为 真\n        跳出\n如果 hit：\n    打印(\"hit\")", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "class Bird(Animal):\n    def speak(self):\n        print(f'{self.name}: chirp!')", "output": "类 鸟 继承 动物：\n    段落 说话：\n        打印(f\"{己.名字}: chirp!\")", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def greet_name(名):\n    print('Hello, ' + 名)", "output": "段落 打招呼 接收 名：\n    打印(\"Hello, \" 加 名)", "category": "段落"}
+{"instruction": "将Python翻译成段言。", "input": "nums = []", "output": "设 nums 为 []", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "print(f'Result: {x}')", "output": "打印(f\"Result: {x}\")", "category": "字符串"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "lst.append(10)", "output": "lst.追加(10)", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "def subtract(a, b):\n    return a - b", "output": "段落 减法 接收 a, b：\n    返回 a 减 b", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "while x > 0:\n    x -= 1", "output": "当 x 大于 0：\n    x 减去 1", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "d = {}", "output": "设 d 为 {}", "category": "字典"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "class Counter:\n    def __init__(self):\n        self.count = 0\n    def increment(self):\n        self.count += 1\n    def get(self):\n        return self.count", "output": "类 计数器：\n    属性 计数值\n    构造：\n        己.计数值 为 0\n    段落 增加：\n        己.计数值 加上 1\n    段落 获取：\n        返回 己.计数值", "category": "类"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "grade = 'A' if score >= 90 else 'B'", "output": "如果 score 大于等于 90：\n    设 grade 为 \"A\"\n否则：\n    设 grade 为 \"B\"", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "idx = s.index('abc')", "output": "设 idx 为 字符串查找(s, \"abc\")", "category": "字符串"}
+{"instruction": "将Python翻译成段言。", "input": "list_.sort()", "output": "设 n 为 len(list_)\n遍历 i 于 0至n减2：\n    遍历 j 于 0至n减i减2：\n        如果 list_[j] 大于 list_[j 加 1]：\n            设 tmp 为 list_[j]\n            list_[j] = list_[j 加 1]\n            list_[j 加 1] = tmp", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if s.startswith('http'):", "output": "如果 字符串开头是(s, \"http\")：", "category": "字符串"}
+{"instruction": "将Python翻译成段言。", "input": "if len(lst) == 0:\n    print('empty')", "output": "如果 len(lst) 等于 0：\n    打印(\"empty\")", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "def gcd(a, b):\n    while b != 0:\n        a, b = b, a % b\n    return a", "output": "段落 最大公约数 接收 a, b：\n    当 b 不等于 0：\n        设 tmp 为 a 取余 b\n        设 a 为 b\n        设 b 为 tmp\n    返回 a", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "list_.append(10)", "output": "list_.追加(10)", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "new_lst = lst[1:3]", "output": "设 new_lst 为 []\n设 i 为 1\n当 i 小于 3：\n    new_lst.追加(lst[i])\n    i 加上 1", "category": "列表"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if len(列表) == 0:\n    print('empty')", "output": "如果 len(列表) 等于 0：\n    打印(\"empty\")", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "d['key'] = 10", "output": "d[\"key\"] = 10", "category": "字典"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "print(f'Result: {x}')", "output": "打印(f\"Result: {x}\")", "category": "字符串"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "结果 = [甲 for 甲 in 列表 if 甲 > 0]", "output": "设 结果 为 []\n遍历 甲 于 列表：\n    如果 甲 大于 0：\n        结果.追加(甲)", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "def temperature_report(celsius):\n    if celsius < 0:\n        return 'freezing'\n    elif celsius < 15:\n        return 'cold'\n    elif celsius < 25:\n        return 'comfortable'\n    elif celsius < 35:\n        return 'warm'\n    else:\n        return 'hot'", "output": "段落 温度报告 接收 celsius：\n    如果 celsius 小于 0：\n        返回 \"freezing\"\n    否则如果 celsius 小于 15：\n        返回 \"cold\"\n    否则如果 celsius 小于 25：\n        返回 \"comfortable\"\n    否则如果 celsius 小于 35：\n        返回 \"warm\"\n    否则：\n        返回 \"hot\"", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if score >= 90:\n    grade = 'A'\nelif score >= 80:\n    grade = 'B'\nelse:\n    grade = 'C'", "output": "如果 score 大于等于 90：\n    设 grade 为 \"A\"\n否则如果 score 大于等于 80：\n    设 grade 为 \"B\"\n否则：\n    设 grade 为 \"C\"", "category": "条件"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def greet_name(nm):\n    print('Hello, ' + nm)", "output": "段落 打招呼 接收 nm：\n    打印(\"Hello, \" 加 nm)", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "for i in range(5, 15):\n    print(i)", "output": "遍历 i 于 5至14：\n    打印(i)", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def negate(n):\n    return -n", "output": "段落 取反 接收 n：\n    返回 0 减 n", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "grade = 'A' if score >= 90 else 'B'", "output": "如果 score 大于等于 90：\n    设 grade 为 \"A\"\n否则：\n    设 grade 为 \"B\"", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst[0] = 10", "output": "lst[0] = 10", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "lower_s = s.lower()", "output": "设 lower_s 为 字符串转小写(s)", "category": "字符串"}
+{"instruction": "Python→段言翻译：", "input": "if len(lst) == 0:\n    print('empty')", "output": "如果 len(lst) 等于 0：\n    打印(\"empty\")", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "if a > 0:\n    print('positive')", "output": "如果 a 大于 0：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "cnt = 0\ncnt += 1", "output": "设 cnt 为 0\ncnt 加上 1", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "name = 'hello'", "output": "定义 name 等于 \"hello\"", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if a != 0:\n    print('not zero')", "output": "如果 a 不等于 0：\n    打印(\"not zero\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def count_down(num):\n    while num > 0:\n        print(num)\n        num -= 1", "output": "段落 倒计时 接收 num：\n    当 num 大于 0：\n        打印(num)\n        num 减去 1", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "for 序 in range(1, 11):\n    print(序)", "output": "遍历 序 于 1至10：\n    打印(序)", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "ratio = 2.5", "output": "设 ratio 为 2.5", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "i = 0\nwhile i < 10:\n    print(i)\n    i += 1", "output": "设 i 为 0\n当 i 小于 10：\n    打印(i)\n    i 加上 1", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def is_even(n):\n    return n % 2 == 0", "output": "段落 是偶数 接收 n：\n    返回 n 取余 2 等于 0", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "n = len(lst)", "output": "设 n 为 len(lst)", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "return 甲", "output": "返回 甲", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if num % 3 == 0:\n    print('divisible by 3')", "output": "如果 num 取余 3 等于 0：\n    打印(\"divisible by 3\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "def count_words(text):\n    words = text.split()\n    counts = {}\n    for w in words:\n        if w in counts:\n            counts[w] += 1\n        else:\n            counts[w] = 1\n    return counts", "output": "段落 统计词频 接收 text：\n    设 words 为 字符串分割(text)\n    设 counts 为 {}\n    遍历 w 于 words：\n        如果 w 于 counts：\n            counts[w] = counts[w] 加 1\n        否则：\n            counts[w] = 1\n    返回 counts", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def remove_duplicates(lst):\n    seen = []\n    result = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n            result.append(item)\n    return result", "output": "段落 去重 接收 lst：\n    设 seen 为 []\n    设 result 为 []\n    遍历 item 于 lst：\n        设 found 为 假\n        遍历 s 于 seen：\n            如果 s 等于 item：\n                设 found 为 真\n                跳出\n        如果 非 found：\n            seen.追加(item)\n            result.追加(item)\n    返回 result", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if s.startswith('http'):", "output": "如果 字符串开头是(s, \"http\")：", "category": "字符串"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "lower_s = s.lower()", "output": "设 lower_s 为 字符串转小写(s)", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "for key in sorted(d):", "output": "设 keys 为 []\n遍历 k 于 d：\n    keys.追加(k)\n# sorted需要自行实现", "category": "字典"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def modulo(a, b):\n    return a % b", "output": "段落 取余 接收 a, b：\n    返回 a 取余 b", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "True", "output": "真", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "msg = 'ok'", "output": "定义 msg 等于 \"ok\"", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "for 序 in range(10):\n    if 序 % 2 == 0:\n        continue\n    print(序)", "output": "遍历 序 于 0至9：\n    如果 序 取余 2 等于 0：\n        跳过\n    打印(序)", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if score >= 90:\n    grade = 'A'\nelif score >= 80:\n    grade = 'B'\nelse:\n    grade = 'C'", "output": "如果 score 大于等于 90：\n    设 grade 为 \"A\"\n否则如果 score 大于等于 80：\n    设 grade 为 \"B\"\n否则：\n    设 grade 为 \"C\"", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "total = sum(lst)", "output": "设 total 为 0\n遍历 x 于 lst：\n    设 total 为 total 加 x", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "new_lst = 列表[1:3]", "output": "设 new_lst 为 []\n设 i 为 1\n当 i 小于 3：\n    new_lst.追加(列表[i])\n    i 加上 1", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "data = None", "output": "设 data 为 空", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def histogram(data, bins):\n    counts = [0] * bins\n    for 值 in data:\n        idx = min(int(值 * bins), bins - 1)\n        counts[idx] += 1\n    return counts", "output": "段落 直方图 接收 data, bins：\n    设 counts 为 []\n    遍历 _ 于 0至bins减1：\n        counts.追加(0)\n    遍历 值 于 data：\n        设 idx 为 int(值 乘 bins)\n        如果 idx 大于等于 bins：\n            设 idx 为 bins 减 1\n        counts[idx] = counts[idx] 加 1\n    返回 counts", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "result = [x for x in lst if x > 0]", "output": "设 result 为 []\n遍历 x 于 lst：\n    如果 x 大于 0：\n        result.追加(x)", "category": "列表"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "pairs = {}", "output": "设 pairs 为 {}", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if n % 2 == 0:\n    print('even')\nelse:\n    print('odd')", "output": "如果 n 取余 2 等于 0：\n    打印(\"even\")\n否则：\n    打印(\"odd\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "total = 0\ni = 1\nwhile i <= 100:\n    total += i\n    i += 1", "output": "设 total 为 0\n设 i 为 1\n当 i 小于等于 100：\n    total 加上 i\n    i 加上 1", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "doubled = [x * 2 for x in lst]", "output": "设 doubled 为 []\n遍历 x 于 lst：\n    doubled.追加(x 乘 2)", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "nums = []", "output": "设 nums 为 []", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "class Rect:\n    def __init__(self, w, h):\n        self.w = w\n        self.h = h\n    def area(self):\n        return self.w * self.h", "output": "类 矩形：\n    属性 宽\n    属性 高\n    构造 接收 宽, 高：\n        己.宽 为 宽\n        己.高 为 高\n    段落 面积：\n        返回 己.宽 乘 己.高", "category": "类"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for i in range(len(lst)):\n    print(lst[i])", "output": "遍历 i 于 0至len(lst)减1：\n    打印(lst[i])", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def collatz(num):\n    steps = 0\n    while num != 1:\n        if num % 2 == 0:\n            num = num // 2\n        else:\n            num = 3 * num + 1\n        steps += 1\n    return steps", "output": "段落 考拉兹 接收 num：\n    设 steps 为 0\n    当 num 不等于 1：\n        如果 num 取余 2 等于 0：\n            设 num 为 num 除以 2\n        否则：\n            设 num 为 3 乘 num 加 1\n        steps 加上 1\n    返回 steps", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def sum_digits(n):\n    total = 0\n    while n > 0:\n        total += n % 10\n        n //= 10\n    return total", "output": "段落 数位求和 接收 n：\n    设 total 为 0\n    当 n 大于 0：\n        total 加上 n 取余 10\n        设 n 为 n 除以 10\n    返回 total", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "def greet_name(name):\n    print('Hello, ' + name)", "output": "段落 打招呼 接收 name：\n    打印(\"Hello, \" 加 name)", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for key in d:\n    print(key, d[key])", "output": "遍历 key 于 d：\n    打印(key)\n    打印(d[key])", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for i in range(1, 11):\n    print(i)", "output": "遍历 i 于 1至10：\n    打印(i)", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst = [1, 2, 3]", "output": "设 lst 为 [1, 2, 3]", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "i = i + 1", "output": "设 i 为 i 加 1", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "for key in sorted(d):", "output": "设 keys 为 []\n遍历 k 于 d：\n    keys.追加(k)\n# sorted需要自行实现", "category": "字典"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def area(width, height):\n    return width * height", "output": "段落 面积 接收 宽, 高：\n    返回 宽 乘 高", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "list_.pop()", "output": "设 last 为 list_[len(list_) 减 1]\n设 new_lst 为 []\n遍历 i 于 0至len(list_)减2：\n    new_lst.追加(list_[i])\n设 list_ 为 new_lst", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "n = len(lst)", "output": "设 n 为 len(lst)", "category": "暗坑"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if n % 3 == 0:\n    print('divisible by 3')", "output": "如果 n 取余 3 等于 0：\n    打印(\"divisible by 3\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "from math import sqrt, pi", "output": "从 数学工具 导入 平方, 圆周率", "category": "导入"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "x = lst[0]", "output": "设 x 为 lst[0]", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "import json", "output": "导入 JSON", "category": "导入"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def is_positive(n):\n    return n > 0", "output": "段落 是正数 接收 n：\n    返回 n 大于 0", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "try:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    result = 0", "output": "尝试：\n    设 result 为 10 除以 0\n捕获 异常：\n    设 result 为 0", "category": "异常"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if x < 0 or x > 100:\n    print('out of range')", "output": "如果 x 小于 0 或 x 大于 100：\n    打印(\"out of range\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def reverse_string(s):\n    res = ''\n    for i in range(len(s)-1, -1, -1):\n        res += s[i]\n    return res", "output": "段落 反转字符串 接收 s：\n    设 res 为 \"\"\n    设 i 为 len(s) 减 1\n    当 i 大于等于 0：\n        定义 res 等于 res 加 s[i]\n        i 减去 1\n    返回 res", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if len(s) > 0:\n    print('not empty')", "output": "如果 len(s) 大于 0：\n    打印(\"not empty\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "list_[0] = 10", "output": "list_[0] = 10", "category": "暗坑"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "class Cat(Dog):\n    def speak(self):\n        print(f'{self.名}: meow!')", "output": "类 猫 继承 狗：\n    段落 说话：\n        打印(f\"{己.名字}: meow!\")", "category": "类"}
+{"instruction": "将Python翻译成段言。", "input": "msg = 'ok'", "output": "定义 msg 等于 \"ok\"", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "import random\nx = random.randint(1, 10)", "output": "导入 随机数据\n设 x 为 随机整数(1, 10)", "category": "导入"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "d = {}", "output": "设 d 为 {}", "category": "字典"}
+{"instruction": "将Python代码转为段言代码：", "input": "obj = Dog('Rex')\nobj.speak()", "output": "设 obj 为 新建 狗(\"Rex\")\nobj.说话()", "category": "类"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "i = 0\nwhile i < 10:\n    print(i)\n    i += 1", "output": "设 i 为 0\n当 i 小于 10：\n    打印(i)\n    i 加上 1", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "d['名'] = 'test'", "output": "d[\"名\"] = \"test\"", "category": "字典"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "pairs = {}", "output": "设 pairs 为 {}", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def is_odd(数):\n    return 数 % 2 != 0", "output": "段落 是奇数 接收 数：\n    返回 数 取余 2 不等于 0", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if not flag:\n    print('off')", "output": "如果 非 flag：\n    打印(\"off\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "if 'hello' in s:\n    print('found')", "output": "如果 字符串包含(s, \"hello\")：\n    打印(\"found\")", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "if 'hello' in s:\n    print('hit')", "output": "如果 字符串包含(s, \"hello\")：\n    打印(\"hit\")", "category": "字符串"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def max_of_two(a, b):\n    if a >= b:\n        return a\n    return b", "output": "段落 最大值 接收 a, b：\n    如果 a 大于等于 b：\n        返回 a\n    返回 b", "category": "段落"}
+{"instruction": "将Python翻译成段言。", "input": "def subtract(a, b):\n    return a - b", "output": "段落 减法 接收 a, b：\n    返回 a 减 b", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "greeting = 'hi' + ' ' + name", "output": "定义 greeting 等于 \"hi\" 加 \" \" 加 name", "category": "字符串"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def square(num):\n    return num * num", "output": "段落 平方 接收 num：\n    返回 num 乘 num", "category": "段落"}
+{"instruction": "将Python翻译成段言。", "input": "val = d.get('key', 0)", "output": "设 val 为 d.get(\"key\", 0)", "category": "字典"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if score > 60:\n    print('pass')\nelse:\n    print('fail')", "output": "如果 score 大于 60：\n    打印(\"pass\")\n否则：\n    打印(\"fail\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "文 = 'hello' + ' world'", "output": "定义 文 等于 \"hello\" 加 \" world\"", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "stripped = s.strip()", "output": "设 stripped 为 字符串去空白(s)", "category": "字符串"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "count = lst.count(5)", "output": "设 count 为 0\n遍历 x 于 lst：\n    如果 x 等于 5：\n        count 加上 1", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for c in 'hello':\n    print(c)", "output": "遍历 c 于 \"hello\"：\n    打印(c)", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "a /= 2", "output": "a 除以 2", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "def count_down(n):\n    while n > 0:\n        print(n)\n        n -= 1", "output": "段落 倒计时 接收 n：\n    当 n 大于 0：\n        打印(n)\n        n 减去 1", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "if a < 0 or a > 100:\n    print('out of range')", "output": "如果 a 小于 0 或 a 大于 100：\n    打印(\"out of range\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "a or b", "output": "a 或 b", "category": "暗坑"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "flag = True", "output": "设 flag 为 真", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "for i in range(3):\n    for j in range(3):\n        print(i, j)", "output": "遍历 i 于 0至2：\n    遍历 j 于 0至2：\n        打印(i)\n        打印(j)", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "class Stack:\n    def __init__(self):\n        self.items = []\n    def push(self, item):\n        self.items.append(item)\n    def pop(self):\n        return self.items.pop()\n    def is_empty(self):\n        return len(self.items) == 0", "output": "类 栈：\n    属性 元素列表\n    构造：\n        己.元素列表 为 []\n    段落 入栈 接收 item：\n        己.元素列表.追加(item)\n    段落 出栈：\n        返回 己.元素列表.弹出()\n    段落 是否为空：\n        返回 len(己.元素列表) 等于 0", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "找到 = False\nfor 项 in 列表:\n    if 项 == 目标:\n        找到 = True\n        break", "output": "设 找到 为 假\n遍历 项 于 列表：\n    如果 项 等于 目标：\n        设 找到 为 真\n        跳出", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "a or b", "output": "a 或 b", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def count_down(n):\n    while n > 0:\n        print(n)\n        n -= 1", "output": "段落 倒计时 接收 n：\n    当 n 大于 0：\n        打印(n)\n        n 减去 1", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "import random\nx = random.randint(1, 10)", "output": "导入 随机数据\n设 x 为 随机整数(1, 10)", "category": "导入"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def sum_digits(n):\n    total = 0\n    while n > 0:\n        total += n % 10\n        n //= 10\n    return total", "output": "段落 数位求和 接收 n：\n    设 total 为 0\n    当 n 大于 0：\n        total 加上 n 取余 10\n        设 n 为 n 除以 10\n    返回 total", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "x = 10", "output": "设 x 为 10", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "nums = []", "output": "设 nums 为 []", "category": "变量"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "for 序 in range(5, 15):\n    print(序)", "output": "遍历 序 于 5至14：\n    打印(序)", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "for 项 in 列表:\n    print(项)", "output": "遍历 项 于 列表：\n    打印(项)", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "a * b", "output": "a 乘 b", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if x > 0:\n    print('yes')\nelse:\n    print('no')", "output": "如果 x 大于 0：\n    打印(\"yes\")\n否则：\n    打印(\"no\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def caesar_cipher(text, shift):\n    result = ''\n    for c in text:\n        if c.isalpha():\n            base = ord('a') if c.islower() else ord('A')\n            result += chr((ord(c) - base + shift) % 26 + base)\n        else:\n            result += c\n    return result", "output": "段落 凯撒加密 接收 text, shift：\n    定义 result 等于 \"\"\n    遍历 c 于 text：\n        如果 字符串包含(小写字母表, c) 或 字符串包含(大写字母表, c)：\n            定义 shifted 等于 字符偏移(c, shift)\n            定义 result 等于 result 加 shifted\n        否则：\n            定义 result 等于 result 加 c\n    返回 result", "category": "复合"}
+{"instruction": "Python→段言翻译：", "input": "def fib(n):\n    if n <= 2:\n        return 1\n    return fib(n-1) + fib(n-2)", "output": "段落 斐波那契 接收 n：\n    如果 n 小于等于 2：\n        返回 1\n    返回 斐波那契(n 减 1) 加 斐波那契(n 减 2)", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def power(base, exp):\n    结果 = 1\n    for _ in range(exp):\n        结果 *= base\n    return 结果", "output": "段落 幂运算 接收 base, exp：\n    设 结果 为 1\n    遍历 _ 于 0至exp减1：\n        结果 乘以 base\n    返回 结果", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "def fizzbuzz(n):\n    for i in range(1, n+1):\n        if i % 15 == 0:\n            print('FizzBuzz')\n        elif i % 3 == 0:\n            print('Fizz')\n        elif i % 5 == 0:\n            print('Buzz')\n        else:\n            print(i)", "output": "段落 FizzBuzz 接收 n：\n    遍历 i 于 1至n：\n        如果 i 取余 15 等于 0：\n            打印(\"FizzBuzz\")\n        否则如果 i 取余 3 等于 0：\n            打印(\"Fizz\")\n        否则如果 i 取余 5 等于 0：\n            打印(\"Buzz\")\n        否则：\n            打印(i)", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "列表.pop()", "output": "设 last 为 列表[len(列表) 减 1]\n设 new_lst 为 []\n遍历 i 于 0至len(列表)减2：\n    new_lst.追加(列表[i])\n设 列表 为 new_lst", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "def min_of_three(a, b, c):\n    m = a\n    if b < m:\n        m = b\n    if c < m:\n        m = c\n    return m", "output": "段落 三数最小 接收 a, b, c：\n    设 m 为 a\n    如果 b 小于 m：\n        设 m 为 b\n    如果 c 小于 m：\n        设 m 为 c\n    返回 m", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "x = lst[0]", "output": "设 x 为 lst[0]", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def modulo(a, b):\n    return a % b", "output": "段落 取余 接收 a, b：\n    返回 a 取余 b", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def is_odd(n):\n    return n % 2 != 0", "output": "段落 是奇数 接收 n：\n    返回 n 取余 2 不等于 0", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "for c in 'hello':\n    print(c)", "output": "遍历 c 于 \"hello\"：\n    打印(c)", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if 甲 != 0:\n    print('not zero')", "output": "如果 甲 不等于 0：\n    打印(\"not zero\")", "category": "条件"}
+{"instruction": "请将以下代码翻译为段言：", "input": "total = 100\ntotal -= 20", "output": "设 total 为 100\ntotal 减去 20", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "first = 列表[0]\nlast = 列表[-1]", "output": "设 first 为 列表[0]\n设 last 为 列表[len(列表) 减 1]", "category": "列表"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def multiply(a, b):\n    return a * b", "output": "段落 乘法 接收 a, b：\n    返回 a 乘 b", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def greet():\n    print('hello')", "output": "段落 打招呼：\n    打印(\"hello\")", "category": "段落"}
+{"instruction": "将Python翻译成段言。", "input": "sum_ = 0\ni = 1\nwhile i <= 100:\n    sum_ += i\n    i += 1", "output": "设 sum_ 为 0\n设 i 为 1\n当 i 小于等于 100：\n    sum_ 加上 i\n    i 加上 1", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "n = len(s)", "output": "设 n 为 len(s)", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "print(f'{name} is {age} years old')", "output": "打印(f\"{name} is {age} years old\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def power(base, exp):\n    result = 1\n    for _ in range(exp):\n        result *= base\n    return result", "output": "段落 幂运算 接收 base, exp：\n    设 result 为 1\n    遍历 _ 于 0至exp减1：\n        result 乘以 base\n    返回 result", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "lst.append(10)", "output": "lst.追加(10)", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "try:\n    a = list_[100]\nexcept IndexError:\n    a = None", "output": "尝试：\n    设 a 为 list_[100]\n捕获 异常：\n    设 a 为 空", "category": "异常"}
+{"instruction": "Python→段言翻译：", "input": "keys = list(d.keys())", "output": "设 keys 为 []\n遍历 k 于 d：\n    keys.追加(k)", "category": "字典"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "s = \"world\"", "output": "定义 s 等于 \"world\"", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "d = {'a': 1, 'b': 2}", "output": "设 d 为 {\"a\": 1, \"b\": 2}", "category": "字典"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "lst.sort()", "output": "设 n 为 len(lst)\n遍历 i 于 0至n减2：\n    遍历 j 于 0至n减i减2：\n        如果 lst[j] 大于 lst[j 加 1]：\n            设 tmp 为 lst[j]\n            lst[j] = lst[j 加 1]\n            lst[j 加 1] = tmp", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def gcd(a, b):\n    while b != 0:\n        a, b = b, a % b\n    return a", "output": "段落 最大公约数 接收 a, b：\n    当 b 不等于 0：\n        设 tmp 为 a 取余 b\n        设 a 为 b\n        设 b 为 tmp\n    返回 a", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "first = lst[0]\nlast = lst[-1]", "output": "设 first 为 lst[0]\n设 last 为 lst[len(lst) 减 1]", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def rock_paper_scissors(p1, p2):\n    if p1 == p2:\n        return 'draw'\n    if (p1 == 'rock' and p2 == 'scissors') or (p1 == 'scissors' and p2 == 'paper') or (p1 == 'paper' and p2 == 'rock'):\n        return 'p1 wins'\n    return 'p2 wins'", "output": "段落 石头剪刀布 接收 p1, p2：\n    如果 p1 等于 p2：\n        返回 \"draw\"\n    如果 (p1 等于 \"rock\" 且 p2 等于 \"scissors\") 或 (p1 等于 \"scissors\" 且 p2 等于 \"paper\") 或 (p1 等于 \"paper\" 且 p2 等于 \"rock\")：\n        返回 \"p1 wins\"\n    返回 \"p2 wins\"", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "for key in d:\n    print(key, d[key])", "output": "遍历 key 于 d：\n    打印(key)\n    打印(d[key])", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if x < 0 or x > 100:\n    print('out of range')", "output": "如果 x 小于 0 或 x 大于 100：\n    打印(\"out of range\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "def greet_name(name):\n    print('Hello, ' + name)", "output": "段落 打招呼 接收 name：\n    打印(\"Hello, \" 加 name)", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n-1)", "output": "段落 阶乘 接收 n：\n    如果 n 小于等于 1：\n        返回 1\n    返回 n 乘 阶乘(n 减 1)", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if a == b and b == c:\n    print('all equal')", "output": "如果 a 等于 b 且 b 等于 c：\n    打印(\"all equal\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "import math", "output": "导入 数学工具", "category": "导入"}
+{"instruction": "将Python翻译成段言。", "input": "def fib(数):\n    if 数 <= 2:\n        return 1\n    return fib(数-1) + fib(数-2)", "output": "段落 斐波那契 接收 数：\n    如果 数 小于等于 2：\n        返回 1\n    返回 斐波那契(数 减 1) 加 斐波那契(数 减 2)", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "def negate(num):\n    return -num", "output": "段落 取反 接收 num：\n    返回 0 减 num", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "for i in range(0, 10, 2):\n    print(i)", "output": "遍历 i 于 0至9步2：\n    打印(i)", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "w = 100\nw /= 5", "output": "设 w 为 100\nw 除以 5", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "for i in range(5):\n    if i == 3:\n        continue\n    print(i)", "output": "遍历 i 于 0至4：\n    如果 i 等于 3：\n        跳过\n    打印(i)", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "def square(数):\n    return 数 * 数", "output": "段落 平方 接收 数：\n    返回 数 乘 数", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr", "output": "段落 冒泡排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 0至n减1：\n        遍历 j 于 0至n减i减2：\n            如果 arr[j] 大于 arr[j 加 1]：\n                设 tmp 为 arr[j]\n                arr[j] = arr[j 加 1]\n                arr[j 加 1] = tmp\n    返回 arr", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "items = [10, 20, 30]", "output": "设 items 为 [10, 20, 30]", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "raise ValueError('invalid')", "output": "抛出 异常(\"invalid\")", "category": "异常"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "class Rect:\n    def __init__(self, w, h):\n        self.w = w\n        self.h = h\n    def area(self):\n        return self.w * self.h", "output": "类 矩形：\n    属性 宽\n    属性 高\n    构造 接收 宽, 高：\n        己.宽 为 宽\n        己.高 为 高\n    段落 面积：\n        返回 己.宽 乘 己.高", "category": "类"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "raise Exception('error')", "output": "抛出 异常(\"error\")", "category": "异常"}
+{"instruction": "Python→段言翻译：", "input": "a = 10", "output": "设 a 为 10", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "列表.sort()", "output": "设 n 为 len(列表)\n遍历 i 于 0至n减2：\n    遍历 j 于 0至n减i减2：\n        如果 列表[j] 大于 列表[j 加 1]：\n            设 tmp 为 列表[j]\n            列表[j] = 列表[j 加 1]\n            列表[j 加 1] = tmp", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "try:\n    a = int(s)\nexcept:\n    a = 0", "output": "尝试：\n    设 a 为 int(s)\n捕获 异常：\n    设 a 为 0", "category": "异常"}
+{"instruction": "将Python翻译成段言。", "input": "import math", "output": "导入 数学工具", "category": "导入"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def matrix_sum(matrix):\n    总计 = 0\n    for row in matrix:\n        for 值 in row:\n            总计 += 值\n    return 总计", "output": "段落 矩阵求和 接收 matrix：\n    设 总计 为 0\n    遍历 row 于 matrix：\n        遍历 值 于 row：\n            总计 加上 值\n    返回 总计", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def remove_duplicates(lst):\n    seen = []\n    result = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n            result.append(item)\n    return result", "output": "段落 去重 接收 lst：\n    设 seen 为 []\n    设 result 为 []\n    遍历 item 于 lst：\n        设 found 为 假\n        遍历 s 于 seen：\n            如果 s 等于 item：\n                设 found 为 真\n                跳出\n        如果 非 found：\n            seen.追加(item)\n            result.追加(item)\n    返回 result", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "class Cat(Dog):\n    def speak(self):\n        print(f'{self.name}: meow!')", "output": "类 猫 继承 狗：\n    段落 说话：\n        打印(f\"{己.名字}: meow!\")", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "total = 0\nfor n in numbers:\n    total += n", "output": "设 total 为 0\n遍历 n 于 numbers：\n    total 加上 n", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "obj = Dog('Rex')\nobj.speak()", "output": "设 obj 为 新建 狗(\"Rex\")\nobj.说话()", "category": "类"}
+{"instruction": "Python→段言翻译：", "input": "def power2(num):\n    return 2 ** num", "output": "段落 二的幂 接收 num：\n    返回 2 的 num 次方", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def square(n):\n    return n * n", "output": "段落 平方 接收 n：\n    返回 n 乘 n", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def is_even(num):\n    return num % 2 == 0", "output": "段落 是偶数 接收 num：\n    返回 num 取余 2 等于 0", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "try:\n    a = int(input())\nexcept ValueError:\n    a = 0\n    print('invalid')", "output": "尝试：\n    设 a 为 int(输入())\n捕获 异常：\n    设 a 为 0\n    打印(\"invalid\")", "category": "异常"}
+{"instruction": "请将以下代码翻译为段言：", "input": "z = 3\nz *= 4", "output": "设 z 为 3\nz 乘以 4", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if x <= 0:\n    print('non-positive')\nelse:\n    print('positive')", "output": "如果 x 小于等于 0：\n    打印(\"non-positive\")\n否则：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def temperature_report(celsius):\n    if celsius < 0:\n        return 'freezing'\n    elif celsius < 15:\n        return 'cold'\n    elif celsius < 25:\n        return 'comfortable'\n    elif celsius < 35:\n        return 'warm'\n    else:\n        return 'hot'", "output": "段落 温度报告 接收 celsius：\n    如果 celsius 小于 0：\n        返回 \"freezing\"\n    否则如果 celsius 小于 15：\n        返回 \"cold\"\n    否则如果 celsius 小于 25：\n        返回 \"comfortable\"\n    否则如果 celsius 小于 35：\n        返回 \"warm\"\n    否则：\n        返回 \"hot\"", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if 5 in lst:\n    print('found')", "output": "设 found 为 假\n遍历 x 于 lst：\n    如果 x 等于 5：\n        设 found 为 真\n        跳出\n如果 found：\n    打印(\"found\")", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if 数 % 2 == 0:\n    print('even')\nelse:\n    print('odd')", "output": "如果 数 取余 2 等于 0：\n    打印(\"even\")\n否则：\n    打印(\"odd\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "class BankAccount:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n    def deposit(self, amount):\n        self.balance += amount\n    def withdraw(self, amount):\n        if amount <= self.balance:\n            self.balance -= amount", "output": "类 银行账户：\n    属性 户主\n    属性 余额\n    构造 接收 owner, balance：\n        己.户主 为 owner\n        己.余额 为 balance\n    段落 存款 接收 amount：\n        己.余额 加上 amount\n    段落 取款 接收 amount：\n        如果 amount 小于等于 己.余额：\n            己.余额 减去 amount", "category": "类"}
+{"instruction": "Python→段言翻译：", "input": "class BankAccount:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n    def deposit(self, amount):\n        self.balance += amount\n    def withdraw(self, amount):\n        if amount <= self.balance:\n            self.balance -= amount", "output": "类 银行账户：\n    属性 户主\n    属性 余额\n    构造 接收 owner, balance：\n        己.户主 为 owner\n        己.余额 为 balance\n    段落 存款 接收 amount：\n        己.余额 加上 amount\n    段落 取款 接收 amount：\n        如果 amount 小于等于 己.余额：\n            己.余额 减去 amount", "category": "类"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def abs_val(n):\n    if n < 0:\n        return -n\n    return n", "output": "段落 绝对值 接收 n：\n    如果 n 小于 0：\n        返回 0 减 n\n    返回 n", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "x = 5\ny = 3", "output": "设 x 为 5\n设 y 为 3", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def is_odd(n):\n    return n % 2 != 0", "output": "段落 是奇数 接收 n：\n    返回 n 取余 2 不等于 0", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "print(f'Result: {a}')", "output": "打印(f\"Result: {a}\")", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "n = len(s)", "output": "设 n 为 len(s)", "category": "字符串"}
+{"instruction": "Python→段言翻译：", "input": "def reverse_string(s):\n    result = ''\n    for i in range(len(s)-1, -1, -1):\n        result += s[i]\n    return result", "output": "段落 反转字符串 接收 s：\n    设 result 为 \"\"\n    设 i 为 len(s) 减 1\n    当 i 大于等于 0：\n        定义 result 等于 result 加 s[i]\n        i 减去 1\n    返回 result", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst.reverse()", "output": "设 n 为 len(lst)\n设 i 为 0\n设 j 为 n 减 1\n当 i 小于 j：\n    设 tmp 为 lst[i]\n    lst[i] = lst[j]\n    lst[j] = tmp\n    i 加上 1\n    j 减去 1", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "lst.sort()", "output": "设 n 为 len(lst)\n遍历 i 于 0至n减2：\n    遍历 j 于 0至n减i减2：\n        如果 lst[j] 大于 lst[j 加 1]：\n            设 tmp 为 lst[j]\n            lst[j] = lst[j 加 1]\n            lst[j 加 1] = tmp", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def linear_search(list_, target):\n    for i in range(len(list_)):\n        if list_[i] == target:\n            return i\n    return -1", "output": "段落 线性查找 接收 list_, target：\n    遍历 i 于 0至len(list_)减1：\n        如果 list_[i] 等于 target：\n            返回 i\n    返回 减 1", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def histogram(data, bins):\n    counts = [0] * bins\n    for v in data:\n        idx = min(int(v * bins), bins - 1)\n        counts[idx] += 1\n    return counts", "output": "段落 直方图 接收 data, bins：\n    设 counts 为 []\n    遍历 _ 于 0至bins减1：\n        counts.追加(0)\n    遍历 v 于 data：\n        设 idx 为 int(v 乘 bins)\n        如果 idx 大于等于 bins：\n            设 idx 为 bins 减 1\n        counts[idx] = counts[idx] 加 1\n    返回 counts", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if a or b:\n    print('either')", "output": "如果 a 或 b：\n    打印(\"either\")", "category": "条件"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if 'age' in d:\n    age = d['age']", "output": "如果 \"age\" 于 d：\n        设 age 为 d[\"age\"]", "category": "字典"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "count = 0\ncount += 1", "output": "设 count 为 0\ncount 加上 1", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "lst.sort()", "output": "设 n 为 len(lst)\n遍历 i 于 0至n减2：\n    遍历 j 于 0至n减i减2：\n        如果 lst[j] 大于 lst[j 加 1]：\n            设 tmp 为 lst[j]\n            lst[j] = lst[j 加 1]\n            lst[j 加 1] = tmp", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "try:\n    f = open('data.txt')\nexcept FileNotFoundError:\n    print('file not 找到')", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    打印(\"file not 找到\")", "category": "异常"}
+{"instruction": "Python→段言翻译：", "input": "def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True", "output": "段落 是素数 接收 n：\n    如果 n 小于 2：\n        返回 假\n    设 limit 为 int(n 的 0.5 次方) 加 1\n    遍历 i 于 2至limit减1：\n        如果 n 取余 i 等于 0：\n            返回 假\n    返回 真", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "except:", "output": "捕获 异常：", "category": "暗坑"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "a % b", "output": "a 取余 b", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "import os", "output": "导入 文件系统", "category": "导入"}
+{"instruction": "Python→段言翻译：", "input": "if x > 0:\n    print('yes')\nelse:\n    print('no')", "output": "如果 x 大于 0：\n    打印(\"yes\")\n否则：\n    打印(\"no\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "from math import sqrt", "output": "从 数学工具 导入 平方", "category": "导入"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "lst.pop()", "output": "设 last 为 lst[len(lst) 减 1]\n设 new_lst 为 []\n遍历 i 于 0至len(lst)减2：\n    new_lst.追加(lst[i])\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "d = {'a': 1, 'b': 2}", "output": "设 d 为 {\"a\": 1, \"b\": 2}", "category": "字典"}
+{"instruction": "将Python代码转为段言代码：", "input": "if x >= 0 and x <= 100:\n    print('valid')", "output": "如果 x 大于等于 0 且 x 小于等于 100：\n    打印(\"valid\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "a and b", "output": "a 且 b", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if x == 0:\n    print('zero')", "output": "如果 x 等于 0：\n    打印(\"zero\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def palindrome_check(s):\n    return s == s[::-1]", "output": "段落 回文判断 接收 s：\n    设 reversed 为 \"\"\n    设 i 为 len(s) 减 1\n    当 i 大于等于 0：\n        定义 reversed 等于 reversed 加 s[i]\n        i 减去 1\n    返回 s 等于 reversed", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "upper_s = s.upper()", "output": "设 upper_s 为 字符串转大写(s)", "category": "字符串"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "for i in range(5, 15):\n    print(i)", "output": "遍历 i 于 5至14：\n    打印(i)", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def palindrome_check(s):\n    return s == s[::-1]", "output": "段落 回文判断 接收 s：\n    设 reversed 为 \"\"\n    设 i 为 len(s) 减 1\n    当 i 大于等于 0：\n        定义 reversed 等于 reversed 加 s[i]\n        i 减去 1\n    返回 s 等于 reversed", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def is_even(数):\n    return 数 % 2 == 0", "output": "段落 是偶数 接收 数：\n    返回 数 取余 2 等于 0", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "from math import sqrt, pi", "output": "从 数学工具 导入 平方, 圆周率", "category": "导入"}
+{"instruction": "将Python代码转为段言代码：", "input": "名 = 'hello'", "output": "定义 名 等于 \"hello\"", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "while cond:", "output": "当 cond：", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "doubled = [x * 2 for x in lst]", "output": "设 doubled 为 []\n遍历 x 于 lst：\n    doubled.追加(x 乘 2)", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "num = 5\nnum *= 3", "output": "设 num 为 5\nnum 乘以 3", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def insertion_sort(arr):\n    for i in range(1, len(arr)):\n        key = arr[i]\n        j = i - 1\n        while j >= 0 and arr[j] > key:\n            arr[j+1] = arr[j]\n            j -= 1\n        arr[j+1] = key\n    return arr", "output": "段落 插入排序 接收 arr：\n    遍历 i 于 1至len(arr)减1：\n        设 key 为 arr[i]\n        设 j 为 i 减 1\n        当 j 大于等于 0 且 arr[j] 大于 key：\n            arr[j 加 1] = arr[j]\n            j 减去 1\n        arr[j 加 1] = key\n    返回 arr", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "if 'age' in d:\n    age = d['age']", "output": "如果 \"age\" 于 d：\n        设 age 为 d[\"age\"]", "category": "字典"}
+{"instruction": "Python→段言翻译：", "input": "if n % 2 == 0:\n    print('even')\nelse:\n    print('odd')", "output": "如果 n 取余 2 等于 0：\n    打印(\"even\")\n否则：\n    打印(\"odd\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "def power2(数):\n    return 2 ** 数", "output": "段落 二的幂 接收 数：\n    返回 2 的 数 次方", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def greet_name(name):\n    print('Hello, ' + name)", "output": "段落 打招呼 接收 name：\n    打印(\"Hello, \" 加 name)", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "import json", "output": "导入 JSON", "category": "导入"}
+{"instruction": "Python→段言翻译：", "input": "lst = [1, 2, 3]", "output": "设 lst 为 [1, 2, 3]", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "sum_ = sum(list_)", "output": "设 sum_ 为 0\n遍历 x 于 list_：\n    设 sum_ 为 sum_ 加 x", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "count = 0\nfor x in lst:\n    if x > 0:\n        count += 1", "output": "设 count 为 0\n遍历 x 于 lst：\n    如果 x 大于 0：\n        count 加上 1", "category": "循环"}
+{"instruction": "将Python翻译成段言。", "input": "raise Exception('error')", "output": "抛出 异常(\"error\")", "category": "异常"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "x = 100\nx += 5", "output": "设 x 为 100\nx 加上 5", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "clean = s.replace(' ', '_')", "output": "设 clean 为 字符串替换(s, \" \", \"_\")", "category": "字符串"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "try:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    result = 0", "output": "尝试：\n    设 result 为 10 除以 0\n捕获 异常：\n    设 result 为 0", "category": "异常"}
+{"instruction": "将Python翻译成段言。", "input": "res = s.replace('old', 'new')", "output": "设 res 为 字符串替换(s, \"old\", \"new\")", "category": "字符串"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "greeting = 'hi' + ' ' + name", "output": "定义 greeting 等于 \"hi\" 加 \" \" 加 name", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if 数 > 0:\n    print('positive')\nelif 数 == 0:\n    print('zero')\nelse:\n    print('negative')", "output": "如果 数 大于 0：\n    打印(\"positive\")\n否则如果 数 等于 0：\n    打印(\"zero\")\n否则：\n    打印(\"negative\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "print(f'Result: {甲}')", "output": "打印(f\"Result: {甲}\")", "category": "字符串"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def collatz(数):\n    steps = 0\n    while 数 != 1:\n        if 数 % 2 == 0:\n            数 = 数 // 2\n        else:\n            数 = 3 * 数 + 1\n        steps += 1\n    return steps", "output": "段落 考拉兹 接收 数：\n    设 steps 为 0\n    当 数 不等于 1：\n        如果 数 取余 2 等于 0：\n            设 数 为 数 除以 2\n        否则：\n            设 数 为 3 乘 数 加 1\n        steps 加上 1\n    返回 steps", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "for i in range(10):\n    print(i)", "output": "遍历 i 于 0至9：\n    打印(i)", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "def add(a, b):\n    return a + b", "output": "段落 加法 接收 a, b：\n    返回 a 加 b", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "from collections import Counter", "output": "从 集合操作 导入 计数", "category": "导入"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "class Foo:", "output": "类 Foo：", "category": "暗坑"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "try:\n    甲 = 列表[100]\nexcept IndexError:\n    甲 = None", "output": "尝试：\n    设 甲 为 列表[100]\n捕获 异常：\n    设 甲 为 空", "category": "异常"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "del d['key']", "output": "d.删除(\"key\")", "category": "字典"}
+{"instruction": "将Python代码转为段言代码：", "input": "continue", "output": "跳过", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "try:\n    x = lst[100]\nexcept IndexError:\n    x = None", "output": "尝试：\n    设 x 为 lst[100]\n捕获 异常：\n    设 x 为 空", "category": "异常"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def is_odd(num):\n    return num % 2 != 0", "output": "段落 是奇数 接收 num：\n    返回 num 取余 2 不等于 0", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "while True:\n    if a == 0:\n        break\n    a -= 1", "output": "当 真：\n    如果 a 等于 0：\n        跳出\n    a 减去 1", "category": "循环"}
+{"instruction": "将Python翻译成段言。", "input": "class Cat(Dog):\n    def speak(self):\n        print(f'{self.name}: meow!')", "output": "类 猫 继承 狗：\n    段落 说话：\n        打印(f\"{己.名字}: meow!\")", "category": "类"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if 文.startswith('http'):", "output": "如果 字符串开头是(文, \"http\")：", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "def count_vowels(文):\n    vowels = 'aeiou'\n    计数 = 0\n    for c in 文:\n        if c in vowels:\n            计数 += 1\n    return 计数", "output": "段落 统计元音 接收 文：\n    定义 vowels 等于 \"aeiou\"\n    设 计数 为 0\n    遍历 c 于 文：\n        如果 字符串包含(vowels, c)：\n            计数 加上 1\n    返回 计数", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "class Dog:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        print(f'{self.name}: woof!')", "output": "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        打印(f\"{己.名字}: woof!\")", "category": "类"}
+{"instruction": "将Python代码转为段言代码：", "input": "def power(base, exp):\n    result = 1\n    for _ in range(exp):\n        result *= base\n    return result", "output": "段落 幂运算 接收 base, exp：\n    设 result 为 1\n    遍历 _ 于 0至exp减1：\n        result 乘以 base\n    返回 result", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "class Bird(Animal):\n    def speak(self):\n        print(f'{self.nm}: chirp!')", "output": "类 鸟 继承 动物：\n    段落 说话：\n        打印(f\"{己.名字}: chirp!\")", "category": "类"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "if n > 0:\n    print('positive')\nelif n == 0:\n    print('zero')\nelse:\n    print('negative')", "output": "如果 n 大于 0：\n    打印(\"positive\")\n否则如果 n 等于 0：\n    打印(\"zero\")\n否则：\n    打印(\"negative\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "cnt = 0\nfor a in list_:\n    if a > 0:\n        cnt += 1", "output": "设 cnt 为 0\n遍历 a 于 list_：\n    如果 a 大于 0：\n        cnt 加上 1", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def caesar_cipher(text, shift):\n    result = ''\n    for c in text:\n        if c.isalpha():\n            base = ord('a') if c.islower() else ord('A')\n            result += chr((ord(c) - base + shift) % 26 + base)\n        else:\n            result += c\n    return result", "output": "段落 凯撒加密 接收 text, shift：\n    定义 result 等于 \"\"\n    遍历 c 于 text：\n        如果 字符串包含(小写字母表, c) 或 字符串包含(大写字母表, c)：\n            定义 shifted 等于 字符偏移(c, shift)\n            定义 result 等于 result 加 shifted\n        否则：\n            定义 result 等于 result 加 c\n    返回 result", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def find_max(列表):\n    最大 = 列表[0]\n    for 项 in 列表[1:]:\n        if 项 > 最大:\n            最大 = 项\n    return 最大", "output": "段落 求最大值 接收 列表：\n    设 最大 为 列表[0]\n    遍历 项 于 列表：\n        如果 项 大于 最大：\n            设 最大 为 项\n    返回 最大", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "items = [10, 20, 30]", "output": "设 items 为 [10, 20, 30]", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "列表.remove(5)", "output": "设 new_lst 为 []\n设 skip 为 假\n遍历 x 于 列表：\n    如果 x 等于 5 且 非 skip：\n        设 skip 为 真\n    否则：\n        new_lst.追加(x)\n设 列表 为 new_lst", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "for i in range(3):\n    for j in range(3):\n        print(i, j)", "output": "遍历 i 于 0至2：\n    遍历 j 于 0至2：\n        打印(i)\n        打印(j)", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "list_.reverse()", "output": "设 n 为 len(list_)\n设 i 为 0\n设 j 为 n 减 1\n当 i 小于 j：\n    设 tmp 为 list_[i]\n    list_[i] = list_[j]\n    list_[j] = tmp\n    i 加上 1\n    j 减去 1", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "num = len(s)", "output": "设 num 为 len(s)", "category": "字符串"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "try:\n    x = lst[100]\nexcept IndexError:\n    x = None", "output": "尝试：\n    设 x 为 lst[100]\n捕获 异常：\n    设 x 为 空", "category": "异常"}
+{"instruction": "将Python代码转为段言代码：", "input": "print('hello')", "output": "打印(\"hello\")", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if x > 0 and x < 10:\n    print('in range')", "output": "如果 x 大于 0 且 x 小于 10：\n    打印(\"in range\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "d['name'] = 'test'", "output": "d[\"name\"] = \"test\"", "category": "字典"}
+{"instruction": "将Python翻译成段言。", "input": "序 = 0\nwhile 序 < len(列表):\n    print(列表[序])\n    序 += 1", "output": "设 序 为 0\n当 序 小于 len(列表)：\n    打印(列表[序])\n    序 加上 1", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "for elem in list_:\n    print(elem)", "output": "遍历 elem 于 list_：\n    打印(elem)", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "keys = list(d.keys())", "output": "设 keys 为 []\n遍历 k 于 d：\n    keys.追加(k)", "category": "字典"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def fibonacci_iter(n):\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n+1):\n        a, b = b, a+b\n    return b", "output": "段落 斐波那契迭代 接收 n：\n    如果 n 小于等于 1：\n        返回 n\n    设 a 为 0\n    设 b 为 1\n    遍历 _ 于 2至n：\n        设 tmp 为 b\n        设 b 为 a 加 b\n        设 a 为 tmp\n    返回 b", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "new_lst = lst[1:3]", "output": "设 new_lst 为 []\n设 i 为 1\n当 i 小于 3：\n    new_lst.追加(lst[i])\n    i 加上 1", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if 甲 > 0:\n    print('positive')", "output": "如果 甲 大于 0：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "import json", "output": "导入 JSON", "category": "导入"}
+{"instruction": "Python→段言翻译：", "input": "def rock_paper_scissors(p1, p2):\n    if p1 == p2:\n        return 'draw'\n    if (p1 == 'rock' and p2 == 'scissors') or (p1 == 'scissors' and p2 == 'paper') or (p1 == 'paper' and p2 == 'rock'):\n        return 'p1 wins'\n    return 'p2 wins'", "output": "段落 石头剪刀布 接收 p1, p2：\n    如果 p1 等于 p2：\n        返回 \"draw\"\n    如果 (p1 等于 \"rock\" 且 p2 等于 \"scissors\") 或 (p1 等于 \"scissors\" 且 p2 等于 \"paper\") 或 (p1 等于 \"paper\" 且 p2 等于 \"rock\")：\n        返回 \"p1 wins\"\n    返回 \"p2 wins\"", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def collatz(n):\n    steps = 0\n    while n != 1:\n        if n % 2 == 0:\n            n = n // 2\n        else:\n            n = 3 * n + 1\n        steps += 1\n    return steps", "output": "段落 考拉兹 接收 n：\n    设 steps 为 0\n    当 n 不等于 1：\n        如果 n 取余 2 等于 0：\n            设 n 为 n 除以 2\n        否则：\n            设 n 为 3 乘 n 加 1\n        steps 加上 1\n    返回 steps", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "first = lst[0]\nlast = lst[-1]", "output": "设 first 为 lst[0]\n设 last 为 lst[len(lst) 减 1]", "category": "列表"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "evens = [a for a in list_ if a % 2 == 0]", "output": "设 evens 为 []\n遍历 a 于 list_：\n    如果 a 取余 2 等于 0：\n        evens.追加(a)", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "found = False\nfor item in lst:\n    if item == target:\n        found = True\n        break", "output": "设 found 为 假\n遍历 item 于 lst：\n    如果 item 等于 target：\n        设 found 为 真\n        跳出", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "y = 50\ny -= 10", "output": "设 y 为 50\ny 减去 10", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "True", "output": "真", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "if num % 2 == 0:\n    print('even')\nelse:\n    print('odd')", "output": "如果 num 取余 2 等于 0：\n    打印(\"even\")\n否则：\n    打印(\"odd\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "甲 = 10\n甲 = 甲 + 1", "output": "设 甲 为 10\n设 甲 为 甲 加 1", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "try:\n    甲 = int(文)\nexcept:\n    甲 = 0", "output": "尝试：\n    设 甲 为 int(文)\n捕获 异常：\n    设 甲 为 0", "category": "异常"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if a and b:\n    print('both')", "output": "如果 a 且 b：\n    打印(\"both\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "lower_s = 文.lower()", "output": "设 lower_s 为 字符串转小写(文)", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "False", "output": "假", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "obj = Dog('Rex')\nobj.speak()", "output": "设 obj 为 新建 狗(\"Rex\")\nobj.说话()", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "try:\n    f = open('data.txt')\nexcept FileNotFoundError:\n    print('file not hit')", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    打印(\"file not hit\")", "category": "异常"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "x = 10\nx = x + 1", "output": "设 x 为 10\n设 x 为 x 加 1", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "for i in range(len(lst)):\n    print(lst[i])", "output": "遍历 i 于 0至len(lst)减1：\n    打印(lst[i])", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def min_of_three(a, b, c):\n    m = a\n    if b < m:\n        m = b\n    if c < m:\n        m = c\n    return m", "output": "段落 三数最小 接收 a, b, c：\n    设 m 为 a\n    如果 b 小于 m：\n        设 m 为 b\n    如果 c 小于 m：\n        设 m 为 c\n    返回 m", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "repeated = s * 3", "output": "设 repeated 为 字符串重复(s, 3)", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "total = sum(lst)", "output": "设 total 为 0\n遍历 x 于 lst：\n    设 total 为 total 加 x", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "def count_vowels(s):\n    vowels = 'aeiou'\n    cnt = 0\n    for c in s:\n        if c in vowels:\n            cnt += 1\n    return cnt", "output": "段落 统计元音 接收 s：\n    定义 vowels 等于 \"aeiou\"\n    设 cnt 为 0\n    遍历 c 于 s：\n        如果 字符串包含(vowels, c)：\n            cnt 加上 1\n    返回 cnt", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "while True:\n    if x == 0:\n        break\n    x -= 1", "output": "当 真：\n    如果 x 等于 0：\n        跳出\n    x 减去 1", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "for a in list_:", "output": "遍历 a 于 list_：", "category": "暗坑"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "a = 1\nb = 2\nc = a + b", "output": "设 a 为 1\n设 b 为 2\n设 c 为 a 加 b", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if num > 0:\n    print('positive')\nelif num == 0:\n    print('zero')\nelse:\n    print('negative')", "output": "如果 num 大于 0：\n    打印(\"positive\")\n否则如果 num 等于 0：\n    打印(\"zero\")\n否则：\n    打印(\"negative\")", "category": "条件"}
+{"instruction": "请将以下代码翻译为段言：", "input": "lst.append(10)", "output": "lst.追加(10)", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "def greet():\n    print('hello')", "output": "段落 打招呼：\n    打印(\"hello\")", "category": "段落"}
+{"instruction": "将Python翻译成段言。", "input": "for i in range(100, 0, -1):\n    print(i)", "output": "遍历 i 于 100至1步1：\n    打印(i)", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def selection_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        min_idx = i\n        for j in range(i+1, n):\n            if arr[j] < arr[min_idx]:\n                min_idx = j\n        arr[i], arr[min_idx] = arr[min_idx], arr[i]\n    return arr", "output": "段落 选择排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 0至n减1：\n        设 min_idx 为 i\n        遍历 j 于 i加1至n减1：\n            如果 arr[j] 小于 arr[min_idx]：\n                设 min_idx 为 j\n        设 tmp 为 arr[i]\n        arr[i] = arr[min_idx]\n        arr[min_idx] = tmp\n    返回 arr", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if n % 2 == 0:\n    print('even')\nelse:\n    print('odd')", "output": "如果 n 取余 2 等于 0：\n    打印(\"even\")\n否则：\n    打印(\"odd\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "class Animal:\n    def __init__(self, 名):\n        self.名 = 名\n    def speak(self):\n        pass", "output": "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        空操作", "category": "类"}
+{"instruction": "Python→段言翻译：", "input": "v = d.get('key', 0)", "output": "设 v 为 d.get(\"key\", 0)", "category": "字典"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "甲 = 5\n乙 = 3", "output": "设 甲 为 5\n设 乙 为 3", "category": "变量"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "import math", "output": "导入 数学工具", "category": "暗坑"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "count = 0\ncount += 1", "output": "设 count 为 0\ncount 加上 1", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "greeting = 'hi' + ' ' + 名", "output": "定义 greeting 等于 \"hi\" 加 \" \" 加 名", "category": "字符串"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "try:\n    x = int(s)\nexcept:\n    x = 0", "output": "尝试：\n    设 x 为 int(s)\n捕获 异常：\n    设 x 为 0", "category": "异常"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "a = 1\nb = 2\nc = a + b", "output": "设 a 为 1\n设 b 为 2\n设 c 为 a 加 b", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "for key in sorted(d):", "output": "设 keys 为 []\n遍历 k 于 d：\n    keys.追加(k)\n# sorted需要自行实现", "category": "字典"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if age >= 18:\n    print('adult')", "output": "如果 age 大于等于 18：\n    打印(\"adult\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "i = 0\nwhile i < len(lst):\n    print(lst[i])\n    i += 1", "output": "设 i 为 0\n当 i 小于 len(lst)：\n    打印(lst[i])\n    i 加上 1", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def add(a, b):\n    return a + b", "output": "段落 加法 接收 a, b：\n    返回 a 加 b", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def add(a, b):\n    return a + b", "output": "段落 加法 接收 a, b：\n    返回 a 加 b", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "class Bird(Animal):\n    def speak(self):\n        print(f'{self.name}: chirp!')", "output": "类 鸟 继承 动物：\n    段落 说话：\n        打印(f\"{己.名字}: chirp!\")", "category": "类"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "except:", "output": "捕获 异常：", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def distance(self):\n        return (self.x**2 + self.y**2)**0.5", "output": "class Point：\n    属性 x\n    属性 y\n    构造 接收 x, y：\n        己.x 为 x\n        己.y 为 y\n    段落 距离：\n        返回 (己.x 乘 己.x 加 己.y 乘 己.y) 的 0.5 次方", "category": "类"}
+{"instruction": "将Python代码转为段言代码：", "input": "for i in range(100, 0, -1):\n    print(i)", "output": "遍历 i 于 100至1步1：\n    打印(i)", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def celsius_to_fahrenheit(c):\n    return c * 9 / 5 + 32", "output": "段落 摄氏转华氏 接收 c：\n    返回 c 乘 9 除以 5 加 32", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "total = 100\ntotal -= 20", "output": "设 total 为 100\ntotal 减去 20", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "def area(width, height):\n    return width * height", "output": "段落 面积 接收 宽, 高：\n    返回 宽 乘 高", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "list_[0] = 10", "output": "list_[0] = 10", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "stripped = s.strip()", "output": "设 stripped 为 字符串去空白(s)", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def negate(n):\n    return -n", "output": "段落 取反 接收 n：\n    返回 0 减 n", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def matrix_sum(matrix):\n    total = 0\n    for row in matrix:\n        for val in row:\n            total += val\n    return total", "output": "段落 矩阵求和 接收 matrix：\n    设 total 为 0\n    遍历 row 于 matrix：\n        遍历 val 于 row：\n            total 加上 val\n    返回 total", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "def sign(n):\n    if n > 0:\n        return 1\n    elif n < 0:\n        return -1\n    return 0", "output": "段落 符号 接收 n：\n    如果 n 大于 0：\n        返回 1\n    否则如果 n 小于 0：\n        返回 减 1\n    返回 0", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "None", "output": "空", "category": "暗坑"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "msg = 'ok'", "output": "定义 msg 等于 \"ok\"", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "序 = 0\nwhile 序 < 10:\n    print(序)\n    序 += 1", "output": "设 序 为 0\n当 序 小于 10：\n    打印(序)\n    序 加上 1", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "def power2(n):\n    return 2 ** n", "output": "段落 二的幂 接收 n：\n    返回 2 的 n 次方", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "import random\nx = random.randint(1, 10)", "output": "导入 随机数据\n设 x 为 随机整数(1, 10)", "category": "导入"}
+{"instruction": "Python→段言翻译：", "input": "if not done:\n    print('continue')", "output": "如果 非 done：\n    打印(\"continue\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def fizzbuzz(n):\n    for i in range(1, n+1):\n        if i % 15 == 0:\n            print('FizzBuzz')\n        elif i % 3 == 0:\n            print('Fizz')\n        elif i % 5 == 0:\n            print('Buzz')\n        else:\n            print(i)", "output": "段落 FizzBuzz 接收 n：\n    遍历 i 于 1至n：\n        如果 i 取余 15 等于 0：\n            打印(\"FizzBuzz\")\n        否则如果 i 取余 3 等于 0：\n            打印(\"Fizz\")\n        否则如果 i 取余 5 等于 0：\n            打印(\"Buzz\")\n        否则：\n            打印(i)", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "s = \"world\"", "output": "定义 s 等于 \"world\"", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "from collections import Counter", "output": "从 集合操作 导入 计数", "category": "导入"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "raise Exception()", "output": "抛出 异常()", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def selection_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        min_idx = i\n        for j in range(i+1, n):\n            if arr[j] < arr[min_idx]:\n                min_idx = j\n        arr[i], arr[min_idx] = arr[min_idx], arr[i]\n    return arr", "output": "段落 选择排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 0至n减1：\n        设 min_idx 为 i\n        遍历 j 于 i加1至n减1：\n            如果 arr[j] 小于 arr[min_idx]：\n                设 min_idx 为 j\n        设 tmp 为 arr[i]\n        arr[i] = arr[min_idx]\n        arr[min_idx] = tmp\n    返回 arr", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "count = 0\nfor x in lst:\n    if x > 0:\n        count += 1", "output": "设 count 为 0\n遍历 x 于 lst：\n    如果 x 大于 0：\n        count 加上 1", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def negate(数):\n    return -数", "output": "段落 取反 接收 数：\n    返回 0 减 数", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "乙 = 50\n乙 -= 10", "output": "设 乙 为 50\n乙 减去 10", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "None", "output": "空", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "a >= b", "output": "a 大于等于 b", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "if x > 0 and x < 10:\n    print('in range')", "output": "如果 x 大于 0 且 x 小于 10：\n    打印(\"in range\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "total = 0\ni = 1\nwhile i <= 100:\n    total += i\n    i += 1", "output": "设 total 为 0\n设 i 为 1\n当 i 小于等于 100：\n    total 加上 i\n    i 加上 1", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def sum_digits(数):\n    总计 = 0\n    while 数 > 0:\n        总计 += 数 % 10\n        数 //= 10\n    return 总计", "output": "段落 数位求和 接收 数：\n    设 总计 为 0\n    当 数 大于 0：\n        总计 加上 数 取余 10\n        设 数 为 数 除以 10\n    返回 总计", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "hit = False\nfor elem in list_:\n    if elem == target:\n        hit = True\n        break", "output": "设 hit 为 假\n遍历 elem 于 list_：\n    如果 elem 等于 target：\n        设 hit 为 真\n        跳出", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if 'hello' in s:\n    print('found')", "output": "如果 字符串包含(s, \"hello\")：\n    打印(\"found\")", "category": "字符串"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "a <= b", "output": "a 小于等于 b", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "ratio = 2.5", "output": "设 ratio 为 2.5", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "def find_max(lst):\n    max_val = lst[0]\n    for item in lst[1:]:\n        if item > max_val:\n            max_val = item\n    return max_val", "output": "段落 求最大值 接收 lst：\n    设 max_val 为 lst[0]\n    遍历 item 于 lst：\n        如果 item 大于 max_val：\n            设 max_val 为 item\n    返回 max_val", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "class Animal:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        pass", "output": "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        空操作", "category": "类"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "try:\n    x = int(s)\nexcept:\n    x = 0", "output": "尝试：\n    设 x 为 int(s)\n捕获 异常：\n    设 x 为 0", "category": "异常"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "总计 = 100\n总计 -= 20", "output": "设 总计 为 100\n总计 减去 20", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def count_vowels(s):\n    vowels = 'aeiou'\n    count = 0\n    for c in s:\n        if c in vowels:\n            count += 1\n    return count", "output": "段落 统计元音 接收 s：\n    定义 vowels 等于 \"aeiou\"\n    设 count 为 0\n    遍历 c 于 s：\n        如果 字符串包含(vowels, c)：\n            count 加上 1\n    返回 count", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "lst.insert(0, 10)", "output": "设 new_lst 为 [10]\n遍历 x 于 lst：\n    new_lst.追加(x)\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "a -= 1", "output": "a 减去 1", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "active = False", "output": "设 active 为 假", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for i in range(0, 10, 2):\n    print(i)", "output": "遍历 i 于 0至9步2：\n    打印(i)", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "a % b", "output": "a 取余 b", "category": "暗坑"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "continue", "output": "跳过", "category": "暗坑"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "for 序 in range(len(列表)):\n    print(列表[序])", "output": "遍历 序 于 0至len(列表)减1：\n    打印(列表[序])", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def square(n):\n    return n * n", "output": "段落 平方 接收 n：\n    返回 n 乘 n", "category": "段落"}
+{"instruction": "将Python代码转为段言代码：", "input": "from typing import List", "output": "从 类型工具 导入 列表类型", "category": "导入"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "try:\n    f = open('data.txt')\n    content = f.read()\nexcept:\n    content = ''", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    定义 content 等于 \"\"", "category": "异常"}
+{"instruction": "Python→段言翻译：", "input": "lst.pop()", "output": "设 last 为 lst[len(lst) 减 1]\n设 new_lst 为 []\n遍历 i 于 0至len(lst)减2：\n    new_lst.追加(lst[i])\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "return x", "output": "返回 x", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "def fibonacci_iter(n):\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n+1):\n        a, b = b, a+b\n    return b", "output": "段落 斐波那契迭代 接收 n：\n    如果 n 小于等于 1：\n        返回 n\n    设 a 为 0\n    设 b 为 1\n    遍历 _ 于 2至n：\n        设 tmp 为 b\n        设 b 为 a 加 b\n        设 a 为 tmp\n    返回 b", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "d['key'] = 10", "output": "d[\"key\"] = 10", "category": "字典"}
+{"instruction": "将Python代码转为段言代码：", "input": "found = False\nfor item in lst:\n    if item == target:\n        found = True\n        break", "output": "设 found 为 假\n遍历 item 于 lst：\n    如果 item 等于 target：\n        设 found 为 真\n        跳出", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "data = None", "output": "设 data 为 空", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "if a >= 0 and a <= 100:\n    print('valid')", "output": "如果 a 大于等于 0 且 a 小于等于 100：\n    打印(\"valid\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "def modulo(a, b):\n    return a % b", "output": "段落 取余 接收 a, b：\n    返回 a 取余 b", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "for k, v in d.items():\n    print(k, v)", "output": "遍历 k 于 d：\n    打印(k)\n    打印(d[k])", "category": "字典"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "class Dog:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        print(f'{self.name}: woof!')", "output": "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        打印(f\"{己.名字}: woof!\")", "category": "类"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if len(lst) == 0:\n    print('empty')", "output": "如果 len(lst) 等于 0：\n    打印(\"empty\")", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "try:\n    f = open('data.txt')\nexcept FileNotFoundError:\n    print('file not found')", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    打印(\"file not found\")", "category": "异常"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if 'key' in d:\n    print(d['key'])", "output": "如果 \"key\" 于 d：\n    打印(d[\"key\"])", "category": "字典"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if x > 0:\n    print('positive')", "output": "如果 x 大于 0：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "n = 5\nn *= 3", "output": "设 n 为 5\nn 乘以 3", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def is_positive(n):\n    return n > 0", "output": "段落 是正数 接收 n：\n    返回 n 大于 0", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "while 甲 > 0:\n    甲 -= 1", "output": "当 甲 大于 0：\n    甲 减去 1", "category": "循环"}
+{"instruction": "将Python翻译成段言。", "input": "try:\n    x = int(input())\nexcept ValueError:\n    x = 0\n    print('invalid')", "output": "尝试：\n    设 x 为 int(输入())\n捕获 异常：\n    设 x 为 0\n    打印(\"invalid\")", "category": "异常"}
+{"instruction": "将Python代码转为段言代码：", "input": "a <= b", "output": "a 小于等于 b", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "while x > 0:\n    x -= 1", "output": "当 x 大于 0：\n    x 减去 1", "category": "循环"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "found = False\nfor item in lst:\n    if item == target:\n        found = True\n        break", "output": "设 found 为 假\n遍历 item 于 lst：\n    如果 item 等于 target：\n        设 found 为 真\n        跳出", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "idx = 文.find('abc')", "output": "设 idx 为 字符串查找(文, \"abc\")", "category": "字符串"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "try:\n    x = int(input())\nexcept ValueError:\n    x = 0\n    print('invalid')", "output": "尝试：\n    设 x 为 int(输入())\n捕获 异常：\n    设 x 为 0\n    打印(\"invalid\")", "category": "异常"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "a = list_[0]", "output": "设 a 为 list_[0]", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "evens = [甲 for 甲 in 列表 if 甲 % 2 == 0]", "output": "设 evens 为 []\n遍历 甲 于 列表：\n    如果 甲 取余 2 等于 0：\n        evens.追加(甲)", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def reverse_string(文):\n    结果 = ''\n    for 序 in range(len(文)-1, -1, -1):\n        结果 += 文[序]\n    return 结果", "output": "段落 反转字符串 接收 文：\n    设 结果 为 \"\"\n    设 序 为 len(文) 减 1\n    当 序 大于等于 0：\n        定义 结果 等于 结果 加 文[序]\n        序 减去 1\n    返回 结果", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "break", "output": "跳出", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "for k, v in d.items():\n    print(k, v)", "output": "遍历 k 于 d：\n    打印(k)\n    打印(d[k])", "category": "字典"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "n = len(lst)", "output": "设 n 为 len(lst)", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if x >= 0 and x <= 100:\n    print('valid')", "output": "如果 x 大于等于 0 且 x 小于等于 100：\n    打印(\"valid\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "del d['key']", "output": "d.删除(\"key\")", "category": "字典"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def divide(a, b):\n    return a / b", "output": "段落 除法 接收 a, b：\n    返回 a 除以 b", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "a = 1\nb = 2\nc = a + b", "output": "设 a 为 1\n设 b 为 2\n设 c 为 a 加 b", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "idx = s.index('abc')", "output": "设 idx 为 字符串查找(s, \"abc\")", "category": "字符串"}
+{"instruction": "将Python翻译成段言。", "input": "if len(s) > 0:\n    print('not empty')", "output": "如果 len(s) 大于 0：\n    打印(\"not empty\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "def palindrome_check(文):\n    return 文 == 文[::-1]", "output": "段落 回文判断 接收 文：\n    设 reversed 为 \"\"\n    设 i 为 len(文) 减 1\n    当 i 大于等于 0：\n        定义 reversed 等于 reversed 加 文[i]\n        i 减去 1\n    返回 文 等于 reversed", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "a + b", "output": "a 加 b", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "pairs = {}", "output": "设 pairs 为 {}", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "print('hello')", "output": "打印(\"hello\")", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if 5 in lst:\n    print('found')", "output": "设 found 为 假\n遍历 x 于 lst：\n    如果 x 等于 5：\n        设 found 为 真\n        跳出\n如果 found：\n    打印(\"found\")", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def count_vowels(s):\n    vowels = 'aeiou'\n    count = 0\n    for c in s:\n        if c in vowels:\n            count += 1\n    return count", "output": "段落 统计元音 接收 s：\n    定义 vowels 等于 \"aeiou\"\n    设 count 为 0\n    遍历 c 于 s：\n        如果 字符串包含(vowels, c)：\n            count 加上 1\n    返回 count", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def greet():\n    print('hello')", "output": "段落 打招呼：\n    打印(\"hello\")", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "num = len(list_)", "output": "设 num 为 len(list_)", "category": "列表"}
+{"instruction": "Python→段言翻译：", "input": "merged = a + b", "output": "设 merged 为 []\n遍历 x 于 a：\n    merged.追加(x)\n遍历 x 于 b：\n    merged.追加(x)", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "count = 0\nfor x in lst:\n    if x > 0:\n        count += 1", "output": "设 count 为 0\n遍历 x 于 lst：\n    如果 x 大于 0：\n        count 加上 1", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "d = 10\nd /= 2", "output": "设 d 为 10\nd 除以 2", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "def fibonacci_iter(数):\n    if 数 <= 1:\n        return 数\n    a, b = 0, 1\n    for _ in range(2, 数+1):\n        a, b = b, a+b\n    return b", "output": "段落 斐波那契迭代 接收 数：\n    如果 数 小于等于 1：\n        返回 数\n    设 a 为 0\n    设 b 为 1\n    遍历 _ 于 2至n：\n        设 tmp 为 b\n        设 b 为 a 加 b\n        设 a 为 tmp\n    返回 b", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "a == b", "output": "a 等于 b", "category": "暗坑"}
+{"instruction": "将Python代码转为段言代码：", "input": "for 序 in range(10):\n    print(序)", "output": "遍历 序 于 0至9：\n    打印(序)", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def min_of_three(a, b, c):\n    m = a\n    if b < m:\n        m = b\n    if c < m:\n        m = c\n    return m", "output": "段落 三数最小 接收 a, b, c：\n    设 m 为 a\n    如果 b 小于 m：\n        设 m 为 b\n    如果 c 小于 m：\n        设 m 为 c\n    返回 m", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "total = 0\ni = 1\nwhile i <= 100:\n    total += i\n    i += 1", "output": "设 total 为 0\n设 i 为 1\n当 i 小于等于 100：\n    total 加上 i\n    i 加上 1", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "for i in range(10):\n    if i % 2 == 0:\n        continue\n    print(i)", "output": "遍历 i 于 0至9：\n    如果 i 取余 2 等于 0：\n        跳过\n    打印(i)", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "for item in lst:\n    print(item)", "output": "遍历 item 于 lst：\n    打印(item)", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def leap_year(year):\n    if year % 400 == 0:\n        return True\n    if year % 100 == 0:\n        return False\n    if year % 4 == 0:\n        return True\n    return False", "output": "段落 闰年判断 接收 year：\n    如果 year 取余 400 等于 0：\n        返回 真\n    如果 year 取余 100 等于 0：\n        返回 假\n    如果 year 取余 4 等于 0：\n        返回 真\n    返回 假", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "name = 'hello'", "output": "定义 name 等于 \"hello\"", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "raise ValueError('invalid')", "output": "抛出 异常(\"invalid\")", "category": "异常"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def remove_duplicates(list_):\n    seen = []\n    res = []\n    for elem in list_:\n        if elem not in seen:\n            seen.append(elem)\n            res.append(elem)\n    return res", "output": "段落 去重 接收 list_：\n    设 seen 为 []\n    设 res 为 []\n    遍历 elem 于 list_：\n        设 found 为 假\n        遍历 s 于 seen：\n            如果 s 等于 elem：\n                设 found 为 真\n                跳出\n        如果 非 found：\n            seen.追加(elem)\n            res.追加(elem)\n    返回 res", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def find_max(lst):\n    max_val = lst[0]\n    for item in lst[1:]:\n        if item > max_val:\n            max_val = item\n    return max_val", "output": "段落 求最大值 接收 lst：\n    设 max_val 为 lst[0]\n    遍历 item 于 lst：\n        如果 item 大于 max_val：\n            设 max_val 为 item\n    返回 max_val", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def double(num):\n    return num * 2", "output": "段落 双倍 接收 num：\n    返回 num 乘 2", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "sum_ = 100\nsum_ -= 20", "output": "设 sum_ 为 100\nsum_ 减去 20", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "from math import sqrt", "output": "从 数学工具 导入 平方", "category": "导入"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "try:\n    x = int(input())\nexcept ValueError:\n    x = 0\n    print('invalid')", "output": "尝试：\n    设 x 为 int(输入())\n捕获 异常：\n    设 x 为 0\n    打印(\"invalid\")", "category": "异常"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if x < 0 or x > 100:\n    print('out of range')", "output": "如果 x 小于 0 或 x 大于 100：\n    打印(\"out of range\")", "category": "条件"}
+{"instruction": "请将以下代码翻译为段言：", "input": "a / b", "output": "a 除以 b", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "def reverse_string(s):\n    result = ''\n    for i in range(len(s)-1, -1, -1):\n        result += s[i]\n    return result", "output": "段落 反转字符串 接收 s：\n    设 result 为 \"\"\n    设 i 为 len(s) 减 1\n    当 i 大于等于 0：\n        定义 result 等于 result 加 s[i]\n        i 减去 1\n    返回 result", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "flag = True", "output": "设 flag 为 真", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "for item in lst:\n    print(item)", "output": "遍历 item 于 lst：\n    打印(item)", "category": "循环"}
+{"instruction": "将Python翻译成段言。", "input": "if len(list_) == 0:\n    print('empty')", "output": "如果 len(list_) 等于 0：\n    打印(\"empty\")", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def swap(a, b):\n    return b, a", "output": "段落 交换 接收 a, b：\n    返回 b, a", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "a + b", "output": "a 加 b", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "while a > 0:\n    a -= 1", "output": "当 a 大于 0：\n    a 减去 1", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "flag = True", "output": "设 flag 为 真", "category": "变量"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "class Animal:\n    def __init__(self, nm):\n        self.nm = nm\n    def speak(self):\n        pass", "output": "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        空操作", "category": "类"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def leap_year(year):\n    if year % 400 == 0:\n        return True\n    if year % 100 == 0:\n        return False\n    if year % 4 == 0:\n        return True\n    return False", "output": "段落 闰年判断 接收 year：\n    如果 year 取余 400 等于 0：\n        返回 真\n    如果 year 取余 100 等于 0：\n        返回 假\n    如果 year 取余 4 等于 0：\n        返回 真\n    返回 假", "category": "复合"}
+{"instruction": "Python→段言翻译：", "input": "merged = a + b", "output": "设 merged 为 []\n遍历 x 于 a：\n    merged.追加(x)\n遍历 x 于 b：\n    merged.追加(x)", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "甲 = 列表[0]", "output": "设 甲 为 列表[0]", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "列表[0] = 10", "output": "列表[0] = 10", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "not a", "output": "非 a", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "if a <= 0:\n    print('non-positive')\nelse:\n    print('positive')", "output": "如果 a 小于等于 0：\n    打印(\"non-positive\")\n否则：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "计数 = 0\nfor 甲 in 列表:\n    if 甲 > 0:\n        计数 += 1", "output": "设 计数 为 0\n遍历 甲 于 列表：\n    如果 甲 大于 0：\n        计数 加上 1", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if s.startswith('http'):", "output": "如果 字符串开头是(s, \"http\")：", "category": "字符串"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "width = 10\nheight = 5", "output": "设 width 为 10\n设 height 为 5", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def abs_val(数):\n    if 数 < 0:\n        return -数\n    return 数", "output": "段落 绝对值 接收 数：\n    如果 数 小于 0：\n        返回 0 减 数\n    返回 数", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "数 = len(列表)", "output": "设 数 为 len(列表)", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "return x", "output": "返回 x", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "while cond:", "output": "当 cond：", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if 'hello' in 文:\n    print('找到')", "output": "如果 字符串包含(文, \"hello\")：\n    打印(\"找到\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if x > 0:\n    print('positive')", "output": "如果 x 大于 0：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "z = 3\nz *= 4", "output": "设 z 为 3\nz 乘以 4", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def power(base, exp):\n    result = 1\n    for _ in range(exp):\n        result *= base\n    return result", "output": "段落 幂运算 接收 base, exp：\n    设 result 为 1\n    遍历 _ 于 0至exp减1：\n        result 乘以 base\n    返回 result", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "for item in lst:\n    print(item)", "output": "遍历 item 于 lst：\n    打印(item)", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "s = 'hello' + ' world'", "output": "定义 s 等于 \"hello\" 加 \" world\"", "category": "字符串"}
+{"instruction": "Python→段言翻译：", "input": "if a and b:\n    print('both')", "output": "如果 a 且 b：\n    打印(\"both\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "class Point:\n    def __init__(self, 甲, 乙):\n        self.甲 = 甲\n        self.乙 = 乙\n    def distance(self):\n        return (self.甲**2 + self.乙**2)**0.5", "output": "class Point：\n    属性 甲\n    属性 乙\n    构造 接收 甲, 乙：\n        己.甲 为 甲\n        己.乙 为 乙\n    段落 距离：\n        返回 (己.甲 乘 己.甲 加 己.乙 乘 己.乙) 的 0.5 次方", "category": "类"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def count_down(数):\n    while 数 > 0:\n        print(数)\n        数 -= 1", "output": "段落 倒计时 接收 数：\n    当 数 大于 0：\n        打印(数)\n        数 减去 1", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "parts = s.split(',')", "output": "设 parts 为 字符串分割(s, \",\")", "category": "字符串"}
+{"instruction": "将Python翻译成段言。", "input": "def fibonacci_iter(n):\n    if n <= 1:\n        return n\n    a, b = 0, 1\n    for _ in range(2, n+1):\n        a, b = b, a+b\n    return b", "output": "段落 斐波那契迭代 接收 n：\n    如果 n 小于等于 1：\n        返回 n\n    设 a 为 0\n    设 b 为 1\n    遍历 _ 于 2至n：\n        设 tmp 为 b\n        设 b 为 a 加 b\n        设 a 为 tmp\n    返回 b", "category": "复合"}
+{"instruction": "Python→段言翻译：", "input": "for i in range(5, 15):\n    print(i)", "output": "遍历 i 于 5至14：\n    打印(i)", "category": "循环"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def is_odd(n):\n    return n % 2 != 0", "output": "段落 是奇数 接收 n：\n    返回 n 取余 2 不等于 0", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def is_positive(n):\n    return n > 0", "output": "段落 是正数 接收 n：\n    返回 n 大于 0", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "for c in 'hello':\n    print(c)", "output": "遍历 c 于 \"hello\"：\n    打印(c)", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "a *= 2", "output": "a 乘以 2", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "i = 0\nwhile i < len(lst):\n    print(lst[i])\n    i += 1", "output": "设 i 为 0\n当 i 小于 len(lst)：\n    打印(lst[i])\n    i 加上 1", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "s = 'hello' + ' world'", "output": "定义 s 等于 \"hello\" 加 \" world\"", "category": "字符串"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "try:\n    结果 = 10 / 0\nexcept ZeroDivisionError:\n    结果 = 0", "output": "尝试：\n    设 结果 为 10 除以 0\n捕获 异常：\n    设 结果 为 0", "category": "异常"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "w = 100\nw /= 5", "output": "设 w 为 100\nw 除以 5", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "a - b", "output": "a 减 b", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if 数 % 3 == 0:\n    print('divisible by 3')", "output": "如果 数 取余 3 等于 0：\n    打印(\"divisible by 3\")", "category": "条件"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def power(base, exp):\n    res = 1\n    for _ in range(exp):\n        res *= base\n    return res", "output": "段落 幂运算 接收 base, exp：\n    设 res 为 1\n    遍历 _ 于 0至exp减1：\n        res 乘以 base\n    返回 res", "category": "复合"}
+{"instruction": "Python→段言翻译：", "input": "if not flag:\n    print('off')", "output": "如果 非 flag：\n    打印(\"off\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "标志 = True", "output": "设 标志 为 真", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "if score > 60:\n    print('pass')\nelse:\n    print('fail')", "output": "如果 score 大于 60：\n    打印(\"pass\")\n否则：\n    打印(\"fail\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "grade = 'A' if score >= 90 else 'B'", "output": "如果 score 大于等于 90：\n    设 grade 为 \"A\"\n否则：\n    设 grade 为 \"B\"", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "try:\n    res = 10 / 0\nexcept ZeroDivisionError:\n    res = 0", "output": "尝试：\n    设 res 为 10 除以 0\n捕获 异常：\n    设 res 为 0", "category": "异常"}
+{"instruction": "将Python代码转为段言代码：", "input": "if n > 0:\n    print('positive')\nelif n == 0:\n    print('zero')\nelse:\n    print('negative')", "output": "如果 n 大于 0：\n    打印(\"positive\")\n否则如果 n 等于 0：\n    打印(\"zero\")\n否则：\n    打印(\"negative\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "parts = s.split(',')", "output": "设 parts 为 字符串分割(s, \",\")", "category": "字符串"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "doubled = [a * 2 for a in list_]", "output": "设 doubled 为 []\n遍历 a 于 list_：\n    doubled.追加(a 乘 2)", "category": "列表"}
+{"instruction": "请将以下代码翻译为段言：", "input": "w = 100\nw /= 5", "output": "设 w 为 100\nw 除以 5", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "d['nm'] = 'test'", "output": "d[\"nm\"] = \"test\"", "category": "字典"}
+{"instruction": "将Python翻译成段言。", "input": "def double(n):\n    return n * 2", "output": "段落 双倍 接收 n：\n    返回 n 乘 2", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "grade = 'A' if 分数 >= 90 else 'B'", "output": "如果 分数 大于等于 90：\n    设 grade 为 \"A\"\n否则：\n    设 grade 为 \"B\"", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "for i in range(10):\n    if i % 2 == 0:\n        continue\n    print(i)", "output": "遍历 i 于 0至9：\n    如果 i 取余 2 等于 0：\n        跳过\n    打印(i)", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def fib(n):\n    if n <= 2:\n        return 1\n    return fib(n-1) + fib(n-2)", "output": "段落 斐波那契 接收 n：\n    如果 n 小于等于 2：\n        返回 1\n    返回 斐波那契(n 减 1) 加 斐波那契(n 减 2)", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "a = 10\na = a + 1", "output": "设 a 为 10\n设 a 为 a 加 1", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True", "output": "段落 是素数 接收 n：\n    如果 n 小于 2：\n        返回 假\n    设 limit 为 int(n 的 0.5 次方) 加 1\n    遍历 i 于 2至limit减1：\n        如果 n 取余 i 等于 0：\n            返回 假\n    返回 真", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "total = 0\nfor n in numbers:\n    total += n", "output": "设 total 为 0\n遍历 n 于 numbers：\n    total 加上 n", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "s = 'hello' + ' world'", "output": "定义 s 等于 \"hello\" 加 \" world\"", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if 'key' in d:\n    print(d['key'])", "output": "如果 \"key\" 于 d：\n    打印(d[\"key\"])", "category": "字典"}
+{"instruction": "将Python翻译成段言。", "input": "evens = [x for x in lst if x % 2 == 0]", "output": "设 evens 为 []\n遍历 x 于 lst：\n    如果 x 取余 2 等于 0：\n        evens.追加(x)", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def max_of_two(a, b):\n    if a >= b:\n        return a\n    return b", "output": "段落 最大值 接收 a, b：\n    如果 a 大于等于 b：\n        返回 a\n    返回 b", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "import math", "output": "导入 数学工具", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "def binary_search(arr, target):\n    low, high = 0, len(arr) - 1\n    while low <= high:\n        mid = (low + high) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            low = mid + 1\n        else:\n            high = mid - 1\n    return -1", "output": "段落 二分查找 接收 arr, target：\n    设 low 为 0\n    设 high 为 len(arr) 减 1\n    当 low 小于等于 high：\n        设 mid 为 (low 加 high) 除以 2\n        如果 arr[mid] 等于 target：\n            返回 mid\n        否则如果 arr[mid] 小于 target：\n            设 low 为 mid 加 1\n        否则：\n            设 high 为 mid 减 1\n    返回 减 1", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "name = 'hello'", "output": "定义 name 等于 \"hello\"", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if 甲 >= 0 and 甲 <= 100:\n    print('valid')", "output": "如果 甲 大于等于 0 且 甲 小于等于 100：\n    打印(\"valid\")", "category": "条件"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def max_of_two(a, b):\n    if a >= b:\n        return a\n    return b", "output": "段落 最大值 接收 a, b：\n    如果 a 大于等于 b：\n        返回 a\n    返回 b", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "if not done:\n    print('continue')", "output": "如果 非 done：\n    打印(\"continue\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "lst[0] = 10", "output": "lst[0] = 10", "category": "暗坑"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "x = 10\nx = x + 1", "output": "设 x 为 10\n设 x 为 x 加 1", "category": "变量"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "d = {}", "output": "设 d 为 {}", "category": "字典"}
+{"instruction": "将Python翻译成段言。", "input": "import os", "output": "导入 文件系统", "category": "导入"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "a /= 2", "output": "a 除以 2", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "i = i + 1", "output": "设 i 为 i 加 1", "category": "暗坑"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if 'key' in d:\n    print(d['key'])", "output": "如果 \"key\" 于 d：\n    打印(d[\"key\"])", "category": "字典"}
+{"instruction": "Python→段言翻译：", "input": "for i in range(5):\n    if i == 3:\n        continue\n    print(i)", "output": "遍历 i 于 0至4：\n    如果 i 等于 3：\n        跳过\n    打印(i)", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "def is_prime(num):\n    if num < 2:\n        return False\n    for i in range(2, int(num**0.5) + 1):\n        if num % i == 0:\n            return False\n    return True", "output": "段落 是素数 接收 num：\n    如果 num 小于 2：\n        返回 假\n    设 limit 为 int(num 的 0.5 次方) 加 1\n    遍历 i 于 2至limit减1：\n        如果 num 取余 i 等于 0：\n            返回 假\n    返回 真", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def insertion_sort(arr):\n    for i in range(1, len(arr)):\n        key = arr[i]\n        j = i - 1\n        while j >= 0 and arr[j] > key:\n            arr[j+1] = arr[j]\n            j -= 1\n        arr[j+1] = key\n    return arr", "output": "段落 插入排序 接收 arr：\n    遍历 i 于 1至len(arr)减1：\n        设 key 为 arr[i]\n        设 j 为 i 减 1\n        当 j 大于等于 0 且 arr[j] 大于 key：\n            arr[j 加 1] = arr[j]\n            j 减去 1\n        arr[j 加 1] = key\n    返回 arr", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "from typing import List", "output": "从 类型工具 导入 列表类型", "category": "导入"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def sign(n):\n    if n > 0:\n        return 1\n    elif n < 0:\n        return -1\n    return 0", "output": "段落 符号 接收 n：\n    如果 n 大于 0：\n        返回 1\n    否则如果 n 小于 0：\n        返回 减 1\n    返回 0", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def matrix_sum(matrix):\n    total = 0\n    for row in matrix:\n        for val in row:\n            total += val\n    return total", "output": "段落 矩阵求和 接收 matrix：\n    设 total 为 0\n    遍历 row 于 matrix：\n        遍历 val 于 row：\n            total 加上 val\n    返回 total", "category": "复合"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "width = 10\nheight = 5", "output": "设 width 为 10\n设 height 为 5", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def abs_val(num):\n    if num < 0:\n        return -num\n    return num", "output": "段落 绝对值 接收 num：\n    如果 num 小于 0：\n        返回 0 减 num\n    返回 num", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "val = d.get('key', 0)", "output": "设 val 为 d.get(\"key\", 0)", "category": "字典"}
+{"instruction": "Python→段言翻译：", "input": "evens = [x for x in lst if x % 2 == 0]", "output": "设 evens 为 []\n遍历 x 于 lst：\n    如果 x 取余 2 等于 0：\n        evens.追加(x)", "category": "列表"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "empty = None", "output": "设 empty 为 空", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "d['key'] = 10", "output": "d[\"key\"] = 10", "category": "字典"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def clamp(值, lo, hi):\n    if 值 < lo:\n        return lo\n    if 值 > hi:\n        return hi\n    return 值", "output": "段落 限值 接收 值, lo, hi：\n    如果 值 小于 lo：\n        返回 lo\n    如果 值 大于 hi：\n        返回 hi\n    返回 值", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "lst.insert(0, 10)", "output": "设 new_lst 为 [10]\n遍历 x 于 lst：\n    new_lst.追加(x)\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "count = lst.count(5)", "output": "设 count 为 0\n遍历 x 于 lst：\n    如果 x 等于 5：\n        count 加上 1", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst.remove(5)", "output": "设 new_lst 为 []\n设 skip 为 假\n遍历 x 于 lst：\n    如果 x 等于 5 且 非 skip：\n        设 skip 为 真\n    否则：\n        new_lst.追加(x)\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "empty = None", "output": "设 empty 为 空", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def factorial(num):\n    if num <= 1:\n        return 1\n    return num * factorial(num-1)", "output": "段落 阶乘 接收 num：\n    如果 num 小于等于 1：\n        返回 1\n    返回 num 乘 阶乘(num 减 1)", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "new_lst = lst[1:3]", "output": "设 new_lst 为 []\n设 i 为 1\n当 i 小于 3：\n    new_lst.追加(lst[i])\n    i 加上 1", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "d = {'a': 1, 'b': 2}", "output": "设 d 为 {\"a\": 1, \"b\": 2}", "category": "字典"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def gcd(a, b):\n    while b != 0:\n        a, b = b, a % b\n    return a", "output": "段落 最大公约数 接收 a, b：\n    当 b 不等于 0：\n        设 tmp 为 a 取余 b\n        设 a 为 b\n        设 b 为 tmp\n    返回 a", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "try:\n    x = int(s)\nexcept:\n    x = 0", "output": "尝试：\n    设 x 为 int(s)\n捕获 异常：\n    设 x 为 0", "category": "异常"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "d['name'] = 'test'", "output": "d[\"name\"] = \"test\"", "category": "字典"}
+{"instruction": "请将以下代码翻译为段言：", "input": "lst.remove(5)", "output": "设 new_lst 为 []\n设 skip 为 假\n遍历 x 于 lst：\n    如果 x 等于 5 且 非 skip：\n        设 skip 为 真\n    否则：\n        new_lst.追加(x)\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "for i in range(10):\n    if i % 2 == 0:\n        continue\n    print(i)", "output": "遍历 i 于 0至9：\n    如果 i 取余 2 等于 0：\n        跳过\n    打印(i)", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if x == 0:\n    print('zero')", "output": "如果 x 等于 0：\n    打印(\"zero\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "repeated = s * 3", "output": "设 repeated 为 字符串重复(s, 3)", "category": "字符串"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if x > 0:\n    print('positive')", "output": "如果 x 大于 0：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def find_max(list_):\n    max_val = list_[0]\n    for elem in list_[1:]:\n        if elem > max_val:\n            max_val = elem\n    return max_val", "output": "段落 求最大值 接收 list_：\n    设 max_val 为 list_[0]\n    遍历 elem 于 list_：\n        如果 elem 大于 max_val：\n            设 max_val 为 elem\n    返回 max_val", "category": "复合"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "print(f'{名} is {age} years old')", "output": "打印(f\"{名} is {age} years old\")", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "class Point:\n    def __init__(self, a, b):\n        self.a = a\n        self.b = b\n    def distance(self):\n        return (self.a**2 + self.b**2)**0.5", "output": "class Point：\n    属性 a\n    属性 b\n    构造 接收 a, b：\n        己.a 为 a\n        己.b 为 b\n    段落 距离：\n        返回 (己.a 乘 己.a 加 己.b 乘 己.b) 的 0.5 次方", "category": "类"}
+{"instruction": "Python→段言翻译：", "input": "lst[0] = 10", "output": "lst[0] = 10", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def linear_search(lst, target):\n    for i in range(len(lst)):\n        if lst[i] == target:\n            return i\n    return -1", "output": "段落 线性查找 接收 lst, target：\n    遍历 i 于 0至len(lst)减1：\n        如果 lst[i] 等于 target：\n            返回 i\n    返回 减 1", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def square(n):\n    return n * n", "output": "段落 平方 接收 n：\n    返回 n 乘 n", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if not flag:\n    print('off')", "output": "如果 非 flag：\n    打印(\"off\")", "category": "条件"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "data = None", "output": "设 data 为 空", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "doubled = [甲 * 2 for 甲 in 列表]", "output": "设 doubled 为 []\n遍历 甲 于 列表：\n    doubled.追加(甲 乘 2)", "category": "列表"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def is_even(n):\n    return n % 2 == 0", "output": "段落 是偶数 接收 n：\n    返回 n 取余 2 等于 0", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "raise Exception()", "output": "抛出 异常()", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "x = 10", "output": "设 x 为 10", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "total = 0\nfor n in numbers:\n    total += n", "output": "设 total 为 0\n遍历 n 于 numbers：\n    total 加上 n", "category": "循环"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if 5 in lst:\n    print('found')", "output": "设 found 为 假\n遍历 x 于 lst：\n    如果 x 等于 5：\n        设 found 为 真\n        跳出\n如果 found：\n    打印(\"found\")", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "from math import sqrt", "output": "从 数学工具 导入 平方", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "count = lst.count(5)", "output": "设 count 为 0\n遍历 x 于 lst：\n    如果 x 等于 5：\n        count 加上 1", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def linear_search(列表, 目标):\n    for 序 in range(len(列表)):\n        if 列表[序] == 目标:\n            return 序\n    return -1", "output": "段落 线性查找 接收 列表, 目标：\n    遍历 序 于 0至len(列表)减1：\n        如果 列表[序] 等于 目标：\n            返回 序\n    返回 减 1", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def sum_digits(n):\n    total = 0\n    while n > 0:\n        total += n % 10\n        n //= 10\n    return total", "output": "段落 数位求和 接收 n：\n    设 total 为 0\n    当 n 大于 0：\n        total 加上 n 取余 10\n        设 n 为 n 除以 10\n    返回 total", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "n = len(lst)", "output": "设 n 为 len(lst)", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "from math import sqrt, pi", "output": "从 数学工具 导入 平方, 圆周率", "category": "导入"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "result = [x for x in lst if x > 0]", "output": "设 result 为 []\n遍历 x 于 lst：\n    如果 x 大于 0：\n        result.追加(x)", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "a -= 1", "output": "a 减去 1", "category": "暗坑"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "result = s.replace('old', 'new')", "output": "设 result 为 字符串替换(s, \"old\", \"new\")", "category": "字符串"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "repeated = 文 * 3", "output": "设 repeated 为 字符串重复(文, 3)", "category": "字符串"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "n = 5\nn *= 3", "output": "设 n 为 5\nn 乘以 3", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def count_words(text):\n    words = text.split()\n    counts = {}\n    for w in words:\n        if w in counts:\n            counts[w] += 1\n        else:\n            counts[w] = 1\n    return counts", "output": "段落 统计词频 接收 text：\n    设 words 为 字符串分割(text)\n    设 counts 为 {}\n    遍历 w 于 words：\n        如果 w 于 counts：\n            counts[w] = counts[w] 加 1\n        否则：\n            counts[w] = 1\n    返回 counts", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def swap(a, b):\n    return b, a", "output": "段落 交换 接收 a, b：\n    返回 b, a", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def selection_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        min_idx = i\n        for j in range(i+1, n):\n            if arr[j] < arr[min_idx]:\n                min_idx = j\n        arr[i], arr[min_idx] = arr[min_idx], arr[i]\n    return arr", "output": "段落 选择排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 0至n减1：\n        设 min_idx 为 i\n        遍历 j 于 i加1至n减1：\n            如果 arr[j] 小于 arr[min_idx]：\n                设 min_idx 为 j\n        设 tmp 为 arr[i]\n        arr[i] = arr[min_idx]\n        arr[min_idx] = tmp\n    返回 arr", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "class Dog:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        print(f'{self.name}: woof!')", "output": "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        打印(f\"{己.名字}: woof!\")", "category": "类"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if a or b:\n    print('either')", "output": "如果 a 或 b：\n    打印(\"either\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "if score > 60:\n    print('pass')\nelse:\n    print('fail')", "output": "如果 score 大于 60：\n    打印(\"pass\")\n否则：\n    打印(\"fail\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst.reverse()", "output": "设 n 为 len(lst)\n设 i 为 0\n设 j 为 n 减 1\n当 i 小于 j：\n    设 tmp 为 lst[i]\n    lst[i] = lst[j]\n    lst[j] = tmp\n    i 加上 1\n    j 减去 1", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "for i in range(num):", "output": "遍历 i 于 0至n减1：", "category": "暗坑"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if a or b:\n    print('either')", "output": "如果 a 或 b：\n    打印(\"either\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n-1)", "output": "段落 阶乘 接收 n：\n    如果 n 小于等于 1：\n        返回 1\n    返回 n 乘 阶乘(n 减 1)", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def binary_search(arr, target):\n    low, high = 0, len(arr) - 1\n    while low <= high:\n        mid = (low + high) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            low = mid + 1\n        else:\n            high = mid - 1\n    return -1", "output": "段落 二分查找 接收 arr, target：\n    设 low 为 0\n    设 high 为 len(arr) 减 1\n    当 low 小于等于 high：\n        设 mid 为 (low 加 high) 除以 2\n        如果 arr[mid] 等于 target：\n            返回 mid\n        否则如果 arr[mid] 小于 target：\n            设 low 为 mid 加 1\n        否则：\n            设 high 为 mid 减 1\n    返回 减 1", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "lst.reverse()", "output": "设 n 为 len(lst)\n设 i 为 0\n设 j 为 n 减 1\n当 i 小于 j：\n    设 tmp 为 lst[i]\n    lst[i] = lst[j]\n    lst[j] = tmp\n    i 加上 1\n    j 减去 1", "category": "列表"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def abs_val(n):\n    if n < 0:\n        return -n\n    return n", "output": "段落 绝对值 接收 n：\n    如果 n 小于 0：\n        返回 0 减 n\n    返回 n", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "idx = s.find('abc')", "output": "设 idx 为 字符串查找(s, \"abc\")", "category": "字符串"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for 序 in range(3):\n    for j in range(3):\n        print(序, j)", "output": "遍历 序 于 0至2：\n    遍历 j 于 0至2：\n        打印(序)\n        打印(j)", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "for 甲 in 列表:", "output": "遍历 甲 于 列表：", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "result = s.replace('old', 'new')", "output": "设 result 为 字符串替换(s, \"old\", \"new\")", "category": "字符串"}
+{"instruction": "将Python翻译成段言。", "input": "x = 100\nx += 5", "output": "设 x 为 100\nx 加上 5", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "if 甲 <= 0:\n    print('non-positive')\nelse:\n    print('positive')", "output": "如果 甲 小于等于 0：\n    打印(\"non-positive\")\n否则：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if a > 0 and a < 10:\n    print('in range')", "output": "如果 a 大于 0 且 a 小于 10：\n    打印(\"in range\")", "category": "条件"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def is_prime(数):\n    if 数 < 2:\n        return False\n    for 序 in range(2, int(数**0.5) + 1):\n        if 数 % 序 == 0:\n            return False\n    return True", "output": "段落 是素数 接收 数：\n    如果 数 小于 2：\n        返回 假\n    设 limit 为 int(数 的 0.5 次方) 加 1\n    遍历 序 于 2至limit减1：\n        如果 数 取余 序 等于 0：\n            返回 假\n    返回 真", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "def abs_val(n):\n    if n < 0:\n        return -n\n    return n", "output": "段落 绝对值 接收 n：\n    如果 n 小于 0：\n        返回 0 减 n\n    返回 n", "category": "段落"}
+{"instruction": "将Python翻译成段言。", "input": "for i in range(len(list_)):\n    print(list_[i])", "output": "遍历 i 于 0至len(list_)减1：\n    打印(list_[i])", "category": "循环"}
+{"instruction": "Python→段言翻译：", "input": "a > b", "output": "a 大于 b", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "def f(a, b):", "output": "段落 f 接收 a, b：", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def linear_search(lst, target):\n    for i in range(len(lst)):\n        if lst[i] == target:\n            return i\n    return -1", "output": "段落 线性查找 接收 lst, target：\n    遍历 i 于 0至len(lst)减1：\n        如果 lst[i] 等于 target：\n            返回 i\n    返回 减 1", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "upper_s = s.upper()", "output": "设 upper_s 为 字符串转大写(s)", "category": "字符串"}
+{"instruction": "Python→段言翻译：", "input": "lst[0] = 10", "output": "lst[0] = 10", "category": "列表"}
+{"instruction": "将Python翻译成段言。", "input": "class Counter:\n    def __init__(self):\n        self.count = 0\n    def increment(self):\n        self.count += 1\n    def get(self):\n        return self.count", "output": "类 计数器：\n    属性 计数值\n    构造：\n        己.计数值 为 0\n    段落 增加：\n        己.计数值 加上 1\n    段落 获取：\n        返回 己.计数值", "category": "类"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if len(文) > 0:\n    print('not empty')", "output": "如果 len(文) 大于 0：\n    打印(\"not empty\")", "category": "条件"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "def double(n):\n    return n * 2", "output": "段落 双倍 接收 n：\n    返回 n 乘 2", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "if x != 0:\n    print('not zero')", "output": "如果 x 不等于 0：\n    打印(\"not zero\")", "category": "条件"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for 序 in range(数):", "output": "遍历 序 于 0至n减1：", "category": "暗坑"}
+{"instruction": "将Python代码转为段言代码：", "input": "idx = s.find('abc')", "output": "设 idx 为 字符串查找(s, \"abc\")", "category": "字符串"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "a *= 2", "output": "a 乘以 2", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def swap(a, b):\n    return b, a", "output": "段落 交换 接收 a, b：\n    返回 b, a", "category": "段落"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "总计 = 0\nfor 数 in numbers:\n    总计 += 数", "output": "设 总计 为 0\n遍历 数 于 numbers：\n    总计 加上 数", "category": "循环"}
+{"instruction": "将Python翻译成段言。", "input": "class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def distance(self):\n        return (self.x**2 + self.y**2)**0.5", "output": "class Point：\n    属性 x\n    属性 y\n    构造 接收 x, y：\n        己.x 为 x\n        己.y 为 y\n    段落 距离：\n        返回 (己.x 乘 己.x 加 己.y 乘 己.y) 的 0.5 次方", "category": "类"}
+{"instruction": "将Python代码转为段言代码：", "input": "idx = s.find('abc')", "output": "设 idx 为 字符串查找(s, \"abc\")", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "def palindrome_check(s):\n    return s == s[::-1]", "output": "段落 回文判断 接收 s：\n    设 reversed 为 \"\"\n    设 i 为 len(s) 减 1\n    当 i 大于等于 0：\n        定义 reversed 等于 reversed 加 s[i]\n        i 减去 1\n    返回 s 等于 reversed", "category": "复合"}
+{"instruction": "将Python代码转为段言代码：", "input": "if 甲 < 0 or 甲 > 100:\n    print('out of range')", "output": "如果 甲 小于 0 或 甲 大于 100：\n    打印(\"out of range\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "try:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    result = 0", "output": "尝试：\n    设 result 为 10 除以 0\n捕获 异常：\n    设 result 为 0", "category": "异常"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "if 文.endswith('.txt'):", "output": "如果 字符串结尾是(文, \".txt\")：", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst[2] = 99", "output": "lst[2] = 99", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if not done:\n    print('continue')", "output": "如果 非 done：\n    打印(\"continue\")", "category": "条件"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def divide(a, b):\n    return a / b", "output": "段落 除法 接收 a, b：\n    返回 a 除以 b", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "if not 标志:\n    print('off')", "output": "如果 非 标志：\n    打印(\"off\")", "category": "条件"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "def fibonacci_iter(num):\n    if num <= 1:\n        return num\n    a, b = 0, 1\n    for _ in range(2, num+1):\n        a, b = b, a+b\n    return b", "output": "段落 斐波那契迭代 接收 num：\n    如果 num 小于等于 1：\n        返回 num\n    设 a 为 0\n    设 b 为 1\n    遍历 _ 于 2至n：\n        设 tmp 为 b\n        设 b 为 a 加 b\n        设 a 为 tmp\n    返回 b", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "if x <= 0:\n    print('non-positive')\nelse:\n    print('positive')", "output": "如果 x 小于等于 0：\n    打印(\"non-positive\")\n否则：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "a = 5\nb = 3", "output": "设 a 为 5\n设 b 为 3", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "idx = s.index('abc')", "output": "设 idx 为 字符串查找(s, \"abc\")", "category": "字符串"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if age >= 18:\n    print('adult')", "output": "如果 age 大于等于 18：\n    打印(\"adult\")", "category": "条件"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "class Animal:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        pass", "output": "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        空操作", "category": "类"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def bubble_sort(数组):\n    数 = len(数组)\n    for 序 in range(数):\n        for j in range(0, 数-序-1):\n            if 数组[j] > 数组[j+1]:\n                数组[j], 数组[j+1] = 数组[j+1], 数组[j]\n    return 数组", "output": "段落 冒泡排序 接收 数组：\n    设 数 为 len(数组)\n    遍历 序 于 0至n减1：\n        遍历 j 于 0至n减i减2：\n            如果 数组[j] 大于 数组[j 加 1]：\n                设 tmp 为 数组[j]\n                数组[j] = 数组[j 加 1]\n                数组[j 加 1] = tmp\n    返回 数组", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "d = 10\nd /= 2", "output": "设 d 为 10\nd 除以 2", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "d = 10\nd /= 2", "output": "设 d 为 10\nd 除以 2", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "result = [x for x in lst if x > 0]", "output": "设 result 为 []\n遍历 x 于 lst：\n    如果 x 大于 0：\n        result.追加(x)", "category": "列表"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def insertion_sort(arr):\n    for i in range(1, len(arr)):\n        key = arr[i]\n        j = i - 1\n        while j >= 0 and arr[j] > key:\n            arr[j+1] = arr[j]\n            j -= 1\n        arr[j+1] = key\n    return arr", "output": "段落 插入排序 接收 arr：\n    遍历 i 于 1至len(arr)减1：\n        设 key 为 arr[i]\n        设 j 为 i 减 1\n        当 j 大于等于 0 且 arr[j] 大于 key：\n            arr[j 加 1] = arr[j]\n            j 减去 1\n        arr[j 加 1] = key\n    返回 arr", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "for i in range(len(lst)):\n    print(lst[i])", "output": "遍历 i 于 0至len(lst)减1：\n    打印(lst[i])", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "import math", "output": "导入 数学工具", "category": "导入"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def histogram(data, bins):\n    counts = [0] * bins\n    for val in data:\n        idx = min(int(val * bins), bins - 1)\n        counts[idx] += 1\n    return counts", "output": "段落 直方图 接收 data, bins：\n    设 counts 为 []\n    遍历 _ 于 0至bins减1：\n        counts.追加(0)\n    遍历 val 于 data：\n        设 idx 为 int(val 乘 bins)\n        如果 idx 大于等于 bins：\n            设 idx 为 bins 减 1\n        counts[idx] = counts[idx] 加 1\n    返回 counts", "category": "复合"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "res = [a for a in list_ if a > 0]", "output": "设 res 为 []\n遍历 a 于 list_：\n    如果 a 大于 0：\n        res.追加(a)", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "keys = list(d.keys())", "output": "设 keys 为 []\n遍历 k 于 d：\n    keys.追加(k)", "category": "字典"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if x == 0:\n    print('zero')", "output": "如果 x 等于 0：\n    打印(\"zero\")", "category": "条件"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "if 分数 >= 90:\n    grade = 'A'\nelif 分数 >= 80:\n    grade = 'B'\nelse:\n    grade = 'C'", "output": "如果 分数 大于等于 90：\n    设 grade 为 \"A\"\n否则如果 分数 大于等于 80：\n    设 grade 为 \"B\"\n否则：\n    设 grade 为 \"C\"", "category": "条件"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for i in range(0, 10, 2):\n    print(i)", "output": "遍历 i 于 0至9步2：\n    打印(i)", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "a >= b", "output": "a 大于等于 b", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "def clamp(val, lo, hi):\n    if val < lo:\n        return lo\n    if val > hi:\n        return hi\n    return val", "output": "段落 限值 接收 val, lo, hi：\n    如果 val 小于 lo：\n        返回 lo\n    如果 val 大于 hi：\n        返回 hi\n    返回 val", "category": "段落"}
+{"instruction": "Python→段言翻译：", "input": "raise Exception('error')", "output": "抛出 异常(\"error\")", "category": "异常"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "try:\n    x = lst[100]\nexcept IndexError:\n    x = None", "output": "尝试：\n    设 x 为 lst[100]\n捕获 异常：\n    设 x 为 空", "category": "异常"}
+{"instruction": "Python→段言翻译：", "input": "if n % 3 == 0:\n    print('divisible by 3')", "output": "如果 n 取余 3 等于 0：\n    打印(\"divisible by 3\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "False", "output": "假", "category": "暗坑"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "x = 10\nx = x + 1", "output": "设 x 为 10\n设 x 为 x 加 1", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "pi = 3.14", "output": "设 pi 为 3.14", "category": "变量"}
+{"instruction": "请将以下代码翻译为段言：", "input": "try:", "output": "尝试：", "category": "暗坑"}
+{"instruction": "请将以下代码翻译为段言：", "input": "pi = 3.14", "output": "设 pi 为 3.14", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "class Foo:", "output": "类 Foo：", "category": "暗坑"}
+{"instruction": "将Python代码转为段言代码：", "input": "import random\n甲 = random.randint(1, 10)", "output": "导入 随机数据\n设 甲 为 随机整数(1, 10)", "category": "导入"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "class Stack:\n    def __init__(self):\n        self.items = []\n    def push(self, item):\n        self.items.append(item)\n    def pop(self):\n        return self.items.pop()\n    def is_empty(self):\n        return len(self.items) == 0", "output": "类 栈：\n    属性 元素列表\n    构造：\n        己.元素列表 为 []\n    段落 入栈 接收 item：\n        己.元素列表.追加(item)\n    段落 出栈：\n        返回 己.元素列表.弹出()\n    段落 是否为空：\n        返回 len(己.元素列表) 等于 0", "category": "类"}
+{"instruction": "Python→段言翻译：", "input": "def min_of_three(a, b, c):\n    量 = a\n    if b < 量:\n        量 = b\n    if c < 量:\n        量 = c\n    return 量", "output": "段落 三数最小 接收 a, b, c：\n    设 量 为 a\n    如果 b 小于 量：\n        设 量 为 b\n    如果 c 小于 量：\n        设 量 为 c\n    返回 量", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "计数 = 0\n计数 += 1", "output": "设 计数 为 0\n计数 加上 1", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "for i in range(10):\n    print(i)", "output": "遍历 i 于 0至9：\n    打印(i)", "category": "循环"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "first = lst[0]\nlast = lst[-1]", "output": "设 first 为 lst[0]\n设 last 为 lst[len(lst) 减 1]", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "class Dog:\n    def __init__(self, nm):\n        self.nm = nm\n    def speak(self):\n        print(f'{self.nm}: woof!')", "output": "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        打印(f\"{己.名字}: woof!\")", "category": "类"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def count_words(text):\n    words = text.split()\n    counts = {}\n    for w in words:\n        if w in counts:\n            counts[w] += 1\n        else:\n            counts[w] = 1\n    return counts", "output": "段落 统计词频 接收 text：\n    设 words 为 字符串分割(text)\n    设 counts 为 {}\n    遍历 w 于 words：\n        如果 w 于 counts：\n            counts[w] = counts[w] 加 1\n        否则：\n            counts[w] = 1\n    返回 counts", "category": "复合"}
+{"instruction": "Python→段言翻译：", "input": "def sum_digits(num):\n    sum_ = 0\n    while num > 0:\n        sum_ += num % 10\n        num //= 10\n    return sum_", "output": "段落 数位求和 接收 num：\n    设 sum_ 为 0\n    当 num 大于 0：\n        sum_ 加上 num 取余 10\n        设 num 为 num 除以 10\n    返回 sum_", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "lst.insert(0, 10)", "output": "设 new_lst 为 [10]\n遍历 x 于 lst：\n    new_lst.追加(x)\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "class Cat(Dog):\n    def speak(self):\n        print(f'{self.name}: meow!')", "output": "类 猫 继承 狗：\n    段落 说话：\n        打印(f\"{己.名字}: meow!\")", "category": "类"}
+{"instruction": "将Python翻译成段言。", "input": "def clamp(v, lo, hi):\n    if v < lo:\n        return lo\n    if v > hi:\n        return hi\n    return v", "output": "段落 限值 接收 v, lo, hi：\n    如果 v 小于 lo：\n        返回 lo\n    如果 v 大于 hi：\n        返回 hi\n    返回 v", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "try:\n    f = open('data.txt')\nexcept FileNotFoundError:\n    print('file not found')", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    打印(\"file not found\")", "category": "异常"}
+{"instruction": "将Python代码转为段言代码：", "input": "total = sum(lst)", "output": "设 total 为 0\n遍历 x 于 lst：\n    设 total 为 total 加 x", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if s.endswith('.txt'):", "output": "如果 字符串结尾是(s, \".txt\")：", "category": "字符串"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for i in range(3):\n    for j in range(3):\n        print(i, j)", "output": "遍历 i 于 0至2：\n    遍历 j 于 0至2：\n        打印(i)\n        打印(j)", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "i = 0\nwhile i < len(lst):\n    print(lst[i])\n    i += 1", "output": "设 i 为 0\n当 i 小于 len(lst)：\n    打印(lst[i])\n    i 加上 1", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "stripped = 文.strip()", "output": "设 stripped 为 字符串去空白(文)", "category": "字符串"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "列表[2] = 99", "output": "列表[2] = 99", "category": "列表"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if x != 0:\n    print('not zero')", "output": "如果 x 不等于 0：\n    打印(\"not zero\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "items = [10, 20, 30]", "output": "设 items 为 [10, 20, 30]", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "lst.remove(5)", "output": "设 new_lst 为 []\n设 skip 为 假\n遍历 x 于 lst：\n    如果 x 等于 5 且 非 skip：\n        设 skip 为 真\n    否则：\n        new_lst.追加(x)\n设 lst 为 new_lst", "category": "列表"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "class Dog:\n    def __init__(self, 名):\n        self.名 = 名\n    def speak(self):\n        print(f'{self.名}: woof!')", "output": "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        打印(f\"{己.名字}: woof!\")", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if a == b and b == c:\n    print('all equal')", "output": "如果 a 等于 b 且 b 等于 c：\n    打印(\"all equal\")", "category": "条件"}
+{"instruction": "请将以下代码翻译为段言：", "input": "if s.endswith('.txt'):", "output": "如果 字符串结尾是(s, \".txt\")：", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "print(f'{name} is {age} years old')", "output": "打印(f\"{name} is {age} years old\")", "category": "字符串"}
+{"instruction": "请将以下代码翻译为段言：", "input": "list_.remove(5)", "output": "设 new_lst 为 []\n设 skip 为 假\n遍历 x 于 list_：\n    如果 x 等于 5 且 非 skip：\n        设 skip 为 真\n    否则：\n        new_lst.追加(x)\n设 list_ 为 new_lst", "category": "列表"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "a and b", "output": "a 且 b", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "a < b", "output": "a 小于 b", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "class Rect:\n    def __init__(self, w, h):\n        self.w = w\n        self.h = h\n    def area(self):\n        return self.w * self.h", "output": "类 矩形：\n    属性 宽\n    属性 高\n    构造 接收 宽, 高：\n        己.宽 为 宽\n        己.高 为 高\n    段落 面积：\n        返回 己.宽 乘 己.高", "category": "类"}
+{"instruction": "请将以下代码翻译为段言：", "input": "greeting = 'hi' + ' ' + name", "output": "定义 greeting 等于 \"hi\" 加 \" \" 加 name", "category": "字符串"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "y = 50\ny -= 10", "output": "设 y 为 50\ny 减去 10", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "try:\n    f = open('data.txt')\n    content = f.read()\nexcept:\n    content = ''", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    定义 content 等于 \"\"", "category": "异常"}
+{"instruction": "将Python翻译成段言。", "input": "a = 100\na += 5", "output": "设 a 为 100\na 加上 5", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def multiply(a, b):\n    return a * b", "output": "段落 乘法 接收 a, b：\n    返回 a 乘 b", "category": "段落"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "class Counter:\n    def __init__(self):\n        self.cnt = 0\n    def increment(self):\n        self.cnt += 1\n    def get(self):\n        return self.cnt", "output": "类 计数器：\n    属性 计数值\n    构造：\n        己.计数值 为 0\n    段落 增加：\n        己.计数值 加上 1\n    段落 获取：\n        返回 己.计数值", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "from math import sqrt", "output": "从 数学工具 导入 平方", "category": "导入"}
+{"instruction": "请将以下代码翻译为段言：", "input": "try:\n    f = open('data.txt')\nexcept FileNotFoundError:\n    print('file not found')", "output": "尝试：\n    设 f 为 读取文件(\"data.txt\")\n捕获 异常：\n    打印(\"file not found\")", "category": "异常"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "upper_s = s.upper()", "output": "设 upper_s 为 字符串转大写(s)", "category": "字符串"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "a > b", "output": "a 大于 b", "category": "暗坑"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "a += 1", "output": "a 加上 1", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "for 序 in range(0, 10, 2):\n    print(序)", "output": "遍历 序 于 0至9步2：\n    打印(序)", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if n > 0:\n    print('positive')\nelif n == 0:\n    print('zero')\nelse:\n    print('negative')", "output": "如果 n 大于 0：\n    打印(\"positive\")\n否则如果 n 等于 0：\n    打印(\"zero\")\n否则：\n    打印(\"negative\")", "category": "条件"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "list_ = [1, 2, 3]", "output": "设 list_ 为 [1, 2, 3]", "category": "变量"}
+{"instruction": "Python→段言翻译：", "input": "a == b", "output": "a 等于 b", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "raise ValueError('invalid')", "output": "抛出 异常(\"invalid\")", "category": "异常"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "while True:\n    if 甲 == 0:\n        break\n    甲 -= 1", "output": "当 真：\n    如果 甲 等于 0：\n        跳出\n    甲 减去 1", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "active = False", "output": "设 active 为 假", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def factorial(数):\n    if 数 <= 1:\n        return 1\n    return 数 * factorial(数-1)", "output": "段落 阶乘 接收 数：\n    如果 数 小于等于 1：\n        返回 1\n    返回 数 乘 阶乘(数 减 1)", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "列表.append(10)", "output": "列表.追加(10)", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "list_[2] = 99", "output": "list_[2] = 99", "category": "列表"}
+{"instruction": "Python→段言翻译：", "input": "def bubble_sort(data):\n    num = len(data)\n    for i in range(num):\n        for j in range(0, num-i-1):\n            if data[j] > data[j+1]:\n                data[j], data[j+1] = data[j+1], data[j]\n    return data", "output": "段落 冒泡排序 接收 data：\n    设 num 为 len(data)\n    遍历 i 于 0至n减1：\n        遍历 j 于 0至n减i减2：\n            如果 data[j] 大于 data[j 加 1]：\n                设 tmp 为 data[j]\n                data[j] = data[j 加 1]\n                data[j 加 1] = tmp\n    返回 data", "category": "复合"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def celsius_to_fahrenheit(c):\n    return c * 9 / 5 + 32", "output": "段落 摄氏转华氏 接收 c：\n    返回 c 乘 9 除以 5 加 32", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "clean = s.replace(' ', '_')", "output": "设 clean 为 字符串替换(s, \" \", \"_\")", "category": "字符串"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "数 = len(列表)", "output": "设 数 为 len(列表)", "category": "暗坑"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "class Stack:\n    def __init__(self):\n        self.items = []\n    def push(self, item):\n        self.items.append(item)\n    def pop(self):\n        return self.items.pop()\n    def is_empty(self):\n        return len(self.items) == 0", "output": "类 栈：\n    属性 元素列表\n    构造：\n        己.元素列表 为 []\n    段落 入栈 接收 item：\n        己.元素列表.追加(item)\n    段落 出栈：\n        返回 己.元素列表.弹出()\n    段落 是否为空：\n        返回 len(己.元素列表) 等于 0", "category": "类"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "class Bird(Animal):\n    def speak(self):\n        print(f'{self.名}: chirp!')", "output": "类 鸟 继承 动物：\n    段落 说话：\n        打印(f\"{己.名字}: chirp!\")", "category": "类"}
+{"instruction": "将Python代码转为段言代码：", "input": "parts = s.split(',')", "output": "设 parts 为 字符串分割(s, \",\")", "category": "字符串"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def area(width, height):\n    return width * height", "output": "段落 面积 接收 宽, 高：\n    返回 宽 乘 高", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "for i in range(n):", "output": "遍历 i 于 0至n减1：", "category": "暗坑"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "class BankAccount:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n    def deposit(self, amount):\n        self.balance += amount\n    def withdraw(self, amount):\n        if amount <= self.balance:\n            self.balance -= amount", "output": "类 银行账户：\n    属性 户主\n    属性 余额\n    构造 接收 owner, balance：\n        己.户主 为 owner\n        己.余额 为 balance\n    段落 存款 接收 amount：\n        己.余额 加上 amount\n    段落 取款 接收 amount：\n        如果 amount 小于等于 己.余额：\n            己.余额 减去 amount", "category": "类"}
+{"instruction": "将Python代码转为段言代码：", "input": "n = len(s)", "output": "设 n 为 len(s)", "category": "字符串"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "z = 3\nz *= 4", "output": "设 z 为 3\nz 乘以 4", "category": "变量"}
+{"instruction": "将Python代码转为段言代码：", "input": "while True:\n    cmd = input()\n    if cmd == 'quit':\n        break", "output": "当 真：\n    设 cmd 为 输入()\n    如果 cmd 等于 \"quit\"：\n        跳出", "category": "循环"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "while True:\n    cmd = input()\n    if cmd == 'quit':\n        break", "output": "当 真：\n    设 cmd 为 输入()\n    如果 cmd 等于 \"quit\"：\n        跳出", "category": "循环"}
+{"instruction": "将Python翻译成段言。", "input": "def binary_search(arr, target):\n    low, high = 0, len(arr) - 1\n    while low <= high:\n        mid = (low + high) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            low = mid + 1\n        else:\n            high = mid - 1\n    return -1", "output": "段落 二分查找 接收 arr, target：\n    设 low 为 0\n    设 high 为 len(arr) 减 1\n    当 low 小于等于 high：\n        设 mid 为 (low 加 high) 除以 2\n        如果 arr[mid] 等于 target：\n            返回 mid\n        否则如果 arr[mid] 小于 target：\n            设 low 为 mid 加 1\n        否则：\n            设 high 为 mid 减 1\n    返回 减 1", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "try:", "output": "尝试：", "category": "暗坑"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "if age >= 18:\n    print('adult')", "output": "如果 age 大于等于 18：\n    打印(\"adult\")", "category": "条件"}
+{"instruction": "将Python翻译成段言。", "input": "stripped = s.strip()", "output": "设 stripped 为 字符串去空白(s)", "category": "字符串"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if x <= 0:\n    print('non-positive')\nelse:\n    print('positive')", "output": "如果 x 小于等于 0：\n    打印(\"non-positive\")\n否则：\n    打印(\"positive\")", "category": "条件"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst[2] = 99", "output": "lst[2] = 99", "category": "列表"}
+{"instruction": "Python→段言翻译：", "input": "值 = d.get('key', 0)", "output": "设 值 为 d.get(\"key\", 0)", "category": "字典"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "文 = \"world\"", "output": "定义 文 等于 \"world\"", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "if 'age' in d:\n    age = d['age']", "output": "如果 \"age\" 于 d：\n        设 age 为 d[\"age\"]", "category": "字典"}
+{"instruction": "Python→段言翻译：", "input": "for x in lst:", "output": "遍历 x 于 lst：", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "width = 10\nheight = 5", "output": "设 width 为 10\n设 height 为 5", "category": "变量"}
+{"instruction": "将Python翻译成段言。", "input": "lst = [1, 2, 3]", "output": "设 lst 为 [1, 2, 3]", "category": "变量"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "val = d.get('key', 0)", "output": "设 val 为 d.get(\"key\", 0)", "category": "字典"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "result = s.replace('old', 'new')", "output": "设 result 为 字符串替换(s, \"old\", \"new\")", "category": "字符串"}
+{"instruction": "Python→段言翻译：", "input": "总计 = 0\n序 = 1\nwhile 序 <= 100:\n    总计 += 序\n    序 += 1", "output": "设 总计 为 0\n设 序 为 1\n当 序 小于等于 100：\n    总计 加上 序\n    序 加上 1", "category": "循环"}
+{"instruction": "将Python代码转为段言代码：", "input": "for i in range(100, 0, -1):\n    print(i)", "output": "遍历 i 于 100至1步1：\n    打印(i)", "category": "循环"}
+{"instruction": "请将以下代码翻译为段言：", "input": "i = 0\nwhile i < len(list_):\n    print(list_[i])\n    i += 1", "output": "设 i 为 0\n当 i 小于 len(list_)：\n    打印(list_[i])\n    i 加上 1", "category": "循环"}
+{"instruction": "将Python翻译成段言。", "input": "def histogram(data, bins):\n    counts = [0] * bins\n    for val in data:\n        idx = min(int(val * bins), bins - 1)\n        counts[idx] += 1\n    return counts", "output": "段落 直方图 接收 data, bins：\n    设 counts 为 []\n    遍历 _ 于 0至bins减1：\n        counts.追加(0)\n    遍历 val 于 data：\n        设 idx 为 int(val 乘 bins)\n        如果 idx 大于等于 bins：\n            设 idx 为 bins 减 1\n        counts[idx] = counts[idx] 加 1\n    返回 counts", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "for key in d:\n    print(key, d[key])", "output": "遍历 key 于 d：\n    打印(key)\n    打印(d[key])", "category": "循环"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "x = lst[0]", "output": "设 x 为 lst[0]", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "列表[0] = 10", "output": "列表[0] = 10", "category": "列表"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "n = len(lst)", "output": "设 n 为 len(lst)", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "idx = 文.index('abc')", "output": "设 idx 为 字符串查找(文, \"abc\")", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "数 = 5\n数 *= 3", "output": "设 数 为 5\n数 乘以 3", "category": "变量"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def is_positive(数):\n    return 数 > 0", "output": "段落 是正数 接收 数：\n    返回 数 大于 0", "category": "段落"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "class Animal:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        pass", "output": "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        空操作", "category": "类"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "x = 10", "output": "设 x 为 10", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def distance(self):\n        return (self.x**2 + self.y**2)**0.5", "output": "class Point：\n    属性 x\n    属性 y\n    构造 接收 x, y：\n        己.x 为 x\n        己.y 为 y\n    段落 距离：\n        返回 (己.x 乘 己.x 加 己.y 乘 己.y) 的 0.5 次方", "category": "类"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "x = 5\ny = 3", "output": "设 x 为 5\n设 y 为 3", "category": "变量"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "总计 = sum(列表)", "output": "设 总计 为 0\n遍历 x 于 列表：\n    设 总计 为 总计 加 x", "category": "列表"}
+{"instruction": "将Python代码转为段言代码：", "input": "class Bird(Animal):\n    def speak(self):\n        print(f'{self.name}: chirp!')", "output": "类 鸟 继承 动物：\n    段落 说话：\n        打印(f\"{己.名字}: chirp!\")", "category": "类"}
+{"instruction": "将Python代码转为段言代码：", "input": "def sign(数):\n    if 数 > 0:\n        return 1\n    elif 数 < 0:\n        return -1\n    return 0", "output": "段落 符号 接收 数：\n    如果 数 大于 0：\n        返回 1\n    否则如果 数 小于 0：\n        返回 减 1\n    返回 0", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "if a and b:\n    print('both')", "output": "如果 a 且 b：\n    打印(\"both\")", "category": "条件"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "if x >= 0 and x <= 100:\n    print('valid')", "output": "如果 x 大于等于 0 且 x 小于等于 100：\n    打印(\"valid\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "def power2(n):\n    return 2 ** n", "output": "段落 二的幂 接收 n：\n    返回 2 的 n 次方", "category": "段落"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "import os", "output": "导入 文件系统", "category": "导入"}
+{"instruction": "将Python代码转为段言代码：", "input": "lst[0] = 10", "output": "lst[0] = 10", "category": "列表"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def collatz(n):\n    steps = 0\n    while n != 1:\n        if n % 2 == 0:\n            n = n // 2\n        else:\n            n = 3 * n + 1\n        steps += 1\n    return steps", "output": "段落 考拉兹 接收 n：\n    设 steps 为 0\n    当 n 不等于 1：\n        如果 n 取余 2 等于 0：\n            设 n 为 n 除以 2\n        否则：\n            设 n 为 3 乘 n 加 1\n        steps 加上 1\n    返回 steps", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True", "output": "段落 是素数 接收 n：\n    如果 n 小于 2：\n        返回 假\n    设 limit 为 int(n 的 0.5 次方) 加 1\n    遍历 i 于 2至limit减1：\n        如果 n 取余 i 等于 0：\n            返回 假\n    返回 真", "category": "复合"}
+{"instruction": "将Python翻译成段言。", "input": "a != b", "output": "a 不等于 b", "category": "暗坑"}
+{"instruction": "将Python翻译成段言。", "input": "clean = 文.replace(' ', '_')", "output": "设 clean 为 字符串替换(文, \" \", \"_\")", "category": "字符串"}
+{"instruction": "翻译：将Python代码改写为段言代码。", "input": "def double(数):\n    return 数 * 2", "output": "段落 双倍 接收 数：\n    返回 数 乘 2", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "def is_positive(num):\n    return num > 0", "output": "段落 是正数 接收 num：\n    返回 num 大于 0", "category": "段落"}
+{"instruction": "用段言v3.2语法重写以下Python代码。", "input": "if n % 3 == 0:\n    print('divisible by 3')", "output": "如果 n 取余 3 等于 0：\n    打印(\"divisible by 3\")", "category": "条件"}
+{"instruction": "Python→段言翻译：", "input": "if 'hello' in s:\n    print('found')", "output": "如果 字符串包含(s, \"hello\")：\n    打印(\"found\")", "category": "字符串"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "a * b", "output": "a 乘 b", "category": "暗坑"}
+{"instruction": "Python→段言翻译：", "input": "nm = 'hello'", "output": "定义 nm 等于 \"hello\"", "category": "变量"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "def count_down(n):\n    while n > 0:\n        print(n)\n        n -= 1", "output": "段落 倒计时 接收 n：\n    当 n 大于 0：\n        打印(n)\n        n 减去 1", "category": "段落"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def reverse_string(s):\n    result = ''\n    for i in range(len(s)-1, -1, -1):\n        result += s[i]\n    return result", "output": "段落 反转字符串 接收 s：\n    设 result 为 \"\"\n    设 i 为 len(s) 减 1\n    当 i 大于等于 0：\n        定义 result 等于 result 加 s[i]\n        i 减去 1\n    返回 result", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def multiply(a, b):\n    return a * b", "output": "段落 乘法 接收 a, b：\n    返回 a 乘 b", "category": "段落"}
+{"instruction": "请将以下代码翻译为段言：", "input": "甲 = 100\n甲 += 5", "output": "设 甲 为 100\n甲 加上 5", "category": "变量"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "greeting = 'hi' + ' ' + nm", "output": "定义 greeting 等于 \"hi\" 加 \" \" 加 nm", "category": "字符串"}
+{"instruction": "将Python代码转为段言代码：", "input": "def count_vowels(s):\n    vowels = 'aeiou'\n    count = 0\n    for c in s:\n        if c in vowels:\n            count += 1\n    return count", "output": "段落 统计元音 接收 s：\n    定义 vowels 等于 \"aeiou\"\n    设 count 为 0\n    遍历 c 于 s：\n        如果 字符串包含(vowels, c)：\n            count 加上 1\n    返回 count", "category": "复合"}
+{"instruction": "请把下面的Python代码转换成段言语法。", "input": "pi = 3.14", "output": "设 pi 为 3.14", "category": "变量"}
+{"instruction": "将以下Python代码翻译为段言v3.2代码。", "input": "def remove_duplicates(lst):\n    seen = []\n    result = []\n    for item in lst:\n        if item not in seen:\n            seen.append(item)\n            result.append(item)\n    return result", "output": "段落 去重 接收 lst：\n    设 seen 为 []\n    设 result 为 []\n    遍历 item 于 lst：\n        设 found 为 假\n        遍历 s 于 seen：\n            如果 s 等于 item：\n                设 found 为 真\n                跳出\n        如果 非 found：\n            seen.追加(item)\n            result.追加(item)\n    返回 result", "category": "复合"}
+{"instruction": "将下面的Python改写成段言v3.2：", "input": "def leap_year(year):\n    if year % 400 == 0:\n        return True\n    if year % 100 == 0:\n        return False\n    if year % 4 == 0:\n        return True\n    return False", "output": "段落 闰年判断 接收 year：\n    如果 year 取余 400 等于 0：\n        返回 真\n    如果 year 取余 100 等于 0：\n        返回 假\n    如果 year 取余 4 等于 0：\n        返回 真\n    返回 假", "category": "复合"}
+{"instruction": "请将以下代码翻译为段言：", "input": "repeated = s * 3", "output": "设 repeated 为 字符串重复(s, 3)", "category": "字符串"}
+{"instruction": "用段言语法表达以下Python代码：", "input": "merged = a + b", "output": "设 merged 为 []\n遍历 x 于 a：\n    merged.追加(x)\n遍历 x 于 b：\n    merged.追加(x)", "category": "列表"}
