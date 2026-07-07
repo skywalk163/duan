@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-段言翻译器 — Qwen3-8B 一键 LoRA 微调脚本
+段言翻译器 — 多模型 LoRA/QLoRA 一键微调脚本
 
-使用 LLaMA-Factory 框架对 Qwen3-8B-Instruct 进行 LoRA/QLoRA 微调，
+使用 LLaMA-Factory 框架对多种模型进行 LoRA/QLoRA 微调，
 使其学会将 Python 代码翻译为段言 v3.2 代码。
 
-为什么选 Qwen3-8B？
-  - 2026 年 7-8B 级中文代码生成最强模型（HumanEval 76.0）
-  - 中文训练数据占 60%，CJK 多语言场景最优
-  - 支持 32K 上下文，指令跟随能力强
-  - 社区活跃，LLaMA-Factory 原生支持
+支持模型（通过 --model-preset 选择）：
+  qwen3-8b   — Qwen3-8B-Instruct（7-8B 级中文代码最强，生产用）
+  qwen3.5-2b — Qwen3.5-2B-Instruct（2B 级轻量模型，开发调试首选）
+
+为什么有 Qwen3.5-2B？
+  - 仅 20 亿参数，LoRA BF16 显存 ~5GB，QLoRA ~3GB
+  - 任何消费级显卡都能跑，训练速度极快（~10 分钟）
+  - 适合开发阶段快速迭代、验证 prompt/数据质量
+  - 新架构（门控 DeltaNet + MoE），2B 级性能领先
 
 完整流程：
   1. 环境检查（PyTorch / CUDA / LLaMA-Factory）
-  2. 下载 Qwen3-8B-Instruct 模型
+  2. 下载预训练模型
   3. 注册段言数据集到 LLaMA-Factory
   4. 自动生成 YAML 训练配置
   5. 执行 LoRA/QLoRA SFT 训练
@@ -22,28 +26,31 @@
   7. （可选）测试推理效果
 
 显存需求：
-  - LoRA BF16:  ~22 GB（RTX 3090/4090/A100 等 24GB 显卡）
-  - QLoRA 4bit: ~8 GB（RTX 4060 8GB 可跑，batch=1 + grad_accum=8）
-  - QLoRA 4bit + offload: ~6 GB（配合 CPU offload）
+  Qwen3-8B:
+    - LoRA BF16:  ~22 GB（RTX 3090/4090/A100）
+    - QLoRA 4bit: ~8 GB（RTX 4060）
+  Qwen3.5-2B:
+    - LoRA BF16:  ~5 GB（GTX 1660 即可）
+    - QLoRA 4bit: ~3 GB（几乎任何 GPU）
 
 用法：
-    # 最简单：一键训练（LoRA BF16，需 24GB 显存）
-    python train_lora_7b.py
+    # 开发调试首选：2B 模型，飞快
+    python train_lora_7b.py --model-preset qwen3.5-2b
 
-    # QLoRA 4bit 量化训练（仅需 8GB 显存）
-    python train_lora_7b.py --qlora
+    # 生产部署：8B 模型，效果最好
+    python train_lora_7b.py --model-preset qwen3-8b
+
+    # QLoRA 4bit 量化训练（显存更省）
+    python train_lora_7b.py --model-preset qwen3.5-2b --qlora
 
     # 自定义参数
-    python train_lora_7b.py --epochs 5 --lora-rank 32 --lr 2e-4
+    python train_lora_7b.py --model-preset qwen3-8b --epochs 5 --lora-rank 32
 
     # 只生成配置文件不训练
-    python train_lora_7b.py --dry-run
-
-    # 跳过下载（模型已存在本地）
-    python train_lora_7b.py --skip-download
+    python train_lora_7b.py --model-preset qwen3.5-2b --dry-run
 
     # 训练完测试推理
-    python train_lora_7b.py --test-infer
+    python train_lora_7b.py --model-preset qwen3.5-2b --test-infer
 
 前置条件：
     # 1. 安装 LLaMA-Factory（推荐 conda 环境）
@@ -72,11 +79,50 @@ from pathlib import Path
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_DIR = os.path.dirname(os.path.dirname(_SCRIPT_DIR))
 _DATASET_PATH = os.path.join(_SCRIPT_DIR, 'sft_dataset.jsonl')
-_DEFAULT_MODEL = 'Qwen/Qwen3-8B-Instruct'
-_DEFAULT_OUTPUT = os.path.join(_SCRIPT_DIR, 'output', 'qwen3_8b_duan')
 
 # LLaMA-Factory 数据集注册文件路径
 _LF_DATASET_INFO = None  # 运行时检测
+
+# ═══════════════════════════════════════════════════════════════════
+# 模型预设
+# ═══════════════════════════════════════════════════════════════════
+# 每个预设包含：模型名称、默认输出目录、LLaMA-Factory template、
+# LoRA target modules、推荐参数（batch_size / lora_rank / 显存估算）
+
+MODEL_PRESETS = {
+    'qwen3-8b': {
+        'name': 'Qwen3-8B-Instruct',
+        'model_id': 'Qwen/Qwen3-8B-Instruct',
+        'output_dir': os.path.join(_SCRIPT_DIR, 'output', 'qwen3_8b_duan'),
+        'template': 'qwen3',
+        'lora_target': 'q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj',
+        'description': '7-8B 级中文代码生成最强模型（HumanEval 76.0），生产部署首选',
+        'params_b': 8,
+        'vram_lora': '~22 GB',
+        'vram_qlora': '~8 GB',
+        'default_batch_size': 2,
+        'default_lora_rank': 16,
+        'default_lr': 1e-4,
+        'default_grad_accum': 8,
+    },
+    'qwen3.5-2b': {
+        'name': 'Qwen3.5-2B-Instruct',
+        'model_id': 'Qwen/Qwen3.5-2B-Instruct',
+        'output_dir': os.path.join(_SCRIPT_DIR, 'output', 'qwen3.5_2b_duan'),
+        'template': 'qwen3',
+        'lora_target': 'q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj',
+        'description': '2B 级轻量模型（门控 DeltaNet + MoE），开发调试首选，飞快',
+        'params_b': 2,
+        'vram_lora': '~5 GB',
+        'vram_qlora': '~3 GB',
+        'default_batch_size': 4,
+        'default_lora_rank': 16,
+        'default_lr': 2e-4,
+        'default_grad_accum': 4,
+    },
+}
+
+_DEFAULT_PRESET = 'qwen3-8b'
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -264,14 +310,15 @@ def check_environment(qlora: bool = False) -> bool:
 
     # 显存估算
     print()
-    print("  显存估算（Qwen3-8B）：")
-    print("  ┌──────────────────────┬───────────┐")
-    print("  │ 模式                 │ 显存需求  │")
-    print("  ├──────────────────────┼───────────┤")
-    print("  │ LoRA BF16            │ ~22 GB    │")
-    print("  │ QLoRA 4bit           │ ~8 GB     │")
-    print("  │ QLoRA 4bit + offload │ ~6 GB     │")
-    print("  └──────────────────────┴───────────┘")
+    print("  显存估算：")
+    print("  ┌──────────────────────────────────┬───────────┐")
+    print("  │ 模型 + 模式                       │ 显存需求  │")
+    print("  ├──────────────────────────────────┼───────────┤")
+    print("  │ Qwen3-8B  LoRA BF16              │ ~22 GB    │")
+    print("  │ Qwen3-8B  QLoRA 4bit             │ ~8 GB     │")
+    print("  │ Qwen3.5-2B LoRA BF16             │ ~5 GB     │")
+    print("  │ Qwen3.5-2B QLoRA 4bit            │ ~3 GB     │")
+    print("  └──────────────────────────────────┴───────────┘")
 
     print()
     return ok
@@ -443,6 +490,8 @@ def generate_yaml_config(
     qlora: bool = False,
     gradient_accumulation: int = 8,
     use_absolute_path: bool = False,
+    template: str = 'qwen3',
+    lora_target: str = 'q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj',
 ) -> str:
     """生成 LLaMA-Factory 训练 YAML 配置文件
 
@@ -467,7 +516,7 @@ def generate_yaml_config(
     os.makedirs(output_dir, exist_ok=True)
 
     lora_alpha = lora_rank * 2
-    lora_target = "q_proj,v_proj,k_proj,o_proj,gate_proj,up_proj,down_proj"
+    lora_target = lora_target
 
     # 量化配置
     quant_bit = 4 if qlora else None
@@ -516,13 +565,13 @@ def generate_yaml_config(
     if dataset_format:
         yaml_lines.extend([
             f"dataset_dir: {os.path.dirname(dataset_path)}",
-            f"template: qwen3",
+            f"template: {template}",
             f"cutoff_len: {max_seq_len}",
             f"formatting: {dataset_format}",
         ])
     else:
         yaml_lines.extend([
-            f"template: qwen3",
+            f"template: {template}",
             f"cutoff_len: {max_seq_len}",
         ])
 
@@ -804,48 +853,58 @@ def test_inference(model_path: str, merged_path: str = None) -> bool:
 # ═══════════════════════════════════════════════════════════════════
 
 def main():
+    # ── 预设名称列表（用于帮助信息） ──
+    preset_names = ', '.join(f'{k} ({v["name"]})' for k, v in MODEL_PRESETS.items())
+    default_preset = MODEL_PRESETS[_DEFAULT_PRESET]
+
     parser = argparse.ArgumentParser(
-        description='段言翻译器 — Qwen3-8B 一键 LoRA/QLoRA 微调',
+        description='段言翻译器 — 多模型 LoRA/QLoRA 一键微调',
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
+        epilog=f"""
+支持的模型预设（--model-preset）：
+  qwen3-8b   — Qwen3-8B-Instruct（8B，生产部署首选，LoRA ~22GB / QLoRA ~8GB）
+  qwen3.5-2b — Qwen3.5-2B-Instruct（2B，开发调试首选，LoRA ~5GB / QLoRA ~3GB）
+
 示例:
-  python train_lora_7b.py                           # 一键 LoRA BF16 训练（需 24GB 显存）
-  python train_lora_7b.py --qlora                   # QLoRA 4bit 训练（仅需 8GB 显存）
-  python train_lora_7b.py --epochs 5 --lora-rank 32 # 更多轮次 + 更高秩
-  python train_lora_7b.py --dry-run                 # 只生成配置不训练
-  python train_lora_7b.py --skip-download            # 跳过模型下载
-  python train_lora_7b.py --test-infer               # 测试推理效果
-  python train_lora_7b.py --model ./my_qwen3_8b     # 使用本地模型
+  python train_lora_7b.py --model-preset qwen3.5-2b          # 2B 快速调试
+  python train_lora_7b.py --model-preset qwen3-8b            # 8B 生产训练
+  python train_lora_7b.py --model-preset qwen3.5-2b --qlora  # QLoRA 更省显存
+  python train_lora_7b.py --model-preset qwen3-8b --epochs 5 --lora-rank 32
+  python train_lora_7b.py --model-preset qwen3.5-2b --dry-run
+  python train_lora_7b.py --model-preset qwen3.5-2b --test-infer
+  python train_lora_7b.py --model ./my_local_model            # 自定义模型路径
 
 显存需求:
-  LoRA BF16:  ~22 GB（RTX 3090/4090/A100）
-  QLoRA 4bit: ~8 GB（RTX 4060 8GB）
-  QLoRA+offload: ~6 GB（配合 CPU offload）
+  Qwen3-8B:    LoRA BF16 ~22GB / QLoRA 4bit ~8GB
+  Qwen3.5-2B:  LoRA BF16 ~5GB  / QLoRA 4bit ~3GB
 
 完整文档: tools/ai_copilot/README_LoRA7B.md
         """
     )
 
-    parser.add_argument('--model', default=_DEFAULT_MODEL,
-                        help='预训练模型名称或路径（默认: Qwen/Qwen3-8B-Instruct）')
-    parser.add_argument('--output', default=_DEFAULT_OUTPUT,
-                        help='输出目录（默认: tools/ai_copilot/output/qwen3_8b_duan）')
+    parser.add_argument('--model-preset', default=_DEFAULT_PRESET,
+                        choices=list(MODEL_PRESETS.keys()),
+                        help=f'模型预设名称（默认: {_DEFAULT_PRESET}）')
+    parser.add_argument('--model', default=None,
+                        help='自定义预训练模型名称或路径（覆盖预设）')
+    parser.add_argument('--output', default=None,
+                        help='输出目录（默认: 根据预设自动生成）')
     parser.add_argument('--dataset', default=_DATASET_PATH,
-                        help='训练数据 JSONL 路径（默认: tools/ai_copilot/sft_dataset.jsonl）')
-    parser.add_argument('--epochs', type=int, default=3,
-                        help='训练轮数（默认: 3）')
-    parser.add_argument('--batch-size', type=int, default=2,
-                        help='每设备批大小（默认: 2，QLoRA 建议 1）')
-    parser.add_argument('--lr', type=float, default=1e-4,
-                        help='学习率（默认: 1e-4，LoRA/QLoRA 推荐 5e-5 ~ 2e-4）')
-    parser.add_argument('--lora-rank', type=int, default=16,
-                        help='LoRA 秩（默认: 16，范围 8-64，越大效果越好但显存越多）')
+                        help='训练数据 JSONL 路径')
+    parser.add_argument('--epochs', type=int, default=None,
+                        help='训练轮数（默认: 根据预设）')
+    parser.add_argument('--batch-size', type=int, default=None,
+                        help='每设备批大小（默认: 根据预设）')
+    parser.add_argument('--lr', type=float, default=None,
+                        help='学习率（默认: 根据预设）')
+    parser.add_argument('--lora-rank', type=int, default=None,
+                        help='LoRA 秩（默认: 16）')
     parser.add_argument('--max-seq-len', type=int, default=1024,
                         help='最大序列长度（默认: 1024）')
-    parser.add_argument('--grad-accum', type=int, default=8,
-                        help='梯度累积步数（默认: 8，等效 batch_size = batch_size × grad_accum）')
+    parser.add_argument('--grad-accum', type=int, default=None,
+                        help='梯度累积步数（默认: 根据预设）')
     parser.add_argument('--qlora', action='store_true',
-                        help='使用 QLoRA 4bit 量化训练（显存从 ~22GB 降到 ~8GB）')
+                        help='使用 QLoRA 4bit 量化训练')
     parser.add_argument('--dry-run', action='store_true',
                         help='只生成配置文件，不执行训练')
     parser.add_argument('--skip-download', action='store_true',
@@ -863,16 +922,35 @@ def main():
 
     args = parser.parse_args()
 
+    # ── 应用预设 ──
+    preset = MODEL_PRESETS[args.model_preset]
+    model_name = args.model or preset['model_id']
+    output_dir = args.output or preset['output_dir']
+    batch_size = args.batch_size or preset['default_batch_size']
+    lr = args.lr or preset['default_lr']
+    lora_rank = args.lora_rank or preset['default_lora_rank']
+    grad_accum = args.grad_accum or preset['default_grad_accum']
+    template = preset['template']
+    lora_target = preset['lora_target']
+
+    print()
+    print("=" * 60)
+    print(f"模型预设: {args.model_preset} — {preset['name']}")
+    print(f"  {preset['description']}")
+    print(f"  参数量: {preset['params_b']}B")
+    print(f"  显存: LoRA {preset['vram_lora']} / QLoRA {preset['vram_qlora']}")
+    print("=" * 60)
+
     # ── 仅推理模式 ──
     if args.only_infer:
-        merged_path = os.path.join(args.output, 'merged')
-        test_inference(args.model, merged_path)
+        merged_path = os.path.join(output_dir, 'merged')
+        test_inference(model_name, merged_path)
         return
 
     # ── 仅合并模式 ──
     if args.only_merge:
-        checkpoint_dir = os.path.join(args.output, 'checkpoints')
-        merge_lora(args.model, checkpoint_dir, args.output, args.lora_rank)
+        checkpoint_dir = os.path.join(output_dir, 'checkpoints')
+        merge_lora(model_name, checkpoint_dir, output_dir, lora_rank)
         return
 
     # ── 环境检查 ──
@@ -889,14 +967,14 @@ def main():
     print("=" * 60)
 
     if args.skip_download:
-        model_path = args.model
+        model_path = model_name
         print(f"  跳过下载，使用路径: {model_path}")
     else:
         model_cache = os.path.join(_SCRIPT_DIR, 'model_cache')
-        model_path = download_model(args.model, model_cache)
+        model_path = download_model(model_name, model_cache)
 
     # ── 准备数据集 ──
-    sharegpt_path, dataset_name = prepare_dataset(args.dataset, args.output)
+    sharegpt_path, dataset_name = prepare_dataset(args.dataset, output_dir)
 
     # 检查数据集是否成功注册到 LLaMA-Factory
     lf_dir = _find_llamafactory_dir()
@@ -909,24 +987,27 @@ def main():
     print("=" * 60)
 
     mode_str = "QLoRA 4bit" if args.qlora else "LoRA BF16"
+    print(f"  模型: {preset['name']} ({preset['params_b']}B)")
     print(f"  训练模式: {mode_str}")
-    print(f"  LoRA 秩: {args.lora_rank}")
-    print(f"  学习率: {args.lr}")
-    print(f"  批大小: {args.batch_size} × {args.grad_accum} = {args.batch_size * args.grad_accum} (等效)")
+    print(f"  LoRA 秩: {lora_rank}")
+    print(f"  学习率: {lr}")
+    print(f"  批大小: {batch_size} × {grad_accum} = {batch_size * grad_accum} (等效)")
 
     yaml_path = generate_yaml_config(
         model_path=model_path,
         dataset_name=dataset_name,
         dataset_path=sharegpt_path,
-        output_dir=args.output,
-        epochs=args.epochs,
-        batch_size=args.batch_size,
-        lr=args.lr,
-        lora_rank=args.lora_rank,
+        output_dir=output_dir,
+        epochs=args.epochs or 3,
+        batch_size=batch_size,
+        lr=lr,
+        lora_rank=lora_rank,
         max_seq_len=args.max_seq_len,
         qlora=args.qlora,
-        gradient_accumulation=args.grad_accum,
+        gradient_accumulation=grad_accum,
         use_absolute_path=use_absolute_path,
+        template=template,
+        lora_target=lora_target,
     )
 
     if args.dry_run:
@@ -948,33 +1029,34 @@ def main():
 
     # ── 合并 LoRA ──
     if not args.skip_merge:
-        checkpoint_dir = os.path.join(args.output, 'checkpoints')
-        merge_lora(model_path, checkpoint_dir, args.output, args.lora_rank)
+        checkpoint_dir = os.path.join(output_dir, 'checkpoints')
+        merge_lora(model_path, checkpoint_dir, output_dir, lora_rank)
 
     # ── 测试推理 ──
     if args.test_infer:
-        merged_path = os.path.join(args.output, 'merged')
+        merged_path = os.path.join(output_dir, 'merged')
         test_inference(model_path, merged_path)
 
     # ── 完成 ──
-    merged_path = os.path.join(args.output, 'merged')
-    checkpoint_dir = os.path.join(args.output, 'checkpoints')
+    merged_path = os.path.join(output_dir, 'merged')
+    checkpoint_dir = os.path.join(output_dir, 'checkpoints')
     print()
     print("=" * 60)
     print("训练完成！")
     print("=" * 60)
+    print(f"  模型: {preset['name']}")
     print(f"  LoRA checkpoints: {checkpoint_dir}")
     print(f"  合并后模型: {merged_path}")
     print()
     print("下一步：")
-    print(f"  1. 测试推理: python train_lora_7b.py --only-infer --model {args.model}")
-    print(f"  2. 合并权重: python train_lora_7b.py --only-merge --model {args.model}")
+    print(f"  1. 测试推理: python train_lora_7b.py --model-preset {args.model_preset} --only-infer")
+    print(f"  2. 合并权重: python train_lora_7b.py --model-preset {args.model_preset} --only-merge")
     print(f"  3. 集成到段言管线: 将微调后的模型嵌入 duan ai generate 流程")
     print()
     print("部署方式：")
     print("  - vLLM:   vllm serve <merged_path> --port 8000")
     print("  - Ollama: 将 GGUF 导入 Ollama（需先转换格式）")
-    print("  - API:    python -m llamafactory.cli api {merged_path}")
+    print("  - API:    python -m llamafactory.cli api <merged_path>")
 
 
 if __name__ == '__main__':

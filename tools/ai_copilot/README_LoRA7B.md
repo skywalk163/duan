@@ -1,18 +1,29 @@
-# Qwen3-8B LoRA 微调指南 — 段言翻译器
+# LoRA 微调指南 — 段言翻译器
 
-用 LoRA 轻量化微调 Qwen3-8B，使其学会将 Python 代码翻译为段言 v3.2 代码。
+用 LoRA 轻量化微调，使模型学会将 Python 代码翻译为段言 v3.2 代码。
 
-## 为什么选 Qwen3-8B？
+## 支持模型
 
-| 对比项 | Qwen3-8B | Llama 3.3-8B | Mistral Small 3-7B |
-|--------|-----------|---------------|---------------------|
-| HumanEval | **76.0** | 68.5 | 62.1 |
-| 中文能力 | 强（训练数据 60% 中文） | 弱（英文为主） | 中等 |
-| 上下文长度 | 32K | 8K | 32K |
-| LoRA 生态 | LLaMA-Factory 原生支持 | 支持 | 支持 |
-| 指令跟随 | 强 | 强 | 中等 |
+| 模型 | 参数量 | LoRA 显存 | QLoRA 显存 | 定位 |
+|------|--------|-----------|------------|------|
+| **Qwen3.5-2B** | 2B | ~5 GB | ~3 GB | 开发调试首选，飞快 |
+| **Qwen3-8B** | 8B | ~22 GB | ~8 GB | 生产部署，效果最强 |
 
-**结论：Qwen3-8B 是 2026 年 7-8B 级中文代码生成的最佳选择。**
+**推荐工作流**：先用 Qwen3.5-2B 快速迭代验证（~10分钟/轮），确认效果后切 Qwen3-8B 做生产级微调。
+
+### 为什么选这两个模型？
+
+| 对比项 | Qwen3.5-2B | Qwen3-8B | Llama 3.3-8B | Mistral Small 3-7B |
+|--------|------------|----------|---------------|---------------------|
+| 参数量 | 2B | 8B | 8B | 7B |
+| HumanEval | — | **76.0** | 68.5 | 62.1 |
+| 中文能力 | 强 | 强（60% 中文数据） | 弱 | 中等 |
+| 架构 | 门控 DeltaNet + MoE | Transformer | Transformer | Transformer |
+| LoRA 显存 | ~5 GB | ~22 GB | ~22 GB | ~20 GB |
+| 训练速度（881条×3轮） | **~10 分钟** | ~30 分钟 | ~30 分钟 | ~35 分钟 |
+| 适用场景 | 开发调试 | 生产部署 | 英文为主 | 通用 |
+
+**Qwen3.5-2B 亮点**：新架构（门控 DeltaNet + 稀疏 MoE），2B 级性能领先，训练速度极快，任何消费级显卡都能跑。
 
 ## 快速开始
 
@@ -39,11 +50,14 @@ pip install modelscope
 ```bash
 cd tools/ai_copilot
 
-# LoRA BF16 模式（需 24GB 显存，如 RTX 3090/4090/A100）
-python train_lora_7b.py
+# 开发调试首选：2B 模型，飞快（LoRA BF16 ~5GB 显存）
+python train_lora_7b.py --model-preset qwen3.5-2b
 
-# QLoRA 4bit 模式（仅需 8GB 显存，如 RTX 4060）
-python train_lora_7b.py --qlora
+# 生产部署：8B 模型，效果最好（LoRA BF16 ~22GB 显存）
+python train_lora_7b.py --model-preset qwen3-8b
+
+# QLoRA 4bit 量化（更省显存）
+python train_lora_7b.py --model-preset qwen3.5-2b --qlora
 
 # 查看所有选项
 python train_lora_7b.py --help
@@ -57,50 +71,59 @@ jupyter notebook train_lora_7b.ipynb
 
 Notebook 包含 10 个 Cell，逐步引导你从环境检查到推理测试。
 
-## 两种训练模式
+## 两种模型 + 两种模式
 
-### 模式一：LoRA BF16（推荐，24GB 显存）
+### 模型选择
 
-```bash
-python train_lora_7b.py
-```
+| 场景 | 推荐模型 | 命令 |
+|------|----------|------|
+| 开发调试、快速迭代 | Qwen3.5-2B | `--model-preset qwen3.5-2b` |
+| 生产部署、最高质量 | Qwen3-8B | `--model-preset qwen3-8b` |
+| 自定义模型 | 任意 | `--model /path/to/model` |
 
-- 显存需求：~22 GB
-- 训练速度：快（~30 分钟，RTX 4090）
-- 适用显卡：RTX 3090 / 4090 / A100 / A6000
-
-### 模式二：QLoRA 4bit（8GB 显存可跑）
+### 模式一：LoRA BF16（推荐，显存够就用）
 
 ```bash
-python train_lora_7b.py --qlora --batch-size 1 --grad-accum 16
+# 2B 模型（~5GB 显存，GTX 1660 即可）
+python train_lora_7b.py --model-preset qwen3.5-2b
+
+# 8B 模型（~22GB 显存，RTX 3090/4090）
+python train_lora_7b.py --model-preset qwen3-8b
 ```
 
-- 显存需求：~8 GB
-- 训练速度：中等（~60 分钟，RTX 4060）
-- 适用显卡：RTX 4060 / 4070 / 3060 12GB
-- 原理：将模型权重从 BF16 量化为 4bit，训练时仍用 BF16 梯度
+### 模式二：QLoRA 4bit（显存不够时用）
+
+```bash
+# 2B QLoRA（~3GB 显存，几乎任何 GPU）
+python train_lora_7b.py --model-preset qwen3.5-2b --qlora
+
+# 8B QLoRA（~8GB 显存，RTX 4060）
+python train_lora_7b.py --model-preset qwen3-8b --qlora --batch-size 1 --grad-accum 16
+```
 
 ### 显存对照表
 
-| 显存 | 推荐模式 | batch_size | grad_accum |
-|------|----------|------------|------------|
-| ≥24 GB | LoRA BF16 | 2 | 8 |
-| 16-24 GB | LoRA BF16 | 1 | 16 |
-| 8-16 GB | QLoRA 4bit | 1 | 16 |
-| 6-8 GB | QLoRA + offload | 1 | 16 |
+| 显存 | 推荐配置 |
+|------|----------|
+| ≥24 GB | `--model-preset qwen3-8b`（LoRA BF16，batch=2） |
+| 16-24 GB | `--model-preset qwen3-8b`（LoRA BF16，batch=1） |
+| 8-16 GB | `--model-preset qwen3-8b --qlora`（QLoRA 4bit） |
+| 4-8 GB | `--model-preset qwen3.5-2b`（LoRA BF16，batch=4） |
+| <4 GB | `--model-preset qwen3.5-2b --qlora`（QLoRA 4bit） |
 
 ## 参数详解
 
 ### 核心参数
 
-| 参数 | 默认值 | 说明 |
-|------|--------|------|
-| `--model` | `Qwen/Qwen3-8B-Instruct` | 模型名称或本地路径 |
-| `--output` | `output/qwen3_8b_duan` | 输出目录 |
-| `--qlora` | `False` | 启用 QLoRA 4bit 量化 |
-| `--epochs` | `3` | 训练轮数 |
-| `--lr` | `1e-4` | 学习率 |
-| `--lora-rank` | `16` | LoRA 秩 |
+| 参数 | 说明 |
+|------|------|
+| `--model-preset` | 模型预设：`qwen3.5-2b`（2B 开发调试）或 `qwen3-8b`（8B 生产部署） |
+| `--model` | 自定义模型名称或路径（覆盖预设） |
+| `--output` | 输出目录（默认: 根据预设自动生成） |
+| `--qlora` | 启用 QLoRA 4bit 量化 |
+| `--epochs` | 训练轮数（默认: 3） |
+| `--lr` | 学习率（2B 默认 2e-4，8B 默认 1e-4） |
+| `--lora-rank` | LoRA 秩（默认: 16） |
 
 ### LoRA 秩（lora_rank）选择指南
 
@@ -174,7 +197,11 @@ python train_lora_7b.py --qlora --batch-size 1 --grad-accum 16
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-model_path = "output/qwen3_8b_duan/merged"
+# 2B 模型
+model_path = "output/qwen3.5_2b_duan/merged"
+# 或 8B 模型
+# model_path = "output/qwen3_8b_duan/merged"
+
 tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     model_path, device_map="auto", trust_remote_code=True
@@ -194,7 +221,7 @@ print(tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_t
 
 ```bash
 pip install vllm
-vllm serve output/qwen3_8b_duan/merged --port 8000
+vllm serve output/qwen3.5_2b_duan/merged --port 8000
 ```
 
 然后通过 OpenAI 兼容 API 调用：
@@ -238,28 +265,30 @@ duan ai generate "排序算法" --model-size large
 # 1. 安装依赖
 pip install llamafactory transformers accelerate peft bitsandbytes
 
-# 2. 一键训练（QLoRA 模式，8GB 显存）
+# 2. 开发调试：2B 模型快速验证（~10分钟）
 cd tools/ai_copilot
-python train_lora_7b.py --qlora --test-infer
+python train_lora_7b.py --model-preset qwen3.5-2b --test-infer
 
-# 3. 训练完成后，模型在 output/qwen3_8b_duan/merged
+# 3. 效果确认后，切 8B 生产级微调
+python train_lora_7b.py --model-preset qwen3-8b --test-infer
 
 # 4. 部署为 API 服务
 pip install vllm
-vllm serve output/qwen3_8b_duan/merged --port 8000
+vllm serve output/qwen3.5_2b_duan/merged --port 8000
 
 # 5. 集成到段言开发
-duan ai generate "二分查找" --model-path output/qwen3_8b_duan/merged
+duan ai generate "二分查找" --model-path output/qwen3.5_2b_duan/merged
 ```
 
 ## 常见问题
 
 ### Q: 显存不够怎么办？
 
-1. 使用 `--qlora` 开启 4bit 量化（22GB→8GB）
-2. 减小 `--batch-size 1` + 增大 `--grad-accum 16`
-3. 减小 `--max-seq-len 512`
-4. 使用云 GPU（AutoDL / AI Studio 等，约 2-5 元/小时）
+1. 使用 2B 模型：`--model-preset qwen3.5-2b`（LoRA 仅 ~5GB）
+2. 使用 `--qlora` 开启 4bit 量化（2B QLoRA 仅 ~3GB）
+3. 减小 `--batch-size 1` + 增大 `--grad-accum 16`
+4. 减小 `--max-seq-len 512`
+5. 使用云 GPU（AutoDL / AI Studio 等，约 2-5 元/小时）
 
 ### Q: Loss 不下降怎么办？
 
@@ -329,8 +358,8 @@ pip install llamafactory
 
 | 文件 | 说明 |
 |------|------|
-| `train_lora_7b.py` | 一键 LoRA/QLoRA 微调脚本 |
-| `train_lora_7b.ipynb` | Jupyter Notebook 调试版 |
+| `train_lora_7b.py` | 多模型 LoRA/QLoRA 一键微调脚本（支持 qwen3-8b / qwen3.5-2b 预设） |
+| `train_lora_7b.ipynb` | Jupyter Notebook 调试版（含 2B/8B 预设切换） |
 | `sft_dataset.jsonl` | 训练数据（881 条） |
 | `build_sft_dataset.py` | 训练数据构造器 |
 | `train_sft.py` | ERNIE-4.5-0.3B 微调脚本（备用） |
@@ -340,6 +369,7 @@ pip install llamafactory
 ## 参考链接
 
 - [Qwen3-8B-Instruct](https://huggingface.co/Qwen/Qwen3-8B-Instruct)
+- [Qwen3.5-2B-Instruct](https://huggingface.co/Qwen/Qwen3.5-2B-Instruct)
 - [LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory)
 - [LoRA 论文](https://arxiv.org/abs/2106.09685)
 - [QLoRA 论文](https://arxiv.org/abs/2305.14314)
