@@ -158,3 +158,4 @@ src/test_*.py
 tools/ai_copilot/output/
 tools/ai_copilot/model_cache/
 tools/ai_copilot/benchmark/
+!tools/ai_copilot/sft_dataset.jsonl
