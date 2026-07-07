@@ -10,7 +10,7 @@
 - 📦 **双后端架构**：Python 解释执行 + LLVM 原生编译，灵活切换
 - 🔧 **丰富标准库**：数学工具、字符串工具、列表工具、JSON、CSV、文件系统等
 
-## 📊 里程碑
+## 里程碑
 
 | 里程碑 | 状态 | 说明 |
 |--------|------|------|
@@ -18,6 +18,7 @@
 | 自举编译器 | ✅ | 用段言编写的段言编译器（62KB / 95 段） |
 | LLVM 后端 | ✅ | 支持编译为原生 EXE（clang 零错误） |
 | 自举编译 | ✅ | 自举编译器可通过 LLVM 编译为原生 EXE（525KB） |
+| AI Copilot | ✅ | 算力不足场景下的段言代码生成工具链 + LoRA 微调 |
 
 ## 快速开始（3 步跑通）
 
@@ -212,6 +213,68 @@ duan compile hello.duan -o hello.exe
 # 方式2：使用 LLVM 原生编译（需要安装 LLVM）
 duan compile hello.duan --backend llvm-typed -o hello.exe
 ```
+
+## AI Copilot（算力不足时让 AI 写段言代码）
+
+段言提供完整的 AI 辅助工具链，即使只有小模型（7B 以下），也能帮你写出正确的段言代码。
+
+### 核心思路
+
+```
+用户需求 → AI 生成 Python → 微调模型翻译为段言 → duan ai check 验证
+```
+
+1. 大模型生成 Python 代码（擅长）
+2. 微调后的小模型将 Python 翻译为段言（专精）
+3. `duan ai check` 检查暗坑和后端兼容性
+
+### 使用方式
+
+```bash
+# 一键生成段言代码（自动组装速查卡 + 片段 + 暗坑提示）
+duan ai generate "写一个二分查找函数"
+duan ai generate "排序算法" --model-size small   # 小模型用精简提示
+duan ai generate "文件读写" --model-size large   # 大模型用完整提示
+
+# 修复出错的段言代码
+duan ai fix hello.duan "第3行语法错误"
+
+# 查看语法速查卡（复制给 AI 当参考）
+duan ai card
+
+# 查看代码片段模板
+duan ai snippets
+
+# 后端感知检测（类关键字→提示切换 LLVM 后端）
+duan ai check hello.duan
+```
+
+### LoRA 微调训练
+
+提供三套微调方案，覆盖从 0.3B 到 8B 的模型：
+
+| 方案 | 模型 | 显存 | 训练时间 | 定位 |
+|------|------|------|----------|------|
+| ERNIE-4.5-0.3B | 0.3B | ~4 GB | 10-30 分钟 | 轻量级窄翻译 |
+| Qwen3.5-2B | 2B | ~5 GB | ~10 分钟 | 开发调试首选 |
+| Qwen3-8B | 8B | ~22 GB | ~30 分钟 | 生产部署，效果最强 |
+
+```bash
+cd tools/ai_copilot
+
+# 开发调试：2B 模型快速验证
+python train_lora_7b.py --model-preset qwen3.5-2b
+
+# 生产部署：8B 模型最高质量
+python train_lora_7b.py --model-preset qwen3-8b
+
+# 显存不够：QLoRA 4bit 量化
+python train_lora_7b.py --model-preset qwen3.5-2b --qlora
+```
+
+详细文档：
+- [LoRA 微调指南（Qwen3-8B / Qwen3.5-2B）](tools/ai_copilot/README_LoRA7B.md)
+- [ERNIE 微调指南（0.3B）](tools/ai_copilot/README_SFT.md)
 
 ## 标准库
 
@@ -434,6 +497,18 @@ duan/
 ├── lsp/                 # LSP 语言服务器
 ├── debug-adapter/       # DAP 调试适配器
 ├── tools/               # 调试器等工具
+│   └── ai_copilot/      # AI 辅助工具链
+│       ├── syntax_card.py          # 语法速查卡生成
+│       ├── snippets.py             # 代码片段模板
+│       ├── prompt_generator.py     # prompt 生成器
+│       ├── pipeline.py             # 一揽子管线
+│       ├── build_sft_dataset.py    # SFT 训练集构造
+│       ├── train_lora_7b.py        # Qwen3-8B/3.5-2B LoRA 微调
+│       ├── train_lora_7b.ipynb     # Notebook 调试版
+│       ├── train_sft.py            # ERNIE-4.5-0.3B 微调
+│       ├── sft_dataset.jsonl       # 881 条训练数据
+│       ├── README_LoRA7B.md        # LoRA 微调文档
+│       └── README_SFT.md           # ERNIE 微调文档
 ├── demos/               # 示范项目
 ├── examples/            # 示例程序
 ├── tests/               # 测试
@@ -528,6 +603,9 @@ python --version
 - [架构设计](docs/architecture.md)
 - [开发指南](docs/DEVELOPMENT_GUIDE.md)
 - [用户手册](docs/USER_MANUAL.md)
+- [工具链](docs/tools.md)（CLI、调试器、LSP、AI Copilot）
+- [AI Copilot LoRA 微调指南](tools/ai_copilot/README_LoRA7B.md)
+- [AI Copilot ERNIE 微调指南](tools/ai_copilot/README_SFT.md)
 
 ## 许可证
 

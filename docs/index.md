@@ -32,8 +32,15 @@ pip install duan
 - [快速开始](getting-started.md) - 安装和运行
 - [语法规范](syntax.md) - 语言语法参考
 - [标准库](stdlib.md) - 内置模块说明
-- [工具链](tools.md) - CLI、调试器、LSP
+- [工具链](tools.md) - CLI、调试器、LSP、AI Copilot
 - [案例](examples.md) - 示例代码
+
+## AI Copilot
+
+算力不足时让 AI 帮你写段言代码：
+
+- [LoRA 微调指南](../tools/ai_copilot/README_LoRA7B.md) — Qwen3-8B / Qwen3.5-2B 微调训练
+- [ERNIE 微调指南](../tools/ai_copilot/README_SFT.md) — ERNIE-4.5-0.3B 轻量级翻译器
 
 ## 版本
 
