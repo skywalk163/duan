@@ -14,7 +14,8 @@
 包注册中心：
   - 内置注册表（常用包索引）
   - 支持自定义注册中心 URL
-  - 支持 GitHub / Gitee 仓库
+  - 支持 GitCode / GitHub / Gitee ZIP 下载（无需 Git）
+  - 私有仓库支持 Git Clone 回退
 """
 
 import os
@@ -24,9 +25,14 @@ import shutil
 import tempfile
 import subprocess
 import hashlib
+import re
+import zipfile
+import urllib.request
+import urllib.error
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
+from io import BytesIO
 
 
 # ===========================================================================
@@ -40,7 +46,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "扩展数学函数库：矩阵运算、复数、统计函数",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-math-ext.git",
+            "git": "https://gitcode.com/duan-lang/duan-math-ext.git",
             "keywords": ["数学", "矩阵", "统计"]
         },
         "网络请求": {
@@ -48,7 +54,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "HTTP 客户端库：GET/POST 请求、JSON 解析",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-http.git",
+            "git": "https://gitcode.com/duan-lang/duan-http.git",
             "keywords": ["网络", "HTTP", "API"]
         },
         "命令行工具": {
@@ -56,7 +62,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "CLI 开发工具：参数解析、进度条、颜色输出",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-cli-utils.git",
+            "git": "https://gitcode.com/duan-lang/duan-cli-utils.git",
             "keywords": ["CLI", "命令行", "终端"]
         },
         "测试框架": {
@@ -64,7 +70,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "单元测试框架：断言、测试套件、覆盖率",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-test.git",
+            "git": "https://gitcode.com/duan-lang/duan-test.git",
             "keywords": ["测试", "单元测试", "断言"]
         },
         "数据库": {
@@ -72,7 +78,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "数据库操作库：SQL 查询、连接池、ORM",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-db.git",
+            "git": "https://gitcode.com/duan-lang/duan-db.git",
             "keywords": ["数据库", "SQL", "ORM"]
         },
         "模板引擎": {
@@ -80,7 +86,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "文本模板引擎：变量替换、循环、条件渲染",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-template.git",
+            "git": "https://gitcode.com/duan-lang/duan-template.git",
             "keywords": ["模板", "渲染", "HTML"]
         },
         "日志": {
@@ -88,7 +94,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "日志记录库：分级日志、文件输出、格式化",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-log.git",
+            "git": "https://gitcode.com/duan-lang/duan-log.git",
             "keywords": ["日志", "调试", "记录"]
         },
         "配置管理": {
@@ -96,7 +102,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "配置文件管理：TOML/JSON/YAML 读写",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-config.git",
+            "git": "https://gitcode.com/duan-lang/duan-config.git",
             "keywords": ["配置", "TOML", "JSON"]
         },
         "加密": {
@@ -104,7 +110,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "加密工具库：哈希、对称加密、Base64",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-crypto.git",
+            "git": "https://gitcode.com/duan-lang/duan-crypto.git",
             "keywords": ["加密", "哈希", "安全"]
         },
         "图像处理": {
@@ -112,7 +118,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "图像处理库：缩放、裁剪、滤镜",
             "author": "段言团队",
-            "git": "https://github.com/duan-lang/duan-image.git",
+            "git": "https://gitcode.com/duan-lang/duan-image.git",
             "keywords": ["图像", "图片", "处理"]
         },
     },
@@ -147,6 +153,215 @@ class PackageInfo:
         }
 
 
+@dataclass
+class GitUrlInfo:
+    """解析后的 Git 仓库 URL 信息"""
+    platform: str       # gitcode / github / gitee / generic
+    owner: str
+    repo: str
+    branch: str         # 默认 main
+    zip_url: str        # ZIP 下载直链
+
+
+# ===========================================================================
+# Git URL 解析器
+# ===========================================================================
+
+class GitUrlParser:
+    """解析 Git 仓库 URL，生成平台对应的 ZIP 下载链接"""
+
+    # 平台识别规则
+    PLATFORM_PATTERNS = [
+        (re.compile(r'gitcode\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$'), 'gitcode'),
+        (re.compile(r'github\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$'), 'github'),
+        (re.compile(r'gitee\.com[:/]([^/]+)/([^/]+?)(?:\.git)?$'), 'gitee'),
+    ]
+
+    # 各平台 ZIP 下载 URL 模板
+    ZIP_TEMPLATES = {
+        # GitCode 基于 GitLab，archive 格式：/-/archive/<branch>/<repo>-<branch>.zip
+        'gitcode': 'https://gitcode.com/{owner}/{repo}/-/archive/{branch}/{repo}-{branch}.zip',
+        'github': 'https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip',
+        'gitee': 'https://gitee.com/{owner}/{repo}/repository/archive/{branch}.zip',
+    }
+
+    @classmethod
+    def parse(cls, git_url: str) -> Optional[GitUrlInfo]:
+        """解析 Git URL，返回 GitUrlInfo 或 None"""
+        url = git_url.strip().rstrip('/')
+
+        for pattern, platform in cls.PLATFORM_PATTERNS:
+            match = pattern.search(url)
+            if match:
+                owner, repo = match.group(1), match.group(2)
+                repo = repo.replace('.git', '')
+                branch = 'main'
+                zip_template = cls.ZIP_TEMPLATES[platform]
+                zip_url = zip_template.format(owner=owner, repo=repo, branch=branch)
+                return GitUrlInfo(
+                    platform=platform,
+                    owner=owner,
+                    repo=repo,
+                    branch=branch,
+                    zip_url=zip_url
+                )
+
+        return None
+
+
+# ===========================================================================
+# ZIP 下载器
+# ===========================================================================
+
+class ZipDownloader:
+    """从 GitCode / GitHub / Gitee 下载 ZIP 包并解压"""
+
+    CHUNK_SIZE = 64 * 1024   # 64KB
+    TIMEOUT = 120             # 下载超时秒数
+
+    @classmethod
+    def download_and_extract(cls, zip_url: str, dest_dir: Path, package_name: str) -> bool:
+        """下载 ZIP 并解压到目标目录
+
+        Args:
+            zip_url: ZIP 下载链接
+            dest_dir: 解压目标目录
+            package_name: 包名（用于日志）
+
+        Returns:
+            是否成功
+        """
+        print(f"  下载 ZIP: {zip_url}")
+
+        try:
+            req = urllib.request.Request(zip_url, headers={
+                'User-Agent': 'duan-package-installer/1.0',
+                'Accept': 'application/zip, application/octet-stream'
+            })
+
+            with urllib.request.urlopen(req, timeout=cls.TIMEOUT) as response:
+                # 检查重定向
+                final_url = response.geturl()
+                if final_url != zip_url:
+                    print(f"  重定向到: {final_url}")
+
+                content_type = response.headers.get('Content-Type', '')
+                if 'text/html' in content_type and 'zip' not in content_type:
+                    print(f"  警告: 服务器返回 HTML 而非 ZIP（可能需要登录或仓库不存在）")
+                    return False
+
+                # 流式下载
+                content_length = response.headers.get('Content-Length')
+                if content_length:
+                    size_kb = int(content_length) // 1024
+                    print(f"  文件大小: {size_kb} KB")
+
+                zip_data = BytesIO()
+                downloaded = 0
+                while True:
+                    chunk = response.read(cls.CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    zip_data.write(chunk)
+                    downloaded += len(chunk)
+
+                print(f"  下载完成: {downloaded // 1024} KB")
+
+                # 验证是否为有效 ZIP
+                zip_data.seek(0)
+                if not zipfile.is_zipfile(zip_data):
+                    print(f"  错误: 下载的文件不是有效的 ZIP 格式")
+                    return False
+
+                # 解压
+                return cls._extract(zip_data, dest_dir, package_name)
+
+        except urllib.error.HTTPError as e:
+            print(f"  HTTP 错误: {e.code} {e.reason}")
+            if e.code == 404:
+                print(f"  提示: 仓库不存在或分支名不正确")
+            elif e.code == 403:
+                print(f"  提示: 可能需要认证（私有仓库请使用 --git 方式 + git clone）")
+            return False
+        except urllib.error.URLError as e:
+            print(f"  网络错误: {e.reason}")
+            return False
+        except Exception as e:
+            print(f"  下载失败: {e}")
+            return False
+
+    @classmethod
+    def _extract(cls, zip_data: BytesIO, dest_dir: Path, package_name: str) -> bool:
+        """解压 ZIP 到目标目录，处理嵌套文件夹"""
+        try:
+            with zipfile.ZipFile(zip_data) as zf:
+                members = zf.namelist()
+
+                if not members:
+                    print(f"  ZIP 文件为空")
+                    return False
+
+                # 检测顶层文件夹名（GitCode/GitHub 的 ZIP 会包含 <repo>-<branch>/ 前缀）
+                top_dir = cls._detect_top_dir(members)
+                prefix_len = len(top_dir) if top_dir else 0
+
+                print(f"  解压 {len(members)} 个文件...")
+
+                # 清理目标目录
+                if dest_dir.exists():
+                    shutil.rmtree(dest_dir)
+                dest_dir.mkdir(parents=True, exist_ok=True)
+
+                for member in members:
+                    # 跳过目录条目
+                    if member.endswith('/'):
+                        continue
+
+                    # 剥掉顶层目录前缀
+                    if prefix_len and member.startswith(top_dir):
+                        relative_path = member[prefix_len:]
+                    else:
+                        relative_path = member
+
+                    if not relative_path:
+                        continue
+
+                    # 安全检查：防止路径穿越
+                    target_path = dest_dir / relative_path
+                    target_path = target_path.resolve()
+                    if not str(target_path).startswith(str(dest_dir.resolve())):
+                        print(f"  警告: 跳过危险路径 {relative_path}")
+                        continue
+
+                    target_path.parent.mkdir(parents=True, exist_ok=True)
+                    with zf.open(member) as src, open(target_path, 'wb') as dst:
+                        dst.write(src.read())
+
+                print(f"  已解压到: {dest_dir}")
+                return True
+
+        except zipfile.BadZipFile:
+            print(f"  错误: ZIP 文件损坏")
+            return False
+        except Exception as e:
+            print(f"  解压失败: {e}")
+            return False
+
+    @staticmethod
+    def _detect_top_dir(members: List[str]) -> Optional[str]:
+        """检测 ZIP 内顶层目录名
+
+        GitCode:  <repo>-<branch>/xxx.duan
+        GitHub:   <repo>-<branch>/xxx.duan
+        """
+        for m in members:
+            if '/' in m:
+                top = m.split('/')[0]
+                if top:
+                    return top + '/'
+        return None
+
+
 # ===========================================================================
 # 包安装器
 # ===========================================================================
@@ -154,10 +369,15 @@ class PackageInfo:
 class PackageInstaller:
     """段言包安装器
 
+    安装策略（按优先级）：
+      1. GitCode/GitHub/Gitee 公开仓库 → ZIP 下载（无需 Git）
+      2. GitCode/GitHub/Gitee 私有仓库 → Git Clone（需要 Git + 认证）
+      3. 其他 Git 仓库                → Git Clone
+
     典型用法：
         installer = PackageInstaller()
         installer.install("标准数学扩展")        # 从注册中心安装
-        installer.install_from_git("https://github.com/user/repo.git")
+        installer.install_from_git("https://gitcode.com/user/repo.git")
         installer.install_from_path("./local-package")
         installer.list_installed()               # 列出已安装
         installer.search("网络")                  # 搜索
@@ -169,6 +389,7 @@ class PackageInstaller:
         self._packages_dir = self.project_root / "packages"
         self._cache_dir = self._get_cache_dir()
         self._registry = self._load_registry()
+        self._downloader = ZipDownloader()
 
     def _get_cache_dir(self) -> Path:
         """获取缓存目录"""
@@ -187,8 +408,10 @@ class PackageInstaller:
         # 尝试从远程加载注册表
         if self.registry_url:
             try:
-                import urllib.request
-                with urllib.request.urlopen(self.registry_url, timeout=10) as resp:
+                req = urllib.request.Request(self.registry_url, headers={
+                    'User-Agent': 'duan-package-installer/1.0'
+                })
+                with urllib.request.urlopen(req, timeout=10) as resp:
                     remote = json.loads(resp.read().decode('utf-8'))
                     if isinstance(remote, dict) and 'packages' in remote:
                         registry['packages'].update(remote['packages'])
@@ -250,19 +473,11 @@ class PackageInstaller:
         ]
 
     # ------------------------------------------------------------------
-    # 安装
+    # 安装（核心流程）
     # ------------------------------------------------------------------
 
     def install(self, package_name: str, version: Optional[str] = None) -> bool:
-        """从注册中心安装包
-
-        Args:
-            package_name: 包名
-            version: 版本号（可选）
-
-        Returns:
-            是否安装成功
-        """
+        """从注册中心安装包"""
         packages = self._registry.get('packages', {})
         info = packages.get(package_name)
 
@@ -282,15 +497,7 @@ class PackageInstaller:
         return self._install_from_git(package_name, git_url)
 
     def install_from_git(self, git_url: str, package_name: Optional[str] = None) -> bool:
-        """从 Git 仓库安装包
-
-        Args:
-            git_url: Git 仓库 URL
-            package_name: 包名（可选，默认从 URL 提取）
-
-        Returns:
-            是否安装成功
-        """
+        """从 Git 仓库安装包"""
         if not package_name:
             package_name = git_url.rstrip('/').split('/')[-1].replace('.git', '')
 
@@ -300,14 +507,7 @@ class PackageInstaller:
         return self._install_from_git(package_name, git_url)
 
     def install_from_path(self, local_path: str) -> bool:
-        """从本地路径安装包
-
-        Args:
-            local_path: 本地包路径
-
-        Returns:
-            是否安装成功
-        """
+        """从本地路径安装包"""
         src_path = Path(local_path).resolve()
         if not src_path.exists():
             print(f"错误: 路径不存在: {local_path}")
@@ -330,17 +530,59 @@ class PackageInstaller:
             return False
 
     def _install_from_git(self, package_name: str, git_url: str) -> bool:
-        """从 Git 仓库下载并安装"""
-        # 检查 git 是否可用
+        """从 Git URL 安装包
+
+        策略：
+          1. 解析 URL，识别平台
+          2. 如果是 GitCode/GitHub/Gitee → 尝试 ZIP 下载
+          3. ZIP 下载失败 → 回退到 git clone
+          4. 其他 URL → 直接 git clone
+        """
+        dest_dir = self._packages_dir / package_name
+
+        # 解析 Git URL
+        url_info = GitUrlParser.parse(git_url)
+
+        if url_info and url_info.platform in ('gitcode', 'github', 'gitee'):
+            # 尝试 ZIP 下载
+            print(f"  平台: {url_info.platform}（尝试 ZIP 下载）")
+            success = self._install_from_zip(package_name, url_info)
+            if success:
+                self._update_dependencies(package_name, f"path = \"packages/{package_name}\"")
+                return True
+            print(f"  ZIP 下载失败，回退到 git clone...")
+
+        # 回退：git clone
+        return self._install_from_git_clone(package_name, git_url)
+
+    def _install_from_zip(self, package_name: str, url_info: GitUrlInfo) -> bool:
+        """通过 ZIP 下载安装"""
+        dest_dir = self._packages_dir / package_name
+
+        print(f"  ZIP URL: {url_info.zip_url}")
+
+        success = ZipDownloader.download_and_extract(
+            zip_url=url_info.zip_url,
+            dest_dir=dest_dir,
+            package_name=package_name
+        )
+
+        if success:
+            print(f"  已安装到: {dest_dir}")
+
+        return success
+
+    def _install_from_git_clone(self, package_name: str, git_url: str) -> bool:
+        """通过 git clone 安装（回退方案）"""
         if not self._check_git():
-            print("错误: 未找到 git 命令，请安装 Git")
+            print("错误: 未找到 git 命令，且 ZIP 下载不可用")
+            print("提示: 请安装 Git 或使用 --path 从本地安装")
             return False
 
         dest_dir = self._packages_dir / package_name
         cache_dir = self._cache_dir / package_name
 
         try:
-            # 使用缓存或克隆
             if cache_dir.exists():
                 print(f"  更新缓存: {cache_dir}")
                 result = subprocess.run(
@@ -393,7 +635,6 @@ class PackageInstaller:
             self._packages_dir.mkdir(parents=True, exist_ok=True)
             shutil.copytree(str(cache_dir), str(dest_dir))
 
-            # 清理 .git 目录
             git_dir = dest_dir / '.git'
             if git_dir.exists():
                 shutil.rmtree(git_dir, ignore_errors=True)
@@ -451,7 +692,7 @@ class PackageInstaller:
             print(f"  警告: 更新 package.toml 失败: {e}")
 
     # ------------------------------------------------------------------
-    # 已安装列表
+    # 已安装列表 / 卸载
     # ------------------------------------------------------------------
 
     def list_installed(self) -> List[Dict]:
@@ -577,7 +818,7 @@ def run_install(args):
     print()
     print("选项:")
     print("  <包名>              从注册中心安装指定包")
-    print("  --git <URL>         从 Git 仓库安装")
+    print("  --git <URL>         从 Git 仓库安装（自动 ZIP 下载或 git clone）")
     print("  --path <路径>       从本地路径安装")
     print("  --search <关键词>   搜索包")
     print("  --list              列出已安装的包")
@@ -587,7 +828,7 @@ def run_install(args):
     print()
     print("示例:")
     print("  duan install 标准数学扩展")
-    print("  duan install --git https://github.com/user/repo.git")
+    print("  duan install --git https://gitcode.com/user/repo.git")
     print("  duan install --path ./my-package")
     print("  duan install --search 网络")
     print("  duan install --list")
@@ -658,17 +899,6 @@ def _cmd_list_registry(installer: PackageInstaller):
 
 
 if __name__ == '__main__':
-    # 命令行测试
-    class Args:
-        project = '.'
-        package = None
-        git = None
-        path = None
-        search = None
-        list = False
-        registry = False
-        uninstall = None
-
     import argparse
     ap = argparse.ArgumentParser()
     ap.add_argument('package', nargs='?')
