@@ -170,6 +170,13 @@ def _read_source(file_path: str) -> str:
 
 def cmd_run(args):
     """解释执行段言源代码"""
+    from enhanced_errors import format_error
+
+    if args.watch:
+        from file_watcher import run_with_watch
+        run_with_watch(args.file, backend=args.backend)
+        return
+
     source = _read_source(args.file)
 
     try:
@@ -178,11 +185,10 @@ def cmd_run(args):
             if output:
                 print(output)
         else:
-            # ANTLR 解释器内部已直接打印到控制台
             _run_antlr(source)
 
     except Exception as e:
-        print(f"运行错误: {e}", file=sys.stderr)
+        print(format_error(source, e), file=sys.stderr)
         if args.verbose:
             import traceback
             traceback.print_exc()
@@ -471,8 +477,8 @@ def cmd_type_check(args):
 
 
 def cmd_init(args):
-    """初始化段言项目（创建 package.toml 配置）"""
-    from package_manager import PackageManager
+    """初始化段言项目"""
+    from templates import create_project, list_templates
 
     project_name = args.name
     project_dir = Path(project_name)
@@ -482,16 +488,11 @@ def cmd_init(args):
         sys.exit(1)
 
     project_dir.mkdir(parents=True)
-    (project_dir / 'src').mkdir()
-    (project_dir / 'tests').mkdir()
 
-    # 使用 PackageManager 创建 package.toml 与 主.duan
-    pm = PackageManager(project_root=project_dir)
-    if not pm.init_project(name=project_name):
-        print("错误: 项目初始化失败", file=sys.stderr)
-        sys.exit(1)
+    template = create_project(project_dir, args.template)
 
     print(f"✅ 项目 '{project_name}' 初始化完成")
+    print(f"   模板: {template.name} ({template.description})")
     print(f"   目录: {project_dir.resolve()}")
     print(f"   配置: package.toml")
     print(f"   入口: 主.duan")
@@ -499,6 +500,9 @@ def cmd_init(args):
     print(f"   duan pkg run                  运行项目")
     print(f"   duan pkg build                编译项目")
     print(f"   duan run {project_name}/主.duan      直接运行入口")
+    print(f"\n可用模板:")
+    for t in list_templates():
+        print(f"   {t['name']:8} - {t['description']}")
 
 
 def cmd_pkg(args):
@@ -569,6 +573,34 @@ def cmd_pkg(args):
     else:
         print(f"未知子命令: {args.pkg_command}", file=sys.stderr)
         sys.exit(1)
+
+
+def cmd_test(args):
+    """运行段言测试"""
+    from test_runner import run_tests, run_single_file
+
+    if args.file:
+        return run_single_file(args.file, verbose=args.verbose)
+    else:
+        return run_tests(
+            os.getcwd(),
+            filter_pattern=args.filter,
+            verbose=args.verbose
+        )
+
+
+def cmd_fmt(args):
+    """格式化段言代码"""
+    from formatter import run_formatter
+    exit_code = run_formatter(args.target, check_only=args.check)
+    sys.exit(exit_code)
+
+
+def cmd_doc(args):
+    """生成段言代码文档"""
+    from doc_generator import run_doc
+    fmt = 'html' if args.html else 'markdown'
+    run_doc(args.target, fmt, args.output)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -760,6 +792,8 @@ def main():
     run_p.add_argument('file', help='源文件路径')
     run_p.add_argument('--backend', choices=['antlr', 'src'], default='src',
                        help='使用的后端（默认: src，无需额外依赖；antlr 需安装 antlr4-python3-runtime）')
+    run_p.add_argument('--watch', '-w', action='store_true',
+                       help='监视文件变化，自动重新运行')
 
     # ── compile ──
     comp_p = subparsers.add_parser('compile', help='编译为 Python 文件')
@@ -799,6 +833,8 @@ def main():
     # ── init ──
     init_p = subparsers.add_parser('init', help='初始化段言项目')
     init_p.add_argument('name', help='项目名称')
+    init_p.add_argument('--template', '-t', choices=['default', 'cli', 'lib', 'web'],
+                        default='default', help='项目模板（默认: default）')
 
     # ── pkg ──
     pkg_p = subparsers.add_parser('pkg', help='包管理（init/build/run/native）')
@@ -853,6 +889,23 @@ def main():
     ai_fix.add_argument('--model-size', choices=['small', 'medium', 'large'],
                         default='medium', help='目标模型大小（默认medium）')
 
+    # ── test ──
+    test_p = subparsers.add_parser('test', help='运行段言测试')
+    test_p.add_argument('file', nargs='?', help='测试文件路径（默认自动发现）')
+    test_p.add_argument('-v', '--verbose', action='store_true', help='详细输出')
+    test_p.add_argument('--filter', help='按文件名过滤测试')
+
+    # ── fmt ──
+    fmt_p = subparsers.add_parser('fmt', help='格式化段言代码')
+    fmt_p.add_argument('target', help='文件或目录路径')
+    fmt_p.add_argument('--check', action='store_true', help='仅检查格式，不修改文件')
+
+    # ── doc ──
+    doc_p = subparsers.add_parser('doc', help='生成段言代码文档')
+    doc_p.add_argument('target', help='文件或目录路径')
+    doc_p.add_argument('--html', action='store_true', help='生成 HTML 格式文档')
+    doc_p.add_argument('-o', '--output', help='输出文件或目录路径')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -880,6 +933,15 @@ def main():
             parser.parse_args(['pkg', '--help'])
         else:
             cmd_pkg(args)
+    elif args.command == 'test':
+        exit_code = cmd_test(args)
+        sys.exit(exit_code)
+    elif args.command == 'fmt':
+        exit_code = cmd_fmt(args)
+        sys.exit(exit_code)
+    elif args.command == 'doc':
+        cmd_doc(args)
+        sys.exit(0)
 
 
 if __name__ == '__main__':

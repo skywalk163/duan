@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>段言 (Duan) Playground - v3.2</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>段</text></svg>">
+</head>
+<body data-theme="dark">
+    <header class="navbar">
+        <div class="nav-left">
+            <span class="logo">段<span class="logo-accent">言</span></span>
+            <span class="logo-sub">Playground v3.2</span>
+        </div>
+        <div class="nav-center">
+            <button class="btn btn-examples" onclick="toggleSidebar()" title="示例库">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 012.5 1h3A1.5 1.5 0 017 2.5v3A1.5 1.5 0 015.5 7h-3A1.5 1.5 0 011 5.5v-3zm8 0A1.5 1.5 0 0110.5 1h3A1.5 1.5 0 0115 2.5v3A1.5 1.5 0 0113.5 7h-3A1.5 1.5 0 019 5.5v-3zm-8 8A1.5 1.5 0 012.5 9h3A1.5 1.5 0 017 10.5v3A1.5 1.5 0 015.5 15h-3A1.5 1.5 0 011 13.5v-3zm8 0A1.5 1.5 0 0110.5 9h3a1.5 1.5 0 011.5 1.5v3a1.5 1.5 0 01-1.5 1.5h-3A1.5 1.5 0 019 13.5v-3z"/></svg>
+                示例
+            </button>
+            <button class="btn btn-run" onclick="runCode()" id="runBtn">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5-9-5.5z"/></svg>
+                运行
+            </button>
+            <button class="btn btn-clear" onclick="clearOutput()" title="清除输出">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM5.5 4.5L8 7l2.5-2.5L12 5.5 9.5 8 12 10.5 10.5 12 8 9.5 5.5 12 4 10.5 6.5 8 4 5.5l1.5-1z"/></svg>
+            </button>
+            <div class="toolbar-divider"></div>
+            <button class="btn btn-icon" onclick="decreaseFontSize()" title="减小字体">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 10h12v2H2z"/></svg>
+            </button>
+            <span class="font-size-label" id="fontSizeLabel">14px</span>
+            <button class="btn btn-icon" onclick="increaseFontSize()" title="增大字体">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 10h12v2H2zM8 2v12H6V2h2z"/></svg>
+            </button>
+            <div class="toolbar-divider"></div>
+            <button class="btn btn-icon" onclick="toggleTheme()" title="切换主题" id="themeBtn">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 12A5 5 0 118 3a5 5 0 010 10z"/></svg>
+            </button>
+        </div>
+        <div class="nav-right">
+            <button class="btn btn-grammar" onclick="openGrammarModal()" title="语法速查">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1.5A1.5 1.5 0 00.5 3v10A1.5 1.5 0 002 14.5h12a1.5 1.5 0 001.5-1.5V3A1.5 1.5 0 0014 1.5H2zM2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
+                语法
+            </button>
+            <button class="btn btn-stdlib" onclick="openStdlibModal()" title="标准库">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 012 2v1h1a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h1V3a2 2 0 012-2zM5 6v7h6V6H5z"/></svg>
+                标准库
+            </button>
+            <button class="btn btn-share" onclick="shareCode()" id="shareBtn">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M10.5 3.5a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm-5 9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zm7.5 0a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0zM4.36 5.64l4.28 2.72m4.28-2.72l-4.28 2.72"/></svg>
+                分享
+            </button>
+            <div class="toolbar-divider"></div>
+            <button class="btn btn-projects" onclick="openProjectsModal()" title="我的项目">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v11a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 13.5v-11zM3 4v5h2V4H3zm4 0v8h2V4H7zm4 0v2h2V4h-2z"/></svg>
+                项目
+            </button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-tabs">
+                    <button class="sidebar-tab active" data-panel="examples" onclick="switchSidebarTab('examples')">示例</button>
+                    <button class="sidebar-tab" data-panel="files" onclick="switchSidebarTab('files')">文件</button>
+                </div>
+                <button class="btn btn-close" onclick="toggleSidebar()">✕</button>
+            </div>
+            <div class="sidebar-panel" id="sidebarExamples">
+                <div class="example-list" id="exampleList">
+                    <div class="example-loading">加载中...</div>
+                </div>
+            </div>
+            <div class="sidebar-panel hidden" id="sidebarFiles">
+                <div class="file-tree-header">
+                    <span class="file-tree-title" id="fileTreeProjectName"></span>
+                    <button class="btn btn-icon btn-small" onclick="createNewFile()" title="新建文件">+</button>
+                </div>
+                <div class="file-tree" id="fileTree">
+                    <div class="projects-empty">加载项目后可查看文件</div>
+                </div>
+            </div>
+        </aside>
+
+        <div class="content-area">
+            <div class="editor-section">
+                <div class="section-header">
+                    <div class="section-left">
+                        <span class="section-title">编辑器</span>
+                        <span class="file-badge">.duan</span>
+                        <span class="project-name" id="projectNameDisplay" title="未保存">未命名项目</span>
+                        <span class="auto-save" id="autoSaveLabel">已自动保存</span>
+                    </div>
+                    <div class="section-right">
+                        <button class="btn btn-small" onclick="saveCurrentProject()" title="保存到服务器 (Ctrl+S)">保存</button>
+                        <button class="btn btn-small" onclick="downloadCode()" title="下载到本地">下载</button>
+                        <button class="btn btn-small" onclick="uploadCode()" title="从本地打开">上传</button>
+                        <button class="btn btn-small" onclick="resetCode()" title="重置为默认代码">重置</button>
+                        <button class="btn btn-small" onclick="copyCode()" title="复制代码">复制</button>
+                    </div>
+                </div>
+                <div class="editor-tabs" id="editorTabs">
+                    <div class="editor-tab active" data-file="main.duan" onclick="switchEditorTab('main.duan')">
+                        <span class="editor-tab-name">main.duan</span>
+                        <span class="editor-tab-close" onclick="closeEditorTab(event,'main.duan')">×</span>
+                    </div>
+                </div>
+                <div class="editor-wrapper">
+                    <div id="editor" class="editor"></div>
+                </div>
+            </div>
+
+            <div class="output-section">
+                <div class="section-header">
+                    <span class="section-title">输出</span>
+                    <div class="output-tabs">
+                        <button class="tab active" data-tab="output" onclick="switchTab('output')">运行结果</button>
+                        <button class="tab" data-tab="ast" onclick="switchTab('ast')">AST 分析</button>
+                        <button class="tab" data-tab="tokens" onclick="switchTab('tokens')">Token 分析</button>
+                        <button class="tab" data-tab="python" onclick="switchTab('python')">Python 代码</button>
+                        <button class="tab" data-tab="llvm" onclick="switchTab('llvm')">LLVM IR</button>
+                    </div>
+                </div>
+                <div class="output-wrapper">
+                    <div id="outputPanel" class="output-panel">
+                        <div class="output-placeholder">点击「运行」或按 Ctrl+Enter 执行代码</div>
+                    </div>
+                    <div id="astPanel" class="output-panel hidden">
+                        <div class="output-placeholder">点击「运行」查看 AST 分析</div>
+                    </div>
+                    <div id="tokensPanel" class="output-panel hidden">
+                        <div class="output-placeholder">点击「运行」查看 Token 分析</div>
+                    </div>
+                    <div id="pythonPanel" class="output-panel hidden">
+                        <div class="output-placeholder">点击「运行」查看编译后的 Python 代码</div>
+                    </div>
+                    <div id="llvmPanel" class="output-panel hidden">
+                        <div class="output-placeholder">点击「运行」生成 LLVM IR（需要 llvmlite）</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay hidden" id="shareModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🔗 分享代码</h3>
+                <button class="btn btn-close" onclick="closeShareModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>链接已生成，点击复制分享给他人：</p>
+                <div class="share-url-container">
+                    <input type="text" id="shareUrlInput" readonly onclick="this.select()">
+                    <button class="btn btn-copy" onclick="copyShareUrl()">复制</button>
+                </div>
+                <div class="share-tip">对方打开链接即可看到你的代码</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grammar-overlay hidden" id="grammarOverlay" onclick="closeGrammarModal()">
+        <div class="grammar-modal" onclick="event.stopPropagation()">
+            <div class="grammar-modal-header">
+                <div class="grammar-modal-title">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1.5A1.5 1.5 0 00.5 3v10A1.5 1.5 0 002 14.5h12a1.5 1.5 0 001.5-1.5V3A1.5 1.5 0 0014 1.5H2zM2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
+                    段言语法速查 v3.2
+                </div>
+                <button class="btn btn-close" onclick="closeGrammarModal()" title="关闭">✕</button>
+            </div>
+            <div class="grammar-modal-body" id="grammarModalBody">
+                <div class="grammar-loading">📖 加载语法参考中...</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grammar-overlay hidden" id="stdlibOverlay" onclick="closeStdlibModal()">
+        <div class="grammar-modal" onclick="event.stopPropagation()">
+            <div class="grammar-modal-header">
+                <div class="grammar-modal-title" style="color: var(--accent-purple);">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a2 2 0 012 2v1h1a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h1V3a2 2 0 012-2zM5 6v7h6V6H5z"/></svg>
+                    标准库速查
+                </div>
+                <button class="btn btn-close" onclick="closeStdlibModal()" title="关闭">✕</button>
+            </div>
+            <div class="grammar-modal-body" id="stdlibModalBody">
+                <div class="grammar-loading">📚 加载标准库参考中...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目管理弹窗 -->
+    <div class="modal-overlay hidden" id="projectsModal">
+        <div class="modal projects-modal">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2.5A1.5 1.5 0 012.5 1h11A1.5 1.5 0 0115 2.5v11a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 13.5v-11zM3 4v5h2V4H3zm4 0v8h2V4H7zm4 0v2h2V4h-2z"/></svg>
+                    我的项目
+                </div>
+                <button class="btn btn-close" onclick="closeProjectsModal()" title="关闭">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="projects-actions">
+                    <button class="btn btn-primary" onclick="newProject()">新建项目</button>
+                </div>
+                <div class="projects-list" id="projectsList">
+                    <div class="projects-loading">⏳ 加载项目列表中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="overlay hidden" id="overlay" onclick="closeModals()"></div>
+
+    <!-- 隐藏的文件上传输入 -->
+    <input type="file" id="fileInput" accept=".duan,.txt,.text" style="display: none;">
+
+    <!-- 创建文件弹窗 -->
+    <div class="modal-overlay hidden" id="createFileModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>➕ 新建文件</h3>
+                <button class="btn btn-close" onclick="closeCreateFileModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>请输入文件名（自动添加 .duan 后缀）：</p>
+                <input type="text" id="newFileNameInput" placeholder="工具" style="width: 100%;padding: 8px 12px;background: var(--bg-primary);border: 1px solid var(--border-color);border-radius: var(--radius-sm);color: var(--text-primary);outline: none;">
+                <div class="modal-footer" style="margin-top: 16px;text-align: right;">
+                    <button class="btn" onclick="closeCreateFileModal()">取消</button>
+                    <button class="btn btn-primary" onclick="confirmCreateFile()">创建</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 删除文件弹窗 -->
+    <div class="modal-overlay hidden" id="deleteFileModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3>🗑 删除文件</h3>
+                <button class="btn btn-close" onclick="closeDeleteFileModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p>确定要删除文件 <strong id="deleteFileName"></strong> 吗？此操作不可恢复。</p>
+                <div class="modal-footer" style="margin-top: 16px;text-align: right;">
+                    <button class="btn" onclick="closeDeleteFileModal()">取消</button>
+                    <button class="btn btn-danger" onclick="confirmDeleteFile()">删除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>
