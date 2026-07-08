@@ -161,3 +161,8 @@ try:
     from .集合工具 import *
 except ImportError:
     pass
+
+try:
+    from .FFI import *
+except ImportError:
+    pass

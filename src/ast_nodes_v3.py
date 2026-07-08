@@ -676,3 +676,364 @@ class AsyncScope(ASTNode):
     
     def __repr__(self):
         return f"异步作用域({len(self.tasks)}个任务)"
+
+
+# =============================================================================
+# C FFI 节点（外部函数接口）
+# =============================================================================
+
+class FFILoadLibrary(ASTNode):
+    __slots__ = ('library_path', 'alias')
+    """加载动态库：加载库 "libxxx.so" 为 别名"""
+    def __init__(self, library_path: str, alias: str):
+        self.library_path = library_path
+        self.alias = alias
+    
+    def __repr__(self):
+        return f"FFILoadLibrary({self.library_path} -> {self.alias})"
+
+
+class FFIFunctionDecl(ASTNode):
+    __slots__ = ('name', 'params', 'return_type', 'library_alias', 'c_name')
+    """
+    外部函数声明：外部 段落 函数名 接收 参数... 返回 类型 在 库别名
+    c_name: 可选，实际的C函数名（如果与段言函数名不同）
+    """
+    def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str],
+                 library_alias: str, c_name: str = None):
+        self.name = name
+        self.params = params
+        self.return_type = return_type
+        self.library_alias = library_alias
+        self.c_name = c_name or name
+    
+    def __repr__(self):
+        return f"FFIFunctionDecl({self.name} in {self.library_alias})"
+
+
+class FFIStructDef(ASTNode):
+    __slots__ = ('name', 'fields')
+    """
+    C结构体定义：外部 结构体 名称 { 字段1: 类型, 字段2: 类型 }
+    用于定义与C对应的结构体类型
+    """
+    def __init__(self, name: str, fields: List[Dict[str, str]]):
+        self.name = name
+        self.fields = fields
+    
+    def __repr__(self):
+        return f"FFIStructDef({self.name}, {len(self.fields)} fields)"
+
+
+class FFICallbackDef(ASTNode):
+    __slots__ = ('name', 'params', 'return_type')
+    """
+    C回调函数类型定义：外部 回调 名称 接收 参数... 返回 类型
+    用于定义C回调函数签名
+    """
+    def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str]):
+        self.name = name
+        self.params = params
+        self.return_type = return_type
+    
+    def __repr__(self):
+        return f"FFICallbackDef({self.name})"
+
+
+# =============================================================================
+# C FFI 指针/数组/错误处理节点（第二阶段）
+# =============================================================================
+
+class FFIPointerType(ASTNode):
+    __slots__ = ('base_type',)
+    """指针类型：指针[整数]"""
+    def __init__(self, base_type: str):
+        self.base_type = base_type
+    
+    def __repr__(self):
+        return f"指针[{self.base_type}]"
+
+
+class FFIArrayType(ASTNode):
+    __slots__ = ('base_type', 'size')
+    """数组类型：数组[整数] 或 数组[整数, 5]"""
+    def __init__(self, base_type: str, size: Optional[int] = None):
+        self.base_type = base_type
+        self.size = size
+    
+    def __repr__(self):
+        if self.size:
+            return f"数组[{self.base_type}, {self.size}]"
+        return f"数组[{self.base_type}]"
+
+
+class FFIAddressOf(ASTNode):
+    __slots__ = ('target',)
+    """取地址：取地址(变量)"""
+    def __init__(self, target: ASTNode):
+        self.target = target
+    
+    def __repr__(self):
+        return f"取地址({self.target})"
+
+
+class FFIDereference(ASTNode):
+    __slots__ = ('pointer',)
+    """解引用：解引用(指针)"""
+    def __init__(self, pointer: ASTNode):
+        self.pointer = pointer
+    
+    def __repr__(self):
+        return f"解引用({self.pointer})"
+
+
+class FFIPointerOffset(ASTNode):
+    __slots__ = ('pointer', 'offset')
+    """指针偏移：指针偏移(指针, 偏移量)"""
+    def __init__(self, pointer: ASTNode, offset: ASTNode):
+        self.pointer = pointer
+        self.offset = offset
+    
+    def __repr__(self):
+        return f"指针偏移({self.pointer}, {self.offset})"
+
+
+class FFISetPointerValue(ASTNode):
+    __slots__ = ('pointer', 'value')
+    """通过指针写入值：设指针值(指针, 值)"""
+    def __init__(self, pointer: ASTNode, value: ASTNode):
+        self.pointer = pointer
+        self.value = value
+    
+    def __repr__(self):
+        return f"设指针值({self.pointer}, {self.value})"
+
+
+class FFIAllocMemory(ASTNode):
+    __slots__ = ('size',)
+    """分配内存：分配内存(大小)"""
+    def __init__(self, size: ASTNode):
+        self.size = size
+    
+    def __repr__(self):
+        return f"分配内存({self.size})"
+
+
+class FFIFreeMemory(ASTNode):
+    __slots__ = ('pointer',)
+    """释放内存：释放内存(指针)"""
+    def __init__(self, pointer: ASTNode):
+        self.pointer = pointer
+    
+    def __repr__(self):
+        return f"释放内存({self.pointer})"
+
+
+class FFICreateArray(ASTNode):
+    __slots__ = ('base_type', 'size')
+    """创建数组：创建数组 整数 [5]"""
+    def __init__(self, base_type: str, size: ASTNode):
+        self.base_type = base_type
+        self.size = size
+    
+    def __repr__(self):
+        return f"创建数组 {self.base_type}[{self.size}]"
+
+
+class FFISetArrayElement(ASTNode):
+    __slots__ = ('array', 'index', 'value')
+    """设置数组元素：设置数组(数组, 索引, 值)"""
+    def __init__(self, array: ASTNode, index: ASTNode, value: ASTNode):
+        self.array = array
+        self.index = index
+        self.value = value
+    
+    def __repr__(self):
+        return f"设置数组({self.array}, {self.index}, {self.value})"
+
+
+class FFIGetLastError(ASTNode):
+    __slots__ = ()
+    """获取最后的FFI错误：获取FFI错误()"""
+    def __repr__(self):
+        return "获取FFI错误()"
+
+
+class FFIGetErrno(ASTNode):
+    __slots__ = ()
+    """获取系统错误码：获取系统错误码()"""
+    def __repr__(self):
+        return "获取系统错误码()"
+
+
+class FFISetErrno(ASTNode):
+    __slots__ = ('value',)
+    """设置系统错误码：设系统错误码(值)"""
+    def __init__(self, value: ASTNode):
+        self.value = value
+    
+    def __repr__(self):
+        return f"设系统错误码({self.value})"
+
+
+class FFITryCatch(ASTNode):
+    __slots__ = ('try_body', 'error_var', 'catch_body')
+    """FFI 错误捕获：尝试 捕获 外部错误 为 甲："""
+    def __init__(self, try_body: List[ASTNode], error_var: str = None,
+                 catch_body: List[ASTNode] = None):
+        self.try_body = try_body or []
+        self.error_var = error_var or '错误'
+        self.catch_body = catch_body or []
+    
+    def __repr__(self):
+        return f"FFITryCatch({len(self.try_body)} try, {len(self.catch_body)} catch)"
+
+
+# =============================================================================
+# C FFI 第三阶段：回调/结构体传值/枚举/联合体/变长参数
+# =============================================================================
+
+class FFIEnumDef(ASTNode):
+    __slots__ = ('name', 'values')
+    """
+    C枚举定义：外部 枚举 名称 { 成员 = 值, ... }
+    """
+    def __init__(self, name: str, values: Dict[str, int]):
+        self.name = name
+        self.values = values
+    
+    def __repr__(self):
+        return f"FFIEnumDef({self.name}, {len(self.values)} values)"
+
+
+class FFIUnionDef(ASTNode):
+    __slots__ = ('name', 'fields')
+    """
+    C联合体定义：外部 联合体 名称 { 字段: 类型, ... }
+    """
+    def __init__(self, name: str, fields: List[Dict[str, str]]):
+        self.name = name
+        self.fields = fields
+    
+    def __repr__(self):
+        return f"FFIUnionDef({self.name}, {len(self.fields)} fields)"
+
+
+class FFICreateCallback(ASTNode):
+    __slots__ = ('callback_type', 'duan_function')
+    """
+    创建回调：创建回调(回调类型, 段言函数)
+    """
+    def __init__(self, callback_type: str, duan_function: str):
+        self.callback_type = callback_type
+        self.duan_function = duan_function
+    
+    def __repr__(self):
+        return f"创建回调({self.callback_type}, {self.duan_function})"
+
+
+class FFIVarArgsDecl(ASTNode):
+    __slots__ = ('name', 'params', 'return_type', 'library_alias', 'c_name')
+    """
+    变长参数外部函数声明：外部 段落 名称 接收 参数... 在 库别名
+    """
+    def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str],
+                 library_alias: str, c_name: str = None):
+        self.name = name
+        self.params = params
+        self.return_type = return_type
+        self.library_alias = library_alias
+        self.c_name = c_name or name
+    
+    def __repr__(self):
+        return f"FFIVarArgsDecl({self.name} in {self.library_alias})"
+
+
+class FFIStructByValue(ASTNode):
+    __slots__ = ('struct_type', 'fields')
+    """
+    结构体按值传递：用于创建结构体实例并传递给C函数
+    """
+    def __init__(self, struct_type: str, fields: Dict[str, ASTNode]):
+        self.struct_type = struct_type
+        self.fields = fields
+    
+    def __repr__(self):
+        return f"FFIStructByValue({self.struct_type}, {len(self.fields)} fields)"
+
+
+class FFILibraryPath(ASTNode):
+    __slots__ = ('name', 'platform_map')
+    """
+    跨平台库路径：根据当前平台自动选择库文件
+    """
+    def __init__(self, name: str, platform_map: Dict[str, str] = None):
+        self.name = name
+        self.platform_map = platform_map or {}
+    
+    def __repr__(self):
+        return f"FFILibraryPath({self.name})"
+
+
+# =============================================================================
+# C FFI 第四阶段：typedef/位域/函数指针/回调生命周期/调试
+# =============================================================================
+
+class FFITypedefDef(ASTNode):
+    __slots__ = ('name', 'base_type')
+    """C类型别名：外部 类型别名 名称 为 基础类型"""
+    def __init__(self, name: str, base_type: str):
+        self.name = name
+        self.base_type = base_type
+    
+    def __repr__(self):
+        return f"FFITypedefDef({self.name} -> {self.base_type})"
+
+
+class FFIBitfieldDef(ASTNode):
+    __slots__ = ('name', 'base_type', 'fields')
+    """C位域定义：外部 位域 名称 : 基础类型 { 字段: 位数, ... }"""
+    def __init__(self, name: str, base_type: str, fields: List[Dict[str, int]]):
+        self.name = name
+        self.base_type = base_type
+        self.fields = fields
+    
+    def __repr__(self):
+        return f"FFIBitfieldDef({self.name}, {len(self.fields)} fields)"
+
+
+class FFIFuncPtrDef(ASTNode):
+    __slots__ = ('name', 'params', 'return_type')
+    """C函数指针类型：外部 函数指针 名称 接收 参数... 返回 类型"""
+    def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str]):
+        self.name = name
+        self.params = params
+        self.return_type = return_type
+    
+    def __repr__(self):
+        return f"FFIFuncPtrDef({self.name})"
+
+
+class FFIDebugConfig(ASTNode):
+    __slots__ = ('enabled', 'log_calls', 'log_types', 'trace_memory')
+    """FFI调试配置：外部 调试 { 开启, 记录调用, 记录类型, 追踪内存 }"""
+    def __init__(self, enabled: bool = True, log_calls: bool = False,
+                 log_types: bool = False, trace_memory: bool = False):
+        self.enabled = enabled
+        self.log_calls = log_calls
+        self.log_types = log_types
+        self.trace_memory = trace_memory
+    
+    def __repr__(self):
+        return f"FFIDebugConfig(enabled={self.enabled})"
+
+
+class FFIPreprocessorDef(ASTNode):
+    __slots__ = ('name', 'value')
+    """C预处理器宏：外部 宏 名称 为 值"""
+    def __init__(self, name: str, value: str = ""):
+        self.name = name
+        self.value = value
+    
+    def __repr__(self):
+        return f"FFIPreprocessorDef({self.name}={self.value})"

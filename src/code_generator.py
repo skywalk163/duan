@@ -11,7 +11,7 @@ import ast_nodes as ast_nodes_module
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
 from ast_nodes_v3 import Assignment, TypeCheckToggleStmt
 
 
@@ -248,6 +248,45 @@ class PythonCodeGenerator:
             # 日期时间
             '时间戳': '_duan_builtin.时间戳',
             '格式化时间': '_duan_builtin.格式化时间',
+
+            # C FFI 指针/数组/错误处理
+            '取地址': '_duan_ffi.取地址',
+            '解引用': '_duan_ffi.解引用',
+            '指针偏移': '_duan_ffi.指针偏移',
+            'FFI错误': '_duan_ffi.获取FFI错误',
+            '系统错误码': '_duan_ffi.获取系统错误码',
+            '设系统错误码': '_duan_ffi.设系统错误码',
+            '创建数组': '_duan_ffi.创建数组',
+            '设置数组': '_duan_ffi.设置数组',
+            '分配内存': '_duan_ffi.分配内存',
+            '释放内存': '_duan_ffi.释放内存',
+            '设指针值': '_duan_ffi.设指针值',
+            # C FFI 第三阶段
+            '创建回调': '_duan_ffi.创建回调函数',
+            '创建结构体值': '_duan_ffi.创建结构体值',
+            '创建枚举': '_duan_ffi.创建枚举',
+            '创建联合体': '_duan_ffi.创建联合体',
+            '解析库路径': '_duan_ffi.解析库路径',
+            '变长参数调用': '_duan_ffi.变长参数调用',
+            '获取平台': '_duan_ffi.获取平台',
+            '查找库': '_duan_ffi.查找库',
+            '结构体大小': '_duan_ffi.结构体大小',
+            '字段偏移': '_duan_ffi.字段偏移',
+            '结构体转字节': '_duan_ffi.结构体转字节',
+            '字节转结构体': '_duan_ffi.字节转结构体',
+            # C FFI 第四阶段
+            '注册回调': '_duan_ffi.注册回调',
+            '注销回调': '_duan_ffi.注销回调',
+            '获取回调': '_duan_ffi.获取回调',
+            'FFI调试': '_duan_ffi.启用调试',
+            'FFI禁用调试': '_duan_ffi.禁用调试',
+            'FFI获取日志': '_duan_ffi.获取日志',
+            '位域设置': '_duan_ffi.位域设置',
+            '位域获取': '_duan_ffi.位域获取',
+            '创建函数指针': '_duan_ffi.创建函数指针',
+            '创建类型别名': '_duan_ffi.创建类型别名',
+            '定义宏': '_duan_ffi.定义宏',
+            '获取宏': '_duan_ffi.获取宏',
         }
     
     def generate(self, module: Module) -> str:
@@ -262,6 +301,8 @@ class PythonCodeGenerator:
         # 添加标准库导入
         self._add_line("import sys")
         self._add_line("import os")
+        self._add_line("import ctypes")
+        self._add_line("from stdlib.FFI import * as _duan_ffi")
         self._add_line("from typing import Any")
         self._add_line("")
         self._add_line("try:")
@@ -531,6 +572,50 @@ class PythonCodeGenerator:
             # 参数列表声明（段落体内部）
             # 忽略参数列表，参数已由段落定义处理
             pass
+        elif isinstance(stmt, FFILoadLibrary):
+            self._generate_ffi_load_library(stmt)
+        elif isinstance(stmt, FFIFunctionDecl):
+            self._generate_ffi_function_decl(stmt)
+        elif isinstance(stmt, FFIStructDef):
+            self._generate_ffi_struct_def(stmt)
+        elif isinstance(stmt, FFICallbackDef):
+            self._generate_ffi_callback_def(stmt)
+        elif isinstance(stmt, FFICreateArray):
+            self._generate_ffi_create_array(stmt)
+        elif isinstance(stmt, FFISetArrayElement):
+            self._generate_ffi_set_array_element(stmt)
+        elif isinstance(stmt, FFIAllocMemory):
+            self._generate_ffi_alloc_memory(stmt)
+        elif isinstance(stmt, FFIFreeMemory):
+            self._generate_ffi_free_memory(stmt)
+        elif isinstance(stmt, FFISetPointerValue):
+            self._generate_ffi_set_pointer_value(stmt)
+        elif isinstance(stmt, FFISetErrno):
+            self._generate_ffi_set_errno(stmt)
+        elif isinstance(stmt, FFITryCatch):
+            self._generate_ffi_try_catch(stmt)
+        elif isinstance(stmt, FFIEnumDef):
+            self._generate_ffi_enum_def(stmt)
+        elif isinstance(stmt, FFIUnionDef):
+            self._generate_ffi_union_def(stmt)
+        elif isinstance(stmt, FFIVarArgsDecl):
+            self._generate_ffi_varargs_decl(stmt)
+        elif isinstance(stmt, FFICreateCallback):
+            self._generate_ffi_create_callback(stmt)
+        elif isinstance(stmt, FFIStructByValue):
+            self._generate_ffi_struct_by_value(stmt)
+        elif isinstance(stmt, FFILibraryPath):
+            self._generate_ffi_library_path(stmt)
+        elif isinstance(stmt, FFITypedefDef):
+            self._generate_ffi_typedef_def(stmt)
+        elif isinstance(stmt, FFIBitfieldDef):
+            self._generate_ffi_bitfield_def(stmt)
+        elif isinstance(stmt, FFIFuncPtrDef):
+            self._generate_ffi_funcptr_def(stmt)
+        elif isinstance(stmt, FFIDebugConfig):
+            self._generate_ffi_debug_config(stmt)
+        elif isinstance(stmt, FFIPreprocessorDef):
+            self._generate_ffi_preprocessor_def(stmt)
         else:
             raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
@@ -750,7 +835,13 @@ class PythonCodeGenerator:
         
         # except块
         if stmt.catch_body:
-            if stmt.catch_type and stmt.catch_var:
+            if stmt.catch_type == '外部错误':
+                # FFI 外部错误处理
+                if stmt.catch_var:
+                    self._add_line(f"except (ctypes.ArgumentError, OSError, RuntimeError) as {stmt.catch_var}:")
+                else:
+                    self._add_line("except (ctypes.ArgumentError, OSError, RuntimeError):")
+            elif stmt.catch_type and stmt.catch_var:
                 # 捕获指定类型 + 变量：except 值错误 as 错误:
                 self._add_line(f"except {stmt.catch_type} as {stmt.catch_var}:")
             elif stmt.catch_type:
@@ -1461,6 +1552,324 @@ class PythonCodeGenerator:
             # 导出指定符号：生成 __all__ 列表
             symbols_str = ', '.join(f"'{s}'" for s in stmt.symbols)
             self._add_line(f"__all__ = [{symbols_str}]")
+
+    # =========================================================================
+    # C FFI 代码生成方法
+    # =========================================================================
+
+    # FFI 类型映射：段言类型 → ctypes 类型
+    _ffi_type_map = {
+        '整数': 'ctypes.c_int',
+        '小数': 'ctypes.c_double',
+        '浮数': 'ctypes.c_double',
+        '文本': 'ctypes.c_char_p',
+        '串': 'ctypes.c_char_p',
+        '布尔': 'ctypes.c_bool',
+        '空': 'ctypes.c_void_p',
+        '数': 'ctypes.c_double',
+        '无': 'None',
+    }
+
+    def _generate_ffi_load_library(self, stmt: FFILoadLibrary):
+        """生成加载动态库代码"""
+        path = stmt.library_path
+        alias = self._sanitize_name(stmt.alias)
+        self._add_line(f"# 加载动态库: {path}")
+        self._add_line(f"{alias} = ctypes.CDLL({repr(path)})")
+
+    def _generate_ffi_function_decl(self, stmt: FFIFunctionDecl):
+        """生成外部函数声明"""
+        name = self._sanitize_name(stmt.name)
+        library_alias = self._sanitize_name(stmt.library_alias)
+        c_name = stmt.c_name or stmt.name
+
+        # 确定参数类型和返回类型
+        arg_types = []
+        for p in stmt.params:
+            duan_type = p.get('type', '整数')
+            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            arg_types.append(ctype)
+
+        restype = 'None'
+        if stmt.return_type:
+            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+
+        # 生成 ctypes 函数绑定
+        self._add_line(f"# 外部函数声明: {c_name}({', '.join(p['name'] for p in stmt.params)})")
+        self._add_line(f"_{name}_ffi = {library_alias}.{c_name}")
+        if arg_types:
+            arg_types_str = ', '.join(arg_types)
+            self._add_line(f"_{name}_ffi.argtypes = [{arg_types_str}]")
+        self._add_line(f"_{name}_ffi.restype = {restype}")
+
+        # 生成包装函数，处理类型转换
+        params_str = ', '.join(self._sanitize_name(p['name']) for p in stmt.params)
+        param_names = [self._sanitize_name(p['name']) for p in stmt.params]
+
+        self._add_line(f"def {name}({params_str}):")
+        self.indent_level += 1
+        # 类型转换：文本类型需要 encode
+        for i, p in enumerate(stmt.params):
+            pname = self._sanitize_name(p['name'])
+            ptype = p.get('type', '')
+            if ptype in ('文本', '串'):
+                self._add_line(f"{pname}_c = {pname}.encode('utf-8') if isinstance({pname}, str) else {pname}")
+        # 调用 FFI 函数
+        args_pass = []
+        for i, p in enumerate(stmt.params):
+            pname = self._sanitize_name(p['name'])
+            ptype = p.get('type', '')
+            if ptype in ('文本', '串'):
+                args_pass.append(f"{pname}_c")
+            else:
+                args_pass.append(pname)
+        args_str = ', '.join(args_pass)
+        self._add_line(f"_result = _{name}_ffi({args_str})")
+        # 返回类型转换：c_char_p 需要 decode
+        if stmt.return_type in ('文本', '串'):
+            self._add_line(f"return _result.decode('utf-8') if _result else ''")
+        else:
+            self._add_line("return _result")
+        self.indent_level -= 1
+        self._add_line("")
+
+    def _generate_ffi_struct_def(self, stmt: FFIStructDef):
+        """生成外部结构体定义"""
+        name = self._sanitize_name(stmt.name)
+        fields_code = []
+        for f in stmt.fields:
+            fname = self._sanitize_name(f['name'])
+            ftype = self._ffi_type_map.get(f['type'], 'ctypes.c_int')
+            fields_code.append(f"('{fname}', {ftype})")
+        fields_str = ', '.join(fields_code)
+        self._add_line(f"# 外部结构体: {name}")
+        self._add_line(f"class {name}(ctypes.Structure):")
+        self.indent_level += 1
+        self._add_line(f"_fields_ = [{fields_str}]")
+        self.indent_level -= 1
+        self._add_line("")
+
+    def _generate_ffi_callback_def(self, stmt: FFICallbackDef):
+        """生成外部回调类型定义"""
+        name = self._sanitize_name(stmt.name)
+        arg_types = []
+        for p in stmt.params:
+            duan_type = p.get('type', '整数')
+            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            arg_types.append(ctype)
+        restype = 'None'
+        if stmt.return_type:
+            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+        arg_types_str = ', '.join(arg_types)
+        self._add_line(f"# 外部回调类型: {name}")
+        self._add_line(f"{name} = ctypes.CFUNCTYPE({restype}, {arg_types_str})")
+        self._add_line("")
+
+    def _generate_ffi_create_array(self, stmt: FFICreateArray):
+        """生成创建数组代码"""
+        base_type = stmt.base_type
+        ctype = self._ffi_type_map.get(base_type, 'ctypes.c_int')
+        size = self._generate_expr(stmt.size)
+        name = self._sanitize_name(stmt.base_type)
+        self._add_line(f"# 创建数组: {base_type}[{size}]")
+        self._add_line(f"_ffi_arr_{name} = ({ctype} * {size})()")
+        self._add_line("")
+
+    def _generate_ffi_set_array_element(self, stmt: FFISetArrayElement):
+        """生成设置数组元素代码"""
+        arr = self._sanitize_name(stmt.array)
+        idx = self._generate_expr(stmt.index)
+        val = self._generate_expr(stmt.value)
+        self._add_line(f"{arr}[{idx}] = {val}")
+
+    def _generate_ffi_alloc_memory(self, stmt: FFIAllocMemory):
+        """生成分配内存代码"""
+        size = self._generate_expr(stmt.size)
+        self._add_line(f"# 分配内存: {size} 字节")
+        self._add_line(f"_ffi_mem = ctypes.create_string_buffer({size})")
+
+    def _generate_ffi_free_memory(self, stmt: FFIFreeMemory):
+        """生成释放内存代码"""
+        ptr = self._sanitize_name(stmt.pointer)
+        self._add_line(f"# 释放内存: {ptr}")
+        self._add_line(f"del {ptr}")
+
+    def _generate_ffi_set_pointer_value(self, stmt: FFISetPointerValue):
+        """生成设指针值代码"""
+        ptr = self._sanitize_name(stmt.pointer)
+        val = self._generate_expr(stmt.value)
+        self._add_line(f"{ptr}[0] = {val}")
+
+    def _generate_ffi_set_errno(self, stmt: FFISetErrno):
+        """生成设系统错误码代码"""
+        val = self._generate_expr(stmt.value)
+        self._add_line(f"ctypes.set_errno({val})")
+
+    def _generate_ffi_try_catch(self, stmt: FFITryCatch):
+        """生成FFI错误捕获代码"""
+        self._add_line("try:")
+        self.indent_level += 1
+        for s in stmt.try_body:
+            self._generate_statement(s)
+        self.indent_level -= 1
+        if stmt.catch_body:
+            self._add_line(f"except (ctypes.ArgumentError, OSError, RuntimeError) as {stmt.error_var}:")
+            self.indent_level += 1
+            for s in stmt.catch_body:
+                self._generate_statement(s)
+            self.indent_level -= 1
+
+    def _generate_ffi_enum_def(self, stmt: FFIEnumDef):
+        """生成C枚举定义代码"""
+        name = self._sanitize_name(stmt.name)
+        self._add_line(f"# C枚举: {name}")
+        self._add_line(f"class {name}:")
+        self.indent_level += 1
+        for member_name, member_val in stmt.values.items():
+            self._add_line(f"{self._sanitize_name(member_name)} = {member_val}")
+        self.indent_level -= 1
+        self._add_line("")
+
+    def _generate_ffi_union_def(self, stmt: FFIUnionDef):
+        """生成C联合体定义代码"""
+        name = self._sanitize_name(stmt.name)
+        fields_code = []
+        for f in stmt.fields:
+            fname = self._sanitize_name(f['name'])
+            ftype = self._ffi_type_map.get(f['type'], 'ctypes.c_int')
+            fields_code.append(f"('{fname}', {ftype})")
+        fields_str = ', '.join(fields_code)
+        self._add_line(f"# C联合体: {name}")
+        self._add_line(f"class {name}(ctypes.Union):")
+        self.indent_level += 1
+        self._add_line(f"_fields_ = [{fields_str}]")
+        self.indent_level -= 1
+        self._add_line("")
+
+    def _generate_ffi_varargs_decl(self, stmt: FFIVarArgsDecl):
+        """生成变长参数函数声明代码"""
+        name = self._sanitize_name(stmt.name)
+        library_alias = self._sanitize_name(stmt.library_alias)
+        c_name = stmt.c_name or stmt.name
+        
+        arg_types = []
+        for p in stmt.params:
+            duan_type = p.get('type', '整数')
+            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            arg_types.append(ctype)
+        
+        restype = 'None'
+        if stmt.return_type:
+            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+        
+        self._add_line(f"# 变长参数函数声明: {c_name}")
+        self._add_line(f"_{name}_ffi = {library_alias}.{c_name}")
+        if arg_types:
+            arg_types_str = ', '.join(arg_types)
+            self._add_line(f"_{name}_ffi.argtypes = [{arg_types_str}]")
+        self._add_line(f"_{name}_ffi.restype = {restype}")
+        
+        fixed_params = ', '.join(self._sanitize_name(p['name']) for p in stmt.params)
+        self._add_line(f"def {name}({fixed_params}, *args):")
+        self.indent_level += 1
+        self._add_line(f"return _{name}_ffi({fixed_params}, *args)")
+        self.indent_level -= 1
+        self._add_line("")
+
+    def _generate_ffi_create_callback(self, stmt: FFICreateCallback):
+        """生成创建回调函数代码"""
+        cb_type = self._sanitize_name(stmt.callback_type)
+        duan_func = self._sanitize_name(stmt.duan_function)
+        self._add_line(f"# 创建回调: {duan_func} -> {cb_type}")
+        self._add_line(f"_cb_{duan_func} = {cb_type}({duan_func})")
+        self._add_line("")
+
+    def _generate_ffi_struct_by_value(self, stmt: FFIStructByValue):
+        """生成结构体按值传递代码"""
+        struct_type = self._sanitize_name(stmt.struct_type)
+        self._add_line(f"# 结构体按值传递: {struct_type}")
+        self._add_line(f"_struct_val = {struct_type}()")
+        for fname, fval in stmt.fields.items():
+            sfname = self._sanitize_name(fname)
+            val_code = self._generate_expr(fval)
+            self._add_line(f"_struct_val.{sfname} = {val_code}")
+        self._add_line("")
+
+    def _generate_ffi_library_path(self, stmt: FFILibraryPath):
+        """生成跨平台库路径解析代码"""
+        name = self._sanitize_name(stmt.name)
+        self._add_line(f"# 跨平台库路径: {name}")
+        self._add_line(f"_platform = sys.platform")
+        if stmt.platform_map:
+            self._add_line(f"_lib_map_{name} = {{")
+            for plat, path in stmt.platform_map.items():
+                self._add_line(f"    '{plat}': '{path}',")
+            self._add_line("}")
+            self._add_line(f"_{name}_libpath = _lib_map_{name}.get(_platform, '')")
+        else:
+            self._add_line(f"_{name}_libpath = ''")
+        self._add_line("")
+
+    def _generate_ffi_typedef_def(self, stmt: FFITypedefDef):
+        """生成C类型别名代码"""
+        name = self._sanitize_name(stmt.name)
+        base_type = self._ffi_type_map.get(stmt.base_type, stmt.base_type)
+        self._add_line(f"# C类型别名: {name} -> {base_type}")
+        self._add_line(f"{name} = {base_type}")
+        self._add_line("")
+
+    def _generate_ffi_bitfield_def(self, stmt: FFIBitfieldDef):
+        """生成C位域定义代码"""
+        name = self._sanitize_name(stmt.name)
+        base_type = self._ffi_type_map.get(stmt.base_type, 'ctypes.c_int')
+        fields_code = []
+        for f in stmt.fields:
+            fname = self._sanitize_name(f['name'])
+            bits = f['bits']
+            fields_code.append(f"('{fname}', {base_type}, {bits})")
+        fields_str = ', '.join(fields_code)
+        self._add_line(f"# C位域: {name}")
+        self._add_line(f"class {name}(ctypes.Structure):")
+        self.indent_level += 1
+        self._add_line(f"_fields_ = [{fields_str}]")
+        self.indent_level -= 1
+        self._add_line("")
+
+    def _generate_ffi_funcptr_def(self, stmt: FFIFuncPtrDef):
+        """生成C函数指针类型代码"""
+        name = self._sanitize_name(stmt.name)
+        arg_types = []
+        for p in stmt.params:
+            duan_type = p.get('type', '整数')
+            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            arg_types.append(ctype)
+        restype = 'None'
+        if stmt.return_type:
+            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+        arg_types_str = ', '.join(arg_types) if arg_types else ''
+        self._add_line(f"# C函数指针类型: {name}")
+        self._add_line(f"{name} = ctypes.CFUNCTYPE({restype}, {arg_types_str})")
+        self._add_line("")
+
+    def _generate_ffi_debug_config(self, stmt: FFIDebugConfig):
+        """生成FFI调试配置代码"""
+        self._add_line("# FFI调试配置")
+        self._add_line(f"_duan_ffi.set_debug(")
+        self.indent_level += 1
+        self._add_line(f"enabled={stmt.enabled},")
+        self._add_line(f"log_calls={stmt.log_calls},")
+        self._add_line(f"log_types={stmt.log_types},")
+        self._add_line(f"trace_memory={stmt.trace_memory},")
+        self.indent_level -= 1
+        self._add_line(")")
+        self._add_line("")
+
+    def _generate_ffi_preprocessor_def(self, stmt: FFIPreprocessorDef):
+        """生成C预处理器宏代码"""
+        name = self._sanitize_name(stmt.name)
+        self._add_line(f"# C预处理器宏: {name} = {stmt.value}")
+        self._add_line(f"_duan_ffi.定义宏('{name}', {repr(stmt.value)})")
+        self._add_line("")
 
 
 # =============================================================================

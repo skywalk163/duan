@@ -5,6 +5,145 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-07-08
+
+### Added
+
+- **C FFI 第四阶段：企业级成熟度（~90%+）**
+
+  类型别名与位域
+  - `外部 类型别名 名称 为 基础类型`：支持 C typedef 类型别名，生成 ctypes 类型别名代码
+  - `外部 位域 名称 : 类型 { 字段: 位数 }`：支持 C bitfield 位域结构体定义
+  - 位域运行时函数：`位域设置`、`位域获取` 操作位域字段
+
+  函数指针与回调生命周期
+  - `外部 函数指针 名称 接收 参数 返回 类型`：定义 C 函数指针类型，生成 ctypes CFUNCTYPE 代码
+  - 回调注册表：`注册回调(名称, 对象)`、`注销回调(键)`、`获取回调(键)`、`列出回调()`
+  - 防止 Python GC 回收 ctypes 回调对象，确保回调安全
+
+  FFI 调试系统
+  - `外部 调试 { 开启, 记录调用, 记录类型, 追踪内存 }`：声明式 FFI 调试配置
+  - 调用日志：自动记录函数调用参数和返回值
+  - 类型日志：记录 FFI 类型映射信息
+  - 内存日志：追踪手动内存分配/释放操作
+  - 运行时函数：`启用调试()`、`禁用调试()`、`获取日志()`、`清空日志()`
+
+  C 预处理器宏支持
+  - `外部 宏 名称 为 值`：定义 C 预处理器宏常量
+  - 宏管理：`定义宏(名称, 值)`、`获取宏(名称)`、`列出宏()`、`清理宏()`
+  - 支持数值和字符串类型的宏定义
+
+  新增 5 个 AST 节点
+  - `FFITypedefDef`：C 类型别名定义节点
+  - `FFIBitfieldDef`：C 位域定义节点
+  - `FFIFuncPtrDef`：C 函数指针类型定义节点
+  - `FFIDebugConfig`：FFI 调试配置节点
+  - `FFIPreprocessorDef`：C 预处理器宏定义节点
+
+  新增 5 个关键词 + 13 个内置函数
+  - 关键词：`类型别名`、`位域`、`函数指针`、`宏`、`调试`
+  - 内置函数：注册回调、注销回调、获取回调、FFI调试、FFI禁用调试、FFI获取日志、位域设置、位域获取、创建函数指针、创建类型别名、定义宏、获取宏
+
+  扩展解析器
+  - `_parse_ffi_typedef_def`：解析类型别名声明
+  - `_parse_ffi_bitfield_def`：解析位域定义
+  - `_parse_ffi_funcptr_def`：解析函数指针类型
+  - `_parse_ffi_debug_config`：解析调试配置
+  - `_parse_ffi_preprocessor_def`：解析预处理器宏
+
+  扩展代码生成器
+  - `_generate_ffi_typedef_def`：生成 ctypes 类型别名代码
+  - `_generate_ffi_bitfield_def`：生成 ctypes.Structure + 位域字段代码
+  - `_generate_ffi_funcptr_def`：生成 ctypes.CFUNCTYPE 函数指针代码
+  - `_generate_ffi_debug_config`：生成调试配置调用代码
+  - `_generate_ffi_preprocessor_def`：生成宏定义调用代码
+
+  扩展运行时模块（stdlib/FFI.py）
+  - 回调注册表系统：`_callback_registry` 字典 + `注册回调`/`注销回调`/`获取回调`/`列出回调`/`清理回调`
+  - 调试系统：`_debug_config` 配置 + `_debug_log` 日志 + `设置调试`/`启用调试`/`禁用调试`/`获取日志`/`清空日志`
+  - 内部日志函数：`_debug_log_call`/`_debug_log_type`/`_debug_log_memory` 供代码生成器调用
+  - 位域操作：`位域设置`/`位域获取`
+  - 函数指针：`创建函数指针`
+  - 类型别名：`创建类型别名`
+  - 预处理器宏：`_macro_definitions` 字典 + `定义宏`/`获取宏`/`列出宏`/`清理宏`
+
+  测试覆盖
+  - 28 个测试用例（test_ffi_phase4.py）：类型别名、位域、函数指针、调试配置、预处理器宏、回调生命周期、LLVM 兼容性
+  - 全部 84 个 FFI 测试通过（Phase 1-4 累计）
+
+## [1.12.0] - 2026-07-08
+
+### Added
+
+- **C FFI 第三阶段：高级特性（~80%）**
+
+  C 枚举映射
+  - `外部 枚举 名称 { 成员 = 值, ... }`：支持 C 枚举声明，自动分配递增数值
+  - 运行时函数：`创建枚举(名称, 值字典)` 动态创建枚举类
+
+  C 联合体支持
+  - `外部 联合体 名称 { 字段: 类型, ... }`：支持 C union 声明，生成 ctypes.Union 类
+  - 运行时函数：`创建联合体(名称, 字段列表)` 动态创建联合体类型
+
+  变长参数支持
+  - `外部 变长参数 段落 函数名 接收 参数... 返回 类型 在 库`：支持 printf 风格变长参数
+  - 支持自定义 C 函数名：`为 "c_func_name"` 语法
+  - 支持 `:` 和 `为` 两种类型注解分隔符
+  - 运行时函数：`变长参数调用(库别名, 函数名, 固定参数, 可变参数)`
+
+  回调创建
+  - 内置函数：`创建回调(回调类型, 段言函数)` 创建 C 回调函数指针
+
+  结构体按值传递
+  - 内置函数：`创建结构体值(结构体类, **字段值)` 创建结构体实例用于按值传递
+
+  跨平台库路径
+  - 内置函数：`解析库路径(平台映射)` 根据当前平台自动选择库文件
+  - 内置函数：`获取平台()` 返回当前操作系统标识
+  - 内置函数：`查找库(库名)` 使用 ctypes.util.find_library 查找系统库
+
+  结构体工具函数
+  - `结构体大小(结构体类)`：获取结构体字节大小
+  - `字段偏移(结构体类, 字段名)`：获取字段偏移量
+  - `结构体转字节(结构体实例)`：序列化结构体为字节串
+  - `字节转结构体(数据, 结构体类)`：从字节串反序列化结构体
+
+  取地址增强
+  - 原有 `取地址` 函数增强，支持结构体、联合体、基本类型和数组的指针获取
+
+  新增 6 个 AST 节点
+  - `FFIEnumDef`：C 枚举定义节点
+  - `FFIUnionDef`：C 联合体定义节点
+  - `FFICreateCallback`：创建回调函数节点
+  - `FFIVarArgsDecl`：变长参数声明节点
+  - `FFIStructByValue`：结构体按值传递节点
+  - `FFILibraryPath`：跨平台库路径节点
+
+  新增 3 个关键词
+  - `枚举`、`联合体`、`变长参数`
+
+  扩展解析器
+  - `_parse_ffi_enum_def`：解析枚举定义
+  - `_parse_ffi_union_def`：解析联合体定义
+  - `_parse_ffi_varargs_decl`：解析变长参数声明
+  - 修复回调/函数声明中 `:` 类型注解分隔符的支持
+
+  扩展代码生成器
+  - `_generate_ffi_enum_def`：生成枚举类代码
+  - `_generate_ffi_union_def`：生成 ctypes.Union 代码
+  - `_generate_ffi_varargs_decl`：生成变长参数包装代码
+  - `_generate_ffi_create_callback`：生成回调创建代码
+  - `_generate_ffi_struct_by_value`：生成结构体实例化代码
+  - `_generate_ffi_library_path`：生成跨平台路径解析代码
+
+  扩展运行时模块
+  - 新增 12 个内置函数：`创建回调函数`、`创建结构体值`、`创建枚举`、`创建联合体`、`解析库路径`、`变长参数调用`、`获取平台`、`查找库`、`结构体大小`、`字段偏移`、`结构体转字节`、`字节转结构体`
+  - 修复 `查找库` 的兼容性，处理 ctypes.util 不可用的情况
+
+  测试覆盖
+  - 23 个测试用例（test_ffi_phase3.py）：枚举、联合体、变长参数、回调、结构体传值、库路径、结构体工具、LLVM 兼容性
+  - 全部 56 个 FFI 测试通过（Phase 1-3 累计）
+
 ## [1.11.0] - 2026-07-07
 
 ### Added

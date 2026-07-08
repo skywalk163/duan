@@ -28,6 +28,14 @@ from ast_nodes_v3 import (
     DictComprehension, DestructuringAssignment, ConditionalExpression,
     WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition,
     MethodSignature, IndexedAssignment, RangeExpr,
+    FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef,
+    FFIPointerType, FFIArrayType, FFIAddressOf, FFIDereference,
+    FFIPointerOffset, FFISetPointerValue, FFIAllocMemory, FFIFreeMemory,
+    FFICreateArray, FFISetArrayElement, FFIGetLastError, FFIGetErrno,
+    FFISetErrno, FFITryCatch,
+    FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl,
+    FFIStructByValue, FFILibraryPath,
+    FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef,
 )
 
 
@@ -50,6 +58,14 @@ __all__ = [
     'DictComprehension', 'DestructuringAssignment', 'ConditionalExpression',
     'WithStmt', 'DecoratorDefinition', 'DictLiteral', 'InterfaceDefinition',
     'MethodSignature', 'IndexedAssignment', 'RangeExpr',
+    'FFILoadLibrary', 'FFIFunctionDecl', 'FFIStructDef', 'FFICallbackDef',
+    'FFIPointerType', 'FFIArrayType', 'FFIAddressOf', 'FFIDereference',
+    'FFIPointerOffset', 'FFISetPointerValue', 'FFIAllocMemory', 'FFIFreeMemory',
+    'FFICreateArray', 'FFISetArrayElement', 'FFIGetLastError', 'FFIGetErrno',
+    'FFISetErrno', 'FFITryCatch',
+    'FFIEnumDef', 'FFIUnionDef', 'FFICreateCallback', 'FFIVarArgsDecl',
+    'FFIStructByValue', 'FFILibraryPath',
+    'FFITypedefDef', 'FFIBitfieldDef', 'FFIFuncPtrDef', 'FFIDebugConfig', 'FFIPreprocessorDef',
 ]
 
 

@@ -216,6 +216,14 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '使用':
             return self._parse_with_stmt()
 
+        # C FFI：外部 段落 ...
+        if tok.type == TokenType.KEYWORD and tok.value == '外部':
+            return self._parse_ffi_decl()
+
+        # C FFI：加载库 ...
+        if tok.type == TokenType.KEYWORD and tok.value == '加载库':
+            return self._parse_ffi_load_library()
+
         # 动词调用作为独立语句
         if tok.type == TokenType.KEYWORD and tok.value in VERB_ARITY:
             return self._parse_expr_stmt()
@@ -1058,9 +1066,19 @@ class ParserStmtMixin:
                 else:
                     catch_var = first
             elif next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                # 有类型和变量名
-                catch_type = first
-                catch_var = self._consume().value
+                # 跳过 '为' 关键字
+                if next_tok.value == '为':
+                    self._consume()  # 消费 '为'
+                    catch_type = first
+                    var_tok = self._current()
+                    if var_tok and var_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        catch_var = self._consume().value
+                    else:
+                        catch_var = first
+                else:
+                    # 有类型和变量名
+                    catch_type = first
+                    catch_var = self._consume().value
             else:
                 # 只有一个标识符，视为变量名
                 catch_var = first
@@ -2411,3 +2429,670 @@ class ParserStmtMixin:
             return MatchPattern('variable', binding=name)
 
         return MatchPattern('wildcard')
+
+    # =========================================================================
+    # C FFI 解析方法
+    # =========================================================================
+
+    def _parse_ffi_decl(self) -> ASTNode:
+        """解析外部声明：外部 段落/结构体/回调/枚举/联合体/变长参数 ...
+        
+        语法：
+        外部 段落 函数名 接收 参数... 返回 类型 在 库别名
+        外部 结构体 名称 { 字段: 类型, ... }
+        外部 回调 名称 接收 参数... 返回 类型
+        外部 枚举 名称 { 成员 = 值, ... }
+        外部 联合体 名称 { 字段: 类型, ... }
+        外部 变长参数 段落 函数名 接收 参数... 返回 类型 在 库别名
+        """
+        # 外部
+        self._consume(TokenType.KEYWORD, '外部')
+        
+        tok = self._current()
+        if tok is None:
+            self._error("期望'段落'、'结构体'、'回调'、'枚举'、'联合体'或'变长参数'")
+        
+        if tok.type == TokenType.KEYWORD and tok.value == '变长参数':
+            return self._parse_ffi_varargs_decl()
+        elif tok.type == TokenType.KEYWORD and tok.value == '枚举':
+            return self._parse_ffi_enum_def()
+        elif tok.type == TokenType.KEYWORD and tok.value == '联合体':
+            return self._parse_ffi_union_def()
+        elif tok.type == TokenType.KEYWORD and tok.value == '类型别名':
+            return self._parse_ffi_typedef_def()
+        elif tok.type == TokenType.KEYWORD and tok.value == '位域':
+            return self._parse_ffi_bitfield_def()
+        elif tok.type == TokenType.KEYWORD and tok.value == '函数指针':
+            return self._parse_ffi_funcptr_def()
+        elif tok.type == TokenType.KEYWORD and tok.value == '调试':
+            return self._parse_ffi_debug_config()
+        elif tok.type == TokenType.KEYWORD and tok.value == '宏':
+            return self._parse_ffi_preprocessor_def()
+        elif tok.type == TokenType.KEYWORD and tok.value == '段落':
+            return self._parse_ffi_function_decl()
+        elif tok.type == TokenType.KEYWORD and tok.value == '结构体':
+            return self._parse_ffi_struct_def()
+        elif tok.type == TokenType.KEYWORD and tok.value == '回调':
+            return self._parse_ffi_callback_def()
+        else:
+            self._error(f"期望'段落'、'结构体'、'回调'、'枚举'、'联合体'或'变长参数'，但得到'{tok.value}'")
+
+    def _parse_ffi_load_library(self) -> FFILoadLibrary:
+        """解析加载库语句：加载库 "libxxx.so" 为 别名"""
+        # 加载库
+        self._consume(TokenType.KEYWORD, '加载库')
+        
+        # 库路径（字符串）
+        path_tok = self._current()
+        if path_tok and path_tok.type == TokenType.STRING:
+            library_path = self._consume(TokenType.STRING).value
+        else:
+            self._error(f"期望库路径（字符串），但得到 {path_tok.type if path_tok else '输入结束'}")
+        
+        # 为
+        if self._match(TokenType.KEYWORD, '为'):
+            self._consume(TokenType.KEYWORD, '为')
+        else:
+            self._error("期望'为'关键字")
+        
+        # 别名
+        alias_tok = self._current()
+        if alias_tok and alias_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            alias = self._consume().value
+        else:
+            self._error(f"期望库别名，但得到 {alias_tok.type if alias_tok else '输入结束'}")
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFILoadLibrary(library_path, alias)
+
+    def _parse_ffi_function_decl(self) -> FFIFunctionDecl:
+        """解析外部函数声明：外部 段落 函数名 接收 参数... 返回 类型 在 库别名"""
+        # 段落
+        self._consume(TokenType.KEYWORD, '段落')
+        
+        # 函数名
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望函数名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        # 可选C函数名：为 "c_func_name"
+        c_name = None
+        if self._match(TokenType.KEYWORD, '为'):
+            self._consume(TokenType.KEYWORD, '为')
+            c_name_tok = self._current()
+            if c_name_tok and c_name_tok.type == TokenType.STRING:
+                c_name = self._consume(TokenType.STRING).value
+            else:
+                self._error(f"期望C函数名（字符串），但得到 {c_name_tok.type if c_name_tok else '输入结束'}")
+        
+        # 参数：接收 参数1: 类型, 参数2: 类型
+        params = []
+        if self._match(TokenType.KEYWORD, '接收'):
+            self._consume(TokenType.KEYWORD, '接收')
+            
+            while self._current():
+                ptok = self._current()
+                if ptok.type == TokenType.KEYWORD and ptok.value in ('返回', '在'):
+                    break
+                if ptok.type == TokenType.DOT:
+                    break
+                
+                if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    # 收集参数名，直到遇到 '为' 或 ',' 或 '返回' 或 '在'
+                    param_parts = []
+                    while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        if self._current().value in ('返回', '在', '为'):
+                            break
+                        if self._match(TokenType.COMMA):
+                            break
+                        param_parts.append(self._current().value)
+                        self._consume()
+                    param_name = ''.join(param_parts)
+                    if not param_name:
+                        break
+                    
+                    # 类型注解：为 类型 或 : 类型
+                    param_type = None
+                    if self._match(TokenType.KEYWORD, '为'):
+                        self._consume(TokenType.KEYWORD, '为')
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    elif self._match(TokenType.COLON):
+                        self._consume(TokenType.COLON)
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    
+                    params.append({'name': param_name, 'type': param_type})
+                    
+                    # 跳过逗号
+                    if self._match(TokenType.COMMA):
+                        self._consume(TokenType.COMMA)
+                else:
+                    break
+        
+        # 返回类型：返回 类型
+        return_type = None
+        if self._match(TokenType.KEYWORD, '返回'):
+            self._consume(TokenType.KEYWORD, '返回')
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                return_type = self._consume().value
+        
+        # 库别名：在 库别名
+        library_alias = ''
+        if self._match(TokenType.KEYWORD, '在'):
+            self._consume(TokenType.KEYWORD, '在')
+            alias_tok = self._current()
+            if alias_tok and alias_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                library_alias = self._consume().value
+            else:
+                self._error(f"期望库别名，但得到 {alias_tok.type if alias_tok else '输入结束'}")
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIFunctionDecl(name, params, return_type, library_alias, c_name)
+
+    def _parse_ffi_struct_def(self) -> FFIStructDef:
+        """解析外部结构体定义：外部 结构体 名称 { 字段: 类型, ... }"""
+        # 结构体
+        self._consume(TokenType.KEYWORD, '结构体')
+        
+        # 结构体名
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望结构体名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        # 花括号
+        if self._match(TokenType.LBRACE):
+            self._consume(TokenType.LBRACE)
+        else:
+            self._error("期望 '{'")
+        
+        # 字段列表
+        fields = []
+        while self._current() and self._current().type != TokenType.RBRACE:
+            ftok = self._current()
+            if ftok.type == TokenType.COMMA:
+                self._consume(TokenType.COMMA)
+                continue
+            
+            if ftok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                field_name = self._consume().value
+                
+                # 冒号
+                if self._match(TokenType.COLON):
+                    self._consume(TokenType.COLON)
+                
+                # 字段类型
+                if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    field_type = self._consume().value
+                    fields.append({'name': field_name, 'type': field_type})
+                else:
+                    break
+            else:
+                break
+        
+        if self._match(TokenType.RBRACE):
+            self._consume(TokenType.RBRACE)
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIStructDef(name, fields)
+
+    def _parse_ffi_callback_def(self) -> FFICallbackDef:
+        """解析外部回调定义：外部 回调 名称 接收 参数... 返回 类型"""
+        # 回调
+        self._consume(TokenType.KEYWORD, '回调')
+        
+        # 回调名
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望回调名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        # 参数：接收 参数1: 类型, 参数2: 类型
+        params = []
+        if self._match(TokenType.KEYWORD, '接收'):
+            self._consume(TokenType.KEYWORD, '接收')
+            
+            while self._current():
+                ptok = self._current()
+                if ptok.type == TokenType.KEYWORD and ptok.value == '返回':
+                    break
+                if ptok.type == TokenType.DOT:
+                    break
+                
+                if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    param_parts = []
+                    while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        if self._current().value in ('返回', '为'):
+                            break
+                        if self._match(TokenType.COMMA):
+                            break
+                        param_parts.append(self._current().value)
+                        self._consume()
+                    param_name = ''.join(param_parts)
+                    if not param_name:
+                        break
+                    
+                    param_type = None
+                    if self._match(TokenType.KEYWORD, '为'):
+                        self._consume(TokenType.KEYWORD, '为')
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    elif self._match(TokenType.COLON):
+                        self._consume(TokenType.COLON)
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    
+                    params.append({'name': param_name, 'type': param_type})
+                    
+                    if self._match(TokenType.COMMA):
+                        self._consume(TokenType.COMMA)
+                else:
+                    break
+        
+        # 返回类型：返回 类型
+        return_type = None
+        if self._match(TokenType.KEYWORD, '返回'):
+            self._consume(TokenType.KEYWORD, '返回')
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                return_type = self._consume().value
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFICallbackDef(name, params, return_type)
+
+    def _parse_ffi_enum_def(self) -> FFIEnumDef:
+        """解析C枚举定义：外部 枚举 名称 { 成员 = 值, ... }"""
+        # 枚举
+        self._consume(TokenType.KEYWORD, '枚举')
+        
+        # 枚举名
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望枚举名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        # 花括号
+        if self._match(TokenType.LBRACE):
+            self._consume(TokenType.LBRACE)
+        else:
+            self._error("期望 '{'")
+        
+        # 枚举值列表
+        values = {}
+        auto_val = 0
+        while self._current() and self._current().type != TokenType.RBRACE:
+            ftok = self._current()
+            if ftok.type == TokenType.COMMA:
+                self._consume(TokenType.COMMA)
+                continue
+            
+            if ftok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                member_name = self._consume().value
+                
+                # 可选的值赋值：= 值
+                if self._match(TokenType.EQUALS):
+                    self._consume(TokenType.EQUALS)
+                    val_tok = self._current()
+                    if val_tok and val_tok.type == TokenType.NUMBER:
+                        values[member_name] = self._consume(TokenType.NUMBER).value
+                    elif val_tok and val_tok.type == TokenType.CHINESE_NUM:
+                        values[member_name] = self._consume(TokenType.CHINESE_NUM).value
+                    else:
+                        self._error(f"期望数值，但得到 {val_tok.type if val_tok else '输入结束'}")
+                else:
+                    values[member_name] = auto_val
+                    auto_val += 1
+            else:
+                break
+        
+        if self._match(TokenType.RBRACE):
+            self._consume(TokenType.RBRACE)
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIEnumDef(name, values)
+
+    def _parse_ffi_union_def(self) -> FFIUnionDef:
+        """解析C联合体定义：外部 联合体 名称 { 字段: 类型, ... }"""
+        # 联合体
+        self._consume(TokenType.KEYWORD, '联合体')
+        
+        # 联合体名
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望联合体名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        # 花括号
+        if self._match(TokenType.LBRACE):
+            self._consume(TokenType.LBRACE)
+        else:
+            self._error("期望 '{'")
+        
+        # 字段列表
+        fields = []
+        while self._current() and self._current().type != TokenType.RBRACE:
+            ftok = self._current()
+            if ftok.type == TokenType.COMMA:
+                self._consume(TokenType.COMMA)
+                continue
+            
+            if ftok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                field_name = self._consume().value
+                
+                if self._match(TokenType.COLON):
+                    self._consume(TokenType.COLON)
+                
+                if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    field_type = self._consume().value
+                    fields.append({'name': field_name, 'type': field_type})
+                else:
+                    break
+            else:
+                break
+        
+        if self._match(TokenType.RBRACE):
+            self._consume(TokenType.RBRACE)
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIUnionDef(name, fields)
+
+    def _parse_ffi_varargs_decl(self) -> FFIVarArgsDecl:
+        """解析变长参数声明：外部 变长参数 段落 函数名 接收 参数... 返回 类型 在 库别名"""
+        # 变长参数
+        self._consume(TokenType.KEYWORD, '变长参数')
+        
+        # 段落
+        if self._match(TokenType.KEYWORD, '段落'):
+            self._consume(TokenType.KEYWORD, '段落')
+        else:
+            self._error("期望'段落'关键字")
+        
+        # 函数名
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望函数名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        # 可选C函数名：为 "c_func_name"
+        c_name = None
+        if self._match(TokenType.KEYWORD, '为'):
+            self._consume(TokenType.KEYWORD, '为')
+            c_name_tok = self._current()
+            if c_name_tok and c_name_tok.type == TokenType.STRING:
+                c_name = self._consume(TokenType.STRING).value
+            else:
+                self._error(f"期望C函数名（字符串），但得到 {c_name_tok.type if c_name_tok else '输入结束'}")
+        
+        # 固定参数：接收 参数1: 类型, 参数2: 类型
+        params = []
+        if self._match(TokenType.KEYWORD, '接收'):
+            self._consume(TokenType.KEYWORD, '接收')
+            
+            while self._current():
+                ptok = self._current()
+                if ptok.type == TokenType.KEYWORD and ptok.value in ('返回', '在'):
+                    break
+                if ptok.type == TokenType.DOT:
+                    break
+                
+                if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    param_parts = []
+                    while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        if self._current().value in ('返回', '在', '为'):
+                            break
+                        if self._match(TokenType.COMMA):
+                            break
+                        param_parts.append(self._current().value)
+                        self._consume()
+                    param_name = ''.join(param_parts)
+                    if not param_name:
+                        break
+                    
+                    param_type = None
+                    if self._match(TokenType.KEYWORD, '为'):
+                        self._consume(TokenType.KEYWORD, '为')
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    elif self._match(TokenType.COLON):
+                        self._consume(TokenType.COLON)
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    
+                    params.append({'name': param_name, 'type': param_type})
+                    
+                    if self._match(TokenType.COMMA):
+                        self._consume(TokenType.COMMA)
+                else:
+                    break
+        
+        # 返回类型：返回 类型
+        return_type = None
+        if self._match(TokenType.KEYWORD, '返回'):
+            self._consume(TokenType.KEYWORD, '返回')
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                return_type = self._consume().value
+        
+        # 库别名：在 库别名
+        library_alias = ''
+        if self._match(TokenType.KEYWORD, '在'):
+            self._consume(TokenType.KEYWORD, '在')
+            alias_tok = self._current()
+            if alias_tok and alias_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                library_alias = self._consume().value
+            else:
+                self._error(f"期望库别名，但得到 {alias_tok.type if alias_tok else '输入结束'}")
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIVarArgsDecl(name, params, return_type, library_alias, c_name)
+
+    def _parse_ffi_typedef_def(self) -> FFITypedefDef:
+        """解析C类型别名：外部 类型别名 名称 为 基础类型"""
+        self._consume(TokenType.KEYWORD, '类型别名')
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望类型别名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        base_type = name
+        if self._match(TokenType.KEYWORD, '为'):
+            self._consume(TokenType.KEYWORD, '为')
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                base_type = self._consume().value
+        
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFITypedefDef(name, base_type)
+
+    def _parse_ffi_bitfield_def(self) -> FFIBitfieldDef:
+        """解析C位域定义：外部 位域 名称 : 基础类型 { 字段: 位数, ... }"""
+        self._consume(TokenType.KEYWORD, '位域')
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望位域名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        base_type = '整数'
+        if self._match(TokenType.COLON):
+            self._consume(TokenType.COLON)
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                base_type = self._consume().value
+        
+        if self._match(TokenType.LBRACE):
+            self._consume(TokenType.LBRACE)
+        else:
+            self._error("期望 '{'")
+        
+        fields = []
+        while self._current() and self._current().type != TokenType.RBRACE:
+            ftok = self._current()
+            if ftok.type == TokenType.COMMA:
+                self._consume(TokenType.COMMA)
+                continue
+            if ftok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                field_name = self._consume().value
+                bit_width = 1
+                if self._match(TokenType.COLON):
+                    self._consume(TokenType.COLON)
+                    if self._current() and self._current().type == TokenType.NUMBER:
+                        bit_width = self._consume(TokenType.NUMBER).value
+                fields.append({'name': field_name, 'bits': bit_width})
+            else:
+                break
+        
+        if self._match(TokenType.RBRACE):
+            self._consume(TokenType.RBRACE)
+        
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIBitfieldDef(name, base_type, fields)
+
+    def _parse_ffi_funcptr_def(self) -> FFIFuncPtrDef:
+        """解析C函数指针类型：外部 函数指针 名称 接收 参数... 返回 类型"""
+        self._consume(TokenType.KEYWORD, '函数指针')
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望函数指针名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        params = []
+        if self._match(TokenType.KEYWORD, '接收'):
+            self._consume(TokenType.KEYWORD, '接收')
+            while self._current():
+                ptok = self._current()
+                if ptok.type == TokenType.KEYWORD and ptok.value == '返回':
+                    break
+                if ptok.type == TokenType.DOT:
+                    break
+                if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    param_parts = []
+                    while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        if self._current().value in ('返回', '为'):
+                            break
+                        if self._match(TokenType.COMMA):
+                            break
+                        param_parts.append(self._current().value)
+                        self._consume()
+                    param_name = ''.join(param_parts)
+                    if not param_name:
+                        break
+                    param_type = None
+                    if self._match(TokenType.KEYWORD, '为'):
+                        self._consume(TokenType.KEYWORD, '为')
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    elif self._match(TokenType.COLON):
+                        self._consume(TokenType.COLON)
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    params.append({'name': param_name, 'type': param_type})
+                    if self._match(TokenType.COMMA):
+                        self._consume(TokenType.COMMA)
+                else:
+                    break
+        
+        return_type = None
+        if self._match(TokenType.KEYWORD, '返回'):
+            self._consume(TokenType.KEYWORD, '返回')
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                return_type = self._consume().value
+        
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIFuncPtrDef(name, params, return_type)
+
+    def _parse_ffi_debug_config(self) -> FFIDebugConfig:
+        """解析FFI调试配置：外部 调试 { 开启, 记录调用, 记录类型, 追踪内存 }"""
+        self._consume(TokenType.KEYWORD, '调试')
+        
+        enabled = True
+        log_calls = False
+        log_types = False
+        trace_memory = False
+        
+        if self._match(TokenType.LBRACE):
+            self._consume(TokenType.LBRACE)
+            while self._current() and self._current().type != TokenType.RBRACE:
+                tok = self._current()
+                if tok.type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                    continue
+                if tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    val = self._consume().value
+                    if val == '关闭':
+                        enabled = False
+                    elif val == '开启':
+                        enabled = True
+                    elif val == '记录调用':
+                        log_calls = True
+                    elif val == '记录类型':
+                        log_types = True
+                    elif val == '追踪内存':
+                        trace_memory = True
+                else:
+                    break
+            if self._match(TokenType.RBRACE):
+                self._consume(TokenType.RBRACE)
+        
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIDebugConfig(enabled, log_calls, log_types, trace_memory)
+
+    def _parse_ffi_preprocessor_def(self) -> FFIPreprocessorDef:
+        """解析C预处理器宏：外部 宏 名称 为 值"""
+        self._consume(TokenType.KEYWORD, '宏')
+        name_tok = self._current()
+        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            name = self._consume().value
+        else:
+            self._error(f"期望宏名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        value = ""
+        if self._match(TokenType.KEYWORD, '为'):
+            self._consume(TokenType.KEYWORD, '为')
+            if self._current():
+                if self._current().type == TokenType.NUMBER:
+                    value = str(self._consume(TokenType.NUMBER).value)
+                elif self._current().type == TokenType.STRING:
+                    value = self._consume(TokenType.STRING).value
+                elif self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    value = self._consume().value
+        
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        
+        return FFIPreprocessorDef(name, value)

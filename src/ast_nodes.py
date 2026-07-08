@@ -602,6 +602,230 @@ class ExportStatement(ASTNode):
     names: List[str] = field(default_factory=list)
 
 
+# =============================================================================
+# C FFI 节点（外部函数接口）
+# =============================================================================
+
+@dataclass(slots=True)
+class FFILoadLibraryStatement(ASTNode):
+    """加载动态库：加载库 "libxxx.so" 为 别名"""
+    library_path: str = ""
+    alias: str = ""
+
+
+@dataclass(slots=True)
+class FFIFunctionDeclaration(ASTNode):
+    """外部函数声明：外部 段落 函数名 接收 参数... 返回 类型 在 库别名"""
+    name: str = ""
+    params: List[dict] = field(default_factory=list)
+    return_type: Optional[str] = None
+    library_alias: str = ""
+    c_name: Optional[str] = None
+
+
+@dataclass(slots=True)
+class FFIStructDefinition(ASTNode):
+    """外部结构体定义"""
+    name: str = ""
+    fields: List[dict] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class FFICallbackDefinition(ASTNode):
+    """外部回调类型定义"""
+    name: str = ""
+    params: List[dict] = field(default_factory=list)
+    return_type: Optional[str] = None
+
+
+# =============================================================================
+# C FFI 指针/数组/错误处理节点（第二阶段，旧 AST 兼容）
+# =============================================================================
+
+@dataclass(slots=True)
+class FFIPointerType(ASTNode):
+    """指针类型"""
+    base_type: str = ""
+
+
+@dataclass(slots=True)
+class FFIArrayType(ASTNode):
+    """数组类型"""
+    base_type: str = ""
+    size: Optional[int] = None
+
+
+@dataclass(slots=True)
+class FFIAddressOf(ASTNode):
+    """取地址"""
+    target: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFIDereference(ASTNode):
+    """解引用"""
+    pointer: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFIPointerOffset(ASTNode):
+    """指针偏移"""
+    pointer: Optional[ASTNode] = None
+    offset: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFISetPointerValue(ASTNode):
+    """设指针值"""
+    pointer: Optional[ASTNode] = None
+    value: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFIAllocMemory(ASTNode):
+    """分配内存"""
+    size: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFIFreeMemory(ASTNode):
+    """释放内存"""
+    pointer: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFICreateArray(ASTNode):
+    """创建数组"""
+    base_type: str = ""
+    size: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFISetArrayElement(ASTNode):
+    """设置数组元素"""
+    array: Optional[ASTNode] = None
+    index: Optional[ASTNode] = None
+    value: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFIGetLastError(ASTNode):
+    """获取最后FFI错误"""
+    pass
+
+
+@dataclass(slots=True)
+class FFIGetErrno(ASTNode):
+    """获取系统错误码"""
+    pass
+
+
+@dataclass(slots=True)
+class FFISetErrno(ASTNode):
+    """设置系统错误码"""
+    value: Optional[ASTNode] = None
+
+
+@dataclass(slots=True)
+class FFITryCatch(ASTNode):
+    """FFI 错误捕获"""
+    try_body: List[ASTNode] = field(default_factory=list)
+    error_var: str = "错误"
+    catch_body: List[ASTNode] = field(default_factory=list)
+
+
+# =============================================================================
+# C FFI 第三阶段节点（旧 AST 兼容）
+# =============================================================================
+
+@dataclass(slots=True)
+class FFIEnumDef(ASTNode):
+    """C枚举定义"""
+    name: str = ""
+    values: Dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class FFIUnionDef(ASTNode):
+    """C联合体定义"""
+    name: str = ""
+    fields: List[dict] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class FFICreateCallback(ASTNode):
+    """创建回调函数"""
+    callback_type: str = ""
+    duan_function: str = ""
+
+
+@dataclass(slots=True)
+class FFIVarArgsDecl(ASTNode):
+    """变长参数声明"""
+    name: str = ""
+    params: List[dict] = field(default_factory=list)
+    return_type: Optional[str] = None
+    library_alias: str = ""
+    c_name: Optional[str] = None
+
+
+@dataclass(slots=True)
+class FFIStructByValue(ASTNode):
+    """结构体按值传递"""
+    struct_type: str = ""
+    fields: Dict[str, ASTNode] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class FFILibraryPath(ASTNode):
+    """跨平台库路径"""
+    name: str = ""
+    platform_map: Dict[str, str] = field(default_factory=dict)
+
+
+# =============================================================================
+# C FFI 第四阶段节点（旧 AST 兼容）
+# =============================================================================
+
+@dataclass(slots=True)
+class FFITypedefDef(ASTNode):
+    """C类型别名"""
+    name: str = ""
+    base_type: str = ""
+
+
+@dataclass(slots=True)
+class FFIBitfieldDef(ASTNode):
+    """C位域定义"""
+    name: str = ""
+    base_type: str = ""
+    fields: List[dict] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class FFIFuncPtrDef(ASTNode):
+    """C函数指针类型"""
+    name: str = ""
+    params: List[dict] = field(default_factory=list)
+    return_type: Optional[str] = None
+
+
+@dataclass(slots=True)
+class FFIDebugConfig(ASTNode):
+    """FFI调试配置"""
+    enabled: bool = True
+    log_calls: bool = False
+    log_types: bool = False
+    trace_memory: bool = False
+
+
+@dataclass(slots=True)
+class FFIPreprocessorDef(ASTNode):
+    """C预处理器宏"""
+    name: str = ""
+    value: str = ""
+
+
 @dataclass(slots=True)
 class Module(ASTNode):
     """模块（篇）- 顶层节点"""

@@ -36,6 +36,8 @@ class TokenType(Enum):
     RPAREN = auto()      # 右括号 ）
     LBRACKET = auto()    # 左方括号 【
     RBRACKET = auto()    # 右方括号 】
+    LBRACE = auto()      # 左花括号 {
+    RBRACE = auto()      # 右花括号 }
     EQUALS = auto()      # 等于 =
     AT = auto()          # @ 装饰器符号
     PLUS = auto()        # + 加号（字符串连接等）

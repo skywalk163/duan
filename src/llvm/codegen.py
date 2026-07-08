@@ -28,6 +28,8 @@ class LLVMCodeGen(LLVMCodeGenCore):
         self._loop_break_labels = []
         self._loop_continue_labels = []
         self._declared_vars = set()
+        self._ffi_libraries = {}
+        self._ffi_functions = {}
 
     def generate(self, module) -> str:
         self.declare_runtime()
@@ -68,6 +70,43 @@ class LLVMCodeGen(LLVMCodeGenCore):
             if name and name not in self._globals:
                 self.gen_global_var(name)
                 self._declared_vars.add(name)
+        elif isinstance(stmt, ast.FFILoadLibraryStatement):
+            # FFI 加载库：记录到模块中
+            self._ffi_libraries[stmt.alias] = stmt.library_path
+        elif isinstance(stmt, ast.FFIFunctionDeclaration):
+            # FFI 函数声明：记录到模块中
+            self._ffi_functions[stmt.name] = stmt
+        elif isinstance(stmt, ast.FFICreateArray):
+            # FFI 创建数组：暂存
+            pass
+        elif isinstance(stmt, ast.FFISetArrayElement):
+            # FFI 设置数组：暂存
+            pass
+        elif isinstance(stmt, ast.FFIAllocMemory):
+            # FFI 分配内存：暂存
+            pass
+        elif isinstance(stmt, ast.FFIFreeMemory):
+            # FFI 释放内存：暂存
+            pass
+        elif isinstance(stmt, ast.FFISetPointerValue):
+            # FFI 设指针值：暂存
+            pass
+        elif isinstance(stmt, ast.FFISetErrno):
+            # FFI 设系统错误码：暂存
+            pass
+        elif isinstance(stmt, ast.FFITryCatch):
+            # FFI 错误捕获：暂存
+            pass
+        elif isinstance(stmt, (ast.FFIEnumDef, ast.FFIUnionDef,
+                                ast.FFICreateCallback, ast.FFIVarArgsDecl,
+                                ast.FFIStructByValue, ast.FFILibraryPath)):
+            # FFI 第三阶段：暂存
+            pass
+        elif isinstance(stmt, (ast.FFITypedefDef, ast.FFIBitfieldDef,
+                                ast.FFIFuncPtrDef, ast.FFIDebugConfig,
+                                ast.FFIPreprocessorDef)):
+            # FFI 第四阶段：暂存
+            pass
         self._module_statements.append(stmt)
 
     def _get_var_name(self, expr):
@@ -106,6 +145,29 @@ class LLVMCodeGen(LLVMCodeGenCore):
                     safe = self._safe_var_name(name)
                     self.emit(f'store i8* {reg}, i8** @__var_{safe}')
                 return
+        if isinstance(stmt, ast.FFILoadLibraryStatement):
+            # FFI 加载库：记录元数据，不生成 LLVM 声明
+            return
+        if isinstance(stmt, ast.FFIFunctionDeclaration):
+            # FFI 函数声明：生成 LLVM declare
+            self._gen_ffi_declare(stmt)
+            return
+        if isinstance(stmt, (ast.FFICreateArray, ast.FFISetArrayElement,
+                              ast.FFIAllocMemory, ast.FFIFreeMemory,
+                              ast.FFISetPointerValue, ast.FFISetErrno,
+                              ast.FFITryCatch)):
+            # FFI 第二阶段：暂不生成 LLVM
+            return
+        if isinstance(stmt, (ast.FFIEnumDef, ast.FFIUnionDef,
+                              ast.FFICreateCallback, ast.FFIVarArgsDecl,
+                              ast.FFIStructByValue, ast.FFILibraryPath)):
+            # FFI 第三阶段：暂不生成 LLVM
+            return
+        if isinstance(stmt, (ast.FFITypedefDef, ast.FFIBitfieldDef,
+                              ast.FFIFuncPtrDef, ast.FFIDebugConfig,
+                              ast.FFIPreprocessorDef)):
+            # FFI 第四阶段：暂不生成 LLVM
+            return
         self._gen_statement(stmt)
 
     def _gen_main(self):
@@ -624,6 +686,10 @@ class LLVMCodeGen(LLVMCodeGenCore):
         if func_name in self._segments:
             return self._gen_segment_call(func_name, args)
 
+        # FFI 函数调用
+        if func_name in self._ffi_functions:
+            return self._gen_ffi_call(func_name, args)
+
         return self.gen_string_constant(""), 'i8*'
 
     def _gen_method_call(self, expr):
@@ -827,3 +893,81 @@ class LLVMCodeGen(LLVMCodeGenCore):
         loaded = self.new_register()
         self.emit(f'{loaded} = load i8*, i8** {result_reg}')
         return loaded, 'i8*'
+
+    # =========================================================================
+    # C FFI 方法（LLVM 后端）
+    # =========================================================================
+
+    # FFI 段言类型 → LLVM 类型映射
+    _ffi_type_llvm_map = {
+        '整数': 'i32',
+        '小数': 'double',
+        '浮数': 'double',
+        '文本': 'i8*',
+        '串': 'i8*',
+        '布尔': 'i1',
+        '空': 'i8*',
+        '数': 'double',
+        '无': 'void',
+    }
+
+    def _gen_ffi_declare(self, stmt):
+        """生成 LLVM declare 外部函数声明"""
+        c_name = stmt.c_name or stmt.name
+        ret_type = 'void'
+        if stmt.return_type:
+            ret_type = self._ffi_type_llvm_map.get(stmt.return_type, 'i8*')
+        arg_types = []
+        for p in stmt.params:
+            duan_type = p.get('type', '整数')
+            llvm_type = self._ffi_type_llvm_map.get(duan_type, 'i32')
+            arg_types.append(llvm_type)
+        arg_str = ', '.join(arg_types)
+        self.emit(f'declare {ret_type} @{c_name}({arg_str})')
+        self.emit_blank()
+
+    def _gen_ffi_call(self, func_name, args):
+        """生成 LLVM FFI 函数调用"""
+        stmt = self._ffi_functions.get(func_name)
+        if not stmt:
+            return self.gen_string_constant(""), 'i8*'
+        c_name = stmt.c_name or func_name
+        ret_type = stmt.return_type
+        ret_llvm = 'void'
+        if ret_type:
+            ret_llvm = self._ffi_type_llvm_map.get(ret_type, 'i8*')
+        arg_strs = []
+        for i, p in enumerate(stmt.params):
+            duan_type = p.get('type', '整数')
+            llvm_type = self._ffi_type_llvm_map.get(duan_type, 'i32')
+            if i < len(args):
+                if duan_type in ('整数',):
+                    conv_reg = self.new_register()
+                    self.emit(f'{conv_reg} = call i32 @duan_atoi(i8* {args[i]})')
+                    arg_strs.append(f'i32 {conv_reg}')
+                elif duan_type in ('小数', '浮数', '数'):
+                    conv_reg = self.new_register()
+                    self.emit(f'{conv_reg} = call double @duan_atof(i8* {args[i]})')
+                    arg_strs.append(f'double {conv_reg}')
+                elif duan_type in ('布尔',):
+                    conv_reg = self.new_register()
+                    self.emit(f'{conv_reg} = call i32 @duan_str_eq(i8* {args[i]}, i8* {self.gen_string_constant("真")})')
+                    arg_strs.append(f'i1 {conv_reg}')
+                else:
+                    arg_strs.append(f'{llvm_type} {args[i]}')
+            else:
+                arg_strs.append(f'{llvm_type} null')
+        reg = self.new_register()
+        resolved_args = ', '.join(arg_strs)
+        self.emit(f'{reg} = call {ret_llvm} @{c_name}({resolved_args})')
+        if ret_type in ('整数',):
+            str_reg = self.new_register()
+            self.emit(f'{str_reg} = call i8* @duan_itoa(i32 {reg})')
+            return str_reg, 'i8*'
+        elif ret_type in ('小数', '浮数', '数'):
+            str_reg = self.new_register()
+            self.emit(f'{str_reg} = call i8* @duan_ftoa(double {reg})')
+            return str_reg, 'i8*'
+        elif ret_llvm == 'void':
+            return self.gen_string_constant(""), 'i8*'
+        return reg, ret_llvm
