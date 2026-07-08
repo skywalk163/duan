@@ -26,9 +26,13 @@ import tempfile
 import subprocess
 import hashlib
 import re
+import time
+import threading
+import concurrent.futures
 import zipfile
 import urllib.request
 import urllib.error
+import socket
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass, field
@@ -46,7 +50,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "扩展数学函数库：矩阵运算、复数、统计函数",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-math-ext.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-math-ext.git",
+                "https://github.com/duan-lang/duan-math-ext.git",
+                "https://gitee.com/duan-lang/duan-math-ext.git",
+            ],
             "keywords": ["数学", "矩阵", "统计"]
         },
         "网络请求": {
@@ -54,7 +62,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "HTTP 客户端库：GET/POST 请求、JSON 解析",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-http.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-http.git",
+                "https://github.com/duan-lang/duan-http.git",
+                "https://gitee.com/duan-lang/duan-http.git",
+            ],
             "keywords": ["网络", "HTTP", "API"]
         },
         "命令行工具": {
@@ -62,7 +74,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "CLI 开发工具：参数解析、进度条、颜色输出",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-cli-utils.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-cli-utils.git",
+                "https://github.com/duan-lang/duan-cli-utils.git",
+                "https://gitee.com/duan-lang/duan-cli-utils.git",
+            ],
             "keywords": ["CLI", "命令行", "终端"]
         },
         "测试框架": {
@@ -70,7 +86,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "单元测试框架：断言、测试套件、覆盖率",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-test.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-test.git",
+                "https://github.com/duan-lang/duan-test.git",
+                "https://gitee.com/duan-lang/duan-test.git",
+            ],
             "keywords": ["测试", "单元测试", "断言"]
         },
         "数据库": {
@@ -78,7 +98,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "数据库操作库：SQL 查询、连接池、ORM",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-db.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-db.git",
+                "https://github.com/duan-lang/duan-db.git",
+                "https://gitee.com/duan-lang/duan-db.git",
+            ],
             "keywords": ["数据库", "SQL", "ORM"]
         },
         "模板引擎": {
@@ -86,7 +110,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "文本模板引擎：变量替换、循环、条件渲染",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-template.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-template.git",
+                "https://github.com/duan-lang/duan-template.git",
+                "https://gitee.com/duan-lang/duan-template.git",
+            ],
             "keywords": ["模板", "渲染", "HTML"]
         },
         "日志": {
@@ -94,7 +122,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "日志记录库：分级日志、文件输出、格式化",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-log.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-log.git",
+                "https://github.com/duan-lang/duan-log.git",
+                "https://gitee.com/duan-lang/duan-log.git",
+            ],
             "keywords": ["日志", "调试", "记录"]
         },
         "配置管理": {
@@ -102,7 +134,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "配置文件管理：TOML/JSON/YAML 读写",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-config.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-config.git",
+                "https://github.com/duan-lang/duan-config.git",
+                "https://gitee.com/duan-lang/duan-config.git",
+            ],
             "keywords": ["配置", "TOML", "JSON"]
         },
         "加密": {
@@ -110,7 +146,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "加密工具库：哈希、对称加密、Base64",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-crypto.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-crypto.git",
+                "https://github.com/duan-lang/duan-crypto.git",
+                "https://gitee.com/duan-lang/duan-crypto.git",
+            ],
             "keywords": ["加密", "哈希", "安全"]
         },
         "图像处理": {
@@ -118,7 +158,11 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "图像处理库：缩放、裁剪、滤镜",
             "author": "段言团队",
-            "git": "https://gitcode.com/duan-lang/duan-image.git",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-image.git",
+                "https://github.com/duan-lang/duan-image.git",
+                "https://gitee.com/duan-lang/duan-image.git",
+            ],
             "keywords": ["图像", "图片", "处理"]
         },
     },
@@ -207,6 +251,158 @@ class GitUrlParser:
                 )
 
         return None
+
+
+# ===========================================================================
+# 镜像测速器
+# ===========================================================================
+
+@dataclass
+class MirrorResult:
+    """镜像测速结果"""
+    url_info: GitUrlInfo
+    platform: str
+    zip_url: str
+    latency_ms: float       # 延迟（毫秒）
+    reachable: bool         # 是否可达
+    error: str = ""
+
+
+class MirrorSpeedTest:
+    """并发测速：对多个镜像源发起 HEAD 请求，选最快的
+
+    工作原理：
+      1. 对每个镜像的 ZIP 下载链接发起 HEAD 请求
+      2. 测量 TCP 连接 + HTTP 响应时间
+      3. 并发执行，2 秒内返回最快的结果
+      4. 全部不可达时返回 None
+    """
+
+    TIMEOUT = 2.0           # 单个镜像超时秒数
+    MAX_WORKERS = 5         # 并发线程数
+
+    @classmethod
+    def find_fastest(cls, mirror_urls: List[str]) -> Optional[MirrorResult]:
+        """从镜像列表中找到最快的
+
+        Args:
+            mirror_urls: Git 仓库 URL 列表
+
+        Returns:
+            最快的 MirrorResult，全部不可达返回 None
+        """
+        if not mirror_urls:
+            return None
+
+        if len(mirror_urls) == 1:
+            # 单镜像，直接测速
+            return cls._test_single(mirror_urls[0])
+
+        # 多镜像，并发测速
+        print(f"  测速中（{len(mirror_urls)} 个镜像，超时 {cls.TIMEOUT}s）...")
+
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(cls.MAX_WORKERS, len(mirror_urls))) as executor:
+            future_map = {executor.submit(cls._test_single, url): url for url in mirror_urls}
+            for future in concurrent.futures.as_completed(future_map, timeout=cls.TIMEOUT + 2):
+                try:
+                    result = future.result()
+                    if result and result.reachable:
+                        results.append(result)
+                except Exception:
+                    pass
+
+        if not results:
+            return None
+
+        # 按延迟排序，选最快的
+        results.sort(key=lambda r: r.latency_ms)
+
+        print(f"  测速完成:")
+        for r in results:
+            bar = cls._speed_bar(r.latency_ms)
+            print(f"    {r.platform:<8} {r.latency_ms:>6.0f}ms {bar}")
+
+        fastest = results[0]
+        print(f"  选择: {fastest.platform} ({fastest.latency_ms:.0f}ms)")
+        return fastest
+
+    @classmethod
+    def _test_single(cls, git_url: str) -> Optional[MirrorResult]:
+        """测试单个镜像的延迟"""
+        url_info = GitUrlParser.parse(git_url)
+        if not url_info:
+            return MirrorResult(
+                url_info=GitUrlInfo("unknown", "", "", "", ""),
+                platform="unknown",
+                zip_url=git_url,
+                latency_ms=9999,
+                reachable=False,
+                error="无法解析 URL"
+            )
+
+        try:
+            start = time.time()
+
+            req = urllib.request.Request(url_info.zip_url, method='HEAD')
+            req.add_header('User-Agent', 'duan-speed-test/1.0')
+
+            # 先尝试 HEAD，不支持则 fallback 到 GET（只读 1 字节）
+            try:
+                urllib.request.urlopen(req, timeout=cls.TIMEOUT)
+            except urllib.error.HTTPError as e:
+                # HEAD 不被支持时，尝试 GET 请求
+                if e.code in (405, 501):
+                    req.method = 'GET'
+                    urllib.request.urlopen(req, timeout=cls.TIMEOUT)
+                else:
+                    raise
+
+            elapsed = (time.time() - start) * 1000
+
+            return MirrorResult(
+                url_info=url_info,
+                platform=url_info.platform,
+                zip_url=url_info.zip_url,
+                latency_ms=elapsed,
+                reachable=True
+            )
+
+        except (urllib.error.URLError, urllib.error.HTTPError, socket.timeout, OSError) as e:
+            error_msg = str(e)
+            if hasattr(e, 'code'):
+                error_msg = f"HTTP {e.code}"
+            return MirrorResult(
+                url_info=url_info,
+                platform=url_info.platform,
+                zip_url=url_info.zip_url,
+                latency_ms=9999,
+                reachable=False,
+                error=error_msg
+            )
+        except Exception as e:
+            return MirrorResult(
+                url_info=url_info,
+                platform=url_info.platform,
+                zip_url=url_info.zip_url,
+                latency_ms=9999,
+                reachable=False,
+                error=str(e)
+            )
+
+    @staticmethod
+    def _speed_bar(latency_ms: float) -> str:
+        """生成速度条形图"""
+        if latency_ms < 100:
+            return "██████████ 极快"
+        elif latency_ms < 300:
+            return "██████▌   快"
+        elif latency_ms < 600:
+            return "███▌      一般"
+        elif latency_ms < 1000:
+            return "█▌        慢"
+        else:
+            return "▏         很慢"
 
 
 # ===========================================================================
@@ -477,7 +673,7 @@ class PackageInstaller:
     # ------------------------------------------------------------------
 
     def install(self, package_name: str, version: Optional[str] = None) -> bool:
-        """从注册中心安装包"""
+        """从注册中心安装包（自动测速选最快镜像）"""
         packages = self._registry.get('packages', {})
         info = packages.get(package_name)
 
@@ -486,15 +682,35 @@ class PackageInstaller:
             print(f"提示: 使用 'duan install --search {package_name}' 搜索")
             return False
 
-        git_url = info.get('git', '')
-        if not git_url:
-            print(f"错误: 包 '{package_name}' 没有配置 Git 仓库地址")
+        # 获取镜像列表：优先 mirrors，兼容旧 git 字段
+        mirrors = info.get('mirrors', [])
+        if not mirrors and info.get('git'):
+            mirrors = [info['git']]
+
+        if not mirrors:
+            print(f"错误: 包 '{package_name}' 没有配置下载源")
             return False
 
         print(f"正在安装: {package_name} v{info.get('version', '?')}")
-        print(f"  来源: {git_url}")
+        print(f"  描述: {info.get('description', '')}")
 
-        return self._install_from_git(package_name, git_url)
+        # 单镜像：直接安装
+        if len(mirrors) == 1:
+            print(f"  来源: {mirrors[0]}")
+            return self._install_from_git(package_name, mirrors[0])
+
+        # 多镜像：测速选最快的
+        fastest = MirrorSpeedTest.find_fastest(mirrors)
+        if fastest:
+            return self._install_from_zip(package_name, fastest.url_info, update_deps=True)
+        else:
+            print(f"  所有镜像均不可达，尝试逐个安装...")
+            for mirror_url in mirrors:
+                print(f"  尝试: {mirror_url}")
+                if self._install_from_git(package_name, mirror_url):
+                    return True
+            print(f"错误: 所有镜像安装失败")
+            return False
 
     def install_from_git(self, git_url: str, package_name: Optional[str] = None) -> bool:
         """从 Git 仓库安装包"""
@@ -555,7 +771,7 @@ class PackageInstaller:
         # 回退：git clone
         return self._install_from_git_clone(package_name, git_url)
 
-    def _install_from_zip(self, package_name: str, url_info: GitUrlInfo) -> bool:
+    def _install_from_zip(self, package_name: str, url_info: GitUrlInfo, update_deps: bool = False) -> bool:
         """通过 ZIP 下载安装"""
         dest_dir = self._packages_dir / package_name
 
@@ -569,6 +785,8 @@ class PackageInstaller:
 
         if success:
             print(f"  已安装到: {dest_dir}")
+            if update_deps:
+                self._update_dependencies(package_name, f"path = \"packages/{package_name}\"")
 
         return success
 
