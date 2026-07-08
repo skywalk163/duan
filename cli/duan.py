@@ -615,6 +615,12 @@ def cmd_install(args):
     run_install(args)
 
 
+def cmd_publish(args):
+    """发布包"""
+    from package_installer import run_publish
+    run_publish(args)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # AI Copilot 子命令
 # ═══════════════════════════════════════════════════════════════════
@@ -934,7 +940,13 @@ def main():
     install_p.add_argument('--list', action='store_true', help='列出已安装的包')
     install_p.add_argument('--registry', action='store_true', help='列出注册中心所有包')
     install_p.add_argument('--uninstall', default=None, help='卸载包')
+    install_p.add_argument('--update-registry', action='store_true', help='从远程更新本地注册表缓存')
+    install_p.add_argument('--registry-url', default=None, help='远程注册表 URL')
     install_p.add_argument('-p', '--project', default='.', help='项目目录')
+
+    # ── publish ──
+    publish_p = subparsers.add_parser('publish', help='发布包（生成注册表条目并显示 PR 指引）')
+    publish_p.add_argument('-p', '--project', default='.', help='项目目录')
 
     args = parser.parse_args()
 
@@ -977,6 +989,9 @@ def main():
         sys.exit(0)
     elif args.command == 'install':
         cmd_install(args)
+        sys.exit(0)
+    elif args.command == 'publish':
+        cmd_publish(args)
         sys.exit(0)
 
 

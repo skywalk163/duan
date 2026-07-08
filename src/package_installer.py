@@ -1001,7 +1001,12 @@ class PackageInstaller:
 def run_install(args):
     """运行安装命令"""
     project_root = Path(args.project or '.').resolve()
-    installer = PackageInstaller(project_root=project_root)
+    registry_url = getattr(args, 'registry_url', None)
+    installer = PackageInstaller(project_root=project_root, registry_url=registry_url)
+
+    if args.update_registry:
+        _cmd_update_registry(installer)
+        return
 
     if args.list:
         _cmd_list(installer)
@@ -1042,7 +1047,11 @@ def run_install(args):
     print("  --list              列出已安装的包")
     print("  --registry          列出注册中心所有包")
     print("  --uninstall <包名>  卸载包")
+    print("  --update-registry   从远程更新本地注册表缓存")
     print("  -p, --project <目录> 指定项目目录")
+    print()
+    print("发布你的包:")
+    print("  duan publish        生成注册表条目并显示 PR 提交指引")
     print()
     print("示例:")
     print("  duan install 标准数学扩展")
@@ -1092,6 +1101,129 @@ def _cmd_search(installer: PackageInstaller, keyword: str):
         print()
     print("-" * 60)
     print(f"共 {len(results)} 个结果")
+
+
+def _cmd_update_registry(installer: PackageInstaller):
+    """从远程更新本地注册表缓存"""
+    print("正在更新注册表缓存...")
+    if not installer.registry_url:
+        print("未配置远程注册表 URL")
+        print()
+        print("设置方法:")
+        print("  duan install --registry-url https://gitcode.com/duan-lang/registry/raw/main/registry.json")
+        return
+
+    try:
+        req = urllib.request.Request(installer.registry_url, headers={
+            'User-Agent': 'duan-package-installer/1.0'
+        })
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            remote = json.loads(resp.read().decode('utf-8'))
+        installer._registry['packages'].update(remote.get('packages', {}))
+        installer._save_registry_cache()
+        count = len(remote.get('packages', {}))
+        print(f"注册表已更新，共 {count} 个远程包")
+        installer._registry['updated_at'] = remote.get('updated_at', 'unknown')
+    except Exception as e:
+        print(f"更新失败: {e}")
+
+
+def run_publish(args):
+    """发布包 — 生成注册表条目并显示 PR 提交指引"""
+    project_root = Path(args.project or '.').resolve()
+    toml_path = project_root / 'package.toml'
+
+    if not toml_path.exists():
+        print("错误: 当前目录没有 package.toml")
+        print()
+        print("创建 package.toml 示例:")
+        print("  duan init --template lib")
+        return
+
+    # 读取并验证 package.toml
+    try:
+        from package_manager import TomlParser
+        content = toml_path.read_text(encoding='utf-8')
+        data = TomlParser().parse(content)
+        pkg = data.get('package', {})
+    except Exception as e:
+        print(f"错误: 无法解析 package.toml: {e}")
+        return
+
+    # 验证必填字段
+    name = pkg.get('name', '')
+    version = pkg.get('version', '')
+    description = pkg.get('description', '')
+    author = pkg.get('author', '')
+
+    errors = []
+    if not name:
+        errors.append("  [package] name 未设置")
+    if not version:
+        errors.append("  [package] version 未设置")
+    if not description:
+        errors.append("  [package] description 未设置（建议填写）")
+
+    if not name or not version:
+        print("错误: package.toml 缺少必填字段:")
+        for e in errors:
+            print(e)
+        return
+
+    # 获取 mirrors
+    mirrors = pkg.get('mirrors', [])
+    if not mirrors:
+        # 尝试从 git 和 url 字段推导
+        git_url = pkg.get('git', '') or pkg.get('url', '') or pkg.get('repository', '')
+        if git_url:
+            mirrors = [git_url]
+        else:
+            print("提示: 未配置 mirrors，请至少添加一个 Git 仓库地址")
+            print("  在 package.toml 的 [package] 中添加:")
+            print("  mirrors = [")
+            print('      "https://gitcode.com/你的用户名/仓库名.git",')
+            print('      "https://github.com/你的用户名/仓库名.git",')
+            print("  ]")
+            return
+
+    # 获取关键词
+    keywords = pkg.get('keywords', [])
+
+    # 生成注册表条目
+    entry = {
+        "name": name,
+        "version": version,
+        "description": description,
+        "author": author,
+        "mirrors": mirrors,
+        "keywords": keywords
+    }
+
+    print("=" * 60)
+    print("  包注册表条目已生成")
+    print("=" * 60)
+    print()
+    print(json.dumps(entry, ensure_ascii=False, indent=2))
+    print()
+    print("=" * 60)
+    print("  发布步骤")
+    print("=" * 60)
+    print()
+    print("  1. Fork 注册表仓库:")
+    print("     https://gitcode.com/duan-lang/registry")
+    print()
+    print("  2. 在 registry.json 的 packages 中添加以上条目")
+    print()
+    print("  3. 提交 PR（Pull Request）")
+    print()
+    print("  4. PR 合并后，用户即可通过以下命令安装你的包:")
+    print(f"     duan install {name}")
+    print()
+    print("  注意事项:")
+    print("  - 确保 mirrors 中的仓库已推送且公开")
+    print("  - 版本号遵循语义化版本（如 1.0.0）")
+    print("  - 包名不要与已有包重名")
+    print("  - 添加合适的 keywords 方便用户搜索")
 
 
 def _cmd_list_registry(installer: PackageInstaller):
