@@ -668,6 +668,7 @@ class DuanCompiler:
         self._config = DuanConfig()
         self.errors: List[str] = []
         self.warnings: List[str] = []
+        self._typed_errors = []  # 结构化类型错误（携带位置信息）
         # 项目级扩展
         self.project_root: Optional[Path] = Path(project_root) if project_root else None
         # 跨模块符号缓存：module_name -> { symbol_name: symbol_info }
@@ -942,9 +943,12 @@ class DuanCompiler:
         self._inferencer = TypeInferencer()
         self._inferencer.infer(module)
 
-        # 聚合类型推断错误
+        # 聚合类型推断错误（字符串列表，保持向后兼容）
         if hasattr(self._inferencer, 'errors'):
             self.errors.extend(self._inferencer.errors)
+        # 也保存结构化错误（携带位置信息）
+        if hasattr(self._inferencer, 'get_typed_errors'):
+            self._typed_errors = self._inferencer.get_typed_errors()
 
         # 分级类型检查
         if source:

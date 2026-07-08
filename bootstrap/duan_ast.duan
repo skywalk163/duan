@@ -187,6 +187,24 @@
   列表追加(node, prop_name)
   返回 node
 
+段落 make_list_literal 接收 elements：
+  定义 node 等于 列表创建()
+  列表追加(node, "list_literal")
+  列表追加(node, elements)
+  返回 node
+
+段落 make_dict_literal 接收 pairs：
+  定义 node 等于 列表创建()
+  列表追加(node, "dict_literal")
+  列表追加(node, pairs)
+  返回 node
+
+段落 make_template_string 接收 value：
+  定义 node 等于 列表创建()
+  列表追加(node, "template_string")
+  列表追加(node, value)
+  返回 node
+
 # =============================================================================
 # Node access utilities
 # =============================================================================

@@ -17,8 +17,15 @@ duan/
 │   └── self_hosted/      # 自举测试代码
 ├── bootstrap/            # 自举相关代码
 ├── docs/                 # 文档
+│   ├── specs/            # 规格说明文档
+│   └── superpowers/      # 进阶功能设计文档
 ├── examples/             # 示例代码
+│   ├── modules/          # 模块示例
+│   └── bootstrap_*.duan  # 自举示例
 ├── src/                  # 核心源代码
+│   ├── llvm/             # LLVM 后端
+│   ├── optimizer/        # 优化器
+│   └── stdlib/           # 标准库
 └── tests/                # 测试套件
 ```
 
@@ -201,11 +208,150 @@ export LC_ALL=en_US.UTF-8  # Linux/macOS
 
 欢迎贡献代码！请遵循以下步骤：
 
-1. Fork 仓库
-2. 创建特性分支 (`git checkout -b feature/xxx`)
-3. 提交更改 (`git commit -m 'Add xxx'`)
-4. 推送到分支 (`git push origin feature/xxx`)
-5. 创建 Pull Request
+### 1. Fork 仓库
+
+首先 Fork 段言仓库到您的 GitHub 账户。
+
+### 2. 创建特性分支
+
+```bash
+git checkout -b feature/xxx   # 特性开发
+git checkout -b fix/xxx       # Bug 修复
+git checkout -b docs/xxx      # 文档更新
+```
+
+### 3. 提交更改
+
+请遵循 Conventional Commits 规范：
+
+```bash
+# 特性开发
+git commit -m 'feat: 添加类型注解支持'
+
+# Bug 修复
+git commit -m 'fix: 修复变量声明解析错误'
+
+# 文档更新
+git commit -m 'docs: 更新开发指南'
+
+# 代码重构
+git commit -m 'refactor: 优化代码生成器'
+
+# 测试更新
+git commit -m 'test: 添加类型注解测试用例'
+```
+
+### 4. 推送到分支
+
+```bash
+git push origin feature/xxx
+```
+
+### 5. 创建 Pull Request
+
+在 GitHub 上创建 Pull Request，并描述您的更改内容。
+
+### 贡献类型
+
+| 类型 | 说明 |
+|------|------|
+| **特性开发** | 添加新功能，如类型系统、新语法等 |
+| **Bug 修复** | 修复已知问题 |
+| **文档更新** | 更新文档、添加示例 |
+| **代码重构** | 优化代码结构，不改变功能 |
+| **性能优化** | 提升编译器/解释器性能 |
+| **标准库扩展** | 添加新的标准库模块 |
+
+### PR 检查清单
+
+- [ ] 代码遵循项目代码规范
+- [ ] 添加了相应的测试用例
+- [ ] 所有测试通过 (`pytest`)
+- [ ] 文档已更新（如需要）
+- [ ] 提交信息符合规范
+
+## 标准库模块添加流程
+
+### 1. 创建模块文件
+
+在 `src/stdlib/` 目录下创建新的模块文件：
+
+```bash
+touch src/stdlib/my_module.py
+```
+
+### 2. 实现模块功能
+
+模块文件应导出一个 `duan_module` 字典，包含模块名称和导出的函数/类：
+
+```python
+# src/stdlib/my_module.py
+
+def 我的函数(参数):
+    """函数说明"""
+    return 参数
+
+duan_module = {
+    'name': '我的模块',
+    'exports': {
+        '我的函数': 我的函数,
+    }
+}
+```
+
+### 3. 注册模块
+
+在 `src/stdlib/__init__.py` 中注册新模块：
+
+```python
+# src/stdlib/__init__.py
+
+MODULES = {
+    # ... 现有模块 ...
+    '我的模块': 'my_module',
+}
+```
+
+### 4. 添加测试
+
+在 `tests/` 目录下创建对应的测试文件：
+
+```python
+# tests/test_my_module.py
+
+def test_my_function():
+    from stdlib.my_module import 我的函数
+    assert 我的函数(10) == 10
+```
+
+### 5. 运行测试
+
+```bash
+pytest tests/test_my_module.py -v
+```
+
+### 标准库模块规范
+
+- 模块名使用中文
+- 函数/类名使用中文
+- 提供详细的文档字符串
+- 遵循段言命名规范
+- 确保跨平台兼容性
+
+## 代码审查流程
+
+1. PR 创建后，自动运行 CI 测试
+2. 核心开发人员进行代码审查
+3. 根据反馈进行修改
+4. 审查通过后合并到主分支
+
+## 问题反馈
+
+如果遇到问题或有建议，请在 GitHub Issues 中提交：
+
+- **Bug 报告**: 描述问题、复现步骤、期望结果
+- **功能请求**: 描述期望的功能
+- **文档问题**: 描述文档中的问题
 
 ## 许可证
 

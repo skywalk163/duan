@@ -1,5 +1,5 @@
 # bootstrap_v3.duan - v3.2 自举编译器（合并版）
-# 由 _merge_v3.py 自动生成
+# 由 merge_bootstrap.py 自动生成
 
 
 # ===== token.duan =====
@@ -257,10 +257,10 @@
   列表追加(node, prop_name)
   返回 node
 
-段落 make_list_literal 接收 elems：
+段落 make_list_literal 接收 elements：
   定义 node 等于 列表创建()
   列表追加(node, "list_literal")
-  列表追加(node, elems)
+  列表追加(node, elements)
   返回 node
 
 段落 make_dict_literal 接收 pairs：
@@ -269,10 +269,10 @@
   列表追加(node, pairs)
   返回 node
 
-段落 make_template_string 接收 parts：
+段落 make_template_string 接收 value：
   定义 node 等于 列表创建()
   列表追加(node, "template_string")
-  列表追加(node, parts)
+  列表追加(node, value)
   返回 node
 
 # =============================================================================
@@ -1179,9 +1179,12 @@
   如果 p 小于 列表长度(tokens)：
     定义 next_tok 等于 列表获取(tokens, p)
     定义 ttype 等于 字典获取(next_tok, "种别")
-    如果 ttype 等于 "句号" 或 ttype 等于 "反缩进" 或 ttype 等于 "结束"：
+    如果 ttype 等于 "句号"：
       定义 node 等于 make_return(空)
       返回 [node, p 加 1]
+    如果 ttype 等于 "反缩进" 或 ttype 等于 "结束"：
+      定义 node 等于 make_return(空)
+      返回 [node, p]
     定义 result 等于 parse_expr(tokens, p)
     定义 node 等于 make_return(列表获取(result, 0))
     p 等于 列表获取(result, 1)
@@ -1263,7 +1266,7 @@
       定义 block_result 等于 parse_block(tokens, p)
       定义 body 等于 列表获取(block_result, 0)
       p 等于 列表获取(block_result, 1)
-      # Skip dedent
+      # Skip one dedent
       如果 p 小于 列表长度(tokens)：
         定义 dedent_tok 等于 列表获取(tokens, p)
         如果 字典获取(dedent_tok, "种别") 等于 "反缩进"：
@@ -1294,7 +1297,7 @@
       定义 block_result 等于 parse_block(tokens, p)
       定义 body 等于 列表获取(block_result, 0)
       p 等于 列表获取(block_result, 1)
-      # Skip dedent
+      # Skip one dedent
       如果 p 小于 列表长度(tokens)：
         定义 dedent_tok 等于 列表获取(tokens, p)
         如果 字典获取(dedent_tok, "种别") 等于 "反缩进"：
@@ -1302,6 +1305,9 @@
   # Parse elif branches (否则若 / 否则 如果)
   定义 elif_branches 等于 列表创建()
   当 p 小于 列表长度(tokens)：
+    定义 p 等于 skip_newlines(tokens, p)
+    如果 p 大于等于 列表长度(tokens)：
+      跳出
     定义 elif_tok 等于 列表获取(tokens, p)
     定义 is_elif 为 假
     定义 elif_p 为 p
@@ -1336,6 +1342,7 @@
           定义 br 等于 parse_block(tokens, p)
           定义 elif_body 等于 列表获取(br, 0)
           p 等于 列表获取(br, 1)
+          # Skip one dedent
           如果 p 小于 列表长度(tokens)：
             定义 de 等于 列表获取(tokens, p)
             如果 字典获取(de, "种别") 等于 "反缩进"：
@@ -1348,6 +1355,7 @@
     跳出
   # Parse else body
   定义 else_body 等于 空
+  定义 p 等于 skip_newlines(tokens, p)
   如果 p 小于 列表长度(tokens)：
     定义 else_tok 等于 列表获取(tokens, p)
     如果 字典获取(else_tok, "种别") 等于 "关键字" 且 字典获取(else_tok, "值") 等于 "否则"：
@@ -1366,6 +1374,7 @@
           定义 br 等于 parse_block(tokens, p)
           定义 eb 等于 列表获取(br, 0)
           p 等于 列表获取(br, 1)
+          # Skip one dedent
           如果 p 小于 列表长度(tokens)：
             定义 de 等于 列表获取(tokens, p)
             如果 字典获取(de, "种别") 等于 "反缩进"：
@@ -1440,7 +1449,7 @@
       定义 block_result 等于 parse_block(tokens, p)
       定义 body 等于 列表获取(block_result, 0)
       p 等于 列表获取(block_result, 1)
-      # Skip dedent
+      # Skip one dedent
       如果 p 小于 列表长度(tokens)：
         定义 dedent_tok 等于 列表获取(tokens, p)
         如果 字典获取(dedent_tok, "种别") 等于 "反缩进"：
@@ -1738,10 +1747,6 @@
     返回 "_duan_builtin.替换字符串"
   如果 name 等于 "去除空白" 或 name 等于 "去空格"：
     返回 "_duan_builtin.去除空白"
-  如果 name 等于 "转大写"：
-    返回 "_duan_builtin.转大写"
-  如果 name 等于 "转小写"：
-    返回 "_duan_builtin.转小写"
   如果 name 等于 "列表排序" 或 name 等于 "排序"：
     返回 "_duan_builtin.列表排序"
   如果 name 等于 "列表反转" 或 name 等于 "反转"：
@@ -2148,8 +2153,6 @@
   add_line(state, "_duan_builtin.连接字符串 = lambda parts, sep='': sep.join(parts)")
   add_line(state, "_duan_builtin.替换字符串 = lambda s, old, new: s.replace(old, new)")
   add_line(state, "_duan_builtin.去除空白 = lambda s: s.strip()")
-  add_line(state, "_duan_builtin.转大写 = lambda s: s.upper()")
-  add_line(state, "_duan_builtin.转小写 = lambda s: s.lower()")
   add_line(state, "_duan_builtin.列表排序 = lambda lst, reverse=False: lst.sort(reverse=reverse)")
   add_line(state, "_duan_builtin.列表反转 = lambda lst: lst.reverse()")
   add_line(state, "_duan_builtin.是整数 = lambda x: isinstance(x, int)")
@@ -2221,7 +2224,6 @@
   # 组合：头部 + 语句
   返回 header_result 加 "\n" 加 stmts_result
 
-
 # ===== compiler.duan =====
 # compiler.duan - Bootstrap compiler main entry point
 # v3.2 语法标准
@@ -2261,3 +2263,4 @@
 段落 main 接收 filepath：
   定义 py_code 等于 compile_file(filepath)
   打印(py_code)
+

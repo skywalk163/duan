@@ -75,6 +75,8 @@ class TypeInferencer:
         self.symbol_table = TypeSymbolTable()
         self.type_cache: Dict[int, Type] = {}
         self.errors: List[str] = []
+        # 结构化错误列表（携带位置信息）
+        self._typed_errors: List[TypeErrorInference] = []
 
         # 注册内置类型
         self._init_builtin_types()
@@ -125,6 +127,12 @@ class TypeInferencer:
     def _init_builtin_types(self):
         """初始化内置类型"""
         self._builtin_type_names = {'数', '串', '布尔', '空', '列表', '字典', '任意', '元组', '集合'}
+
+    def _add_error(self, message: str, node=None, line: int = 0, col: int = 0):
+        """添加类型错误（同时更新结构化错误列表和字符串列表）"""
+        err = TypeErrorInference(message, node, line, col)
+        self._typed_errors.append(err)
+        self.errors.append(str(err))
 
     # ---- 类型字符串解析 ----
     def _parse_type_string(self, type_str) -> Type:
@@ -189,16 +197,17 @@ class TypeInferencer:
             required = self.trait_defs[impl.trait_name]
             for method_name, func_type in required.methods.items():
                 if method_name not in methods:
-                    self.errors.append(
+                    self._add_error(
                         f"类型 '{impl.type_name}' 未实现接口 '{impl.trait_name}' "
-                        f"的必需方法 '{method_name}'"
+                        f"的必需方法 '{method_name}'",
+                        node=impl
                     )
                 else:
                     # 签名匹配检查
                     actual_ft = methods[method_name]
                     err = required.method_signature_matches(method_name, actual_ft)
                     if err:
-                        self.errors.append(f"类型 '{impl.type_name}' 实现接口 '{impl.trait_name}': {err}")
+                        self._add_error(f"类型 '{impl.type_name}' 实现接口 '{impl.trait_name}': {err}", node=impl)
 
     # ---- 主推断入口（HM 两阶段） ----
     def infer(self, module: Module) -> Dict[int, Type]:
@@ -207,6 +216,7 @@ class TypeInferencer:
         self.symbol_table = TypeSymbolTable()
         self.type_parser = TypeParser(self.symbol_table)
         self.errors = []
+        self._typed_errors = []
         self.enum_defs = {}
         self.trait_defs = {}
         self.trait_impls = {}
@@ -419,7 +429,7 @@ class TypeInferencer:
                     for body_stmt in segment.body:
                         self._infer_statement(body_stmt)
                 except Exception as e:
-                    self.errors.append(f"段 '{segment.name}' 推断异常: {e}")
+                    self._add_error(f"段 '{segment.name}' 推断异常: {e}", node=segment)
 
                 # 应用累积的替换
                 local_subs = self._hm_subs.clone()
@@ -547,8 +557,9 @@ class TypeInferencer:
         seen_methods = set()
         for method in trait_def.methods:
             if method.name in seen_methods:
-                self.errors.append(
-                    f"接口 '{trait_def.name}' 中存在重复方法 '{method.name}'"
+                self._add_error(
+                    f"接口 '{trait_def.name}' 中存在重复方法 '{method.name}'",
+                    node=trait_def
                 )
             seen_methods.add(method.name)
 
@@ -584,7 +595,7 @@ class TypeInferencer:
                 # 逐个检查接口方法是否被实现
                 self._check_class_implements_interface(cls.name, iface, class_method_sigs)
             else:
-                self.errors.append(f"类 '{cls.name}' 声明的接口 '{iface_name}' 未定义")
+                self._add_error(f"类 '{cls.name}' 声明的接口 '{iface_name}' 未定义", node=cls)
 
         # 更新符号表中该类的 ClassType，记录实现的接口
         sym = self.symbol_table.lookup(cls.name)
@@ -598,7 +609,7 @@ class TypeInferencer:
         """检查类是否完整实现了接口的所有方法（存在性 + 签名匹配）"""
         for method_name, required_ft in iface.methods.items():
             if method_name not in class_methods:
-                self.errors.append(
+                self._add_error(
                     f"类 '{class_name}' 未实现接口 '{iface.interface_name}' "
                     f"的必需方法 '{method_name}'"
                 )
@@ -606,7 +617,7 @@ class TypeInferencer:
             actual_ft = class_methods[method_name]
             err = iface.method_signature_matches(method_name, actual_ft)
             if err:
-                self.errors.append(
+                self._add_error(
                     f"类 '{class_name}' 实现接口 '{iface.interface_name}': {err}"
                 )
 
@@ -817,17 +828,19 @@ class TypeInferencer:
             except UnificationError:
                 # 合一失败：类型不匹配
                 if not expr_type.is_subtype_of(anno_type):
-                    self.errors.append(
+                    self._add_error(
                         f"类型不匹配: 变量 '{stmt.name}' 声明为 {anno_type}，"
-                        f"但初始值类型为 {expr_type}"
+                        f"但初始值类型为 {expr_type}",
+                        node=stmt
                     )
                 final_type = anno_type
 
         # 可空性检查
         if isinstance(expr_type, NullType) and type_annotation and '|空' not in type_annotation:
-            self.errors.append(
+            self._add_error(
                 f"空安全错误: 变量 '{stmt.name}' 声明为不可空类型 {type_annotation}，"
-                f"但不能赋值为空"
+                f"但不能赋值为空",
+                node=stmt
             )
 
         is_mutable = getattr(stmt, 'is_mutable', False)
@@ -860,8 +873,9 @@ class TypeInferencer:
             for name in destructure_names:
                 is_mutable = getattr(stmt, 'is_mutable', False)
                 self.symbol_table.define(name, 'variable', TYPE_UNKNOWN, is_mutable)
-            self.errors.append(
-                f"解构赋值期望元组或列表类型，实际为 {expr_type}"
+            self._add_error(
+                f"解构赋值期望元组或列表类型，实际为 {expr_type}",
+                node=stmt
             )
 
         result_type = expr_type  # 整个解构表达式的类型
@@ -877,8 +891,9 @@ class TypeInferencer:
             symbol = self.symbol_table.lookup(target_name)
             if symbol:
                 if not symbol.is_mutable:
-                    self.errors.append(
-                        f"不可变变量 '{target_name}' 不能重新赋值"
+                    self._add_error(
+                        f"不可变变量 '{target_name}' 不能重新赋值",
+                        node=stmt
                     )
                 # 类型兼容检查（使用合一）
                 try:
@@ -887,9 +902,10 @@ class TypeInferencer:
                     self.symbol_table.update_type(target_name, updated)
                 except UnificationError as e:
                     if not value_type.is_subtype_of(symbol.data_type):
-                        self.errors.append(
+                        self._add_error(
                             f"类型不匹配: 变量 '{target_name}' 类型为 {symbol.data_type}，"
-                            f"不能赋值为 {value_type} ({e.message})"
+                            f"不能赋值为 {value_type} ({e.message})",
+                            node=stmt
                         )
             self.type_cache[id(stmt)] = value_type
             return value_type
@@ -905,8 +921,9 @@ class TypeInferencer:
     def _infer_if_stmt(self, stmt) -> Type:
         cond_type = self._infer_expr(stmt.condition)
         if not isinstance(cond_type, (BooleanType, AnyType, UnknownType)):
-            self.errors.append(
-                f"条件表达式类型应为布尔，实际为 {cond_type}"
+            self._add_error(
+                f"条件表达式类型应为布尔，实际为 {cond_type}",
+                node=stmt
             )
 
         self.symbol_table.enter_scope()
@@ -951,8 +968,9 @@ class TypeInferencer:
     def _infer_while_stmt(self, stmt) -> Type:
         cond_type = self._infer_expr(stmt.condition)
         if not isinstance(cond_type, (BooleanType, AnyType, UnknownType)):
-            self.errors.append(
-                f"循环条件类型应为布尔，实际为 {cond_type}"
+            self._add_error(
+                f"循环条件类型应为布尔，实际为 {cond_type}",
+                node=stmt
             )
 
         self.symbol_table.enter_scope()
@@ -982,15 +1000,17 @@ class TypeInferencer:
                     self._current_return_type = resolved
                 except UnificationError:
                     if not return_type.is_subtype_of(self._current_return_type):
-                        self.errors.append(
-                            f"返回类型不匹配: 期望 {self._current_return_type}，实际为 {return_type}"
+                        self._add_error(
+                            f"返回类型不匹配: 期望 {self._current_return_type}，实际为 {return_type}",
+                            node=stmt
                         )
             self.type_cache[id(stmt)] = return_type
             return return_type
         else:
             if self._current_return_type and not isinstance(self._current_return_type, (NullType, UnknownType, AnyType)):
-                self.errors.append(
-                    f"返回类型不匹配: 期望 {self._current_return_type}，但无返回值"
+                self._add_error(
+                    f"返回类型不匹配: 期望 {self._current_return_type}，但无返回值",
+                    node=stmt
                 )
             return TYPE_NULL
 
@@ -1014,8 +1034,9 @@ class TypeInferencer:
                 if case.guard:
                     guard_type = self._infer_expr(case.guard)
                     if not isinstance(guard_type, (BooleanType, AnyType, UnknownType)):
-                        self.errors.append(
-                            f"匹配守卫条件类型应为布尔，实际为 {guard_type}"
+                        self._add_error(
+                            f"匹配守卫条件类型应为布尔，实际为 {guard_type}",
+                            node=stmt
                         )
 
                 for s in case.body:
@@ -1033,9 +1054,10 @@ class TypeInferencer:
                     if v not in matched_variants:
                         unmatched.append(v)
                 if unmatched:
-                    self.errors.append(
+                    self._add_error(
                         f"非穷尽匹配: 枚举 '{subject_type.enum_name}' 的以下变体未处理: "
-                        + ", ".join(unmatched)
+                        + ", ".join(unmatched),
+                        node=stmt
                     )
         else:
             for case in stmt.cases:
@@ -1120,14 +1142,16 @@ class TypeInferencer:
                 return isinstance(t, (OptionalTypeWrapper, NullType))
 
             if _is_nullable(left_type) and not isinstance(right_type, (AnyType, UnknownType, TypeVar)):
-                self.errors.append(
+                self._add_error(
                     f"可空类型不能直接参与运算 '{op}': 左侧类型为 {left_type}，"
-                    f"需要先使用 '!' 或 'unwrap()' 解包"
+                    f"需要先使用 '!' 或 'unwrap()' 解包",
+                    node=expr
                 )
             if _is_nullable(right_type) and not isinstance(left_type, (AnyType, UnknownType, TypeVar)):
-                self.errors.append(
+                self._add_error(
                     f"可空类型不能直接参与运算 '{op}': 右侧类型为 {right_type}，"
-                    f"需要先使用 '!' 或 'unwrap()' 解包"
+                    f"需要先使用 '!' 或 'unwrap()' 解包",
+                    node=expr
                 )
 
             # 小工具：HM 风格双向合一，把 TypeVar 约束为具体类型
@@ -1186,7 +1210,7 @@ class TypeInferencer:
                     unify(left_type, TYPE_NUMBER)
                     unify(right_type, TYPE_NUMBER)
                 except UnificationError:
-                    self.errors.append(f"算术运算 '{op}' 需要数字类型，但得到 {left_type} 和 {right_type}")
+                    self._add_error(f"算术运算 '{op}' 需要数字类型，但得到 {left_type} 和 {right_type}", node=expr)
                 result_type = TYPE_NUMBER
             elif op in ('>', '<', '>=', '<=', '==', '!=', '等于', '不等于', '大于', '小于', '大于等于', '小于等于'):
                 result_type = TYPE_BOOLEAN
@@ -1410,7 +1434,7 @@ class TypeInferencer:
             if expr.condition:
                 cond_type = self._infer_expr(expr.condition)
                 if not isinstance(cond_type, (BooleanType, AnyType, UnknownType)):
-                    self.errors.append(f"列表推导过滤条件类型应为布尔，实际为 {cond_type}")
+                    self._add_error(f"列表推导过滤条件类型应为布尔，实际为 {cond_type}", node=expr)
             elem_type = self._infer_expr(expr.expression)
             self.symbol_table.exit_scope()
             result_type = ListType(elem_type)
@@ -1427,7 +1451,7 @@ class TypeInferencer:
         elif is_instance(expr, 'ConditionalExpression'):
             cond_type = self._infer_expr(expr.condition)
             if not isinstance(cond_type, (BooleanType, AnyType, UnknownType)):
-                self.errors.append(f"条件表达式类型应为布尔，实际为 {cond_type}")
+                self._add_error(f"条件表达式类型应为布尔，实际为 {cond_type}", node=expr)
             then_type = self._infer_expr(expr.then_expr)
             if expr.else_expr:
                 else_type = self._infer_expr(expr.else_expr)
@@ -1535,9 +1559,10 @@ class TypeInferencer:
 
             # 检查参数数量
             if len(arg_types) != len(instantiated.param_types):
-                self.errors.append(
+                self._add_error(
                     f"函数 '{func_name}' 需要 {len(instantiated.param_types)} 个参数，"
-                    f"但提供了 {len(arg_types)} 个"
+                    f"但提供了 {len(arg_types)} 个",
+                    node=expr
                 )
                 return instantiated.return_type
 
@@ -1548,9 +1573,10 @@ class TypeInferencer:
                     continue
                 # 其他任意情况下，只要实参是可空的，就报告解包问题
                 if isinstance(actual, (OptionalTypeWrapper, NullType)):
-                    self.errors.append(
+                    self._add_error(
                         f"函数 '{func_name}' 第 {i + 1} 个参数类型不可空，"
-                        f"但传入可空类型 {actual}，需要先使用 '!' 或 'unwrap()' 解包"
+                        f"但传入可空类型 {actual}，需要先使用 '!' 或 'unwrap()' 解包",
+                        node=expr
                     )
 
             # 若在段体推断上下文中，从 self._hm_subs 继承当前已知约束
@@ -1577,9 +1603,10 @@ class TypeInferencer:
                     subs = new_subs
                 except UnificationError:
                     if not actual.is_subtype_of(formal):
-                        self.errors.append(
+                        self._add_error(
                             f"函数 '{func_name}' 参数类型不匹配: "
-                            f"期望 {formal}，实际 {actual}"
+                            f"期望 {formal}，实际 {actual}",
+                            node=expr
                         )
 
             # 将替换应用到返回类型得到具体返回类型
@@ -1669,6 +1696,10 @@ class TypeInferencer:
     # ---- 公共辅助 ----
     def get_errors(self) -> List[str]:
         return self.errors
+
+    def get_typed_errors(self) -> List[TypeErrorInference]:
+        """获取结构化类型错误列表（携带位置信息）"""
+        return self._typed_errors
 
     def get_type_cache(self) -> Dict[int, Type]:
         return self.type_cache

@@ -12,7 +12,7 @@ import ast_nodes as ast_nodes_module
 
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr
-from ast_nodes_v3 import Assignment
+from ast_nodes_v3 import Assignment, TypeCheckToggleStmt
 
 
 # =============================================================================
@@ -48,6 +48,9 @@ class PythonCodeGenerator:
         
         # 是否需要导入 ABC/abstractmethod
         self._needs_abc = False
+        
+        # 运行时类型检查开关（默认关闭，零开销）
+        self._runtime_type_check = False
         
         # 中文数字映射
         self.chinese_numbers = {
@@ -259,6 +262,7 @@ class PythonCodeGenerator:
         # 添加标准库导入
         self._add_line("import sys")
         self._add_line("import os")
+        self._add_line("from typing import Any")
         self._add_line("")
         self._add_line("try:")
         self._add_line("    import importlib.util")
@@ -436,6 +440,30 @@ class PythonCodeGenerator:
             self._add_line("break")
         elif isinstance(stmt, ContinueStmt):
             self._add_line("continue")
+        elif isinstance(stmt, TypeCheckToggleStmt):
+            # 类型检查开关
+            self._runtime_type_check = stmt.enable
+            action = "开启" if stmt.enable else "关闭"
+            if stmt.enable:
+                # 生成运行时类型检查辅助函数（仅一次）
+                if not hasattr(self, '_type_check_helper_added'):
+                    self._add_line("# 运行时类型检查已开启")
+                    self._add_line("def _duan_check_type(value, expected_type, var_name=''):")
+                    self.indent_level += 1
+                    self._add_line("actual_type = type(value).__name__")
+                    self._add_line("type_map = {'int': '整数', 'float': '小数', 'str': '文本', 'bool': '布尔', 'list': '列表', 'dict': '字典', 'set': '集合', 'type(None)': '空'}")
+                    self._add_line("actual_cn = type_map.get(actual_type, actual_type)")
+                    self._add_line("if expected_type and actual_cn != expected_type and expected_type != '任意':")
+                    self.indent_level += 1
+                    self._add_line("raise TypeError(f'类型错误: 变量 {var_name} 期望类型 {expected_type}, 实际类型 {actual_cn}')")
+                    self.indent_level -= 1
+                    self._add_line("return value")
+                    self.indent_level -= 1
+                    self._type_check_helper_added = True
+                else:
+                    self._add_line(f"# {action}类型检查")
+            else:
+                self._add_line(f"# {action}类型检查")
         elif isinstance(stmt, TryStmt):
             self._generate_try_stmt(stmt)
         elif isinstance(stmt, ThrowStmt):
@@ -510,11 +538,46 @@ class PythonCodeGenerator:
         """生成变量声明"""
         name = self._sanitize_name(stmt.name)
         value = self._generate_expr(stmt.value)
+        
+        type_annotation = ''
+        if stmt.type_annotation:
+            python_type = self._map_type(stmt.type_annotation)
+            type_annotation = f': {python_type}'
+        
         # 类方法中，如果变量是类属性，使用 self. 前缀
         if self._in_class_method and stmt.name in self._class_attr_names:
-            self._add_line(f"self.{name} = {value}")
+            self._add_line(f"self.{name}{type_annotation} = {value}")
         else:
-            self._add_line(f"{name} = {value}")
+            self._add_line(f"{name}{type_annotation} = {value}")
+        
+        # 运行时类型检查（仅在开启时生成）
+        if self._runtime_type_check and stmt.type_annotation:
+            duan_type = stmt.type_annotation
+            if self._in_class_method and stmt.name in self._class_attr_names:
+                self._add_line(f"_duan_check_type(self.{name}, '{duan_type}', '{stmt.name}')")
+            else:
+                self._add_line(f"_duan_check_type({name}, '{duan_type}', '{stmt.name}')")
+    
+    def _map_type(self, duan_type: str) -> str:
+        """将段言类型名映射为Python类型名"""
+        type_map = {
+            '整数': 'int',
+            '小数': 'float',
+            '浮数': 'float',
+            '文本': 'str',
+            '串': 'str',
+            '布尔': 'bool',
+            '列表': 'list',
+            '列': 'list',
+            '字典': 'dict',
+            '典': 'dict',
+            '集合': 'set',
+            '集': 'set',
+            '任意': 'Any',
+            '空': 'None',
+            '数': 'float',
+        }
+        return type_map.get(duan_type, duan_type)
     
     def _generate_if_stmt(self, stmt: IfStmt):
         """生成条件语句"""
@@ -602,24 +665,43 @@ class PythonCodeGenerator:
         body_without_params = []
         for s in (stmt.body or []):
             if isinstance(s, Parameter):
-                params.append(self._sanitize_name(s.name))
+                params.append({'name': self._sanitize_name(s.name), 'type': s.type_annotation})
             elif isinstance(s, ParameterList):
-                # 处理参数列表语句
                 for param_name in s.params:
-                    params.append(self._sanitize_name(param_name))
+                    params.append({'name': self._sanitize_name(param_name), 'type': None})
             else:
                 body_without_params.append(s)
         
         # 如果段落头有参数定义，也加入
         for param in (stmt.params or []):
             param_name = self._sanitize_name(param['name'])
-            if param_name not in params:
-                params.append(param_name)
+            param_type = param.get('type')
+            existing = next((p for p in params if p['name'] == param_name), None)
+            if existing:
+                if param_type:
+                    existing['type'] = param_type
+            else:
+                params.append({'name': param_name, 'type': param_type})
         
-        params_str = ', '.join(params) if params else ''
+        # 生成带类型注解的参数列表
+        params_parts = []
+        for p in params:
+            if p['type']:
+                python_type = self._map_type(p['type'])
+                params_parts.append(f"{p['name']}: {python_type}")
+            else:
+                params_parts.append(p['name'])
+        
+        params_str = ', '.join(params_parts) if params_parts else ''
+        
+        # 生成返回类型注解
+        return_type_annotation = ''
+        if stmt.return_type:
+            python_return_type = self._map_type(stmt.return_type)
+            return_type_annotation = f" -> {python_return_type}"
         
         # 函数定义
-        self._add_line(f"def {name}({params_str}):")
+        self._add_line(f"def {name}({params_str}){return_type_annotation}:")
         
         old_in_function = self._in_function
         self._in_function = True

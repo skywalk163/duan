@@ -1072,10 +1072,16 @@ class TypeSymbolTable:
 class TypeErrorInference(Exception):
     """类型推断错误"""
 
-    def __init__(self, message: str, node=None):
+    def __init__(self, message: str, node=None, line: int = 0, col: int = 0):
         self.message = message
         self.node = node
-        super().__init__(f"类型错误: {message}")
+        self.line = line if line else (getattr(node, 'line', 0) if node else 0)
+        self.col = col if col else (getattr(node, 'column', 0) if node else 0)
+        location = f" (行 {self.line}" if self.line else ""
+        if self.col:
+            location += f", 列 {self.col}" if location else f" (列 {self.col}"
+        location += ")" if location else ""
+        super().__init__(f"类型错误{location}: {message}")
 
 
 # =============================================================================
@@ -1096,8 +1102,8 @@ class TypeParser:
         T|空                （可空类型）
     """
     _BASIC_MAP = {
-        '数': TYPE_NUMBER, '整数': TYPE_NUMBER, '浮点': TYPE_NUMBER,
-        '串': TYPE_STRING, '字符串': TYPE_STRING,
+        '数': TYPE_NUMBER, '整数': TYPE_NUMBER, '浮点': TYPE_NUMBER, '小数': TYPE_NUMBER,
+        '串': TYPE_STRING, '字符串': TYPE_STRING, '文本': TYPE_STRING,
         '布尔': TYPE_BOOLEAN, '逻辑': TYPE_BOOLEAN,
         '空': TYPE_NULL,
         '任意': TYPE_ANY, 'Any': TYPE_ANY,
@@ -1108,6 +1114,15 @@ class TypeParser:
         '元组': TupleType(),
     }
     _COMPOUND_KEYS = frozenset(['列表', 'List', '字典', 'Map', '映射', '集合', 'Set', '元组', 'Tuple'])
+    
+    # 中文类型语法糖映射
+    # 格式: "前缀+类型" → 复合类型
+    # 如 "整数列表" → ListType(NumberType)
+    # 如 "文本到整数字典" → DictType(StringType, NumberType)
+    _TYPE_SUGAR_LIST_SUFFIXES = frozenset(['列表', '列'])
+    _TYPE_SUGAR_SET_SUFFIXES = frozenset(['集合', '集'])
+    _TYPE_SUGAR_DICT_SEPARATOR = '到'
+    _TYPE_SUGAR_DICT_SUFFIXES = frozenset(['字典', '典'])
 
     def __init__(self, symbol_table: Optional[TypeSymbolTable] = None):
         self.symbol_table = symbol_table
@@ -1170,6 +1185,12 @@ class TypeParser:
         # 基本类型（预构建映射，避免每次创建 dict）
         if expr in TypeParser._BASIC_MAP:
             return TypeParser._BASIC_MAP[expr]
+        
+        # 中文类型语法糖：整数列表、文本到整数字典 等
+        sugar_result = self._parse_type_sugar(expr)
+        if sugar_result is not None:
+            return sugar_result
+        
         # 类型变量（大写开头或单字母）
         if self._looks_like_type_var(expr):
             # 优先从符号表解析
@@ -1180,6 +1201,63 @@ class TypeParser:
             return TypeVar(expr)
         # 否则：类/接口/枚举名称
         return ClassType(expr)
+
+    def _parse_type_sugar(self, expr: str) -> Optional[Type]:
+        """解析中文类型语法糖
+        
+        支持的语法糖：
+        - 整数列表 / 文本列表 → ListType(元素类型)
+        - 整数集合 / 文本集合 → SetType(元素类型)
+        - 文本到整数字典 → DictType(键类型, 值类型)
+        
+        Returns:
+            解析成功的 Type 对象，如果不匹配语法糖则返回 None
+        """
+        if not expr or len(expr) < 3:
+            return None
+        
+        # 检查列表语法糖：X列表 / X列
+        for suffix in self._TYPE_SUGAR_LIST_SUFFIXES:
+            if expr.endswith(suffix) and len(expr) > len(suffix):
+                prefix = expr[:-len(suffix)].strip()
+                elem_type = self._parse_basic_type_name(prefix)
+                if elem_type is not None:
+                    return ListType(elem_type)
+        
+        # 检查集合语法糖：X集合 / X集
+        for suffix in self._TYPE_SUGAR_SET_SUFFIXES:
+            if expr.endswith(suffix) and len(expr) > len(suffix):
+                prefix = expr[:-len(suffix)].strip()
+                elem_type = self._parse_basic_type_name(prefix)
+                if elem_type is not None:
+                    return SetType(elem_type)
+        
+        # 检查字典语法糖：X到Y字典 / X到Y典
+        for suffix in self._TYPE_SUGAR_DICT_SUFFIXES:
+            if expr.endswith(suffix) and len(expr) > len(suffix):
+                prefix = expr[:-len(suffix)].strip()
+                if self._TYPE_SUGAR_DICT_SEPARATOR in prefix:
+                    parts = prefix.split(self._TYPE_SUGAR_DICT_SEPARATOR, 1)
+                    if len(parts) == 2:
+                        key_type = self._parse_basic_type_name(parts[0].strip())
+                        val_type = self._parse_basic_type_name(parts[1].strip())
+                        if key_type is not None and val_type is not None:
+                            return DictType(key_type, val_type)
+        
+        return None
+    
+    def _parse_basic_type_name(self, name: str) -> Optional[Type]:
+        """解析基本类型名称（不包括复合类型）
+        
+        Returns:
+            对应的 Type 对象，如果不是基本类型则返回 None
+        """
+        if name in TypeParser._BASIC_MAP:
+            t = TypeParser._BASIC_MAP[name]
+            # 排除复合类型（列表、字典等无参数的基本映射）
+            if not isinstance(t, (ListType, DictType, SetType, TupleType)):
+                return t
+        return None
 
     def _looks_like_type_var(self, name: str) -> bool:
         """判断是否看起来像类型变量（单字母大写，或全大写标识符）"""

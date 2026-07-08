@@ -117,6 +117,32 @@ class ParserStmtMixin:
                 self._consume(TokenType.DOT)
             return ContinueStmt()
         
+        # 类型检查开关：开启类型检查 / 关闭类型检查
+        if tok.type == TokenType.KEYWORD and tok.value in ('开启', '关闭'):
+            next_tok = self._peek(1)
+            if next_tok and (next_tok.value == '类型' or next_tok.value == '类型检查'):
+                # 支持 "开启 类型检查" 和 "开启类型检查" 两种写法
+                if next_tok.value == '类型检查':
+                    # "类型检查" 作为一个整体标识符
+                    enable = tok.value == '开启'
+                    line, col = tok.line, tok.col
+                    self._consume(TokenType.KEYWORD)  # 开启/关闭
+                    self._consume()  # 类型检查（IDENTIFIER）
+                    if self._current() and self._current().type == TokenType.DOT:
+                        self._consume(TokenType.DOT)
+                    return TypeCheckToggleStmt(enable, line, col)
+                else:
+                    next_next = self._peek(2)
+                    if next_next and next_next.value == '检查':
+                        enable = tok.value == '开启'
+                        line, col = tok.line, tok.col
+                        self._consume(TokenType.KEYWORD)  # 开启/关闭
+                        self._consume(TokenType.KEYWORD)  # 类型
+                        self._consume()  # 检查（可能是 IDENTIFIER）
+                        if self._current() and self._current().type == TokenType.DOT:
+                            self._consume(TokenType.DOT)
+                        return TypeCheckToggleStmt(enable, line, col)
+        
         # 异常捕获：尝试
         if tok.type == TokenType.KEYWORD and tok.value == '尝试':
             return self._parse_try_stmt()
@@ -519,7 +545,7 @@ class ParserStmtMixin:
         return ImportStmt(module_name, symbols=symbols, alias=alias)
     
     def _parse_set_stmt(self) -> ASTNode:
-        """解析变量声明：设 变量名 为 值。或 解构赋值：设（甲，乙）为 元组。"""
+        """解析变量声明：设 变量名 为 值。或 设 变量 为 类型 = 值。或 解构赋值：设（甲，乙）为 元组。"""
         # 设
         self._consume(TokenType.KEYWORD, '设')
         
@@ -597,21 +623,51 @@ class ParserStmtMixin:
             elif type_tok and type_tok.type == TokenType.KEYWORD:
                 type_annotation = self._consume(TokenType.KEYWORD).value
         
-        # 为 / 等于（支持两种赋值关键字）
+        # 为（支持设 变量 为 值 和 设 变量 为 类型 = 值 两种语法）
         if self._match(TokenType.KEYWORD, '为'):
             self._consume(TokenType.KEYWORD, '为')
+            
+            # 检查是否是 设 变量 为 类型 = 值 语法
+            # 如果"为"后面是类型名（内置类型或标识符），后面跟着 = 或 等于，则是类型注解
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                next_tok = self._peek(1)
+                is_type_annotation = False
+                
+                # 判断下一个token是否是等号或"等于"关键字
+                if next_tok and (next_tok.type == TokenType.EQUALS or 
+                               (next_tok.type == TokenType.KEYWORD and next_tok.value == '等于')):
+                    is_type_annotation = True
+                elif next_tok and next_tok.type == TokenType.COLON:
+                    is_type_annotation = True
+                
+                if is_type_annotation:
+                    # 这是类型注解：设 x 为 整数 = 10
+                    type_tok = self._current()
+                    type_annotation = type_tok.value
+                    self._consume()
+                
+                # 处理 = 或 等于
+                if self._match(TokenType.EQUALS):
+                    self._consume(TokenType.EQUALS)
+                elif self._match(TokenType.KEYWORD, '等于'):
+                    self._consume(TokenType.KEYWORD, '等于')
+                
+                # 值
+                value = self._parse_expr()
+            else:
+                # 传统语法：设 x 为 值（没有类型注解）
+                value = self._parse_expr()
         elif self._match(TokenType.KEYWORD, '等于'):
             self._consume(TokenType.KEYWORD, '等于')
+            value = self._parse_expr()
         elif self._match(TokenType.EQUALS):
             self._consume(TokenType.EQUALS)
+            value = self._parse_expr()
         else:
             tok = self._current()
             raise ParseError(
                 f"期望'为'或'等于'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
                 tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None)
-        
-        # 值
-        value = self._parse_expr()
         
         # 句号（可选）
         if self._current() and self._current().type == TokenType.DOT:
@@ -1180,10 +1236,10 @@ class ParserStmtMixin:
                 if tok.type == TokenType.IDENTIFIER:
                     param_name = self._consume(TokenType.IDENTIFIER).value
                     param_type = None
+                    
+                    # 检查是否是 参数名: 类型 语法
                     if self._current() and self._current().type == TokenType.COLON:
                         next_tok = self._peek(1)
-                        # 检查冒号后面是否是类型注解
-                        # 类型注解不能是语句关键字（如返回、设、定义等）
                         if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.CHINESE_NUM) \
                                 and (next_tok.type != TokenType.KEYWORD or next_tok.value not in ('返回', '设', '定义', '当', '如果', '若', '遍历', '打印', '导入', '导出', '跳出', '跳过', '尝试', '抛出', '匹配')):
                             self._consume(TokenType.COLON)
@@ -1191,9 +1247,29 @@ class ParserStmtMixin:
                             if type_tok and type_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD, TokenType.CHINESE_NUM):
                                 param_type = self._consume().value
                         else:
-                            # 冒号后面不是类型，这是参数列表的结束
                             params.append({'name': param_name, 'type': param_type})
                             break
+                    # 检查是否是 参数名 类型名 语法（空格分隔，类型名是内置类型或普通标识符）
+                    elif self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        next_tok = self._current()
+                        next_next = self._peek(1)
+                        
+                        # 判断是否是类型名：
+                        # 1. 是内置类型
+                        # 2. 是标识符且下一个token是逗号、冒号、或关键字（返回、设等）
+                        is_type = False
+                        if next_tok.value in BUILTIN_TYPES:
+                            is_type = True
+                        elif next_tok.type == TokenType.IDENTIFIER:
+                            if next_next and (next_next.type == TokenType.COMMA or 
+                                             next_next.type == TokenType.COLON or
+                                             (next_next.type == TokenType.KEYWORD and 
+                                              (next_next.value == '返回' or next_next.value in _stmt_keywords))):
+                                is_type = True
+                        
+                        if is_type:
+                            param_type = self._consume().value
+                    
                     params.append({'name': param_name, 'type': param_type})
                 elif tok.type == TokenType.KEYWORD:
                     if tok.value == '接收':
@@ -1203,6 +1279,8 @@ class ParserStmtMixin:
                         break
                     param_name = self._consume(TokenType.KEYWORD).value
                     param_type = None
+                    
+                    # 检查是否是 参数名: 类型 语法
                     if self._current() and self._current().type == TokenType.COLON:
                         next_tok = self._peek(1)
                         if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD, TokenType.CHINESE_NUM):
@@ -1213,16 +1291,26 @@ class ParserStmtMixin:
                         else:
                             params.append({'name': param_name, 'type': param_type})
                             break
-                    if param_type is not None or not (self._current() and self._current().type == TokenType.COLON):
-                        params.append({'name': param_name, 'type': param_type})
+                    # 检查是否是 参数名 类型名 语法
+                    elif self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        next_tok = self._current()
+                        next_next = self._peek(1)
+                        if next_tok.value in BUILTIN_TYPES:
+                            param_type = self._consume().value
+                        elif next_tok.type == TokenType.IDENTIFIER and next_next and \
+                             (next_next.type == TokenType.COMMA or next_next.type == TokenType.COLON):
+                            param_type = self._consume().value
+                    
+                    params.append({'name': param_name, 'type': param_type})
                 else:
                     break
         
         return_type = None
-        if (self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '返回'
-            and self._peek(1) and self._peek(1).value in BUILTIN_TYPES):
-            self._consume(TokenType.KEYWORD, '返回')
-            return_type = self._consume().value
+        if (self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '返回'):
+            next_tok = self._peek(1)
+            if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                self._consume(TokenType.KEYWORD, '返回')
+                return_type = self._consume().value
         
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)

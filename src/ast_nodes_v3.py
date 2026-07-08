@@ -13,13 +13,18 @@ from typing import List, Any, Optional, Dict
 
 class ASTNode:
     """AST 节点基类"""
-    __slots__ = ()
+    __slots__ = ('line', 'col')
+    
+    def __init__(self, line: int = 0, col: int = 0):
+        self.line = line
+        self.col = col
 
 
 class Module(ASTNode):
     __slots__ = ('statements',)
     """模块"""
-    def __init__(self, statements: List[ASTNode]):
+    def __init__(self, statements: List[ASTNode], line: int = 0, col: int = 0):
+        super().__init__(line, col)
         self.statements = statements
     
     def __repr__(self):
@@ -39,7 +44,8 @@ class ParameterList(ASTNode):
 class VarDecl(ASTNode):
     __slots__ = ('name', 'value', 'type_annotation')
     """变量声明"""
-    def __init__(self, name: str, value: ASTNode, type_annotation: Optional[str] = None):
+    def __init__(self, name: str, value: ASTNode, type_annotation: Optional[str] = None, line: int = 0, col: int = 0):
+        super().__init__(line, col)
         self.name = name
         self.value = value
         self.type_annotation = type_annotation
@@ -203,6 +209,17 @@ class ContinueStmt(ASTNode):
     """跳过语句"""
     def __repr__(self):
         return "跳过"
+
+
+class TypeCheckToggleStmt(ASTNode):
+    __slots__ = ('enable',)
+    """类型检查开关语句：开启类型检查 / 关闭类型检查"""
+    def __init__(self, enable: bool, line: int = 0, col: int = 0):
+        super().__init__(line, col)
+        self.enable = enable
+    
+    def __repr__(self):
+        return f"TypeCheckToggle({'开启' if self.enable else '关闭'})"
 
 
 class TryStmt(ASTNode):

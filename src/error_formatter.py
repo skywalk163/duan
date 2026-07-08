@@ -146,6 +146,16 @@ class DuanErrorFormatter:
             'PermissionError': '权限不足',
             'ConnectionError': '连接错误',
             'TimeoutError': '超时错误',
+            'AssertionError': '断言失败',
+            'UnicodeDecodeError': 'Unicode解码错误',
+            'UnicodeEncodeError': 'Unicode编码错误',
+            'EOFError': '文件提前结束',
+            'FloatingPointError': '浮点运算错误',
+            'ReferenceError': '引用错误',
+            'TabError': 'Tab与空格混用',
+            'SystemError': '系统内部错误',
+            'SystemExit': '程序退出',
+            'KeyboardInterrupt': '用户中断',
         }
         return mapping.get(en_name, en_name)
 
@@ -194,35 +204,142 @@ class DuanErrorFormatter:
         if exc_name == 'NameError':
             suggestions.append("• 检查变量名是否拼写正确")
             suggestions.append("• 确认变量在使用前已经通过'设 ... 为'声明")
+            suggestions.append("• 检查变量是否在正确的作用域内（如在段落内部定义的变量不能在外部使用）")
             suggestions.append(f"  错误信息提示: {exc_msg}")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 x 为 10")
+            suggestions.append("          打印(x)")
+            suggestions.append("")
+            suggestions.append("    错误: 打印(x)")
+            suggestions.append("          设 x 为 10")
         elif exc_name == 'TypeError':
-            suggestions.append("• 检查操作数类型是否正确")
+            suggestions.append("• 检查操作数类型是否正确（如不能对文本进行乘法运算）")
             suggestions.append("• 确认函数调用时参数类型与声明一致")
+            suggestions.append("• 如果使用了类型注解，请检查实际传值是否符合类型要求")
             suggestions.append(f"  错误信息提示: {exc_msg}")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 x 为 整数 = 10")
+            suggestions.append("          设 y 为 整数 = 20")
+            suggestions.append("          打印(x 加 y)")
+            suggestions.append("")
+            suggestions.append("    错误: 设 x 为 文本 = \"hello\"")
+            suggestions.append("          打印(x 乘 2)")
         elif exc_name == 'IndexError':
-            suggestions.append("• 检查列表索引是否在有效范围内")
+            suggestions.append("• 检查列表索引是否在有效范围内（索引从0开始，长度为N的列表最大索引为N-1）")
             suggestions.append("• 可以先用 长度() 获取列表长度后再访问")
+            suggestions.append("• 使用 有() 方法判断索引是否有效")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 lst 为 [1, 2, 3]")
+            suggestions.append("          如 索引 < 长度(lst)：")
+            suggestions.append("              打印(lst[索引])")
+            suggestions.append("          否则：")
+            suggestions.append("              打印(\"索引越界\")")
         elif exc_name == 'KeyError':
             suggestions.append("• 检查字典键是否存在")
             suggestions.append("• 可以用 有() 方法先判断键是否存在")
+            suggestions.append("• 使用 获取() 方法提供默认值")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 d 为 {'名字': '张三'}")
+            suggestions.append("          如 有(d, '年龄')：")
+            suggestions.append("              打印(d['年龄'])")
+            suggestions.append("          否则：")
+            suggestions.append("              打印(获取(d, '年龄', 0))")
         elif exc_name == 'AttributeError':
             suggestions.append("• 检查对象是否拥有该属性或方法")
             suggestions.append("• 确认类名/对象名拼写正确")
+            suggestions.append("• 检查是否混淆了属性和方法（方法需要加括号调用）")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 s 为 \"hello\"")
+            suggestions.append("          打印(长度(s))")
+            suggestions.append("")
+            suggestions.append("    错误: 设 s 为 \"hello\"")
+            suggestions.append("          打印(s.长度)")
         elif exc_name == 'ZeroDivisionError':
             suggestions.append("• 检查除数是否为零")
-            suggestions.append("• 可以在除法前先判断除数")
+            suggestions.append("• 在除法前添加条件判断")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 除数 为 0")
+            suggestions.append("          如 除数 != 0：")
+            suggestions.append("              打印(10 / 除数)")
+            suggestions.append("          否则：")
+            suggestions.append("              打印(\"除数不能为零\")")
         elif exc_name == 'IndentationError':
             suggestions.append("• 检查缩进是否一致（段言使用 4 空格缩进）")
             suggestions.append("• 不要混用 Tab 和空格")
+            suggestions.append("• 确保所有同级语句缩进级别相同")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 段落 测试：")
+            suggestions.append("              打印(\"第一行\")")
+            suggestions.append("              打印(\"第二行\")")
+            suggestions.append("")
+            suggestions.append("    错误: 段落 测试：")
+            suggestions.append("              打印(\"第一行\")")
+            suggestions.append("            打印(\"缩进不一致\")")
         elif exc_name == 'FileNotFoundError':
             suggestions.append("• 检查文件路径是否正确")
+            suggestions.append("• 使用绝对路径或相对于当前目录的路径")
             suggestions.append("• 确认文件确实存在")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 内容 为 读取文件(\"data/文件.txt\")")
+            suggestions.append("")
+            suggestions.append("    错误: 设 内容 为 读取文件(\"不存在的文件.txt\")")
         elif exc_name == 'RecursionError':
             suggestions.append("• 检查函数是否存在无限递归")
             suggestions.append("• 增加递归终止条件")
+            suggestions.append("• 考虑使用循环替代递归")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 段落 递归(n):")
+            suggestions.append("              如 n <= 0:")
+            suggestions.append("                  返回 0")
+            suggestions.append("              返回 n 加 递归(n - 1)")
+            suggestions.append("")
+            suggestions.append("    错误: 段落 无限递归():")
+            suggestions.append("              返回 无限递归()")
+        elif exc_name == 'AssertionError':
+            suggestions.append("• 检查断言条件是否正确")
+            suggestions.append("• 确认前置条件满足")
+            suggestions.append("• 如果断言总是失败，请修改条件或移除断言")
+        elif exc_name == 'UnicodeDecodeError':
+            suggestions.append("• 检查文件编码是否正确")
+            suggestions.append("• 尝试指定编码格式（如 UTF-8）")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 设 内容 为 读取文件(\"文件.txt\", 编码=\"utf-8\")")
+        elif exc_name == 'ImportError' or exc_name == 'ModuleNotFoundError':
+            suggestions.append("• 检查模块名是否拼写正确")
+            suggestions.append("• 确认模块已安装或在标准库路径中")
+            suggestions.append("• 使用 导入 语句而不是直接使用模块名")
+            suggestions.append("")
+            suggestions.append("  示例：")
+            suggestions.append("    正确: 导入 数学")
+            suggestions.append("          打印(数学.π)")
+        elif exc_name == 'PermissionError':
+            suggestions.append("• 检查文件或目录的访问权限")
+            suggestions.append("• 以管理员/超级用户身份运行程序")
+            suggestions.append("• 确认目标路径有写入权限")
+        elif exc_name == 'TimeoutError':
+            suggestions.append("• 检查网络连接是否正常")
+            suggestions.append("• 增加超时时间")
+            suggestions.append("• 检查目标服务器是否可达")
         else:
             suggestions.append(f"• 详细错误信息: {exc_msg}")
             suggestions.append("• 可以查阅段言文档: docs/")
+            suggestions.append("• 访问段言官网获取更多帮助")
+
+        suggestions.append("")
+        suggestions.append("📖 更多帮助：")
+        suggestions.append("• 段言文档: https://docs.duan-lang.org")
+        suggestions.append("• 示例代码: examples/")
+        suggestions.append("• 常见问题: docs/FAQ.md")
 
         suggestions.append("")
         return suggestions

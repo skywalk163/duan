@@ -71,9 +71,22 @@ class SemanticAnalyzer(ASTVisitor):
         return symbol
     
     def check_types(self, expected: Type, actual: Type, node: ASTNode, context: str = ""):
-        """检查类型兼容性"""
-        if expected != actual:
-            self.add_error(f"类型不匹配{context}：期望 {expected}，得到 {actual}", node)
+        """检查类型兼容性（使用子类型关系，支持多态）"""
+        if expected is None or actual is None:
+            return
+        
+        # 相同类型直接通过
+        if expected == actual:
+            return
+        
+        # 尝试子类型检查（支持多态、可空类型等）
+        # 如果 Type 对象有 is_subtype_of 方法，使用它
+        if hasattr(expected, 'is_subtype_of'):
+            if expected.is_subtype_of(actual) or actual.is_subtype_of(expected):
+                return
+        
+        # 兼容性检查失败，报告错误
+        self.add_error(f"类型不匹配{context}：期望 {expected}，得到 {actual}", node)
     
     def visit_Module(self, node: Module):
         """访问模块"""
@@ -242,10 +255,8 @@ class SemanticAnalyzer(ASTVisitor):
         if not left_type or not right_type:
             return
         
-        # 检查操作数类型
-        if left_type != right_type:
-            self.add_error(f"二元运算操作数类型不匹配：{left_type} 和 {right_type}", node)
-            return
+        # 检查操作数类型兼容性（使用子类型关系）
+        self.check_types(left_type, right_type, node, "（二元运算）")
         
         # 设置结果类型
         node.inferred_type = left_type
