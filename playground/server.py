@@ -980,10 +980,383 @@ def get_shared_code(share_id):
     return jsonify(data)
 
 
+# ==================== 调试 API（Playground 调试器） ====================
+
+import threading
+
+_debug_sessions = {}
+_debug_lock = threading.Lock()
+
+
+def _get_debug_dir() -> str:
+    """获取调试会话存储目录"""
+    debug_dir = os.path.join(_script_dir, 'debug_sessions')
+    os.makedirs(debug_dir, exist_ok=True)
+    return debug_dir
+
+
+class PlaygroundDebugSession:
+    """Playground 调试会话"""
+
+    def __init__(self, session_id: str, source: str):
+        self.session_id = session_id
+        self.source = source
+        self.python_code = ''
+        self.running = False
+        self.paused = False
+        self.stopped = False
+        self.breakpoints = {}
+        self.variables = {}
+        self.call_stack = []
+        self.current_line = 0
+        self.output = []
+        self.errors = []
+        self._thread = None
+        self._pause_event = threading.Event()
+        self._pause_event.set()
+        self._step_mode = 'none'  # none, over, into, out
+        self._debugger = None
+        self._exec_namespace = {}
+        self._compile_errors = []
+
+    def compile(self):
+        """编译源代码"""
+        try:
+            from duan_parser_v3 import DuanParser
+            from code_generator import PythonCodeGenerator
+
+            parser = DuanParser()
+            module = parser.parse(self.source)
+            generator = PythonCodeGenerator()
+            self.python_code = generator.generate(module)
+            return True
+        except Exception as e:
+            self._compile_errors.append(str(e))
+            return False
+
+    def set_breakpoints(self, breakpoints: dict):
+        """设置断点 {line: condition}"""
+        self.breakpoints = breakpoints
+
+    def _trace_func(self, frame, event, arg):
+        """Python 跟踪函数"""
+        if self.stopped:
+            return None
+
+        filename = frame.f_code.co_filename
+        lineno = frame.f_lineno
+
+        if event == 'line':
+            # 检查是否应该在此行暂停
+            should_pause = False
+
+            if self._step_mode == 'into':
+                should_pause = True
+            elif self._step_mode == 'over':
+                should_pause = True
+            elif self._step_mode == 'out':
+                should_pause = True
+
+            if lineno in self.breakpoints:
+                should_pause = True
+
+            if should_pause:
+                self.paused = True
+                self.current_line = lineno
+                self.variables = {k: v for k, v in frame.f_locals.items() if not k.startswith('_')}
+
+                # 收集调用栈
+                self.call_stack = []
+                f = frame
+                while f is not None:
+                    self.call_stack.append({
+                        'name': f.f_code.co_name,
+                        'file': f.f_code.co_filename,
+                        'line': f.f_lineno
+                    })
+                    f = f.f_back
+
+                self._step_mode = 'none'
+                self._pause_event.clear()
+                self._pause_event.wait()
+
+                if self.stopped:
+                    return None
+
+            if self._step_mode == 'none':
+                pass
+
+        elif event == 'call':
+            if self._step_mode == 'into':
+                self.paused = True
+                self.current_line = frame.f_lineno
+                self.variables = {k: v for k, v in frame.f_locals.items() if not k.startswith('_')}
+                self._step_mode = 'none'
+                self._pause_event.clear()
+                self._pause_event.wait()
+
+        elif event == 'return':
+            if self._step_mode == 'out':
+                self.paused = True
+                self.current_line = frame.f_lineno
+                self.variables = {k: v for k, v in frame.f_locals.items() if not k.startswith('_')}
+                self._step_mode = 'none'
+                self._pause_event.clear()
+                self._pause_event.wait()
+
+        return self._trace_func
+
+    def _run_in_thread(self):
+        """在线程中执行代码"""
+        old_stdout = sys.stdout
+        output_capture = io.StringIO()
+        sys.stdout = output_capture
+
+        try:
+            import sys as _sys
+            _sys.settrace(self._trace_func)
+
+            compiled = compile(self.python_code, '<playground_debug>', 'exec')
+            self._exec_namespace = {
+                'print': lambda *a, **k: print(' '.join(str(x) for x in a), file=output_capture),
+                '__name__': '__main__',
+                '__file__': '<playground_debug>'
+            }
+            exec(compiled, self._exec_namespace)
+
+            _sys.settrace(None)
+        except Exception as e:
+            self.errors.append(f'运行时错误: {type(e).__name__}: {e}')
+            import traceback as tb
+            self.errors.append(tb.format_exc())
+        finally:
+            sys.stdout = old_stdout
+            self.output = output_capture.getvalue().split('\n')
+            self.output = [l for l in self.output if l.strip()]
+            self.stopped = True
+            self.paused = False
+            self.running = False
+
+    def start(self):
+        """启动调试会话"""
+        if not self.compile():
+            return False
+        self.running = True
+        self._thread = threading.Thread(target=self._run_in_thread, daemon=True)
+        self._thread.start()
+        return True
+
+    def step_over(self):
+        """单步跳过"""
+        self._step_mode = 'over'
+        self.paused = False
+        self._pause_event.set()
+
+    def step_into(self):
+        """单步进入"""
+        self._step_mode = 'into'
+        self.paused = False
+        self._pause_event.set()
+
+    def step_out(self):
+        """单步跳出"""
+        self._step_mode = 'out'
+        self.paused = False
+        self._pause_event.set()
+
+    def resume(self):
+        """继续执行"""
+        self._step_mode = 'none'
+        self.paused = False
+        self._pause_event.set()
+
+    def stop(self):
+        """停止调试"""
+        self.stopped = True
+        self.running = False
+        self.paused = False
+        self._pause_event.set()
+
+    def get_state(self) -> dict:
+        """获取当前调试状态"""
+        # 提取源代码行
+        source_lines = self.source.split('\n')
+        current_source = ''
+        if 1 <= self.current_line <= len(source_lines):
+            current_source = source_lines[self.current_line - 1].strip()
+
+        return {
+            'session_id': self.session_id,
+            'running': self.running,
+            'paused': self.paused,
+            'stopped': self.stopped,
+            'current_line': self.current_line,
+            'current_source': current_source,
+            'variables': self._serialize_variables(),
+            'call_stack': self.call_stack,
+            'output': self.output[-50:] if self.output else [],
+            'errors': self.errors,
+            'compile_errors': self._compile_errors,
+            'breakpoints': self.breakpoints,
+            'total_lines': len(source_lines)
+        }
+
+    def _serialize_variables(self) -> list:
+        """序列化变量为可JSON格式"""
+        result = []
+        for name, value in self.variables.items():
+            var_info = {
+                'name': name,
+                'type': type(value).__name__,
+                'value': self._format_var(value)
+            }
+            result.append(var_info)
+        return sorted(result, key=lambda x: x['name'])
+
+    def _format_var(self, value) -> str:
+        if value is None:
+            return '空'
+        if isinstance(value, bool):
+            return '真' if value else '假'
+        if isinstance(value, str):
+            if len(value) > 100:
+                return f'"{value[:97]}..."'
+            return f'"{value}"'
+        if isinstance(value, (list, tuple)):
+            if len(value) > 10:
+                return f'{type(value).__name__}[{len(value)}]'
+            return repr(value)
+        if isinstance(value, dict):
+            if len(value) > 5:
+                return f'字典[{len(value)}]'
+            return repr(value)
+        return repr(value)
+
+
+@app.route('/api/debug/start', methods=['POST'])
+def debug_start():
+    """启动调试会话"""
+    data = request.get_json(silent=True) or {}
+    code = data.get('code', '').strip()
+    breakpoints = data.get('breakpoints', {})
+
+    if not code:
+        return jsonify({'success': False, 'error': '代码不能为空'})
+
+    session_id = str(uuid.uuid4())[:8]
+    session = PlaygroundDebugSession(session_id, code)
+    session.set_breakpoints(breakpoints)
+
+    if not session.start():
+        return jsonify({
+            'success': False,
+            'error': '编译失败',
+            'compile_errors': session._compile_errors
+        })
+
+    with _debug_lock:
+        _debug_sessions[session_id] = session
+
+    import time as _time
+    _time.sleep(0.3)
+
+    state = session.get_state()
+    return jsonify({
+        'success': True,
+        'session_id': session_id,
+        'state': state
+    })
+
+
+@app.route('/api/debug/state/<session_id>', methods=['GET'])
+def debug_state(session_id):
+    """获取调试会话状态"""
+    with _debug_lock:
+        session = _debug_sessions.get(session_id)
+
+    if not session:
+        return jsonify({'error': '调试会话不存在或已结束'}), 404
+
+    state = session.get_state()
+    return jsonify(state)
+
+
+@app.route('/api/debug/step/<session_id>', methods=['POST'])
+def debug_step(session_id):
+    """单步执行"""
+    data = request.get_json(silent=True) or {}
+    action = data.get('action', 'over')
+
+    with _debug_lock:
+        session = _debug_sessions.get(session_id)
+
+    if not session:
+        return jsonify({'error': '调试会话不存在或已结束'}), 404
+
+    if action == 'over':
+        session.step_over()
+    elif action == 'into':
+        session.step_into()
+    elif action == 'out':
+        session.step_out()
+    elif action == 'continue':
+        session.resume()
+
+    import time as _time
+    _time.sleep(0.3)
+
+    state = session.get_state()
+    return jsonify({
+        'success': True,
+        'state': state
+    })
+
+
+@app.route('/api/debug/stop/<session_id>', methods=['POST'])
+def debug_stop(session_id):
+    """停止调试会话"""
+    with _debug_lock:
+        session = _debug_sessions.get(session_id)
+
+    if not session:
+        return jsonify({'error': '调试会话不存在或已结束'}), 404
+
+    session.stop()
+    state = session.get_state()
+
+    with _debug_lock:
+        _debug_sessions.pop(session_id, None)
+
+    return jsonify({
+        'success': True,
+        'state': state
+    })
+
+
+@app.route('/api/debug/breakpoints/<session_id>', methods=['POST'])
+def debug_set_breakpoints(session_id):
+    """设置断点"""
+    data = request.get_json(silent=True) or {}
+    breakpoints = data.get('breakpoints', {})
+
+    with _debug_lock:
+        session = _debug_sessions.get(session_id)
+
+    if not session:
+        return jsonify({'error': '调试会话不存在或已结束'}), 404
+
+    session.set_breakpoints(breakpoints)
+    return jsonify({
+        'success': True,
+        'breakpoints': breakpoints
+    })
+
+
 if __name__ == '__main__':
     print(f"段言 Web Playground 启动中...")
     print(f"  静态文件目录: {app.static_folder}")
     print(f"  分享存储目录: {SHARED_DIR}")
     print(f"  访问地址: http://localhost:5000")
+    print(f"  调试器: 已集成")
     print()
     app.run(debug=True, host='0.0.0.0', port=5000)

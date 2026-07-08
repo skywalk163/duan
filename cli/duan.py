@@ -603,6 +603,18 @@ def cmd_doc(args):
     run_doc(args.target, fmt, args.output)
 
 
+def cmd_profile(args):
+    """性能分析"""
+    from profiler import run_profile
+    run_profile(args.file, memory=args.memory, report=args.report, cprofile=args.cprofile)
+
+
+def cmd_install(args):
+    """安装段言包"""
+    from package_installer import run_install
+    run_install(args)
+
+
 # ═══════════════════════════════════════════════════════════════════
 # AI Copilot 子命令
 # ═══════════════════════════════════════════════════════════════════
@@ -906,6 +918,24 @@ def main():
     doc_p.add_argument('--html', action='store_true', help='生成 HTML 格式文档')
     doc_p.add_argument('-o', '--output', help='输出文件或目录路径')
 
+    # ── profile ──
+    profile_p = subparsers.add_parser('profile', help='性能分析')
+    profile_p.add_argument('file', help='源文件路径')
+    profile_p.add_argument('--memory', '-m', action='store_true', help='包含内存分析')
+    profile_p.add_argument('--report', '-r', action='store_true', help='生成详细报告')
+    profile_p.add_argument('--cprofile', action='store_true', help='使用 cProfile 详细分析')
+
+    # ── install ──
+    install_p = subparsers.add_parser('install', help='安装段言包')
+    install_p.add_argument('package', nargs='?', default=None, help='包名')
+    install_p.add_argument('--git', default=None, help='从 Git 仓库安装')
+    install_p.add_argument('--path', default=None, help='从本地路径安装')
+    install_p.add_argument('--search', default=None, help='搜索包')
+    install_p.add_argument('--list', action='store_true', help='列出已安装的包')
+    install_p.add_argument('--registry', action='store_true', help='列出注册中心所有包')
+    install_p.add_argument('--uninstall', default=None, help='卸载包')
+    install_p.add_argument('-p', '--project', default='.', help='项目目录')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -941,6 +971,12 @@ def main():
         sys.exit(exit_code)
     elif args.command == 'doc':
         cmd_doc(args)
+        sys.exit(0)
+    elif args.command == 'profile':
+        cmd_profile(args)
+        sys.exit(0)
+    elif args.command == 'install':
+        cmd_install(args)
         sys.exit(0)
 
 
