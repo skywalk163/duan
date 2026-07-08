@@ -610,13 +610,13 @@ def cmd_profile(args):
 
 
 def cmd_install(args):
-    """安装段言包"""
+    """安装段言段件"""
     from package_installer import run_install
     run_install(args)
 
 
 def cmd_publish(args):
-    """发布包"""
+    """发布段言段件"""
     from package_installer import run_publish
     run_publish(args)
 
@@ -932,20 +932,20 @@ def main():
     profile_p.add_argument('--cprofile', action='store_true', help='使用 cProfile 详细分析')
 
     # ── install ──
-    install_p = subparsers.add_parser('install', help='安装段言包')
-    install_p.add_argument('package', nargs='?', default=None, help='包名')
+    install_p = subparsers.add_parser('install', help='安装段言段件')
+    install_p.add_argument('package', nargs='?', default=None, help='段件名')
     install_p.add_argument('--git', default=None, help='从 Git 仓库安装')
     install_p.add_argument('--path', default=None, help='从本地路径安装')
-    install_p.add_argument('--search', default=None, help='搜索包')
-    install_p.add_argument('--list', action='store_true', help='列出已安装的包')
-    install_p.add_argument('--registry', action='store_true', help='列出注册中心所有包')
-    install_p.add_argument('--uninstall', default=None, help='卸载包')
-    install_p.add_argument('--update-registry', action='store_true', help='从远程更新本地注册表缓存')
-    install_p.add_argument('--registry-url', default=None, help='远程注册表 URL')
+    install_p.add_argument('--search', default=None, help='搜索段件')
+    install_p.add_argument('--list', action='store_true', help='列出已安装的段件')
+    install_p.add_argument('--registry', action='store_true', help='列出段件库中所有段件')
+    install_p.add_argument('--uninstall', default=None, help='卸载段件')
+    install_p.add_argument('--update-registry', action='store_true', help='从远程更新本地段件库缓存')
+    install_p.add_argument('--registry-url', default=None, help='远程段件库 URL')
     install_p.add_argument('-p', '--project', default='.', help='项目目录')
 
     # ── publish ──
-    publish_p = subparsers.add_parser('publish', help='发布包（生成注册表条目并显示 PR 指引）')
+    publish_p = subparsers.add_parser('publish', help='发布段件（生成段件库条目并显示 PR 指引）')
     publish_p.add_argument('-p', '--project', default='.', help='项目目录')
 
     args = parser.parse_args()

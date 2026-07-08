@@ -1,19 +1,19 @@
 # -*- coding: utf-8 -*-
 """
-段言（Duan）包安装器
+段言（Duan）段件安装器
 
-负责从远程仓库下载并安装段言包。
+负责从远程仓库下载并安装段言段件。
 
 功能：
-  - duan install <包名>          从注册中心安装
-  - duan install --git <url>     从 Git 仓库安装
-  - duan install --path <路径>   从本地路径安装
-  - duan install --list          列出已安装的包
-  - duan install --search <关键词> 搜索包
+  - duan install <段件名>          从注册中心安装
+  - duan install --git <url>       从 Git 仓库安装
+  - duan install --path <路径>     从本地路径安装
+  - duan install --list            列出已安装的段件
+  - duan install --search <关键词>  搜索段件
 
-包注册中心：
-  - 内置注册表（常用包索引）
-  - 支持自定义注册中心 URL
+段件库（段件注册中心）：
+  - 内置注册表（常用段件索引）
+  - 支持自定义注册表 URL
   - 支持 GitCode / GitHub / Gitee ZIP 下载（无需 Git）
   - 私有仓库支持 Git Clone 回退
 """
@@ -176,7 +176,7 @@ BUILTIN_REGISTRY = {
 
 @dataclass
 class PackageInfo:
-    """包信息"""
+    """段件信息"""
     name: str
     version: str = "0.1.0"
     description: str = ""
@@ -410,7 +410,7 @@ class MirrorSpeedTest:
 # ===========================================================================
 
 class ZipDownloader:
-    """从 GitCode / GitHub / Gitee 下载 ZIP 包并解压"""
+    """从 GitCode / GitHub / Gitee 下载 ZIP 段件并解压"""
 
     CHUNK_SIZE = 64 * 1024   # 64KB
     TIMEOUT = 120             # 下载超时秒数
@@ -598,7 +598,7 @@ class PackageInstaller:
         return cache
 
     def _load_registry(self) -> Dict:
-        """加载包注册表"""
+        """加载段件注册表"""
         registry = dict(BUILTIN_REGISTRY)
 
         # 尝试从远程加载注册表
@@ -642,7 +642,7 @@ class PackageInstaller:
     # ------------------------------------------------------------------
 
     def search(self, keyword: str) -> List[PackageInfo]:
-        """搜索包"""
+        """搜索段件"""
         results = []
         keyword_lower = keyword.lower()
         packages = self._registry.get('packages', {})
@@ -661,7 +661,7 @@ class PackageInstaller:
         return results
 
     def list_registry(self) -> List[PackageInfo]:
-        """列出注册表中所有包"""
+        """列出注册表中所有段件"""
         packages = self._registry.get('packages', {})
         return [
             PackageInfo(**{k: v for k, v in info.items() if k in PackageInfo.__dataclass_fields__})
@@ -673,12 +673,12 @@ class PackageInstaller:
     # ------------------------------------------------------------------
 
     def install(self, package_name: str, version: Optional[str] = None) -> bool:
-        """从注册中心安装包（自动测速选最快镜像）"""
+        """从注册中心安装段件（自动测速选最快镜像）"""
         packages = self._registry.get('packages', {})
         info = packages.get(package_name)
 
         if not info:
-            print(f"错误: 未找到包 '{package_name}'")
+            print(f"错误: 未找到段件 '{package_name}'")
             print(f"提示: 使用 'duan install --search {package_name}' 搜索")
             return False
 
@@ -688,7 +688,7 @@ class PackageInstaller:
             mirrors = [info['git']]
 
         if not mirrors:
-            print(f"错误: 包 '{package_name}' 没有配置下载源")
+            print(f"错误: 段件 '{package_name}' 没有配置下载源")
             return False
 
         print(f"正在安装: {package_name} v{info.get('version', '?')}")
@@ -713,7 +713,7 @@ class PackageInstaller:
             return False
 
     def install_from_git(self, git_url: str, package_name: Optional[str] = None) -> bool:
-        """从 Git 仓库安装包"""
+        """从 Git 仓库安装段件"""
         if not package_name:
             package_name = git_url.rstrip('/').split('/')[-1].replace('.git', '')
 
@@ -723,7 +723,7 @@ class PackageInstaller:
         return self._install_from_git(package_name, git_url)
 
     def install_from_path(self, local_path: str) -> bool:
-        """从本地路径安装包"""
+        """从本地路径安装段件"""
         src_path = Path(local_path).resolve()
         if not src_path.exists():
             print(f"错误: 路径不存在: {local_path}")
@@ -914,7 +914,7 @@ class PackageInstaller:
     # ------------------------------------------------------------------
 
     def list_installed(self) -> List[Dict]:
-        """列出已安装的包"""
+        """列出已安装的段件"""
         installed = []
         if self._packages_dir.exists():
             for d in sorted(self._packages_dir.iterdir()):
@@ -942,10 +942,10 @@ class PackageInstaller:
         return installed
 
     def uninstall(self, package_name: str) -> bool:
-        """卸载包"""
+        """卸载段件"""
         pkg_dir = self._packages_dir / package_name
         if not pkg_dir.exists():
-            print(f"错误: 包 '{package_name}' 未安装")
+            print(f"错误: 段件 '{package_name}' 未安装")
             return False
 
         try:
@@ -1037,21 +1037,21 @@ def run_install(args):
         return
 
     # 默认：显示帮助
-    print("用法: duan install <包名> [选项]")
+    print("用法: duan install <段件名> [选项]")
     print()
     print("选项:")
-    print("  <包名>              从注册中心安装指定包")
+    print("  <段件名>            从段件库安装指定段件")
     print("  --git <URL>         从 Git 仓库安装（自动 ZIP 下载或 git clone）")
     print("  --path <路径>       从本地路径安装")
-    print("  --search <关键词>   搜索包")
-    print("  --list              列出已安装的包")
-    print("  --registry          列出注册中心所有包")
-    print("  --uninstall <包名>  卸载包")
-    print("  --update-registry   从远程更新本地注册表缓存")
+    print("  --search <关键词>   搜索段件")
+    print("  --list              列出已安装的段件")
+    print("  --registry          列出段件库中所有段件")
+    print("  --uninstall <段件名> 卸载段件")
+    print("  --update-registry   从远程更新本地段件库缓存")
     print("  -p, --project <目录> 指定项目目录")
     print()
-    print("发布你的包:")
-    print("  duan publish        生成注册表条目并显示 PR 提交指引")
+    print("发布你的段件:")
+    print("  duan publish        生成段件库条目并显示 PR 指引")
     print()
     print("示例:")
     print("  duan install 标准数学扩展")
@@ -1062,32 +1062,32 @@ def run_install(args):
 
 
 def _cmd_list(installer: PackageInstaller):
-    """列出已安装的包"""
+    """列出已安装的段件"""
     installed = installer.list_installed()
     if not installed:
-        print("(没有已安装的包)")
+        print("(没有已安装的段件)")
         print()
-        print("使用 'duan install --registry' 查看可用包")
-        print("使用 'duan install <包名>' 安装包")
+        print("使用 'duan install --registry' 查看可用段件")
+        print("使用 'duan install <段件名>' 安装段件")
         return
 
-    print("已安装的包:")
+    print("已安装的段件:")
     print("-" * 60)
     for pkg in installed:
         print(f"  {pkg['name']:<20} v{pkg['version']:<8} 文件: {pkg['files']}")
         if pkg['description']:
             print(f"    {pkg['description']}")
     print("-" * 60)
-    print(f"共 {len(installed)} 个包")
+    print(f"共 {len(installed)} 个段件")
 
 
 def _cmd_search(installer: PackageInstaller, keyword: str):
-    """搜索包"""
+    """搜索段件"""
     results = installer.search(keyword)
     if not results:
-        print(f"未找到与 '{keyword}' 相关的包")
+        print(f"未找到与 '{keyword}' 相关的段件")
         print()
-        print("使用 'duan install --registry' 查看所有可用包")
+        print("使用 'duan install --registry' 查看所有可用段件")
         return
 
     print(f"搜索 '{keyword}' 的结果:")
@@ -1104,10 +1104,10 @@ def _cmd_search(installer: PackageInstaller, keyword: str):
 
 
 def _cmd_update_registry(installer: PackageInstaller):
-    """从远程更新本地注册表缓存"""
-    print("正在更新注册表缓存...")
+    """从远程更新本地段件库缓存"""
+    print("正在更新段件库缓存...")
     if not installer.registry_url:
-        print("未配置远程注册表 URL")
+        print("未配置远程段件库 URL")
         print()
         print("设置方法:")
         print("  duan install --registry-url https://gitcode.com/duan-lang/registry/raw/main/registry.json")
@@ -1122,14 +1122,14 @@ def _cmd_update_registry(installer: PackageInstaller):
         installer._registry['packages'].update(remote.get('packages', {}))
         installer._save_registry_cache()
         count = len(remote.get('packages', {}))
-        print(f"注册表已更新，共 {count} 个远程包")
+        print(f"段件库已更新，共 {count} 个远程段件")
         installer._registry['updated_at'] = remote.get('updated_at', 'unknown')
     except Exception as e:
         print(f"更新失败: {e}")
 
 
 def run_publish(args):
-    """发布包 — 生成注册表条目并显示 PR 提交指引"""
+    """发布段件 — 生成段件库条目并显示 PR 提交指引"""
     project_root = Path(args.project or '.').resolve()
     toml_path = project_root / 'package.toml'
 
@@ -1200,7 +1200,7 @@ def run_publish(args):
     }
 
     print("=" * 60)
-    print("  包注册表条目已生成")
+    print("  段件库条目已生成")
     print("=" * 60)
     print()
     print(json.dumps(entry, ensure_ascii=False, indent=2))
@@ -1209,31 +1209,31 @@ def run_publish(args):
     print("  发布步骤")
     print("=" * 60)
     print()
-    print("  1. Fork 注册表仓库:")
+    print("  1. Fork 段件库仓库:")
     print("     https://gitcode.com/duan-lang/registry")
     print()
     print("  2. 在 registry.json 的 packages 中添加以上条目")
     print()
     print("  3. 提交 PR（Pull Request）")
     print()
-    print("  4. PR 合并后，用户即可通过以下命令安装你的包:")
+    print("  4. PR 合并后，用户即可通过以下命令安装你的段件:")
     print(f"     duan install {name}")
     print()
     print("  注意事项:")
     print("  - 确保 mirrors 中的仓库已推送且公开")
     print("  - 版本号遵循语义化版本（如 1.0.0）")
-    print("  - 包名不要与已有包重名")
+    print("  - 段件名不要与已有段件重名")
     print("  - 添加合适的 keywords 方便用户搜索")
 
 
 def _cmd_list_registry(installer: PackageInstaller):
-    """列出注册中心所有包"""
+    """列出段件库中所有段件"""
     packages = installer.list_registry()
     if not packages:
-        print("注册中心没有可用包")
+        print("段件库没有可用段件")
         return
 
-    print("注册中心可用包:")
+    print("段件库可用段件:")
     print("-" * 60)
     for pkg in packages:
         print(f"  {pkg.name:<20} v{pkg.version:<8}")
@@ -1243,9 +1243,9 @@ def _cmd_list_registry(installer: PackageInstaller):
         print(f"    安装: duan install {pkg.name}")
         print()
     print("-" * 60)
-    print(f"共 {len(packages)} 个包")
+    print(f"共 {len(packages)} 个段件")
     print()
-    print("安装: duan install <包名>")
+    print("安装: duan install <段件名>")
 
 
 if __name__ == '__main__':
