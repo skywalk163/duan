@@ -437,6 +437,83 @@ def 转小写(text: str) -> str:
     return text.lower()
 
 
+def 字符串包含(text: str, substring: str) -> bool:
+    """检查字符串是否包含子串"""
+    return substring in text
+
+
+def 开头(text: str, prefix: str) -> bool:
+    """检查字符串是否以指定前缀开头"""
+    return text.startswith(prefix)
+
+
+def 结尾(text: str, suffix: str) -> bool:
+    """检查字符串是否以指定后缀结尾"""
+    return text.endswith(suffix)
+
+
+def 查找子串(text: str, substring: str) -> int:
+    """查找子串位置，未找到返回-1"""
+    return text.find(substring)
+
+
+def 替换字符串次数(text: str, old: str, new: str, count: int = -1) -> str:
+    """替换字符串，指定替换次数"""
+    if count < 0:
+        return text.replace(old, new)
+    return text.replace(old, new, count)
+
+
+def 截取到末尾(text: str, start: int) -> str:
+    """从指定位置截取到字符串末尾"""
+    return text[start:]
+
+
+def 字符串计数(text: str, substring: str) -> int:
+    """统计子串出现次数"""
+    return text.count(substring)
+
+
+def 字符串重复(text: str, times: int) -> str:
+    """重复字符串指定次数"""
+    return text * times
+
+
+def 字符串反转(text: str) -> str:
+    """反转字符串"""
+    return text[::-1]
+
+
+def 转标题(text: str) -> str:
+    """转换为标题格式（首字母大写）"""
+    return text.title()
+
+
+def 去除左侧空白(text: str) -> str:
+    """去除左侧空白"""
+    return text.lstrip()
+
+
+def 去除右侧空白(text: str) -> str:
+    """去除右侧空白"""
+    return text.rstrip()
+
+
+def 字符串对齐居中(text: str, width: int, fillchar: str = ' ') -> str:
+    """居中对齐字符串"""
+    return text.center(width, fillchar)
+
+
+def 字符串对齐左(text: str, width: int, fillchar: str = ' ') -> str:
+    """左对齐字符串"""
+    return text.ljust(width, fillchar)
+
+
+def 字符串对齐右(text: str, width: int, fillchar: str = ' ') -> str:
+    """右对齐字符串"""
+    return text.rjust(width, fillchar)
+
+
 # =============================================================================
 # 列表工具函数
 # =============================================================================
@@ -878,6 +955,11 @@ __all__ = [
     '转整数', '转浮点', '转字符串',
     '字符串长度', '字符串获取', '分割字符串', '连接字符串',
     '替换字符串', '去除空白',
+    '字符串包含', '开头', '结尾', '查找子串',
+    '替换字符串次数', '截取到末尾', '字符串计数',
+    '字符串重复', '字符串反转', '转标题',
+    '去除左侧空白', '去除右侧空白',
+    '字符串对齐居中', '字符串对齐左', '字符串对齐右',
     
     # 列表工具
     '列', '列表长度', '列表追加', '列表弹出',

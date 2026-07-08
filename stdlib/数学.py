@@ -5,6 +5,7 @@
 """
 
 import math
+import cmath
 import random as _random
 import statistics as _stats
 from typing import Union, List, Optional
@@ -121,6 +122,319 @@ def 自然对数(x: Number) -> float:
     if x <= 0:
         raise RuntimeError(f"不能对非正数求自然对数: {x}")
     return math.log(x)
+
+
+def 常用对数(x: Number) -> float:
+    """常用对数 log10(x)"""
+    if x <= 0:
+        raise RuntimeError(f"不能对非正数求常用对数: {x}")
+    return math.log10(x)
+
+
+def 对数2(x: Number) -> float:
+    """以2为底的对数 log2(x)"""
+    if x <= 0:
+        raise RuntimeError(f"不能对非正数求对数: {x}")
+    return math.log2(x)
+
+
+def 立方根(x: Number) -> float:
+    """立方根"""
+    return math.cbrt(x)
+
+
+def 指数(x: Number) -> float:
+    """指数函数 e^x"""
+    return math.exp(x)
+
+
+def 双曲正弦(x: Number) -> float:
+    """双曲正弦 sinh(x)"""
+    return math.sinh(x)
+
+
+def 双曲余弦(x: Number) -> float:
+    """双曲余弦 cosh(x)"""
+    return math.cosh(x)
+
+
+def 双曲正切(x: Number) -> float:
+    """双曲正切 tanh(x)"""
+    return math.tanh(x)
+
+
+def 反双曲正弦(x: Number) -> float:
+    """反双曲正弦 asinh(x)"""
+    return math.asinh(x)
+
+
+def 反双曲余弦(x: Number) -> float:
+    """反双曲余弦 acosh(x)"""
+    return math.acosh(x)
+
+
+def 反双曲正切(x: Number) -> float:
+    """反双曲正切 atanh(x)"""
+    return math.atanh(x)
+
+
+def 反正弦(x: Number) -> float:
+    """反正弦 arcsin(x)（弧度）"""
+    return math.asin(x)
+
+
+def 反余弦(x: Number) -> float:
+    """反余弦 arccos(x)（弧度）"""
+    return math.acos(x)
+
+
+def 反正切(x: Number) -> float:
+    """反正切 arctan(x)（弧度）"""
+    return math.atan(x)
+
+
+def 反正切2(y: Number, x: Number) -> float:
+    """反正切2 atan2(y, x)（弧度）"""
+    return math.atan2(y, x)
+
+
+def 余切(x: Number) -> float:
+    """余切 cot(x)"""
+    return 1.0 / math.tan(x)
+
+
+def 正割(x: Number) -> float:
+    """正割 sec(x)"""
+    return 1.0 / math.cos(x)
+
+
+def 余割(x: Number) -> float:
+    """余割 csc(x)"""
+    return 1.0 / math.sin(x)
+
+
+def 双曲余切(x: Number) -> float:
+    """双曲余切 coth(x)"""
+    return 1.0 / math.tanh(x)
+
+
+def 双曲正割(x: Number) -> float:
+    """双曲正割 sech(x)"""
+    return 1.0 / math.cosh(x)
+
+
+def 双曲余割(x: Number) -> float:
+    """双曲余割 csch(x)"""
+    return 1.0 / math.sinh(x)
+
+
+def 弧度(x: Number) -> float:
+    """角度转弧度（别名）"""
+    return math.radians(x)
+
+
+def 角度(x: Number) -> float:
+    """弧度转角度（别名）"""
+    return math.degrees(x)
+
+
+def 双阶乘(n: int) -> int:
+    """双阶乘 n!!"""
+    if n < 0:
+        raise RuntimeError(f"不能对负数求双阶乘: {n}")
+    result = 1
+    i = n
+    while i > 0:
+        result *= i
+        i -= 2
+    return result
+
+
+def 排列(n: int, k: int) -> int:
+    """排列数 P(n, k)"""
+    if n < 0 or k < 0 or k > n:
+        raise RuntimeError(f"无效的排列参数: n={n}, k={k}")
+    result = 1
+    for i in range(k):
+        result *= (n - i)
+    return result
+
+
+def 组合(n: int, k: int) -> int:
+    """组合数 C(n, k)"""
+    if n < 0 or k < 0 or k > n:
+        raise RuntimeError(f"无效的组合参数: n={n}, k={k}")
+    if k > n - k:
+        k = n - k
+    result = 1
+    for i in range(k):
+        result = result * (n - i) // (i + 1)
+    return result
+
+
+def 二项式系数(n: int, k: int) -> int:
+    """二项式系数（组合数别名）"""
+    return 组合(n, k)
+
+
+def 欧拉常数() -> float:
+    """欧拉常数 γ ≈ 0.5772"""
+    return math.gamma(1)
+
+
+def 黄金比例() -> float:
+    """黄金比例 φ ≈ 1.618"""
+    return (1 + math.sqrt(5)) / 2
+
+
+def 弧度π() -> float:
+    """π 弧度（180度）"""
+    return math.pi
+
+
+def 弧度π2() -> float:
+    """π/2 弧度（90度）"""
+    return math.pi / 2
+
+
+def 弧度π4() -> float:
+    """π/4 弧度（45度）"""
+    return math.pi / 4
+
+
+def 弧度2π() -> float:
+    """2π 弧度（360度）"""
+    return math.pi * 2
+
+
+def 度分秒转弧度(度: int, 分: int = 0, 秒: float = 0) -> float:
+    """度分秒转弧度"""
+    return math.radians(度 + 分 / 60 + 秒 / 3600)
+
+
+def 弧度转度分秒(弧度: float) -> tuple:
+    """弧度转度分秒"""
+    度 = math.degrees(弧度)
+    整数度 = int(度)
+    分 = (度 - 整数度) * 60
+    整数分 = int(分)
+    秒 = (分 - 整数分) * 60
+    return (整数度, 整数分, 秒)
+
+
+def 复数实部(z: complex) -> float:
+    """复数实部"""
+    return z.real
+
+
+def 复数虚部(z: complex) -> float:
+    """复数虚部"""
+    return z.imag
+
+
+def 复数模(z: complex) -> float:
+    """复数模（绝对值）"""
+    return abs(z)
+
+
+def 复数辐角(z: complex) -> float:
+    """复数辐角（弧度）"""
+    return math.atan2(z.imag, z.real)
+
+
+def 复数共轭(z: complex) -> complex:
+    """复数共轭"""
+    return complex(z.real, -z.imag)
+
+
+def 复数极坐标转直角(模: float, 辐角: float) -> complex:
+    """极坐标转直角坐标"""
+    return complex(模 * math.cos(辐角), 模 * math.sin(辐角))
+
+
+def 复数直角转极坐标(z: complex) -> tuple:
+    """直角坐标转极坐标 (模, 辐角)"""
+    return (abs(z), math.atan2(z.imag, z.real))
+
+
+def 复数指数(z: complex) -> complex:
+    """复数指数函数 e^z"""
+    return cmath.exp(z)
+
+
+def 复数对数(z: complex) -> complex:
+    """复数对数"""
+    return cmath.log(z)
+
+
+def 复数平方根(z: complex) -> complex:
+    """复数平方根"""
+    return cmath.sqrt(z)
+
+
+def 复数正弦(z: complex) -> complex:
+    """复数正弦"""
+    return cmath.sin(z)
+
+
+def 复数余弦(z: complex) -> complex:
+    """复数余弦"""
+    return cmath.cos(z)
+
+
+def 复数正切(z: complex) -> complex:
+    """复数正切"""
+    return cmath.tan(z)
+
+
+def 双曲正弦h(x: Number) -> float:
+    """双曲正弦（简写）"""
+    return math.sinh(x)
+
+
+def 双曲余弦h(x: Number) -> float:
+    """双曲余弦（简写）"""
+    return math.cosh(x)
+
+
+def 双曲正切h(x: Number) -> float:
+    """双曲正切（简写）"""
+    return math.tanh(x)
+
+
+def 随机范围(最小值: float, 最大值: float) -> float:
+    """生成指定范围内的随机浮点数"""
+    return _random.uniform(最小值, 最大值)
+
+
+def 随机打乱(列表: List) -> None:
+    """随机打乱列表（原地修改）"""
+    _random.shuffle(列表)
+
+
+def 随机样本(列表: List, k: int) -> List:
+    """从列表中随机抽取k个不重复元素"""
+    return _random.sample(列表, k)
+
+
+def 设置随机种子(种子: int = None) -> None:
+    """设置随机数种子"""
+    _random.seed(种子)
+
+
+def 正态随机(均值: float = 0.0, 标准差: float = 1.0) -> float:
+    """生成正态分布随机数"""
+    return _random.normalvariate(均值, 标准差)
+
+
+def 泊松随机(均值: float) -> int:
+    """生成泊松分布随机数"""
+    return _random.poissonvariate(均值)
+
+
+def 指数随机(均值: float) -> float:
+    """生成指数分布随机数"""
+    return _random.expovariate(均值)
 
 
 # =============================================================================
@@ -309,13 +623,32 @@ def 线性回归(x数据: List[Number], y数据: List[Number]) -> dict:
 
 __all__ = [
     '绝对值', '最大值', '最小值',
-    '幂', '平方根',
+    '幂', '平方根', '立方根',
     '正弦', '余弦', '正切',
-    '弧度转角度', '角度转弧度',
+    '余切', '正割', '余割',
+    '反正弦', '反余弦', '反正切', '反正切2',
+    '弧度转角度', '角度转弧度', '弧度', '角度',
     '向上取整', '向下取整', '四舍五入',
     '随机整数', '随机浮点', '随机选择',
-    '圆周率', '自然常数',
-    '阶乘', '对数', '自然对数',
+    '随机范围', '随机打乱', '随机样本',
+    '设置随机种子', '正态随机', '泊松随机', '指数随机',
+    '圆周率', '自然常数', '欧拉常数', '黄金比例',
+    '弧度π', '弧度π2', '弧度π4', '弧度2π',
+    '阶乘', '双阶乘', '对数', '自然对数',
+    '常用对数', '对数2', '指数',
+    '双曲正弦', '双曲余弦', '双曲正切',
+    '双曲余切', '双曲正割', '双曲余割',
+    '反双曲正弦', '反双曲余弦', '反双曲正切',
+    '双曲正弦h', '双曲余弦h', '双曲正切h',
+    '排列', '组合', '二项式系数',
+    '度分秒转弧度', '弧度转度分秒',
+
+    # 复数运算
+    '复数实部', '复数虚部', '复数模',
+    '复数辐角', '复数共轭',
+    '复数极坐标转直角', '复数直角转极坐标',
+    '复数指数', '复数对数', '复数平方根',
+    '复数正弦', '复数余弦', '复数正切',
 
     # 统计函数
     '平均数', '中位数', '众数',

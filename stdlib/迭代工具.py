@@ -1,265 +1,244 @@
 """
 段言标准库 - 迭代工具模块
 
-提供常用的迭代器工具函数：range、enumerate、zip、map、filter等。
+提供迭代器工具功能，包括：
+- 计数器
+- 分组
+- 排列组合迭代
+- 无限迭代器
 """
 
-from typing import Any, Callable, Iterable, Iterator, List, Optional, TypeVar, Union
+import itertools
+from typing import List, Any, Dict, Iterable, Tuple
 
 
-T = TypeVar('T')
-U = TypeVar('U')
+def 计数器(可迭代对象: Iterable[Any]):
+    """统计可迭代对象中元素出现的次数"""
+    from collections import Counter
+    return Counter(可迭代对象)
 
 
-def 范围(开始: int, 结束: Optional[int] = None, 步长: int = 1) -> List[int]:
-    """
-    生成整数序列
-
-    参数:
-        开始: 起始值（包含）
-        结束: 结束值（不包含），为 None 时表示从 0 开始
-        步长: 步进值（默认 1）
-
-    返回:
-        整数列表
-    """
-    if 结束 is None:
-        结束 = 开始
-        开始 = 0
-    return list(range(开始, 结束, 步长))
-
-
-def 枚举(序列: Iterable[T], 起始索引: int = 0) -> List[tuple]:
-    """
-    返回序列的索引和值对
-
-    参数:
-        序列: 可迭代对象
-        起始索引: 起始索引（默认 0）
-
-    返回:
-        [(0, item0), (1, item1), ...]
-    """
-    return list(enumerate(序列, 起始索引))
-
-
-def 压缩(*序列列表: Iterable) -> List[tuple]:
-    """
-    并行遍历多个序列
-
-    参数:
-        序列列表: 多个可迭代对象
-
-    返回:
-        [(a0, b0, ...), (a1, b1, ...), ...]
-    """
-    return [tuple(序列[i] for 序列 in 序列列表)
-            for i in range(min(len(s) for s in 序列列表))]
-
-
-def 映射(函数: Callable[[T], U], 序列: Iterable[T]) -> List[U]:
-    """
-    对序列每个元素应用函数
-
-    参数:
-        函数: 转换函数
-        序列: 可迭代对象
-
-    返回:
-        转换后的列表
-    """
-    return [函数(item) for item in 序列]
-
-
-def 过滤(条件: Callable[[T], bool], 序列: Iterable[T]) -> List[T]:
-    """
-    过滤序列中满足条件的元素
-
-    参数:
-        条件: 过滤函数，返回 True 保留
-        序列: 可迭代对象
-
-    返回:
-        过滤后的列表
-    """
-    return [item for item in 序列 if 条件(item)]
-
-
-def 累积(函数: Callable[[Any, T], Any], 序列: Iterable[T], 初始值: Any = None) -> List[Any]:
-    """
-    累积计算
-
-    参数:
-        函数: 累积函数
-        序列: 可迭代对象
-        初始值: 初始值
-
-    返回:
-        累积结果列表
-    """
-    from functools import reduce
-    if 初始值 is not None:
-        return [reduce(函数, 序列[:i+1], 初始值) for i in range(len(序列))]
-    return [reduce(函数, 序列[:i+1]) for i in range(len(序列))]
-
-
-def 展平(嵌套列表: Iterable) -> List[Any]:
-    """
-    扁平化嵌套列表（一层）
-
-    参数:
-        嵌套列表: 嵌套的列表
-
-    返回:
-        扁平化后的列表
-    """
-    结果 = []
-    for item in 嵌套列表:
-        if isinstance(item, (list, tuple)):
-            结果.extend(item)
-        else:
-            结果.append(item)
+def 分组(可迭代对象: Iterable[Any], 键函数=None):
+    """按键函数分组可迭代对象"""
+    if 键函数 is None:
+        键函数 = lambda x: x
+    
+    结果 = {}
+    for 元素 in 可迭代对象:
+        键 = 键函数(元素)
+        if 键 not in 结果:
+            结果[键] = []
+        结果[键].append(元素)
     return 结果
 
 
-def 批量(序列: Iterable[T], 每组大小: int) -> List[List[T]]:
-    """
-    将序列分成固定大小的组
-
-    参数:
-        序列: 可迭代对象
-        每组大小: 每组元素数量
-
-    返回:
-        分组后的列表
-    """
-    结果 = []
-    当前组 = []
-    for item in 序列:
-        当前组.append(item)
-        if len(当前组) == 每组大小:
-            结果.append(当前组)
-            当前组 = []
-    if 当前组:
-        结果.append(当前组)
+def 分组字典(可迭代对象: Iterable[Tuple[Any, Any]]):
+    """按键分组键值对可迭代对象"""
+    结果 = {}
+    for 键, 值 in 可迭代对象:
+        if 键 not in 结果:
+            结果[键] = []
+        结果[键].append(值)
     return 结果
 
 
-def 分组(序列: Iterable[T], 大小: int) -> List[List[T]]:
-    """
-    按固定大小分组（别名）
-
-    参数:
-        序列: 可迭代对象
-        大小: 每组元素数量
-
-    返回:
-        分组后的列表
-    """
-    return 批量(序列, 大小)
+def 排列(可迭代对象: Iterable[Any], 长度: int):
+    """生成排列"""
+    return list(itertools.permutations(可迭代对象, 长度))
 
 
-def 全部(序列: Iterable) -> bool:
-    """
-    检查是否所有元素都为真
-
-    参数:
-        序列: 可迭代对象
-
-    返回:
-        是否所有元素都为真
-    """
-    for item in 序列:
-        if not item:
-            return False
-    return True
+def 组合(可迭代对象: Iterable[Any], 长度: int):
+    """生成组合"""
+    return list(itertools.combinations(可迭代对象, 长度))
 
 
-def 任意(序列: Iterable) -> bool:
-    """
-    检查是否有任意元素为真
-
-    参数:
-        序列: 可迭代对象
-
-    返回:
-        是否有任意元素为真
-    """
-    for item in 序列:
-        if item:
-            return True
-    return False
+def 组合带重复(可迭代对象: Iterable[Any], 长度: int):
+    """生成带重复的组合"""
+    return list(itertools.combinations_with_replacement(可迭代对象, 长度))
 
 
-def 是否为空(序列: Iterable) -> bool:
-    """
-    检查序列是否为空
-
-    参数:
-        序列: 可迭代对象
-
-    返回:
-        是否为空
-    """
-    for _ in 序列:
-        return False
-    return True
+def 笛卡尔积(*可迭代对象列表):
+    """生成笛卡尔积"""
+    return list(itertools.product(*可迭代对象列表))
 
 
-def 第一(序列: Iterable[T], 默认值: T = None) -> T:
-    """
-    获取序列的第一个元素
-
-    参数:
-        序列: 可迭代对象
-        默认值: 默认值（序列为空时返回）
-
-    返回:
-        第一个元素或默认值
-    """
-    for item in 序列:
-        return item
-    return 默认值
+def 链(可迭代对象列表: Iterable[Iterable[Any]]):
+    """连接多个可迭代对象"""
+    return itertools.chain(*可迭代对象列表)
 
 
-def 最后(序列: Iterable[T], 默认值: T = None) -> T:
-    """
-    获取序列的最后一个元素
-
-    参数:
-        序列: 可迭代对象
-        默认值: 默认值（序列为空时返回）
-
-    返回:
-        最后一个元素或默认值
-    """
-    结果 = 默认值
-    for item in 序列:
-        结果 = item
-    return 结果
+def 链到列表(可迭代对象列表: Iterable[Iterable[Any]]):
+    """连接多个可迭代对象并转换为列表"""
+    return list(itertools.chain(*可迭代对象列表))
 
 
-def nth(序列: Iterable[T], 索引: int, 默认值: T = None) -> T:
-    """
-    获取序列指定索引的元素
+def 重复(元素: Any, 次数: int = None):
+    """重复元素指定次数或无限次"""
+    if 次数 is None:
+        return itertools.repeat(元素)
+    return itertools.repeat(元素, 次数)
 
-    参数:
-        序列: 可迭代对象
-        索引: 元素索引（从0开始）
-        默认值: 默认值（索引超出范围时返回）
 
-    返回:
-        指定索引的元素或默认值
-    """
-    for i, item in enumerate(序列):
-        if i == 索引:
-            return item
-    return 默认值
+def 重复到列表(元素: Any, 次数: int):
+    """重复元素指定次数并转换为列表"""
+    return list(itertools.repeat(元素, 次数))
+
+
+def 计数(起始: int = 0, 步长: int = 1):
+    """无限计数"""
+    return itertools.count(起始, 步长)
+
+
+def 计数到列表(起始: int = 0, 步长: int = 1, 数量: int = 10):
+    """计数指定数量并转换为列表"""
+    return list(itertools.islice(itertools.count(起始, 步长), 数量))
+
+
+def 循环(可迭代对象: Iterable[Any]):
+    """无限循环可迭代对象"""
+    return itertools.cycle(可迭代对象)
+
+
+def 循环到列表(可迭代对象: Iterable[Any], 数量: int):
+    """循环可迭代对象指定次数并转换为列表"""
+    return list(itertools.islice(itertools.cycle(可迭代对象), 数量))
+
+
+def 压缩(*可迭代对象列表):
+    """压缩多个可迭代对象"""
+    return list(zip(*可迭代对象列表))
+
+
+def 枚举(可迭代对象: Iterable[Any], 起始: int = 0):
+    """枚举可迭代对象"""
+    return list(itertools.islice(enumerate(可迭代对象, 起始), None))
+
+
+def 累积(可迭代对象: Iterable[Any], 函数=None):
+    """累积计算"""
+    if 函数 is None:
+        函数 = lambda x, y: x + y
+    return list(itertools.accumulate(可迭代对象, 函数))
+
+
+def 累积和(可迭代对象: Iterable[Any]):
+    """累积求和"""
+    return list(itertools.accumulate(可迭代对象))
+
+
+def 累积积(可迭代对象: Iterable[Any]):
+    """累积求积"""
+    import operator
+    return list(itertools.accumulate(可迭代对象, operator.mul))
+
+
+def 分组相邻(可迭代对象: Iterable[Any], 大小: int):
+    """按指定大小分组相邻元素"""
+    迭代器 = iter(可迭代对象)
+    return list(iter(lambda: list(itertools.islice(迭代器, 大小)), []))
+
+
+def 滑动窗口(可迭代对象: Iterable[Any], 窗口大小: int):
+    """生成滑动窗口"""
+    迭代器 = iter(可迭代对象)
+    窗口 = list(itertools.islice(迭代器, 窗口大小))
+    if len(窗口) == 窗口大小:
+        yield tuple(窗口)
+    for 元素 in 迭代器:
+        窗口 = 窗口[1:] + [元素]
+        yield tuple(窗口)
+
+
+def 滑动窗口到列表(可迭代对象: Iterable[Any], 窗口大小: int):
+    """生成滑动窗口并转换为列表"""
+    return list(滑动窗口(可迭代对象, 窗口大小))
+
+
+def 成对(可迭代对象: Iterable[Any]):
+    """生成相邻元素对"""
+    return list(itertools.pairwise(可迭代对象))
+
+
+def 去重(可迭代对象: Iterable[Any], 键函数=None):
+    """去除重复元素"""
+    已见 = set()
+    for 元素 in 可迭代对象:
+        键 = 键函数(元素) if 键函数 else 元素
+        if 键 not in 已见:
+            已见.add(键)
+            yield 元素
+
+
+def 去重到列表(可迭代对象: Iterable[Any], 键函数=None):
+    """去除重复元素并转换为列表"""
+    return list(去重(可迭代对象, 键函数))
+
+
+def 筛选(可迭代对象: Iterable[Any], 条件函数):
+    """筛选满足条件的元素"""
+    return list(filter(条件函数, 可迭代对象))
+
+
+def 映射(可迭代对象: Iterable[Any], 函数):
+    """映射函数到可迭代对象"""
+    return list(map(函数, 可迭代对象))
+
+
+def 过滤假值(可迭代对象: Iterable[Any]):
+    """过滤假值（False, None, 0, '', [], {}）"""
+    return list(filter(None, 可迭代对象))
+
+
+def 枚举带索引(可迭代对象: Iterable[Any], 起始: int = 0):
+    """枚举带索引"""
+    return list(enumerate(可迭代对象, 起始))
+
+
+def 反转(可迭代对象: Iterable[Any]):
+    """反转可迭代对象"""
+    return list(reversed(可迭代对象))
+
+
+def 切片(可迭代对象: Iterable[Any], 开始=None, 结束=None, 步长=None):
+    """切片可迭代对象"""
+    return list(itertools.islice(可迭代对象, 开始, 结束, 步长))
+
+
+def 最大N个(可迭代对象: Iterable[Any], N: int, 键函数=None):
+    """获取最大的N个元素"""
+    return list(itertools.islice(itertools.heapq.nlargest(N, 可迭代对象, 键函数), N))
+
+
+def 最小N个(可迭代对象: Iterable[Any], N: int, 键函数=None):
+    """获取最小的N个元素"""
+    return list(itertools.islice(itertools.heapq.nsmallest(N, 可迭代对象, 键函数), N))
+
+
+def 排列数(数量: int, 选取: int):
+    """计算排列数"""
+    from math import factorial
+    return factorial(数量) // factorial(数量 - 选取)
+
+
+def 组合数(数量: int, 选取: int):
+    """计算组合数"""
+    from math import factorial
+    if 选取 > 数量 - 选取:
+        选取 = 数量 - 选取
+    result = 1
+    for i in range(选取):
+        result = result * (数量 - i) // (i + 1)
+    return result
 
 
 __all__ = [
-    '范围', '枚举', '压缩', '映射', '过滤',
-    '累积', '展平', '批量', '分组',
-    '全部', '任意', '是否为空',
-    '第一', '最后', 'nth',
+    '计数器', '分组', '分组字典',
+    '排列', '组合', '组合带重复', '笛卡尔积',
+    '链', '链到列表', '重复', '重复到列表',
+    '计数', '计数到列表', '循环', '循环到列表',
+    '压缩', '枚举', '累积', '累积和', '累积积',
+    '分组相邻', '滑动窗口', '滑动窗口到列表', '成对',
+    '去重', '去重到列表', '筛选', '映射', '过滤假值',
+    '枚举带索引', '反转', '切片',
+    '最大N个', '最小N个', '排列数', '组合数'
 ]

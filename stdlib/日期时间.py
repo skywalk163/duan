@@ -1,219 +1,404 @@
 """
-段言标准库 - 日期时间模块
+日期时间模块 - 时间差、时区、格式解析
 
-提供日期时间获取、格式化、解析、计算等功能。
+提供丰富的日期时间处理功能，包括：
+- 日期时间对象创建与操作
+- 时间差计算
+- 时区转换
+- 格式解析与格式化
+- 日期运算与比较
 """
-
 import time
-from datetime import datetime, timedelta, date
-from typing import Optional, Union
+import datetime
+from datetime import datetime as _datetime, timedelta as _timedelta, timezone as _timezone
+from typing import Tuple, Union, Optional
 
 
-def 当前时间(format_string: str = '%Y-%m-%d %H:%M:%S') -> str:
-    """
-    获取当前日期时间字符串
+class 时间差:
+    """时间差类"""
     
-    参数:
-        format_string: 格式模板（默认 '%Y-%m-%d %H:%M:%S'）
+    def __init__(self, 天数: int = 0, 秒数: int = 0, **参数):
+        self._时间差 = _timedelta(days=天数, seconds=秒数, **参数)
     
-    返回:
-        格式化后的日期时间字符串
+    def __add__(self, 其他: Union['日期时间', '时间差']) -> Union['日期时间', '时间差']:
+        if isinstance(其他, 日期时间):
+            return 日期时间._from_datetime(其他._日期时间 + self._时间差)
+        return 时间差._from_timedelta(self._时间差 + 其他._时间差)
     
-    示例:
-        当前时间()               # '2026-06-16 10:30:00'
-        当前时间('%Y年%m月%d日')  # '2026年06月16日'
-    """
-    return datetime.now().strftime(format_string)
-
-
-def 当前日期(format_string: str = '%Y-%m-%d') -> str:
-    """
-    获取当前日期字符串
+    def __sub__(self, 其他: '时间差') -> '时间差':
+        return 时间差._from_timedelta(self._时间差 - 其他._时间差)
     
-    参数:
-        format_string: 格式模板（默认 '%Y-%m-%d'）
+    def __neg__(self) -> '时间差':
+        return 时间差._from_timedelta(-self._时间差)
     
-    返回:
-        格式化后的日期字符串
-    """
-    return date.today().strftime(format_string)
-
-
-def 时间戳() -> float:
-    """
-    获取当前 Unix 时间戳（秒）
+    def __mul__(self, 标量: float) -> '时间差':
+        return 时间差._from_timedelta(self._时间差 * 标量)
     
-    返回:
-        浮点数时间戳
-    """
-    return time.time()
-
-
-def 格式化时间(时间对象: Union[str, float], 格式: str = '%Y-%m-%d %H:%M:%S') -> str:
-    """
-    将时间戳或时间字符串格式化为指定格式
+    def __truediv__(self, 其他: Union['时间差', float]) -> Union[float, '时间差']:
+        if isinstance(其他, 时间差):
+            return self._时间差 / 其他._时间差
+        return 时间差._from_timedelta(self._时间差 / 其他)
     
-    参数:
-        时间对象: Unix 时间戳（浮点数）或 'YYYY-MM-DD HH:MM:SS' 格式字符串
-        格式: 目标格式模板
+    def __repr__(self) -> str:
+        return f'时间差({self.天数()}天, {self.秒数()}秒)'
     
-    返回:
-        格式化后的时间字符串
-    """
-    if isinstance(时间对象, (int, float)):
-        dt = datetime.fromtimestamp(时间对象)
-    else:
-        # 尝试多种格式解析
-        for fmt in [
-            '%Y-%m-%d %H:%M:%S',
-            '%Y-%m-%d',
-            '%Y/%m/%d %H:%M:%S',
-            '%Y/%m/%d',
-        ]:
-            try:
-                dt = datetime.strptime(时间对象, fmt)
-                break
-            except ValueError:
-                continue
-        else:
-            raise RuntimeError(f"无法解析时间字符串: '{时间对象}'")
+    @classmethod
+    def _from_timedelta(cls, td: _timedelta) -> '时间差':
+        实例 = cls.__new__(cls)
+        实例._时间差 = td
+        return 实例
     
-    return dt.strftime(格式)
-
-
-def 解析时间(time_str: str, format_string: str = '%Y-%m-%d %H:%M:%S') -> float:
-    """
-    解析时间字符串为 Unix 时间戳
+    def 天数(self) -> float:
+        """返回总天数"""
+        return self._时间差.total_seconds() / (24 * 60 * 60)
     
-    参数:
-        time_str: 时间字符串
-        format_string: 输入格式模板
+    def 总秒数(self) -> float:
+        """返回总秒数"""
+        return self._时间差.total_seconds()
     
-    返回:
-        Unix 时间戳（浮点数）
-    """
-    try:
-        dt = datetime.strptime(time_str, format_string)
-        return dt.timestamp()
-    except ValueError as e:
-        raise RuntimeError(f"时间解析失败: {e}")
-
-
-def 创建日期(年: int, 月: int, 日: int) -> str:
-    """
-    创建日期字符串
+    def 秒数(self) -> int:
+        """返回秒数部分"""
+        return self._时间差.seconds % 60
     
-    参数:
-        年: 年份
-        月: 月份（1-12）
-        日: 日（1-31）
+    def 分钟数(self) -> int:
+        """返回分钟数部分"""
+        return (self._时间差.seconds // 60) % 60
     
-    返回:
-        'YYYY-MM-DD' 格式日期字符串
-    """
-    try:
-        d = date(年, 月, 日)
-        return d.isoformat()
-    except ValueError as e:
-        raise RuntimeError(f"无效日期: {e}")
-
-
-def 时间加减(时间对象: str, 天数: int = 0, 小时: int = 0, 分钟: int = 0, 秒: int = 0) -> str:
-    """
-    时间加减运算
+    def 小时数(self) -> int:
+        """返回小时数部分"""
+        return self._时间差.seconds // (60 * 60)
     
-    参数:
-        时间对象: 'YYYY-MM-DD HH:MM:SS' 格式时间字符串
-        天数: 要加的天数（负数表示减）
-        小时: 要加的小时数
-        分钟: 要加的分钟数
-        秒: 要加的秒数
+    def 周数(self) -> float:
+        """返回周数"""
+        return self.天数() / 7
+
+
+class 日期时间:
+    """日期时间类"""
     
-    返回:
-        计算后的时间字符串
-    """
-    try:
-        dt = datetime.strptime(时间对象, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        try:
-            dt = datetime.strptime(时间对象, '%Y-%m-%d')
-        except ValueError:
-            raise RuntimeError(f"无法解析时间: '{时间对象}'，需为 'YYYY-MM-DD HH:MM:SS' 格式")
+    def __init__(self, 年: int, 月: int, 日: int, 时: int = 0, 分: int = 0, 秒: int = 0, 微秒: int = 0, 时区: _timezone = None):
+        self._日期时间 = _datetime(年, 月, 日, 时, 分, 秒, 微秒, tzinfo=时区)
     
-    delta = timedelta(days=天数, hours=小时, minutes=分钟, seconds=秒)
-    result = dt + delta
-    return result.strftime('%Y-%m-%d %H:%M:%S')
-
-
-def 日期差(日期1: str, 日期2: str) -> int:
-    """
-    计算两个日期之间的天数差
+    def __add__(self, 其他: 时间差) -> '日期时间':
+        return 日期时间._from_datetime(self._日期时间 + 其他._时间差)
     
-    参数:
-        日期1: 第一个日期 'YYYY-MM-DD'
-        日期2: 第二个日期 'YYYY-MM-DD'
+    def __sub__(self, 其他: Union['日期时间', 时间差]) -> Union['时间差', '日期时间']:
+        if isinstance(其他, 日期时间):
+            return 时间差._from_timedelta(self._日期时间 - 其他._日期时间)
+        return 日期时间._from_datetime(self._日期时间 - 其他._时间差)
     
-    返回:
-        天数差（日期2 - 日期1）
-    """
-    try:
-        d1 = datetime.strptime(日期1, '%Y-%m-%d').date()
-        d2 = datetime.strptime(日期2, '%Y-%m-%d').date()
-    except ValueError as e:
-        raise RuntimeError(f"日期格式无效: {e}")
+    def __lt__(self, 其他: '日期时间') -> bool:
+        return self._日期时间 < 其他._日期时间
     
-    return (d2 - d1).days
+    def __le__(self, 其他: '日期时间') -> bool:
+        return self._日期时间 <= 其他._日期时间
+    
+    def __gt__(self, 其他: '日期时间') -> bool:
+        return self._日期时间 > 其他._日期时间
+    
+    def __ge__(self, 其他: '日期时间') -> bool:
+        return self._日期时间 >= 其他._日期时间
+    
+    def __eq__(self, 其他: '日期时间') -> bool:
+        return self._日期时间 == 其他._日期时间
+    
+    def __repr__(self) -> str:
+        return f'日期时间({self.年()}, {self.月()}, {self.日()}, {self.时()}, {self.分()}, {self.秒()})'
+    
+    @classmethod
+    def _from_datetime(cls, dt: _datetime) -> '日期时间':
+        实例 = cls.__new__(cls)
+        实例._日期时间 = dt
+        return 实例
+    
+    def 年(self) -> int:
+        return self._日期时间.year
+    
+    def 月(self) -> int:
+        return self._日期时间.month
+    
+    def 日(self) -> int:
+        return self._日期时间.day
+    
+    def 时(self) -> int:
+        return self._日期时间.hour
+    
+    def 分(self) -> int:
+        return self._日期时间.minute
+    
+    def 秒(self) -> int:
+        return self._日期时间.second
+    
+    def 微秒(self) -> int:
+        return self._日期时间.microsecond
+    
+    def 星期(self) -> int:
+        """返回星期几（0=周一，6=周日）"""
+        return self._日期时间.weekday()
+    
+    def 周几(self) -> str:
+        """返回中文星期"""
+        星期列表 = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+        return 星期列表[self.星期()]
+    
+    def 季度(self) -> int:
+        """返回季度"""
+        return (self.月() - 1) // 3 + 1
+    
+    def 年中第几天(self) -> int:
+        """返回年中第几天"""
+        return self._日期时间.timetuple().tm_yday
+    
+    def 周中第几天(self) -> int:
+        """返回周中第几天（1=周一，7=周日）"""
+        return self._日期时间.isoweekday()
+    
+    def 转换时区(self, 目标时区: _timezone) -> '日期时间':
+        """转换时区"""
+        return 日期时间._from_datetime(self._日期时间.astimezone(目标时区))
+    
+    def 转为本地时间(self) -> '日期时间':
+        """转为本地时间"""
+        return 日期时间._from_datetime(self._日期时间.astimezone())
+    
+    def 转为UTC(self) -> '日期时间':
+        """转为UTC时间"""
+        return 日期时间._from_datetime(self._日期时间.astimezone(_timezone.utc))
+    
+    def 是否夏令时(self) -> bool:
+        """是否为夏令时"""
+        return self._日期时间.dst() is not None and self._日期时间.dst() > _timedelta(0)
+    
+    def 格式化(self, 格式字符串: str = '%Y-%m-%d %H:%M:%S') -> str:
+        """格式化日期时间"""
+        return self._日期时间.strftime(格式字符串)
+    
+    def 转为时间戳(self) -> float:
+        """转为时间戳"""
+        return self._日期时间.timestamp()
+    
+    def 是否工作日(self) -> bool:
+        """是否为工作日"""
+        return self.星期() < 5
 
 
-def 获取年(时间对象: str) -> int:
-    """从日期时间字符串中获取年份"""
-    try:
-        dt = datetime.strptime(时间对象, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        dt = datetime.strptime(时间对象, '%Y-%m-%d')
-    return dt.year
+def 当前时间() -> 日期时间:
+    """返回当前日期时间（本地时区）"""
+    return 日期时间._from_datetime(_datetime.now())
 
 
-def 获取月(时间对象: str) -> int:
-    """从日期时间字符串中获取月份"""
-    try:
-        dt = datetime.strptime(时间对象, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        dt = datetime.strptime(时间对象, '%Y-%m-%d')
-    return dt.month
+def 当前UTC时间() -> 日期时间:
+    """返回当前UTC时间"""
+    return 日期时间._from_datetime(_datetime.utcnow())
 
 
-def 获取日(时间对象: str) -> int:
-    """从日期时间字符串中获取日"""
-    try:
-        dt = datetime.strptime(时间对象, '%Y-%m-%d %H:%M:%S')
-    except ValueError:
-        dt = datetime.strptime(时间对象, '%Y-%m-%d')
-    return dt.day
+def 从时间戳(时间戳: float, 时区: _timezone = None) -> 日期时间:
+    """从时间戳创建日期时间"""
+    if 时区 is None:
+        return 日期时间._from_datetime(_datetime.fromtimestamp(时间戳))
+    return 日期时间._from_datetime(_datetime.fromtimestamp(时间戳, 时区))
 
 
-def 获取时(时间对象: str) -> int:
-    """从日期时间字符串中获取小时"""
-    dt = datetime.strptime(时间对象, '%Y-%m-%d %H:%M:%S')
-    return dt.hour
+def 从字符串(字符串: str, 格式字符串: str = '%Y-%m-%d %H:%M:%S') -> 日期时间:
+    """从字符串解析日期时间"""
+    return 日期时间._from_datetime(_datetime.strptime(字符串, 格式字符串))
 
 
-def 获取分(时间对象: str) -> int:
-    """从日期时间字符串中获取分钟"""
-    dt = datetime.strptime(时间对象, '%Y-%m-%d %H:%M:%S')
-    return dt.minute
+def 创建时区(偏移秒数: int) -> _timezone:
+    """创建时区"""
+    return _timezone(_timedelta(seconds=偏移秒数))
 
 
-def 获取秒(时间对象: str) -> int:
-    """从日期时间字符串中获取秒"""
-    dt = datetime.strptime(时间对象, '%Y-%m-%d %H:%M:%S')
-    return dt.second
+def 北京时间() -> _timezone:
+    """返回北京时间（UTC+8）"""
+    return 创建时区(8 * 60 * 60)
 
 
-__all__ = [
-    '当前时间', '当前日期', '时间戳',
-    '格式化时间', '解析时间', '创建日期',
-    '时间加减', '日期差',
-    '获取年', '获取月', '获取日',
-    '获取时', '获取分', '获取秒',
-]
+def 纽约时间() -> _timezone:
+    """返回纽约时间（UTC-5）"""
+    return 创建时区(-5 * 60 * 60)
+
+
+def 伦敦时间() -> _timezone:
+    """返回伦敦时间（UTC+0）"""
+    return 创建时区(0)
+
+
+def 东京时间() -> _timezone:
+    """返回东京时间（UTC+9）"""
+    return 创建时区(9 * 60 * 60)
+
+
+def 计算时间差(开始时间: 日期时间, 结束时间: 日期时间) -> 时间差:
+    """计算两个日期时间之间的时间差"""
+    return 结束时间 - 开始时间
+
+
+def 日期加减(日期时间: 日期时间, 天数: int = 0, 小时: int = 0, 分钟: int = 0, 秒: int = 0) -> 日期时间:
+    """日期加减"""
+    return 日期时间 + 时间差(天数=天数) + 时间差(秒数=小时 * 3600 + 分钟 * 60 + 秒)
+
+
+def 加天数(日期时间: 日期时间, 天数: int) -> 日期时间:
+    """加天数"""
+    return 日期时间 + 时间差(天数=天数)
+
+
+def 减天数(日期时间: 日期时间, 天数: int) -> 日期时间:
+    """减天数"""
+    return 日期时间 - 时间差(天数=天数)
+
+
+def 加小时(日期时间: 日期时间, 小时: int) -> 日期时间:
+    """加小时"""
+    return 日期时间 + 时间差(秒数=小时 * 3600)
+
+
+def 减小时(日期时间: 日期时间, 小时: int) -> 日期时间:
+    """减小时"""
+    return 日期时间 - 时间差(秒数=小时 * 3600)
+
+
+def 获取今天() -> 日期时间:
+    """获取今天"""
+    return 当前时间()
+
+
+def 获取昨天() -> 日期时间:
+    """获取昨天"""
+    return 减天数(当前时间(), 1)
+
+
+def 获取明天() -> 日期时间:
+    """获取明天"""
+    return 加天数(当前时间(), 1)
+
+
+def 获取本周一() -> 日期时间:
+    """获取本周一"""
+    今天 = 当前时间()
+    return 减天数(今天, 今天.星期())
+
+
+def 获取本周末() -> 日期时间:
+    """获取本周末（周日）"""
+    今天 = 当前时间()
+    return 加天数(今天, 6 - 今天.星期())
+
+
+def 获取本月第一天() -> 日期时间:
+    """获取本月第一天"""
+    今天 = 当前时间()
+    return 日期时间(今天.年(), 今天.月(), 1)
+
+
+def 获取本月最后一天() -> 日期时间:
+    """获取本月最后一天"""
+    今天 = 当前时间()
+    下个月 = 今天.月() + 1
+    年 = 今天.年()
+    if 下个月 > 12:
+        下个月 = 1
+        年 += 1
+    return 减天数(日期时间(年, 下个月, 1), 1)
+
+
+def 获取本年第一天() -> 日期时间:
+    """获取本年第一天"""
+    今天 = 当前时间()
+    return 日期时间(今天.年(), 1, 1)
+
+
+def 获取本年最后一天() -> 日期时间:
+    """获取本年最后一天"""
+    今天 = 当前时间()
+    return 日期时间(今天.年(), 12, 31)
+
+
+def 计算两个日期天数差(日期1: 日期时间, 日期2: 日期时间) -> int:
+    """计算两个日期之间的天数差"""
+    差值 = 日期2 - 日期1
+    return int(差值.天数())
+
+
+def 计算工作日天数(开始日期: 日期时间, 结束日期: 日期时间) -> int:
+    """计算两个日期之间的工作日天数"""
+    天数 = 0
+    当前日期 = 开始日期
+    while 当前日期 <= 结束日期:
+        if 当前日期.是否工作日():
+            天数 += 1
+        当前日期 = 加天数(当前日期, 1)
+    return 天数
+
+
+def 判断闰年(年: int) -> bool:
+    """判断是否为闰年"""
+    return (年 % 4 == 0 and 年 % 100 != 0) or (年 % 400 == 0)
+
+
+def 获取月份天数(年: int, 月: int) -> int:
+    """获取月份天数"""
+    月份天数 = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    if 月 == 2 and 判断闰年(年):
+        return 29
+    return 月份天数[月 - 1]
+
+
+def 格式化时间戳(时间戳: float, 格式字符串: str = '%Y-%m-%d %H:%M:%S') -> str:
+    """格式化时间戳"""
+    return 从时间戳(时间戳).格式化(格式字符串)
+
+
+def 解析相对时间(相对时间: str) -> 日期时间:
+    """解析相对时间（如 "1小时前", "2天后"）"""
+    当前 = 当前时间()
+    相对时间 = 相对时间.strip()
+    
+    if '前' in 相对时间:
+        if '秒' in 相对时间:
+            秒数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 - 时间差(秒数=秒数)
+        elif '分钟' in 相对时间:
+            分钟 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 - 时间差(秒数=分钟 * 60)
+        elif '小时' in 相对时间:
+            小时 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 - 时间差(秒数=小时 * 3600)
+        elif '天' in 相对时间:
+            天数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 - 时间差(天数=天数)
+        elif '周' in 相对时间:
+            周数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 - 时间差(天数=周数 * 7)
+        elif '月' in 相对时间:
+            月数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 日期时间(当前.年(), 当前.月() - 月数, 当前.日())
+        elif '年' in 相对时间:
+            年数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 日期时间(当前.年() - 年数, 当前.月(), 当前.日())
+    
+    elif '后' in 相对时间 or '内' in 相对时间:
+        if '秒' in 相对时间:
+            秒数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 + 时间差(秒数=秒数)
+        elif '分钟' in 相对时间:
+            分钟 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 + 时间差(秒数=分钟 * 60)
+        elif '小时' in 相对时间:
+            小时 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 + 时间差(秒数=小时 * 3600)
+        elif '天' in 相对时间:
+            天数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 + 时间差(天数=天数)
+        elif '周' in 相对时间:
+            周数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 当前 + 时间差(天数=周数 * 7)
+        elif '月' in 相对时间:
+            月数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 日期时间(当前.年(), 当前.月() + 月数, 当前.日())
+        elif '年' in 相对时间:
+            年数 = int(''.join(filter(str.isdigit, 相对时间)))
+            return 日期时间(当前.年() + 年数, 当前.月(), 当前.日())
+    
+    return 当前
