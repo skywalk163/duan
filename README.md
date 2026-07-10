@@ -20,7 +20,7 @@
 | LLVM 后端 | ✅ | 支持编译为原生 EXE（clang 零错误） |
 | 自举编译 | ✅ | 自举编译器可通过 LLVM 编译为原生 EXE（525KB） |
 | AI Copilot | ✅ | 算力不足场景下的段言代码生成工具链 + LoRA 微调 |
-| C FFI 绑定 | ✅ | 四阶段实现：基础FFI → 指针/数组 → 枚举/联合体/变长参数 → typedef/位域/调试 |
+| C FFI 绑定 | ✅ | 四阶段实现 + @C 语法标记：基础FFI → 指针/数组 → 枚举/联合体/变长参数 → typedef/位域/调试 |
 
 ## 快速开始（3 步跑通）
 
@@ -441,6 +441,7 @@ python train_lora_7b.py --model-preset qwen3.5-2b --qlora
 | 函数指针 | `外部 函数指针 名称 接收 参数 返回 类型` | C 函数指针类型 |
 | 调试 | `外部 调试 { 开启, 记录调用 }` | FFI 调用日志 |
 | 预处理器宏 | `外部 宏 名称 为 值` | C 宏定义 |
+| `@C` 标记 | `@C 段落/结构体/枚举 ...` | 独立语法标记，与 `外部` 并行 |
 
 ```段言
 加载库 "libm.so" 为 math。
@@ -450,6 +451,9 @@ python train_lora_7b.py --model-preset qwen3.5-2b --qlora
 
 设 结果 为 平方根(16.0)   # 调用 C 的 sqrt 函数
 打印 结果                  # 输出: 4.0
+
+# 或使用 @C 语法标记（更简洁）
+@C 段落 绝对值 接收 甲: 小数 返回 小数 在 math。
 ```
 
 > 详细文档：[C FFI 绑定指南](docs/ffi.md)
@@ -575,6 +579,7 @@ duan/
 │   ├── test_ffi_phase2.py  # C FFI 第二阶段测试（17 个）
 │   ├── test_ffi_phase3.py  # C FFI 第三阶段测试（23 个）
 │   ├── test_ffi_phase4.py  # C FFI 第四阶段测试（28 个）
+│   ├── test_ffi_at_c.py    # @C 语法标记测试（19 个）
 │   ├── unit/            # 单元测试
 │   ├── integration/     # 集成测试
 │   └── e2e/            # 端到端测试

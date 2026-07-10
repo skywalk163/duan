@@ -302,7 +302,7 @@ class PythonCodeGenerator:
         self._add_line("import sys")
         self._add_line("import os")
         self._add_line("import ctypes")
-        self._add_line("from stdlib.FFI import * as _duan_ffi")
+        self._add_line("import stdlib.FFI as _duan_ffi")
         self._add_line("from typing import Any")
         self._add_line("")
         self._add_line("try:")

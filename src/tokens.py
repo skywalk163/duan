@@ -41,6 +41,16 @@ class TokenType(Enum):
     EQUALS = auto()      # 等于 =
     AT = auto()          # @ 装饰器符号
     PLUS = auto()        # + 加号（字符串连接等）
+    MINUS = auto()       # - 减号
+    STAR = auto()        # * 乘号
+    SLASH = auto()       # / 除号
+    PERCENT = auto()     # % 模运算
+    LESS = auto()        # < 小于
+    GREATER = auto()     # > 大于
+    LESS_EQUAL = auto()  # <= 小于等于
+    GREATER_EQUAL = auto()  # >= 大于等于
+    EQ_EQ = auto()       # == 等于比较
+    NOT_EQ = auto()      # != 不等于
     BANG = auto()        # 感叹号 ! 或 ！（可空解包）
     
     # 段落标记

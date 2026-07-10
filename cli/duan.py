@@ -396,7 +396,20 @@ def cmd_check(args):
             parser = DuanParser()
             module = parser.parse(source)
             if module is None:
-                errors.append("解析失败")
+                errors.append("解析失败：返回空模块")
+            else:
+                # 检查是否有未消费的实质性 token（解析器提前停止）
+                first_unparsed = None
+                for i in range(parser.pos, len(parser.tokens)):
+                    t = parser.tokens[i]
+                    if t.type.name not in ('NEWLINE', 'DEDENT', 'INDENT', 'DOT', 'EOF'):
+                        first_unparsed = t
+                        break
+                if first_unparsed:
+                    errors.append(
+                        f"解析失败：无法识别代码语法。"
+                        f"第{first_unparsed.line}行第{first_unparsed.col}列附近: '{first_unparsed.value}'"
+                    )
         else:
             from duan_visitor import DuanParser
             from code_generator_unified import UnifiedCodeGenerator
@@ -410,10 +423,13 @@ def cmd_check(args):
 
     # 简单统计
     lines = source.split('\n')
+    def _is_comment_line(l):
+        s = l.strip()
+        return s.startswith('#') or s.startswith('//')
     stats = {
         'total_lines': len(lines),
-        'code_lines': sum(1 for l in lines if l.strip() and not l.strip().startswith('#')),
-        'comment_lines': sum(1 for l in lines if l.strip().startswith('#')),
+        'code_lines': sum(1 for l in lines if l.strip() and not _is_comment_line(l)),
+        'comment_lines': sum(1 for l in lines if _is_comment_line(l)),
     }
 
     print(f"检查文件: {args.file}")

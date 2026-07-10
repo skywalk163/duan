@@ -81,6 +81,30 @@ class ParserExprMixin:
                 op = self._consume().value
                 right = self._parse_add_expr()
                 left = BinaryOp(self.COMPARISON_OP_MAP.get(op, op), left, right)
+            elif tok.type == TokenType.LESS:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('<', left, right)
+            elif tok.type == TokenType.GREATER:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('>', left, right)
+            elif tok.type == TokenType.LESS_EQUAL:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('<=', left, right)
+            elif tok.type == TokenType.GREATER_EQUAL:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('>=', left, right)
+            elif tok.type == TokenType.EQ_EQ:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('==', left, right)
+            elif tok.type == TokenType.NOT_EQ:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('!=', left, right)
             else:
                 break
         
@@ -102,6 +126,11 @@ class ParserExprMixin:
                 self._consume()
                 right = self._parse_mul_expr()
                 left = BinaryOp('+', left, right)
+            elif tok.type == TokenType.MINUS:
+                # 处理 - 符号（减法）
+                self._consume()
+                right = self._parse_mul_expr()
+                left = BinaryOp('-', left, right)
             else:
                 break
         
@@ -120,6 +149,18 @@ class ParserExprMixin:
                 # 这样'数 乘以 计算阶乘 数 减一'会被正确解析为：数 * 计算阶乘(数 - 1)
                 right = self._parse_add_expr()
                 left = BinaryOp(self.MUL_OP_MAP[op], left, right)
+            elif tok.type == TokenType.STAR:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('*', left, right)
+            elif tok.type == TokenType.SLASH:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('/', left, right)
+            elif tok.type == TokenType.PERCENT:
+                self._consume()
+                right = self._parse_add_expr()
+                left = BinaryOp('%', left, right)
             else:
                 # 遇到加减运算符或其他，返回让上层处理
                 break
@@ -138,6 +179,12 @@ class ParserExprMixin:
             self._consume(TokenType.KEYWORD, '非')
             operand = self._parse_primary()
             return UnaryOp('非', operand)
+        
+        # 一元负号
+        if tok.type == TokenType.MINUS:
+            self._consume()
+            operand = self._parse_primary()
+            return UnaryOp('-', operand)
         
         # 等待表达式：等待 异步操作
         if tok.type == TokenType.KEYWORD and tok.value == '等待':

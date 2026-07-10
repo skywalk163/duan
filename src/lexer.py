@@ -193,12 +193,16 @@ _SYMBOL_TOKEN_MAP = {
     ']': TokenType.RBRACKET,
     '{': TokenType.LBRACE,
     '}': TokenType.RBRACE,
-    '<': TokenType.LBOOK,
-    '>': TokenType.RBOOK,
     '\\': TokenType.COMMA,
     '=': TokenType.EQUALS,
     '@': TokenType.AT,
     '+': TokenType.PLUS,
+    '-': TokenType.MINUS,
+    '*': TokenType.STAR,
+    '/': TokenType.SLASH,
+    '%': TokenType.PERCENT,
+    '<': TokenType.LESS,
+    '>': TokenType.GREATER,
     '!': TokenType.BANG,
     '\uff01': TokenType.BANG,
 }
@@ -384,7 +388,7 @@ class Lexer:
                 continue
             
             # 处理数字
-            if _is_ascii_digit(source[i]) or (source[i] == '-' and i + 1 < n and _is_ascii_digit(source[i+1])):
+            if _is_ascii_digit(source[i]):
                 token, consumed = self._tokenize_number(source, i, line, col)
                 tokens.append(token)
                 col += consumed
@@ -594,6 +598,28 @@ class Lexer:
     def _try_match_symbol(self, source: str, i: int, line: int, col: int) -> Tuple[Optional[Token], int]:
         """尝试匹配符号"""
         ch = source[i]
+        n = len(source)
+        
+        # 多字符运算符（必须在单字符之前检查）
+        # 管道操作符 ->
+        if ch == '-' and i + 1 < n and source[i+1] == '>':
+            return Token(TokenType.ARROW, '->', line, col), 2
+        
+        # 比较运算符（双字符）
+        if ch == '=' and i + 1 < n and source[i+1] == '=':
+            return Token(TokenType.EQ_EQ, '==', line, col), 2
+        if ch == '!' and i + 1 < n and source[i+1] == '=':
+            return Token(TokenType.NOT_EQ, '!=', line, col), 2
+        if ch == '<' and i + 1 < n and source[i+1] == '=':
+            return Token(TokenType.LESS_EQUAL, '<=', line, col), 2
+        if ch == '>' and i + 1 < n and source[i+1] == '=':
+            return Token(TokenType.GREATER_EQUAL, '>=', line, col), 2
+        
+        # 书名号（直接处理，避免与 < 和 > 比较运算符冲突）
+        if ch == '《':
+            return Token(TokenType.LBOOK, '《', line, col), 1
+        if ch == '》':
+            return Token(TokenType.RBOOK, '》', line, col), 1
         
         # 中文符号映射
         if ch in SYMBOL_MAP:
@@ -608,10 +634,6 @@ class Lexer:
         token_type = self._symbol_token_map.get(ch)
         if token_type:
             return Token(token_type, ch, line, col), 1
-        
-        # 管道操作符 ->
-        if ch == '-' and i + 1 < len(source) and source[i+1] == '>':
-            return Token(TokenType.ARROW, '->', line, col), 2
         
         return None, 0
     

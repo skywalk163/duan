@@ -224,6 +224,16 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '加载库':
             return self._parse_ffi_load_library()
 
+        # @C FFI标记（独立语法标记，非装饰器）
+        if tok.type == TokenType.AT and self._peek(1) and \
+           self._peek(1).type == TokenType.IDENTIFIER and self._peek(1).value == 'C':
+            self._consume(TokenType.AT)  # 消耗 @
+            self._consume()  # 消耗 C
+            next_tok = self._current()
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '加载库':
+                return self._parse_ffi_load_library()
+            return self._parse_ffi_decl(from_at_c=True)
+
         # 动词调用作为独立语句
         if tok.type == TokenType.KEYWORD and tok.value in VERB_ARITY:
             return self._parse_expr_stmt()
@@ -2434,8 +2444,9 @@ class ParserStmtMixin:
     # C FFI 解析方法
     # =========================================================================
 
-    def _parse_ffi_decl(self) -> ASTNode:
+    def _parse_ffi_decl(self, from_at_c: bool = False) -> ASTNode:
         """解析外部声明：外部 段落/结构体/回调/枚举/联合体/变长参数 ...
+        也支持 @C 语法标记。
         
         语法：
         外部 段落 函数名 接收 参数... 返回 类型 在 库别名
@@ -2445,8 +2456,9 @@ class ParserStmtMixin:
         外部 联合体 名称 { 字段: 类型, ... }
         外部 变长参数 段落 函数名 接收 参数... 返回 类型 在 库别名
         """
-        # 外部
-        self._consume(TokenType.KEYWORD, '外部')
+        # 外部（仅非@C模式需要）
+        if not from_at_c:
+            self._consume(TokenType.KEYWORD, '外部')
         
         tok = self._current()
         if tok is None:
