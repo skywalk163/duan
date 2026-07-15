@@ -105,6 +105,36 @@ def run_test_file(filepath: str, verbose: bool = False) -> dict:
             '__file__': filepath
         }
 
+        # 预加载同目录下的 源.duan 作为模块，供测试文件导入
+        test_dir = os.path.dirname(os.path.abspath(filepath))
+        src_file = os.path.join(test_dir, '源.duan')
+        if os.path.exists(src_file):
+            import re as _re
+            toml_file = os.path.join(test_dir, '段件.toml')
+            pkg_name = None
+            if os.path.exists(toml_file):
+                with open(toml_file, 'r', encoding='utf-8') as tf:
+                    toml_text = tf.read()
+                m = _re.search(r'名称\s*=\s*"([^"]+)"', toml_text)
+                if m:
+                    pkg_name = m.group(1)
+            if pkg_name:
+                with open(src_file, 'r', encoding='utf-8') as sf:
+                    src_source = sf.read()
+                src_parser = DuanParser()
+                src_module = src_parser.parse(src_source)
+                src_generator = PythonCodeGenerator()
+                src_py_code = src_generator.generate(src_module)
+                src_namespace = dict(namespace)
+                exec(src_py_code, src_namespace)
+                # 注册为 Python 模块，使 from pkg_name import * 可用
+                import types
+                mod = types.ModuleType(pkg_name)
+                for k, v in src_namespace.items():
+                    if not k.startswith('__'):
+                        setattr(mod, k, v)
+                sys.modules[pkg_name] = mod
+
         exec(py_code, namespace)
 
         elapsed = (time.time() - start_time) * 1000

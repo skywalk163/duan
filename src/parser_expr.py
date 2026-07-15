@@ -254,6 +254,10 @@ class ParserExprMixin:
             expr = NumberLiteral(tok.value)
             return self._parse_postfix(expr)
 
+        # C风格匿名函数：函数(params){body}
+        if tok.type == TokenType.KEYWORD and tok.value == '函数':
+            return self._parse_c_anonymous_function()
+
         # 匿名函数：接收 参数：返回 表达式。
         if tok.type == TokenType.KEYWORD and tok.value == '接收':
             return self._parse_lambda()
@@ -481,6 +485,10 @@ class ParserExprMixin:
                 expr = ParagraphCall(name, args)
                 return self._parse_postfix(expr)
 
+        # 字典字面量 {key: value, ...}
+        if tok.type == TokenType.LBRACE:
+            return self._parse_dict_literal()
+
         # 列表字面量 [元素1, 元素2, ...]
         if tok.type == TokenType.LBRACKET:
             return self._parse_list_literal()
@@ -566,6 +574,39 @@ class ParserExprMixin:
         if tok.type == TokenType.IDENTIFIER:
             name = tok.value
             self._consume()
+            
+            # 函数名含动词关键字合并（同 _collect_single_arg 逻辑）
+            if self._current() and self._current().type == TokenType.KEYWORD:
+                _fn_saved_pos = self.pos
+                _fn_prev = tok
+                _fn_parts2 = [name]
+                _fn_stop2 = frozenset({
+                    '为','等于','接收','返回','令','循环','断言','输出',
+                    '如果','否则','那么','若','则','当','遍历','设','定义',
+                    '类','构造','段落','尝试','捕获','抛出','最终','导入',
+                    '导出','从','真','假','空','且','或','非','与','等待',
+                    '匹配','情况','的','之','对','步','至','到','在','于','中的',
+                })
+                while self._current():
+                    _ct = self._current()
+                    if _ct.type == TokenType.KEYWORD and _ct.value not in _fn_stop2:
+                        if _fn_prev.col + len(_fn_prev.value) != _ct.col:
+                            break
+                        _fn_parts2.append(_ct.value)
+                        _fn_prev = _ct
+                        self._consume()
+                    elif _ct.type == TokenType.IDENTIFIER:
+                        if _fn_prev.col + len(_fn_prev.value) != _ct.col:
+                            break
+                        _fn_parts2.append(_ct.value)
+                        _fn_prev = _ct
+                        self._consume()
+                    else:
+                        break
+                if self._current() and self._current().type == TokenType.LPAREN:
+                    name = ''.join(_fn_parts2)
+                else:
+                    self.pos = _fn_saved_pos
             
             # 检查下一个token是否是参数（嵌套函数调用模式）
             next_tok = self._current()
@@ -705,6 +746,41 @@ class ParserExprMixin:
             # 合并连续的 IDENTIFIER 令牌（用于处理 tokenizer 将 "字典创建" 拆分为两个 IDENTIFIER 的情况）
             while self._current() and self._current().type == TokenType.IDENTIFIER:
                 name += self._consume().value
+            
+            # 函数名含动词关键字合并（如"添加模板"被拆分为 添+加+模+板，其中加/模是 OPERATOR_VERBS）
+            # 仅当 token 在源码中相邻（无空格）且合并后紧跟 ( 时才合并
+            # 通过相邻性检查区分 "添加模板" 和 "甲 加 乙"
+            if self._current() and self._current().type == TokenType.KEYWORD:
+                _fn_saved_pos = self.pos
+                _fn_prev = tok
+                _fn_parts = [name]
+                _fn_stop = frozenset({
+                    '为','等于','接收','返回','令','循环','断言','输出',
+                    '如果','否则','那么','若','则','当','遍历','设','定义',
+                    '类','构造','段落','尝试','捕获','抛出','最终','导入',
+                    '导出','从','真','假','空','且','或','非','与','等待',
+                    '匹配','情况','的','之','对','步','至','到','在','于','中的',
+                })
+                while self._current():
+                    _ct = self._current()
+                    if _ct.type == TokenType.KEYWORD and _ct.value not in _fn_stop:
+                        if _fn_prev.col + len(_fn_prev.value) != _ct.col:
+                            break
+                        _fn_parts.append(_ct.value)
+                        _fn_prev = _ct
+                        self._consume()
+                    elif _ct.type == TokenType.IDENTIFIER:
+                        if _fn_prev.col + len(_fn_prev.value) != _ct.col:
+                            break
+                        _fn_parts.append(_ct.value)
+                        _fn_prev = _ct
+                        self._consume()
+                    else:
+                        break
+                if self._current() and self._current().type == TokenType.LPAREN:
+                    name = ''.join(_fn_parts)
+                else:
+                    self.pos = _fn_saved_pos
             
             # 运算符动词（不应收集为参数）
             
@@ -929,14 +1005,25 @@ class ParserExprMixin:
         import re
         parts = []
         last_end = 0
+        has_invalid = False
         for m in re.finditer(r'\{([^}]+)\}', value):
+            expr_text = m.group(1).strip()
+            # 检查是否是有效的插值表达式
+            # 有效标识符：中文、字母、数字、下划线、点号(属性)、方括号(索引)
+            # 无效模式如 {%原始%} 不应作为插值
+            if not re.match(r'^[\u4e00-\u9fa5a-zA-Z_][\u4e00-\u9fa5a-zA-Z0-9_.\[\]"\'\u3010\u3011]*$', expr_text):
+                has_invalid = True
+                break
             # 插值前的普通文本
             if m.start() > last_end:
                 parts.append(value[last_end:m.start()])
             # 插值表达式（作为标识符）
-            expr_text = m.group(1).strip()
             parts.append(Identifier(expr_text))
             last_end = m.end()
+
+        # 如果有无效的插值模式，整个字符串不作为插值处理
+        if has_invalid:
+            return None
 
         # 尾部普通文本
         if last_end < len(value):
@@ -948,6 +1035,113 @@ class ParserExprMixin:
             return None
 
         return StringInterpolation(parts)
+
+
+    def _parse_c_anonymous_function(self) -> ASTNode:
+        """解析C风格匿名函数：函数(params){body}
+
+        转换为 LambdaExpression 或带语句体的匿名函数。
+        """
+        # 函数
+        self._consume(TokenType.KEYWORD, '函数')
+
+        # 参数列表
+        params = []
+        if self._current() and self._current().type == TokenType.LPAREN:
+            self._consume(TokenType.LPAREN)
+            while self._current() and self._current().type != TokenType.RPAREN:
+                tok = self._current()
+                if tok.type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                    continue
+                if tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    params.append(self._consume().value)
+                else:
+                    break
+            if self._current() and self._current().type == TokenType.RPAREN:
+                self._consume(TokenType.RPAREN)
+
+        # 函数体 {body}
+        body_expr = self._parse_c_anon_body()
+
+        if body_expr is not None:
+            return LambdaExpression(params, body_expr)
+        return LambdaExpression(params, Identifier('None'))
+
+    def _parse_c_anon_body(self):
+        """解析匿名函数体，返回单个表达式或None"""
+        from tokens import TokenType as TT
+        if not self._current() or self._current().type != TT.LBRACE:
+            return None
+
+        self._consume(TT.LBRACE)
+
+        # 跳过 NEWLINE / INDENT
+        while self._current() and self._current().type in (TT.NEWLINE, TT.INDENT):
+            self._consume()
+
+        # 收集体内语句，寻找 return 表达式
+        result_expr = None
+        depth = 0
+
+        while self._current() and self._current().type != TT.RBRACE:
+            tok = self._current()
+
+            if tok.type == TT.NEWLINE:
+                self._consume(TT.NEWLINE)
+                continue
+            if tok.type == TT.INDENT:
+                self._consume(TT.INDENT)
+                depth += 1
+                continue
+            if tok.type == TT.DEDENT:
+                if depth > 0:
+                    self._consume(TT.DEDENT)
+                    depth -= 1
+                    continue
+                else:
+                    break
+
+            # 检查是否是 返回 expr
+            if tok.type == TT.KEYWORD and tok.value == '返回':
+                self._consume(TT.KEYWORD, '返回')
+                if self._current() and self._current().type != TT.RBRACE and                    self._current().type != TT.NEWLINE and self._current().type != TT.DEDENT:
+                    result_expr = self._parse_expr()
+                else:
+                    result_expr = Identifier('None')
+                # 跳过到 RBRACE
+                while self._current() and self._current().type != TT.RBRACE:
+                    if self._current().type == TT.DEDENT and depth > 0:
+                        self._consume(TT.DEDENT)
+                        depth -= 1
+                        continue
+                    if self._current().type == TT.NEWLINE:
+                        self._consume(TT.NEWLINE)
+                        continue
+                    self._consume()
+                break
+            else:
+                # 跳过非return语句（简化处理）
+                # 尝试解析为表达式语句
+                try:
+                    expr = self._parse_expr()
+                    if result_expr is None:
+                        result_expr = expr
+                except Exception:
+                    self._consume()
+
+        # 消耗 DEDENT
+        while self._current() and self._current().type == TT.DEDENT and depth > 0:
+            self._consume(TT.DEDENT)
+            depth -= 1
+
+        # 消耗 RBRACE
+        if self._current() and self._current().type == TT.RBRACE:
+            self._consume(TT.RBRACE)
+
+        if result_expr is None:
+            result_expr = Identifier('None')
+        return result_expr
 
     def _parse_lambda(self) -> LambdaExpression:
         """解析匿名函数：接收 参数1 参数2：返回 表达式。 或 接收 参数1 参数2：表达式。"""
@@ -982,6 +1176,41 @@ class ParserExprMixin:
             self._consume(TokenType.DOT)
         
         return LambdaExpression(params, body)
+
+    def _parse_dict_literal(self) -> ASTNode:
+        """解析字典字面量：{key: value, key2: value2, ...}
+
+        生成 DictLiteral AST 节点。支持空字典、单行和多行写法。
+        """
+        self._consume(TokenType.LBRACE)
+        entries = []
+        # 空字典 {}
+        if self._match(TokenType.RBRACE):
+            self._consume(TokenType.RBRACE)
+            return self._parse_postfix(DictLiteral(entries))
+        while True:
+            # 跳过 NEWLINE/INDENT/DEDENT（支持多行字典）
+            while self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                self._consume()
+            if self._match(TokenType.RBRACE):
+                break
+            # 键
+            key = self._parse_comparison()
+            # 冒号
+            self._consume(TokenType.COLON)
+            # 值
+            value = self._parse_comparison()
+            entries.append((key, value))
+            # 跳过 NEWLINE/INDENT/DEDENT
+            while self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                self._consume()
+            # 逗号分隔
+            if self._match(TokenType.COMMA):
+                self._consume(TokenType.COMMA)
+                continue
+            break
+        self._consume(TokenType.RBRACE)
+        return self._parse_postfix(DictLiteral(entries))
 
     def _parse_list_literal(self) -> ASTNode:
         """解析列表字面量或列表推导
@@ -1128,6 +1357,35 @@ class ParserExprMixin:
                 # 以避免逗号被当作管道操作符处理
                 args = []
                 while not self._match(TokenType.RPAREN):
+                    # 跳过 NEWLINE/INDENT/DEDENT（支持多行函数调用）
+                    if self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                        self._consume()
+                        continue
+                    # 支持 C 风格关键字参数：name = value
+                    # name 可能由多个 token 组成（如 "获取函数" 被拆分为 "获取"+函数"）
+                    _kwarg_saved_pos = self.pos
+                    _kwarg_name_parts = []
+                    _kwarg_stop_kws = frozenset({
+                        '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
+                        '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
+                        '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+                        '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
+                        '匹配', '情况', '的', '之', '对', '步', '至', '到',
+                    })
+                    while self._current():
+                        _t = self._current()
+                        if _t.type == TokenType.IDENTIFIER:
+                            _kwarg_name_parts.append(self._consume().value)
+                        elif _t.type == TokenType.KEYWORD and _t.value not in _kwarg_stop_kws:
+                            _kwarg_name_parts.append(self._consume().value)
+                        else:
+                            break
+                    if _kwarg_name_parts and self._current() and self._current().type == TokenType.EQUALS:
+                        # 确认是关键字参数，消耗 =
+                        self._consume(TokenType.EQUALS)
+                    else:
+                        # 不是关键字参数，回退
+                        self.pos = _kwarg_saved_pos
                     arg = self._parse_comparison()
                     if arg is not None:
                         args.append(arg)
@@ -1136,6 +1394,9 @@ class ParserExprMixin:
                     # 逗号分隔
                     if self._match(TokenType.COMMA):
                         self._consume(TokenType.COMMA)
+                    # 跳过逗号后的 NEWLINE/INDENT/DEDENT
+                    while self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                        self._consume()
 
                 self._consume(TokenType.RPAREN)
                 expr = ParagraphCall(func_name, args)
@@ -1174,6 +1435,10 @@ class ParserExprMixin:
                         self._consume(TokenType.LPAREN)
                         # 收集参数直到右括号
                         while not self._match(TokenType.RPAREN):
+                            # 跳过 NEWLINE/INDENT/DEDENT（支持多行方法调用）
+                            if self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                                self._consume()
+                                continue
                             arg = self._parse_comparison()
                             if arg is not None:
                                 args.append(arg)
@@ -1181,6 +1446,9 @@ class ParserExprMixin:
                                 break
                             if self._match(TokenType.COMMA):
                                 self._consume(TokenType.COMMA)
+                            # 跳过逗号后的 NEWLINE/INDENT/DEDENT
+                            while self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                                self._consume()
                         self._consume(TokenType.RPAREN)
                     else:
                         # 无括号模式：收集参数直到阻断符

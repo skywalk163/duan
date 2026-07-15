@@ -12,7 +12,7 @@ import ast_nodes as ast_nodes_module
 
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
-from ast_nodes_v3 import Assignment, TypeCheckToggleStmt
+from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr
 
 
 # =============================================================================
@@ -129,6 +129,8 @@ class PythonCodeGenerator:
             # 基础函数
             '打印': 'print',
             '显示': 'print',
+            '输出': 'print',
+            '断言': '_duan_assert',
             '读取': 'input',
             '长': 'len',
             '首': 'lambda x: x[0]',
@@ -415,6 +417,11 @@ class PythonCodeGenerator:
         self._add_line("    assert _x is not None, \"尝试解包空值\"")
         self._add_line("    return _x")
         self._add_line("")
+        self._add_line("# 断言辅助函数")
+        self._add_line("def _duan_assert(_cond, _msg=''):")
+        self._add_line("    if not _cond:")
+        self._add_line("        raise AssertionError(_msg)")
+        self._add_line("")
 
         # 生成语句
         for stmt in module.statements:
@@ -565,12 +572,11 @@ class PythonCodeGenerator:
             self._generate_interface_definition(stmt)
         elif isinstance(stmt, Parameter):
             # 参数声明（段落体内部）
-            param_name = self._sanitize_name(stmt.name)
-            # 忽略参数声明，参数已由段落定义处理
+            # 顶层参数声明是解析FFI时产生的多余语句，跳过
             pass
         elif isinstance(stmt, ParameterList):
             # 参数列表声明（段落体内部）
-            # 忽略参数列表，参数已由段落定义处理
+            # 顶层参数列表声明是解析FFI时产生的多余语句，跳过
             pass
         elif isinstance(stmt, FFILoadLibrary):
             self._generate_ffi_load_library(stmt)
@@ -616,6 +622,17 @@ class PythonCodeGenerator:
             self._generate_ffi_debug_config(stmt)
         elif isinstance(stmt, FFIPreprocessorDef):
             self._generate_ffi_preprocessor_def(stmt)
+        elif isinstance(stmt, AwaitExpr):
+            # 等待语句 → await expression
+            inner = self._generate_expr(stmt.expression)
+            self._add_line(f"await {inner}")
+        elif type(stmt).__name__ == 'CForStmt':
+            # C风格for循环
+            self._generate_c_for_stmt(stmt)
+        elif type(stmt).__name__ == 'Block':
+            # 花括号代码块
+            for s in stmt.statements:
+                self._generate_statement(s)
         else:
             raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
@@ -741,6 +758,26 @@ class PythonCodeGenerator:
             self._add_line("pass")
         self.indent_level -= 1
     
+    def _generate_c_for_stmt(self, stmt):
+        """生成C风格for循环：init; while(cond){ body; incr; }"""
+        # 生成初始化语句
+        if stmt.init:
+            self._generate_statement(stmt.init)
+        # 生成while循环
+        condition = self._generate_expr(stmt.condition) if stmt.condition else 'True'
+        self._add_line(f"while {condition}:")
+        self.indent_level += 1
+        if stmt.body:
+            for s in stmt.body:
+                self._generate_statement(s)
+        else:
+            self._add_line("pass")
+        # 生成增量语句
+        if stmt.increment:
+            self._generate_statement(stmt.increment)
+        self.indent_level -= 1
+        self._add_line("")
+
     def _generate_paragraph(self, stmt: Paragraph):
         """生成段落定义"""
         name = self._sanitize_name(stmt.name)
@@ -857,6 +894,12 @@ class PythonCodeGenerator:
             self.indent_level += 1
             for s in stmt.catch_body:
                 self._generate_statement(s)
+            self.indent_level -= 1
+        else:
+            # 有尝试块但没有捕获块：生成默认except块
+            self._add_line("except Exception:")
+            self.indent_level += 1
+            self._add_line("pass")
             self.indent_level -= 1
         
         # finally块
@@ -1273,7 +1316,7 @@ class PythonCodeGenerator:
             # 先处理反斜杠（必须是第一步）
             value = value.replace('\\', '\\\\')
             # 再处理不可见字符
-            value = value.replace('\r', '\\r').replace('\n', '\\n').replace('\t', '\\t').replace('"', '\\"')
+            value = value.replace('\r', '\\r').replace('\n', '\\n').replace('\t', '\\t').replace('"', '\\"').replace('\0', '\\0').replace('\x00', '\\0')
             return f'"{value}"'
         
         elif isinstance(expr, Identifier):
@@ -1296,6 +1339,11 @@ class PythonCodeGenerator:
             right = self._generate_expr(expr.right)
             op = self.operator_map.get(expr.operator, expr.operator)
             return f"({left} {op} {right})"
+        
+        elif isinstance(expr, UnaryOp):
+            operand = self._generate_expr(expr.operand)
+            op = self.operator_map.get(expr.operator, expr.operator)
+            return f"({op}{operand})"
         
         elif isinstance(expr, ParagraphCall):
             name = self._sanitize_name(expr.name)
@@ -1465,6 +1513,11 @@ class PythonCodeGenerator:
                 return f"range({start}, ({end}) + 1, {step})"
             return f"range({start}, ({end}) + 1)"
 
+        elif isinstance(expr, AwaitExpr):
+            # 等待表达式 → await expression
+            inner = self._generate_expr(expr.expression)
+            return f"await {inner}"
+        
         else:
             raise CodeGenError(f"不支持的表达式类型", type(expr).__name__)
     
@@ -1596,11 +1649,12 @@ class PythonCodeGenerator:
 
         # 生成 ctypes 函数绑定
         self._add_line(f"# 外部函数声明: {c_name}({', '.join(p['name'] for p in stmt.params)})")
-        self._add_line(f"_{name}_ffi = {library_alias}.{c_name}")
-        if arg_types:
-            arg_types_str = ', '.join(arg_types)
-            self._add_line(f"_{name}_ffi.argtypes = [{arg_types_str}]")
-        self._add_line(f"_{name}_ffi.restype = {restype}")
+        if library_alias:
+            self._add_line(f"_{name}_ffi = {library_alias}.{c_name}")
+            if arg_types:
+                arg_types_str = ', '.join(arg_types)
+                self._add_line(f"_{name}_ffi.argtypes = [{arg_types_str}]")
+            self._add_line(f"_{name}_ffi.restype = {restype}")
 
         # 生成包装函数，处理类型转换
         params_str = ', '.join(self._sanitize_name(p['name']) for p in stmt.params)

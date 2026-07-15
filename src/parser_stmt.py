@@ -18,6 +18,29 @@ from ast_nodes_v3 import *
 from parser_core import ParseError
 
 
+
+# C风格语法 AST 节点
+class CForStmt(ASTNode):
+    """C风格for循环：循环(init;cond;incr){body}"""
+    def __init__(self, init, condition, increment, body):
+        self.init = init
+        self.condition = condition
+        self.increment = increment
+        self.body = body
+
+    def __repr__(self):
+        return f"CForStmt(init={self.init}, cond={self.condition}, incr={self.increment})"
+
+
+class Block(ASTNode):
+    """花括号代码块"""
+    def __init__(self, statements):
+        self.statements = statements
+
+    def __repr__(self):
+        return f"Block({len(self.statements)} stmts)"
+
+
 class ParserStmtMixin:
     """语句解析混入类"""
     
@@ -86,6 +109,25 @@ class ParserStmtMixin:
         # 变量声明：设...为...
         if tok.type == TokenType.KEYWORD and tok.value == '设':
             return self._parse_set_stmt()
+        
+        # C风格变量声明：令 name = expr
+        if tok.type == TokenType.IDENTIFIER and tok.value == '令':
+            return self._parse_c_var_decl()
+        
+        # C风格函数定义：函数 name(params){body}
+        # 仅当函数后跟标识符时才作为函数定义
+        if tok.type == TokenType.IDENTIFIER and tok.value == '函数' and self._peek(1) and self._peek(1).type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            return self._parse_c_function()
+        
+        # C风格for循环：循环(init;cond;incr){body}
+        # 仅当循环后跟(时才作为C风格for循环，否则可能是不含(的标识符部分（如"继续循环"）
+        if tok.type == TokenType.IDENTIFIER and tok.value == '循环' and self._peek(1) and self._peek(1).type == TokenType.LPAREN:
+            return self._parse_c_for_loop()
+        
+        # 裸花括号代码块：{ stmts }
+        if tok.type == TokenType.LBRACE:
+            body = self._parse_brace_body()
+            return Block(body)
         
         # 条件语句：如果 / 若
         if tok.type == TokenType.KEYWORD and tok.value in ('如果', '若'):
@@ -438,6 +480,258 @@ class ParserStmtMixin:
         
         return VarDecl(name, value)
     
+
+    # =========================================================================
+    # C风格语法解析
+    # =========================================================================
+
+    def _parse_c_function(self) -> ASTNode:
+        """解析C风格函数定义：函数 name(params){body}
+
+        生成与 段落 相同的 Paragraph AST 节点。
+        """
+        # 函数
+        self._consume(TokenType.IDENTIFIER, '函数')
+
+        # 函数名（合并连续 IDENTIFIER 和 KEYWORD，如 "测试_作用域守卫" 可能被拆分）
+        name_tok = self._current()
+        if not name_tok or name_tok.type not in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            self._error(f"期望函数名标识符，但得到 {name_tok.type if name_tok else '输入结束'}",
+                        name_tok.line if name_tok else 0, name_tok.col if name_tok else 0)
+        name_parts = []
+        # 收集连续的 IDENTIFIER 和 KEYWORD token 作为函数名
+        # 停止关键字：语句级关键字不应出现在函数名中
+        _func_stop_keywords = frozenset({
+            '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
+            '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
+            '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+            '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
+            '匹配', '的', '之', '对', '步', '至', '到',
+        })
+        while self._current():
+            tok = self._current()
+            if tok.value in _func_stop_keywords:
+                break
+            if tok.type == TokenType.IDENTIFIER:
+                name_parts.append(self._consume(TokenType.IDENTIFIER).value)
+            elif tok.type == TokenType.KEYWORD:
+                name_parts.append(self._consume(TokenType.KEYWORD).value)
+            else:
+                break
+        name = ''.join(name_parts)
+        if not name:
+            self._error(f"期望函数名标识符，但得到 {name_tok.type if name_tok else '输入结束'}",
+                        name_tok.line if name_tok else 0, name_tok.col if name_tok else 0)
+
+        # 参数列表 (params)
+        params = []
+        if self._current() and self._current().type == TokenType.LPAREN:
+            self._consume(TokenType.LPAREN)
+            while self._current() and self._current().type != TokenType.RPAREN:
+                tok = self._current()
+                if tok.type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                    continue
+                if tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    param_name = self._consume().value
+                    param_type = None
+                    # 支持参数类型注解：param: type
+                    if self._current() and self._current().type == TokenType.COLON:
+                        self._consume(TokenType.COLON)
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            param_type = self._consume().value
+                    params.append({'name': param_name, 'type': param_type})
+                else:
+                    break
+            if self._current() and self._current().type == TokenType.RPAREN:
+                self._consume(TokenType.RPAREN)
+
+        # 函数体 {body}
+        body = self._parse_brace_body()
+
+        return Paragraph(name, params, None, body)
+
+    def _parse_c_var_decl(self) -> ASTNode:
+        """解析C风格变量声明：令 name = expr
+
+        生成与 设 name 为 expr 相同的 VarDecl AST 节点。
+        """
+        # 令
+        self._consume(TokenType.IDENTIFIER, '令')
+
+        # 变量名（合并连续 IDENTIFIER 和 KEYWORD，如 "已关闭" 中的 "关闭" 是关键字）
+        name_tok = self._current()
+        if not name_tok or name_tok.type not in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            self._error(f"期望标识符，但得到 {name_tok.type if name_tok else '输入结束'}",
+                        name_tok.line if name_tok else 0, name_tok.col if name_tok else 0)
+        name_parts = []
+        # 收集连续的 IDENTIFIER 和 KEYWORD token 作为变量名
+        # 停止条件：=、等于、:、;、)、,、NEWLINE 等
+        # # 停止关键字：与 _parse_c_function 保持一致，确保变量名/函数名合并行为统一
+        _stop_keywords = frozenset({
+            '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
+            '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
+            '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+            '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
+            '匹配', '情况', '的', '之', '对', '步', '至', '到', '在', '于', '中的',
+        })
+        while self._current():
+            tok = self._current()
+            if tok.type == TokenType.IDENTIFIER:
+                name_parts.append(self._consume(TokenType.IDENTIFIER).value)
+            elif tok.type == TokenType.KEYWORD and tok.value not in _stop_keywords:
+                # 关键字可能是变量名的一部分（如 "已关闭" 中的 "关闭"、"使用率" 中的 "使用"）
+                # 但要排除语句级关键字，避免吞掉后续语句
+                name_parts.append(self._consume(TokenType.KEYWORD).value)
+            else:
+                break
+        name = ''.join(name_parts)
+        if not name:
+            self._error(f"期望标识符，但得到 {name_tok.type if name_tok else '输入结束'}",
+                        name_tok.line if name_tok else 0, name_tok.col if name_tok else 0)
+
+        # 可选类型注解：令 name: type = expr
+        type_annotation = None
+        if self._current() and self._current().type == TokenType.COLON:
+            self._consume(TokenType.COLON)
+            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                type_annotation = self._consume().value
+
+        # = 或 等于
+        if self._match(TokenType.EQUALS):
+            self._consume(TokenType.EQUALS)
+        elif self._match(TokenType.KEYWORD, '等于'):
+            self._consume(TokenType.KEYWORD, '等于')
+        else:
+            tok = self._current()
+            self._error(f"期望'='，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
+                        tok.line if tok else 0, tok.col if tok else 0)
+
+        # 值
+        value = self._parse_expr()
+
+        # 句号（可选，用于独立语句）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+
+        return VarDecl(name, value, type_annotation=type_annotation)
+
+    def _parse_c_for_loop(self) -> ASTNode:
+        """解析C风格for循环：循环(init;cond;incr){body}
+
+        生成 CForStmt AST 节点。
+        """
+        # 循环
+        self._consume(TokenType.IDENTIFIER, '循环')
+
+        # (
+        self._consume(TokenType.LPAREN)
+
+        # init 子句：令 name = expr 或 name = expr 或空
+        init = None
+        if not self._match(TokenType.SEMICOLON):
+            init = self._parse_for_clause()
+        if self._current() and self._current().type == TokenType.SEMICOLON:
+            self._consume(TokenType.SEMICOLON)
+
+        # condition 子句
+        condition = None
+        if not self._match(TokenType.SEMICOLON):
+            condition = self._parse_expr()
+        if self._current() and self._current().type == TokenType.SEMICOLON:
+            self._consume(TokenType.SEMICOLON)
+
+        # increment 子句
+        increment = None
+        if not self._match(TokenType.RPAREN):
+            increment = self._parse_for_clause()
+        if self._current() and self._current().type == TokenType.RPAREN:
+            self._consume(TokenType.RPAREN)
+
+        # 循环体 {body}
+        body = self._parse_brace_body()
+
+        return CForStmt(init, condition, increment, body)
+
+    def _parse_for_clause(self) -> ASTNode:
+        """解析for循环的子句（init或incr）"""
+        # 令 name = expr
+        if self._match(TokenType.IDENTIFIER, '令'):
+            return self._parse_c_var_decl()
+        # name = expr（赋值）
+        saved_pos = self.pos
+        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            # 合并连续 IDENTIFIER 和 KEYWORD
+            name_parts = []
+            _stop_kw = {'为', '等于', '接收', '返回'}
+            while self._current():
+                tok = self._current()
+                if tok.type == TokenType.IDENTIFIER:
+                    name_parts.append(self._consume(TokenType.IDENTIFIER).value)
+                elif tok.type == TokenType.KEYWORD and tok.value not in _stop_kw:
+                    name_parts.append(self._consume(TokenType.KEYWORD).value)
+                else:
+                    break
+            name = ''.join(name_parts)
+            if name and self._match(TokenType.EQUALS):
+                self._consume(TokenType.EQUALS)
+                value = self._parse_expr()
+                return VarDecl(name, value)
+            else:
+                # 不是赋值，回退
+                self.pos = saved_pos
+        # 普通表达式
+        return self._parse_expr()
+
+    def _parse_brace_body(self) -> list:
+        """解析花括号包围的代码块 { stmts }
+
+        支持多行（带缩进）和单行两种形式。
+        """
+        self._consume(TokenType.LBRACE)
+
+        # 跳过 NEWLINE
+        while self._current() and self._current().type == TokenType.NEWLINE:
+            self._consume(TokenType.NEWLINE)
+
+        statements = []
+
+        # 多行模式：有 INDENT
+        if self._current() and self._current().type == TokenType.INDENT:
+            self._consume(TokenType.INDENT)
+            statements = self._parse_body()
+            # _parse_body 在 depth==0 遇到 DEDENT 时停止，不消耗 DEDENT
+            if self._current() and self._current().type == TokenType.DEDENT:
+                self._consume(TokenType.DEDENT)
+        else:
+            # 单行模式：解析语句直到 RBRACE
+            while self._current() and self._current().type != TokenType.RBRACE:
+                tok = self._current()
+                if tok.type == TokenType.NEWLINE:
+                    self._consume(TokenType.NEWLINE)
+                    continue
+                if tok.type == TokenType.DEDENT:
+                    self._consume(TokenType.DEDENT)
+                    continue
+                if tok.type == TokenType.INDENT:
+                    self._consume(TokenType.INDENT)
+                    continue
+                stmt = self._parse_statement()
+                if stmt:
+                    statements.append(stmt)
+                else:
+                    break
+
+        # 跳过 NEWLINE
+        while self._current() and self._current().type == TokenType.NEWLINE:
+            self._consume(TokenType.NEWLINE)
+
+        # 消耗 RBRACE
+        if self._current() and self._current().type == TokenType.RBRACE:
+            self._consume(TokenType.RBRACE)
+
+        return statements
+
     def _parse_import_stmt(self) -> ImportStmt:
         """解析导入语句
         
@@ -821,6 +1115,56 @@ class ParserStmtMixin:
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
         
+        # C风格花括号体：如果(cond){body} 否则{body} 否则如果(cond){body}
+        if self._current() and self._current().type == TokenType.LBRACE:
+            then_body = self._parse_brace_body()
+            result = IfStmt(condition, then_body, None)
+            current = result
+            # 处理 C 风格的 否则 / 否则如果 链
+            while self._current() and self._match(TokenType.KEYWORD, '否则'):
+                self._consume(TokenType.KEYWORD, '否则')
+                if self._match(TokenType.KEYWORD, '如果'):
+                    # 否则如果(cond){body}
+                    self._consume(TokenType.KEYWORD, '如果')
+                    elif_condition = self._parse_expr()
+                    if self._current() and self._current().type == TokenType.DOT:
+                        self._consume(TokenType.DOT)
+                    if self._current() and self._current().type == TokenType.LBRACE:
+                        elif_body = self._parse_brace_body()
+                    else:
+                        # 回退到冒号+缩进体（混合写法兼容）
+                        self._consume(TokenType.COLON)
+                        _hn = False
+                        while self._current() and self._current().type == TokenType.NEWLINE:
+                            _hn = True
+                            self._consume(TokenType.NEWLINE)
+                        if self._current() and self._current().type == TokenType.INDENT:
+                            self._consume(TokenType.INDENT)
+                        elif_body = self._parse_body(allow_single_line=not _hn, stop_on_else=True)
+                        if self._current() and self._current().type == TokenType.DEDENT:
+                            self._consume(TokenType.DEDENT)
+                    current.else_body = IfStmt(elif_condition, elif_body, None)
+                    current = current.else_body
+                else:
+                    # 否则{body}
+                    if self._current() and self._current().type == TokenType.LBRACE:
+                        else_body = self._parse_brace_body()
+                    else:
+                        # 回退到冒号+缩进体（混合写法兼容）
+                        self._consume(TokenType.COLON)
+                        _hn = False
+                        while self._current() and self._current().type == TokenType.NEWLINE:
+                            _hn = True
+                            self._consume(TokenType.NEWLINE)
+                        if self._current() and self._current().type == TokenType.INDENT:
+                            self._consume(TokenType.INDENT)
+                        else_body = self._parse_body(allow_single_line=not _hn, stop_on_else=True)
+                        if self._current() and self._current().type == TokenType.DEDENT:
+                            self._consume(TokenType.DEDENT)
+                    current.else_body = else_body
+                    break
+            return result
+        
         self._consume(TokenType.COLON)
         
         has_newline = False
@@ -934,9 +1278,28 @@ class ParserStmtMixin:
         else:
             self._consume(TokenType.KEYWORD, '遍历')
         
-        # 变量名
-        var_tok = self._consume(TokenType.IDENTIFIER)
-        variable = var_tok.value
+        # 变量名（合并连续 IDENTIFIER 和 KEYWORD，如 "使用率" 被拆分为 "使用"(KEYWORD)+"率"(IDENTIFIER)）
+        _foreach_stop_keywords = frozenset({
+            '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
+            '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
+            '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+            '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
+            '匹配', '情况', '的', '之', '对', '步', '至', '到', '在', '于', '中的',
+        })
+        name_parts = []
+        while self._current():
+            _vt = self._current()
+            if _vt.type == TokenType.IDENTIFIER:
+                name_parts.append(self._consume(TokenType.IDENTIFIER).value)
+            elif _vt.type == TokenType.KEYWORD and _vt.value not in _foreach_stop_keywords:
+                name_parts.append(self._consume(TokenType.KEYWORD).value)
+            else:
+                break
+        if not name_parts:
+            _vt = self._current()
+            self._error(f"遍历循环期望变量名，但得到 {_vt.type if _vt else '输入结束'}",
+                        _vt.line if _vt else 0, _vt.col if _vt else 0)
+        variable = ''.join(name_parts)
         
         # 在 / 之 / 中的 / 于
         tok = self._current()
@@ -953,6 +1316,11 @@ class ParserStmtMixin:
         
         # 可迭代对象
         iterable = self._parse_expr()
+        
+        # C风格花括号体：遍历 x 于 列表{ body }
+        if self._current() and self._current().type == TokenType.LBRACE:
+            body = self._parse_brace_body()
+            return ForeachStmt(variable, iterable, body)
         
         # 冒号
         self._consume(TokenType.COLON)
@@ -1284,13 +1652,12 @@ class ParserStmtMixin:
                         
                         # 判断是否是类型名：
                         # 1. 是内置类型
-                        # 2. 是标识符且下一个token是逗号、冒号、或关键字（返回、设等）
+                        # 2. 是标识符且下一个token是逗号或关键字（返回、设等），但不包括冒号（冒号可能是块开始）
                         is_type = False
                         if next_tok.value in BUILTIN_TYPES:
                             is_type = True
                         elif next_tok.type == TokenType.IDENTIFIER:
                             if next_next and (next_next.type == TokenType.COMMA or 
-                                             next_next.type == TokenType.COLON or
                                              (next_next.type == TokenType.KEYWORD and 
                                               (next_next.value == '返回' or next_next.value in _stmt_keywords))):
                                 is_type = True
@@ -2253,6 +2620,23 @@ class ParserStmtMixin:
         # 使用
         self._consume(TokenType.KEYWORD, '使用')
 
+        # 检测通配符导入：使用 模块名.*
+        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            saved_pos = self.pos
+            mod_tok = self._consume()
+            mod_name = mod_tok.value
+            if self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+                if self._current() and self._current().type == TokenType.STAR:
+                    self._consume(TokenType.STAR)
+                    # 消耗句号（可选）
+                    if self._current() and self._current().type == TokenType.DOT:
+                        self._consume(TokenType.DOT)
+                    return ImportStmt(mod_name, symbols=['*'], alias=None)
+
+            # 不是通配符导入，回退
+            self.pos = saved_pos
+
         # 上下文表达式
         context_expr = self._parse_expr()
 
@@ -2543,10 +2927,15 @@ class ParserStmtMixin:
                 self._error(f"期望C函数名（字符串），但得到 {c_name_tok.type if c_name_tok else '输入结束'}")
         
         # 参数：接收 参数1: 类型, 参数2: 类型
+        # 或 v2 语法：参数名直接跟在函数名后（无"接收"关键字）
         params = []
+        has_jieshou = False
         if self._match(TokenType.KEYWORD, '接收'):
+            has_jieshou = True
             self._consume(TokenType.KEYWORD, '接收')
-            
+        
+        # 如果有"接收"关键字，或当前token是标识符（v2语法），则解析参数
+        if has_jieshou or (self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD) and self._current().value not in ('返回', '在')):
             while self._current():
                 ptok = self._current()
                 if ptok.type == TokenType.KEYWORD and ptok.value in ('返回', '在'):
@@ -2555,12 +2944,12 @@ class ParserStmtMixin:
                     break
                 
                 if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                    # 收集参数名，直到遇到 '为' 或 ',' 或 '返回' 或 '在'
+                    # 收集参数名，直到遇到 '为' 或 ',' 或 '返回' 或 '在' 或 '。'
                     param_parts = []
                     while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                         if self._current().value in ('返回', '在', '为'):
                             break
-                        if self._match(TokenType.COMMA):
+                        if self._match(TokenType.COMMA) or self._current().type == TokenType.DOT:
                             break
                         param_parts.append(self._current().value)
                         self._consume()
