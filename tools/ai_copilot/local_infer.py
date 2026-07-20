@@ -1,0 +1,540 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+段言本地推理器 — 通过本地小模型生成段言代码
+
+支持三种推理后端：
+  1. ollama   — 通过 ollama 调用本地模型（推荐，最快）
+  2. transformers — 直接用 transformers + peft 推理（无需 ollama）
+  3. prompt   — 只生成 prompt 不调用模型（粘贴给外部 AI 用）
+
+两种模式：
+  --prompt-only   使用 prompt 工程（无需微调，用 pipeline 组装 prompt）
+  --fine-tuned    使用微调后的模型（需要先完成训练）
+
+用法：
+    # 使用微调模型推理（默认 ollama 后端）
+    python local_infer.py --fine-tuned "写一个冒泡排序"
+
+    # 使用 prompt 工程 + ollama 基础模型
+    python local_infer.py "写一个冒泡排序"
+
+    # 使用 transformers 后端（不需要 ollama）
+    python local_infer.py --fine-tuned --backend transformers "写一个冒泡排序"
+
+    # 翻译 Python 代码
+    python local_infer.py --fine-tuned --mode translate "def add(a, b): return a + b"
+
+    # 交互模式
+    python local_infer.py --fine-tuned --interactive
+
+    # 修复代码
+    python local_infer.py --fine-tuned --fix hello.duan "第3行语法错误"
+"""
+
+import argparse
+import json
+import os
+import subprocess
+import sys
+import time
+
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _SCRIPT_DIR)
+
+# ── 常量 ──
+_DEFAULT_MODEL_OLLAMA = "qwen2.5-coder:1.5b"
+_FINETUNED_OLLAMA = "duan-translator"
+_DEFAULT_MODEL_PATH = os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
+_LORA_PATH = os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_cpu", "final")
+_MERGED_PATH = os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged")
+
+SYSTEM_PROMPT = (
+    "你是段言（DuanLang）编程语言 v3.2 的翻译专家。"
+    "段言是一种中文编程语言，使用中文关键字。"
+    "你的任务是将 Python 代码翻译为段言 v3.2 代码。\n"
+    "关键规则：\n"
+    "- 变量赋值: 设 x 为 10\n"
+    "- 字符串赋值: 定义 s 等于 \"hello\"\n"
+    "- 段落定义: 段落 名 接收 参数：\n"
+    "- 条件: 如果 / 否则如果 / 否则：\n"
+    "- 循环: 遍历 i 于 0至N： / 当 条件：\n"
+    "- 运算: 加/减/乘/除以/取余/加上/减去/乘以\n"
+    "- 比较: 等于/不等于/大于/小于/大于等于/小于等于\n"
+    "- 逻辑: 且/或/非\n"
+    "- 布尔: 真/假/空\n"
+    "- 跳转: 跳出(break)/跳过(continue)/返回(return)\n"
+    "- 长度: 用 len() 而非 长度()\n"
+    "- 列表索引赋值: lst[0] = 10\n"
+    "- 打印: 打印(x)\n"
+    "只输出段言代码，不要解释。"
+)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 后端 1: ollama
+# ═══════════════════════════════════════════════════════════════════
+
+def call_ollama(
+    model: str,
+    prompt: str,
+    system: str = "",
+    temperature: float = 0.1,
+    max_tokens: int = 1024,
+    timeout: int = 120,
+) -> str:
+    """调用 ollama 本地模型
+
+    使用 ollama 的 HTTP API（默认 localhost:11434）。
+    """
+    import urllib.request
+    import urllib.error
+
+    url = "http://localhost:11434/api/generate"
+
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "system": system or SYSTEM_PROMPT,
+        "stream": False,
+        "options": {
+            "temperature": temperature,
+            "num_predict": max_tokens,
+            "stop": ["<|im_end|>", "```"],
+        },
+    }
+
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+
+    try:
+        t0 = time.time()
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            result = json.loads(resp.read().decode("utf-8"))
+            elapsed = time.time() - t0
+            response = result.get("response", "").strip()
+
+            # 打印统计
+            eval_count = result.get("eval_count", 0)
+            if eval_count and elapsed > 0:
+                speed = eval_count / elapsed
+                print(f"[ollama] {model} | {eval_count} tokens | {elapsed:.1f}s | {speed:.1f} tok/s",
+                      file=sys.stderr)
+
+            return response
+    except urllib.error.URLError as e:
+        print(f"[ERROR] 无法连接 ollama: {e}", file=sys.stderr)
+        print("请确认 ollama 已安装并运行:", file=sys.stderr)
+        print("  安装: winget install Ollama.Ollama", file=sys.stderr)
+        print("  启动: ollama serve", file=sys.stderr)
+        return ""
+    except Exception as e:
+        print(f"[ERROR] ollama 调用失败: {e}", file=sys.stderr)
+        return ""
+
+
+def check_ollama() -> bool:
+    """检查 ollama 是否可用"""
+    import urllib.request
+    import urllib.error
+    try:
+        urllib.request.urlopen("http://localhost:11434/api/tags", timeout=3)
+        return True
+    except Exception:
+        return False
+
+
+def list_ollama_models() -> list:
+    """列出已安装的 ollama 模型"""
+    import urllib.request
+    try:
+        with urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            return [m["name"] for m in data.get("models", [])]
+    except Exception:
+        return []
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 后端 2: transformers（直接推理，不需要 ollama）
+# ═══════════════════════════════════════════════════════════════════
+
+_transformer_pipeline = None
+
+
+def get_transformer_pipeline(use_finetuned: bool = True):
+    """获取或初始化 transformers 推理 pipeline"""
+    global _transformer_pipeline
+
+    if _transformer_pipeline is not None:
+        return _transformer_pipeline
+
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    # 优先使用合并后的模型，其次使用 LoRA
+    if use_finetuned:
+        if os.path.exists(_MERGED_PATH):
+            print(f"[transformers] 加载合并模型: {_MERGED_PATH}", file=sys.stderr)
+            model_path = _MERGED_PATH
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path, dtype=torch.float32, trust_remote_code=True
+            )
+            tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        elif os.path.exists(_LORA_PATH):
+            from peft import PeftModel
+            print(f"[transformers] 加载基础模型 + LoRA: {_DEFAULT_MODEL_PATH} + {_LORA_PATH}", file=sys.stderr)
+            model_path = _DEFAULT_MODEL_PATH
+            base = AutoModelForCausalLM.from_pretrained(
+                model_path, dtype=torch.float32, trust_remote_code=True
+            )
+            model = PeftModel.from_pretrained(base, _LORA_PATH)
+            model = model.merge_and_unload()
+            tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+        else:
+            print(f"[transformers] 未找到微调模型，使用基础模型: {_DEFAULT_MODEL_PATH}", file=sys.stderr)
+            model_path = _DEFAULT_MODEL_PATH
+            model = AutoModelForCausalLM.from_pretrained(
+                model_path, dtype=torch.float32, trust_remote_code=True
+            )
+            tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+    else:
+        model_path = _DEFAULT_MODEL_PATH
+        print(f"[transformers] 加载基础模型: {model_path}", file=sys.stderr)
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path, dtype=torch.float32, trust_remote_code=True
+        )
+        tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+
+    model.eval()
+
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+
+    _transformer_pipeline = (model, tokenizer)
+    return _transformer_pipeline
+
+
+def call_transformers(
+    prompt: str,
+    system: str = "",
+    temperature: float = 0.1,
+    max_tokens: int = 512,
+) -> str:
+    """使用 transformers 直接推理"""
+    import torch
+
+    model, tokenizer = get_transformer_pipeline(use_finetuned=True)
+
+    messages = [
+        {"role": "system", "content": system or SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
+    text = tokenizer.apply_chat_template(
+        messages, tokenize=False, add_generation_prompt=True
+    )
+    inputs = tokenizer(text, return_tensors="pt")
+
+    t0 = time.time()
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            max_new_tokens=max_tokens,
+            temperature=temperature,
+            do_sample=temperature > 0,
+            pad_token_id=tokenizer.pad_token_id,
+            top_p=0.9,
+        )
+
+    elapsed = time.time() - t0
+    response = tokenizer.decode(
+        outputs[0][inputs["input_ids"].shape[1]:],
+        skip_special_tokens=True,
+    ).strip()
+
+    token_count = outputs[0][inputs["input_ids"].shape[1]:].shape[0]
+    if elapsed > 0:
+        speed = token_count / elapsed
+        print(f"[transformers] {token_count} tokens | {elapsed:.1f}s | {speed:.1f} tok/s",
+              file=sys.stderr)
+
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 核心推理函数
+# ═══════════════════════════════════════════════════════════════════
+
+def generate_duan(
+    requirement: str,
+    backend: str = "ollama",
+    use_finetuned: bool = False,
+    mode: str = "auto",
+    model_size: str = "small",
+    temperature: float = 0.1,
+    max_tokens: int = 1024,
+) -> str:
+    """生成段言代码
+
+    Args:
+        requirement: 用户需求（自然语言或 Python 代码）
+        backend: 推理后端 ("ollama" 或 "transformers")
+        use_finetuned: 是否使用微调模型
+        mode: 生成模式 ("auto", "translate", "create")
+        model_size: prompt 工程模式下的模型大小 ("small", "medium", "large")
+        temperature: 生成温度
+        max_tokens: 最大生成 token 数
+
+    Returns:
+        生成的段言代码
+    """
+    # 构造 prompt
+    if use_finetuned:
+        # 微调模型：直接给 Python 代码或需求
+        if mode == "translate" or _looks_like_python(requirement):
+            prompt = f"将以下 Python 代码翻译为段言 v3.2：\n\n{requirement}"
+        else:
+            prompt = f"请用段言 v3.2 语法编写以下功能：\n\n{requirement}"
+    else:
+        # prompt 工程模式：用 pipeline 组装完整 prompt
+        from pipeline import generate_pipeline
+        prompt = generate_pipeline(requirement, model_size=model_size)
+
+    # 调用后端
+    if backend == "ollama":
+        model = _FINETUNED_OLLAMA if use_finetuned else _DEFAULT_MODEL_OLLAMA
+        return call_ollama(model, prompt, temperature=temperature, max_tokens=max_tokens)
+    elif backend == "transformers":
+        return call_transformers(prompt, temperature=temperature, max_tokens=max_tokens)
+    else:
+        raise ValueError(f"未知后端: {backend}")
+
+
+def fix_duan(
+    filepath: str,
+    error_msg: str,
+    backend: str = "ollama",
+    use_finetuned: bool = False,
+    model_size: str = "small",
+) -> str:
+    """修复段言代码"""
+    # 读取原代码
+    if not os.path.exists(filepath):
+        return f"[ERROR] 文件不存在: {filepath}"
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        code = f.read()
+
+    if use_finetuned:
+        prompt = (
+            f"以下段言代码有错误，请修复：\n\n"
+            f"```段言\n{code}\n```\n\n"
+            f"错误信息：{error_msg}\n\n"
+            f"请输出修复后的完整段言代码。"
+        )
+    else:
+        from pipeline import fix_pipeline
+        prompt = fix_pipeline(filepath, error_msg, model_size=model_size)
+
+    if backend == "ollama":
+        model = _FINETUNED_OLLAMA if use_finetuned else _DEFAULT_MODEL_OLLAMA
+        return call_ollama(model, prompt, max_tokens=2048)
+    elif backend == "transformers":
+        return call_transformers(prompt, max_tokens=1024)
+    else:
+        raise ValueError(f"未知后端: {backend}")
+
+
+def _looks_like_python(text: str) -> bool:
+    """判断文本是否像 Python 代码"""
+    indicators = ["def ", "class ", "import ", "for ", "while ", "if ", "return ", "print("]
+    return sum(1 for ind in indicators if ind in text) >= 2
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 交互模式
+# ═══════════════════════════════════════════════════════════════════
+
+def interactive_mode(backend: str, use_finetuned: bool):
+    """交互式对话模式"""
+    print("=" * 60)
+    print("段言本地推理器 — 交互模式")
+    print("=" * 60)
+
+    # 显示当前配置
+    if backend == "ollama":
+        if not check_ollama():
+            print("\n[WARN] ollama 未运行，尝试启动...")
+            subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            time.sleep(3)
+            if not check_ollama():
+                print("[ERROR] ollama 启动失败")
+                return
+
+        model = _FINETUNED_OLLAMA if use_finetuned else _DEFAULT_MODEL_OLLAMA
+        models = list_ollama_models()
+        print(f"  后端: ollama")
+        print(f"  模型: {model}")
+        if use_finetuned and model not in models:
+            print(f"  [WARN] 模型 {model} 未安装，可用模型: {', '.join(models)}")
+            if models:
+                model = models[0]
+                print(f"  切换到: {model}")
+        print(f"  可用模型: {', '.join(models) if models else '无'}")
+    else:
+        print(f"  后端: transformers")
+        print(f"  模型: {'微调' if use_finetuned else '基础'}")
+
+    print(f"  模式: {'微调' if use_finetuned else 'prompt 工程'}")
+    print()
+    print("输入需求或 Python 代码，按回车生成段言代码。")
+    print("输入 'quit' 或 'exit' 退出。")
+    print("输入 'translate' 切换到翻译模式。")
+    print("输入 'fix <文件> <错误>' 修复代码。")
+    print()
+
+    force_translate = False
+
+    while True:
+        try:
+            user_input = input(">>> ").strip()
+        except (EOFError, KeyboardInterrupt):
+            print("\n再见！")
+            break
+
+        if not user_input:
+            continue
+        if user_input.lower() in ("quit", "exit", "q"):
+            print("再见！")
+            break
+        if user_input.lower() == "translate":
+            force_translate = not force_translate
+            print(f"翻译模式: {'开' if force_translate else '关'}")
+            continue
+        if user_input.lower().startswith("fix "):
+            parts = user_input[4:].split(None, 1)
+            if len(parts) < 2:
+                print("用法: fix <文件路径> <错误信息>")
+                continue
+            filepath, error = parts[0], parts[1]
+            result = fix_duan(filepath, error, backend=backend, use_finetuned=use_finetuned)
+            print("\n--- 修复结果 ---")
+            print(result)
+            print()
+            continue
+
+        # 生成
+        mode = "translate" if force_translate or _looks_like_python(user_input) else "auto"
+        result = generate_duan(
+            user_input,
+            backend=backend,
+            use_finetuned=use_finetuned,
+            mode=mode,
+        )
+
+        print("\n--- 段言代码 ---")
+        print(result)
+        print()
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 主函数
+# ═══════════════════════════════════════════════════════════════════
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="段言本地推理器 — 通过本地小模型生成段言代码"
+    )
+    parser.add_argument("input", nargs="?", help="需求描述或 Python 代码")
+    parser.add_argument(
+        "--backend", choices=["ollama", "transformers"],
+        default="ollama", help="推理后端（默认 ollama）",
+    )
+    parser.add_argument(
+        "--fine-tuned", action="store_true",
+        help="使用微调后的模型",
+    )
+    parser.add_argument(
+        "--prompt-only", action="store_true",
+        help="只输出 prompt 不调用模型",
+    )
+    parser.add_argument(
+        "--mode", choices=["auto", "translate", "create"],
+        default="auto", help="生成模式",
+    )
+    parser.add_argument(
+        "--model-size", choices=["small", "medium", "large"],
+        default="small", help="prompt 工程模式下的模型大小",
+    )
+    parser.add_argument(
+        "--interactive", "-i", action="store_true",
+        help="交互模式",
+    )
+    parser.add_argument(
+        "--fix", action="store_true",
+        help="修复模式（需配合 --fix-file 和 --fix-error）",
+    )
+    parser.add_argument("--fix-file", help="要修复的段言文件路径")
+    parser.add_argument("--fix-error", help="错误信息")
+    parser.add_argument("--temperature", type=float, default=0.1, help="生成温度")
+    parser.add_argument("--max-tokens", type=int, default=1024, help="最大 token 数")
+    parser.add_argument("--output", "-o", help="输出文件路径")
+    args = parser.parse_args()
+
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+    # 交互模式
+    if args.interactive:
+        interactive_mode(args.backend, args.fine_tuned)
+        return
+
+    # 修复模式
+    if args.fix:
+        if not args.fix_file or not args.fix_error:
+            print("修复模式需要 --fix-file 和 --fix-error")
+            sys.exit(1)
+        result = fix_duan(
+            args.fix_file, args.fix_error,
+            backend=args.backend, use_finetuned=args.fine_tuned,
+            model_size=args.model_size,
+        )
+        print(result)
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(result)
+            print(f"\n已保存到: {args.output}")
+        return
+
+    # prompt-only 模式
+    if args.prompt_only:
+        from pipeline import generate_pipeline
+        prompt = generate_pipeline(args.input or "", model_size=args.model_size)
+        print(prompt)
+        return
+
+    # 普通生成模式
+    if not args.input:
+        parser.print_help()
+        return
+
+    result = generate_duan(
+        args.input,
+        backend=args.backend,
+        use_finetuned=args.fine_tuned,
+        mode=args.mode,
+        model_size=args.model_size,
+        temperature=args.temperature,
+        max_tokens=args.max_tokens,
+    )
+
+    if result:
+        print(result)
+        if args.output:
+            with open(args.output, "w", encoding="utf-8") as f:
+                f.write(result)
+            print(f"\n已保存到: {args.output}", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
