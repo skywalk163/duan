@@ -19,13 +19,16 @@ tools/ai_copilot/
 ├── train_cpu_lora.py           # CPU 训练脚本（已验证可用）
 ├── train_gpu_lora.py           # GPU 训练脚本（推荐，速度提升 30 倍）
 ├── download_model.py           # 模型下载脚本
-├── local_infer.py              # 推理脚本
+├── local_infer.py              # 推理脚本（支持 ollama / transformers 后端）
 ├── merge_and_convert.py        # LoRA 合并 & GGUF 转换
+├── fix_gguf_rope.py            # GGUF 修复脚本（修复 rope.freq_base=0.0）
+├── create_ollama_model.sh      # 一键创建 ollama 模型（修复 + 量化）
 ├── model_cache/
 │   └── qwen2.5-0.5b/           # 基础模型（~1GB）
 └── output/
     ├── smoke_test/             # 2步验证训练产物
-    └── qwen2.5_0.5b_duan_gpu/  # GPU 全量训练产物
+    ├── qwen2.5_0.5b_duan_gpu/  # GPU 全量训练产物
+    └── duan_translator_merged/ # 合并后模型 + GGUF（.gitignore 排除）
 ```
 
 ## 环境准备
@@ -182,7 +185,244 @@ print(tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_t
 1. **合并 LoRA**：`python merge_and_convert.py --merge-only`
 2. **转 GGUF**：`python merge_and_convert.py --convert-gguf`
 3. **集成到 CLI**：`duan ai local "写一个冒泡排序"`
-4. **部署到 ollama**：参考 `local_infer.py` 的 ollama 后端
+4. **部署到 ollama**：详见下方 [ollama 部署指南](#ollama-部署指南)
+
+---
+
+## ollama 部署指南
+
+本节详细说明如何将微调后的段言翻译模型部署到 ollama，实现快速本地推理。
+
+### 整体流程
+
+```
+LoRA 训练产物
+  │
+  ▼
+merge_and_convert.py --merge-only    →  合并后的 safetensors 模型 (~1.9GB)
+  │
+  ▼
+llama.cpp convert_hf_to_gguf.py      →  GGUF F16 模型 (~994MB)
+  │
+  ▼
+fix_gguf_rope.py                      →  修复 GGUF 中 rope.freq_base=0.0 问题
+  │
+  ▼
+ollama create -q q4_K_M               →  量化导入 ollama (~398MB)
+  │
+  ▼
+ollama run duan-translator            →  推理使用
+```
+
+### 第 0 步：准备文件
+
+你需要准备以下文件（拷到目标机器）：
+
+| 文件 | 说明 | 获取方式 |
+|------|------|----------|
+| `duan_translator.gguf` | F16 格式 GGUF 模型 (~994MB) | `merge_and_convert.py --convert-gguf` 或 Kaggle 训练后转换 |
+| `fix_gguf_rope.py` | GGUF 修复脚本 (4KB) | 仓库 `tools/ai_copilot/fix_gguf_rope.py` |
+| `create_ollama_model.sh` | 一键创建脚本 (3KB) | 仓库 `tools/ai_copilot/create_ollama_model.sh` |
+
+如果你已经有了量化后的 `duan_translator_fixed.gguf`（修复 + 量化的最终文件），可以直接跳到第 3 步。
+
+### 第 1 步：安装 ollama
+
+**Windows**（推荐从 ModelScope 下载，国内速度快）：
+
+1. 下载 `OllamaSetup.exe`：https://www.modelscope.cn/models/Liangdi/ollama-windows-release
+2. 双击安装，默认路径 `C:\Users\<用户名>\AppData\Local\Programs\Ollama\`
+3. 安装完成后 ollama 服务自动启动，托盘图标显示运行状态
+
+验证安装：
+
+```bash
+ollama --version
+# 应输出: ollama version is 0.13.x
+```
+
+**Linux**：
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+### 第 2 步：修复 GGUF 文件（rope.freq_base 问题）
+
+**问题说明**：safetensors → GGUF 转换时，`qwen2.rope.freq_base` 会丢失为 `0.0`（应为 `1000000.0`），导致 ollama 推理时触发 `llama-sampling.cpp:662` 断言崩溃，返回 500 错误。
+
+**修复方法**：
+
+```bash
+# 检查当前值
+python fix_gguf_rope.py duan_translator.gguf
+# 输出: 当前 rope.freq_base = 0.0
+
+# 修复（输出到新文件，原文件不变）
+python fix_gguf_rope.py duan_translator.gguf duan_translator_fixed.gguf
+# 输出:
+#   当前 rope.freq_base = 0.0
+#   修复完成: duan_translator_fixed.gguf
+#   验证 rope.freq_base = 1000000.0
+
+# 也可以就地修改（自动创建 .bak 备份）
+python fix_gguf_rope.py duan_translator.gguf
+```
+
+**原理**：脚本解析 GGUF 二进制头部，定位 `qwen2.rope.freq_base` 的 float32 字节偏移（通常在偏移量 467），将其从 `0x00000000` 改为 `1000000.0` 对应的字节 `0x00247449`。
+
+### 第 3 步：创建 Modelfile
+
+在与 `duan_translator_fixed.gguf` 同一目录下创建 `Modelfile`：
+
+```bash
+cat > Modelfile << 'EOF'
+# 段言翻译器 — ollama Modelfile
+FROM ./duan_translator_fixed.gguf
+
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}{{ if .Prompt }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+"""
+
+SYSTEM """你是段言（DuanLang）编程语言 v3.2 的翻译专家。你的任务是将 Python 代码翻译为段言 v3.2 代码。只输出段言代码，不要解释。"""
+
+PARAMETER temperature 0.1
+PARAMETER top_p 0.9
+PARAMETER num_ctx 1024
+PARAMETER stop "<|im_end|>"
+EOF
+```
+
+**Modelfile 参数说明**：
+
+| 参数 | 值 | 说明 |
+|------|-----|------|
+| `FROM` | `./duan_translator_fixed.gguf` | 指向修复后的 GGUF 文件 |
+| `TEMPLATE` | ChatML 格式 | Qwen2.5 的对话模板，`<\|im_start\|>` / `<\|im_end\|>` |
+| `temperature` | 0.1 | 低温度保证翻译稳定性 |
+| `num_ctx` | 1024 | 上下文窗口，代码翻译够用 |
+| `stop` | `<\|im_end\|>` | 生成终止符 |
+
+> **注意**：TEMPLATE 中不要有多余的 `{{ end }}`。Qwen2.5 的 ChatML 模板在 assistant 标签后直接结束，不需要 `{{ end }}` 闭合。多余的 `{{ end }}` 会导致 `template error: unexpected {{end}}`。
+
+### 第 4 步：创建 ollama 模型
+
+**方式 A：一键脚本（推荐）**
+
+```bash
+# 确保 duan_translator_fixed.gguf 和 Modelfile 在同一目录
+# 脚本会自动检测、修复、创建、验证
+bash create_ollama_model.sh
+```
+
+**方式 B：手动命令**
+
+```bash
+# 创建量化模型（q4_K_M，994MB → 398MB）
+ollama create duan-translator -f Modelfile -q q4_K_M
+
+# 查看模型列表
+ollama list
+# 应出现: duan-translator:latest  398 MB
+```
+
+**量化级别选择**：
+
+| 量化级别 | 大小 | 精度损失 | 速度 | 命令 |
+|----------|------|----------|------|------|
+| F16（不量化） | 994 MB | 无 | 最慢 | `-q f16` 或不指定 `-q` |
+| Q8_0 | 528 MB | 极小 | 慢 | `-q q8_0` |
+| Q5_K_M | 470 MB | 小 | 中 | `-q q5_k_m` |
+| **Q4_K_M（推荐）** | **398 MB** | 小 | **快** | `-q q4_K_M` |
+| Q4_K_S | 374 MB | 中 | 快 | `-q q4_k_s` |
+
+对于 0.5B 参数的小模型，Q4_K_M 是精度和速度的最佳平衡点。
+
+### 第 5 步：测试推理
+
+```bash
+# 基本测试 — 翻译加法函数
+ollama run duan-translator "def add(a, b): return a + b"
+# 预期输出: 段落 加法 接收 a, b：
+#               返回 a 加 b
+
+# 翻译循环
+ollama run duan-translator "for i in range(10): print(i)"
+# 预期输出: 遍历 i 于 0至10：
+#               打印(i)
+
+# 翻译条件
+ollama run duan-translator "if x > 5: print('big')"
+# 预期输出: 如果 x 大于 5：
+#               打印("big")
+```
+
+### 第 6 步：在项目中调用
+
+通过 `local_infer.py` 使用 ollama 后端：
+
+```bash
+# 翻译 Python 代码
+python local_infer.py --fine-tuned --backend ollama --mode translate "def add(a, b): return a + b"
+
+# 交互模式
+python local_infer.py --fine-tuned --backend ollama --interactive
+
+# 生成段言代码（自然语言描述需求）
+python local_infer.py --fine-tuned "写一个冒泡排序"
+```
+
+`local_infer.py` 内部通过 HTTP API 调用 ollama（`localhost:11434/api/generate`），无需额外安装 Python 依赖。
+
+### 性能参考
+
+| 环境 | 模型 | 量化 | 速度 | 单次翻译耗时 |
+|------|------|------|------|-------------|
+| CPU (i5-8250U, 24GB RAM) | Qwen2.5-0.5B | Q4_K_M | 0.01 tok/s | ~6 分钟（不可用） |
+| GPU (RTX 3060 12GB) | Qwen2.5-0.5B | Q4_K_M | 预估 50+ tok/s | ~2 秒 |
+| GPU (RTX 4090 24GB) | Qwen2.5-0.5B | Q4_K_M | 预估 100+ tok/s | ~1 秒 |
+
+> 0.5B 模型在任意 GPU 上都极快。如果 CPU 推理太慢，务必使用 GPU 环境。
+
+### 迁移到另一台机器
+
+如果训练在本机完成，推理在另一台（更快的）机器上运行：
+
+1. **拷贝 GGUF 文件**：将 `duan_translator_fixed.gguf`（398MB 或 994MB F16）拷到目标机器
+2. **拷贝脚本**：`fix_gguf_rope.py`、`create_ollama_model.sh`（或手动创建 Modelfile）
+3. 在目标机器上安装 ollama
+4. 如果 GGUF 未修复，先运行 `python fix_gguf_rope.py`
+5. 创建 Modelfile 并 `ollama create duan-translator -f Modelfile -q q4_K_M`
+6. 测试：`ollama run duan-translator "def add(a, b): return a + b"`
+
+> **注意**：如果目标机器有 GPU，ollama 会自动检测并使用 GPU 推理，无需额外配置。可通过 `ollama ps` 查看模型运行在 CPU 还是 GPU 上。
+
+### 故障排除
+
+**问题：`ollama create` 超时或卡住**
+
+ollama 需要读取 GGUF 文件并量化，994MB 文件可能需要几分钟。确保 `ollama create` 命令有足够超时时间（至少 5 分钟）。
+
+**问题：推理返回 500 错误**
+
+检查 ollama 日志（Windows: `%LOCALAPPDATA%\Ollama\server.log`）：
+- 如果看到 `Assertion failed: found, file llama-sampling.cpp, line 662`，说明 `rope.freq_base` 未修复，回到第 2 步修复 GGUF
+- 如果日志中 `freq_base = 0.0`，同样需要修复
+- 修复后日志应显示 `freq_base = 1000000.0`
+
+**问题：`template error: unexpected {{end}}`**
+
+Modelfile 的 TEMPLATE 中有多余的 `{{ end }}`。正确的 ChatML 模板在 `<|im_start|>assistant\n` 后直接结束，不加 `{{ end }}`。
+
+**问题：模型输出乱码或不相关**
+
+1. 确认使用的是**微调后**的模型，而非基础模型
+2. 检查 SYSTEM prompt 是否正确设置
+3. 尝试降低 `temperature` 到 0
+4. 确认 GGUF 是从**合并后**的 safetensors 转换的，而非基础模型
 
 ## 故障排除
 
