@@ -47,7 +47,10 @@ _DEFAULT_MODEL_OLLAMA = "qwen2.5-coder:1.5b"
 _FINETUNED_OLLAMA = "duan-translator"
 _DEFAULT_MODEL_PATH = os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
 _LORA_PATH = os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_cpu", "final")
-_MERGED_PATH = os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged")
+_MERGED_PATH = os.environ.get(
+    "DUAN_MERGED_MODEL",
+    os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged"),
+)
 
 SYSTEM_PROMPT = (
     "你是段言（DuanLang）编程语言 v3.2 的翻译专家。"
