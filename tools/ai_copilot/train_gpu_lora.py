@@ -18,7 +18,7 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
 支持的模型预设：
   qwen2.5-0.5b  — Qwen2.5-0.5B-Instruct (0.5B, LoRA ~5GB, QLoRA ~3GB)
   qwen2.5-1.5b  — Qwen2.5-1.5B-Instruct (1.5B, LoRA ~10GB, QLoRA ~4GB)
-  qwen3.5-2b    — Qwen3.5-2B-Instruct (2B Dense, LoRA ~5GB, QLoRA ~3GB, 需 transformers>=5.0)
+  qwen3.5-2b    — Qwen3.5-2B (2B, 多模态架构, LoRA ~5GB, QLoRA ~3GB, 需 transformers>=5.0)
 
 预计训练时间（978 条 × 3 epochs = 2934 样本）：
   Qwen2.5-0.5B / RTX 3060 (12GB):  ~9 分钟
@@ -121,7 +121,7 @@ MODEL_PRESETS = {
         "lora_alpha": 64,
         "lr": 1e-4,
         "allow_qlora": True,  # 允许 QLoRA（官方不建议但显存不足时可用）
-        "desc": "Qwen3.5-2B-Instruct (2B Dense, LoRA ~5GB / QLoRA ~3GB, 需 transformers>=5.0)",
+        "desc": "Qwen3.5-2B (2B, 多模态架构, LoRA ~5GB / QLoRA ~3GB, 需 transformers>=5.0)",
     },
 }
 

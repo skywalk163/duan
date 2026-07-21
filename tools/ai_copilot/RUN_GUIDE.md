@@ -7,7 +7,7 @@
 - **支持模型**：
   - Qwen2.5-0.5B-Instruct（0.5B 参数，CPU 也能跑）
   - Qwen2.5-1.5B-Instruct（1.5B 参数，需 GPU）
-  - Qwen3.5-2B-Instruct（2B Dense 架构，需 GPU + transformers>=5.0）
+  - Qwen3.5-2B（2B 多模态架构，需 GPU + transformers>=5.0）
 - **训练方法**：LoRA 微调（只训练 q/v/k/o_proj 等投影层，参数量 ~0.1%）
 - **数据集**：978 条 Python→段言 对照（`sft_dataset.jsonl`）
 - **数据集 v2 扩充**：新增 494 条覆盖类/OOP、f-string、列表推导、异常处理、lambda、with、复合算法
@@ -23,7 +23,7 @@
 |--------|------|--------|----------------------|-------|------|
 | `qwen2.5-0.5b` | Qwen2.5-0.5B-Instruct | 0.5B | ~5 GB | 支持 | 默认，CPU 可跑 |
 | `qwen2.5-1.5b` | Qwen2.5-1.5B-Instruct | 1.5B | ~10 GB | 支持 | 需 GPU |
-| `qwen3.5-2b` | Qwen3.5-2B-Instruct | 2B | ~5 GB | ~3 GB | 需 transformers>=5.0 |
+| `qwen3.5-2b` | Qwen3.5-2B | 2B | ~5 GB | ~3 GB | 需 transformers>=5.0 |
 
 > **Qwen3.5-2B 注意事项**：
 > - 需安装 `transformers>=5.0`：`pip install "transformers>=5.0"`
