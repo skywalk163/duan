@@ -158,4 +158,7 @@ src/test_*.py
 tools/ai_copilot/output/
 tools/ai_copilot/model_cache/
 tools/ai_copilot/benchmark/
+# 只保留合并后的主数据集，中间产物不入库
+tools/ai_copilot/sft_dataset_new.jsonl
+tools/ai_copilot/sft_dataset_long.jsonl
 !tools/ai_copilot/sft_dataset.jsonl
