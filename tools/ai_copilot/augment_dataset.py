@@ -1,507 +1,762 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-段言数据增强脚本 — 从 .duan 示例文件和 Python 对照中提取更多训练对
+段言数据增强脚本 v2 — 扩充 LoRA 微调训练数据集
 
-策略：
-  1. 从 examples/ 和 benchmarks/ 的 .duan 文件中提取段言代码片段
-  2. 为每个段言片段构造对应的 Python 等价代码
-  3. 从段言语法规则中生成更多对照对（边界情况、特殊语法）
-  4. 合并到 sft_dataset.jsonl
+重点覆盖薄弱模式：
+  1. 类定义/继承/OOP (60条)
+  2. f-string 格式化 (80条)
+  3. 列表推导式 (80条)
+  4. try/except 异常处理 (80条)
+  5. 字典操作 (60条)
+  6. lambda/高阶函数 (50条)
+  7. with 语句/文件操作 (30条)
+  8. 复合复杂代码 (40条)
 
-输出：sft_dataset_enhanced.jsonl
+总计: ~480 条新增样本
 """
 
 import json
 import os
-import re
-import random
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(_SCRIPT_DIR))
-_DATASET_PATH = os.path.join(_SCRIPT_DIR, "sft_dataset.jsonl")
-_OUTPUT_PATH = os.path.join(_SCRIPT_DIR, "sft_dataset_enhanced.jsonl")
 
-# ── 手工构造的高质量 Python→段言 对照对 ──
-# 涵盖 examples/ 中的实际代码和更多边界情况
-ENHANCED_PAIRS = [
-    # ── 冒泡排序（来自 benchmarks/programs/bubble_sort.duan）──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "arr = [64, 34, 25, 12, 22, 11, 90]\nn = len(arr)\nfor i in range(n - 1):\n    for j in range(n - i - 1):\n        if arr[j] > arr[j + 1]:\n            arr[j], arr[j + 1] = arr[j + 1], arr[j]\nfor item in arr:\n    print(item)",
-        "output": "设 列表 为 [64, 34, 25, 12, 22, 11, 90]\n设 长度 为 len(列表)\n\n设 i 为 0\n遍历 i 于 0至 长度 减 2：\n  设 j 为 0\n  遍历 j 于 0至 长度 减 i 减 2：\n    如果 列表[j] 大于 列表[j 加 1]：\n      设 临时 为 列表[j]\n      列表[j] = 列表[j 加 1]\n      列表[j 加 1] = 临时\n\n遍历 元素 于 列表：\n  打印(元素)",
-        "category": "复合",
-    },
-    # ── 斐波那契（来自 benchmarks/programs/fibonacci.duan）──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "def fib(n):\n    if n < 2:\n        return n\n    return fib(n - 1) + fib(n - 2)\n\nresult = fib(20)\nprint(result)",
-        "output": "段落 斐波那契 接收 n：\n  如果 n 小于 2：\n    返回 n\n  返回 斐波那契(n 减 1) 加 斐波那契(n 减 2)\n\n设 结果 为 斐波那契(20)\n打印(结果)",
-        "category": "段落",
-    },
-    # ── 汉诺塔（来自 examples/hanoi.duan）──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "def hanoi(n, src, dst, aux):\n    if n == 1:\n        print(f'移动盘子 1 从 {src} 到 {dst}')\n    else:\n        hanoi(n - 1, src, aux, dst)\n        print(f'移动盘子 {n} 从 {src} 到 {dst}')\n        hanoi(n - 1, aux, dst, src)\n\nhanoi(3, 'A', 'C', 'B')",
-        "output": "段落 汉诺塔 接收 层数, 源柱, 目标柱, 辅助柱：\n  如果 层数 等于 1：\n    打印(\"移动盘子 1 从 \" 加 源柱 加 \" 到 \" 加 目标柱)\n  否则：\n    汉诺塔(层数 减 1, 源柱, 辅助柱, 目标柱)\n    打印(\"移动盘子 \" 加 转字符串(层数) 加 \" 从 \" 加 源柱 加 \" 到 \" 加 目标柱)\n    汉诺塔(层数 减 1, 辅助柱, 目标柱, 源柱)\n\n汉诺塔(3, \"A\", \"C\", \"B\")",
-        "category": "段落",
-    },
-    # ── 计算器类（来自 examples/calculator.duan）──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "class Calculator:\n    def __init__(self):\n        self.result = 0\n    def add(self, x):\n        self.result += x\n    def sub(self, x):\n        self.result -= x\n    def mul(self, x):\n        self.result *= x\n    def div(self, x):\n        if x != 0:\n            self.result /= x\n    def clear(self):\n        self.result = 0\n    def get_result(self):\n        return self.result\n\ncalc = Calculator()\ncalc.add(10)\ncalc.mul(2)\nprint(calc.get_result())",
-        "output": "类 计算器：\n  设 结果 为 0\n\n  段落 加 接收 x：\n    设 结果 为 结果 加 x\n\n  段落 减 接收 x：\n    设 结果 为 结果 减 x\n\n  段落 乘 接收 x：\n    设 结果 为 结果 乘 x\n\n  段落 除 接收 x：\n    如果 x 不等于 0：\n      设 结果 为 结果 除以 x\n\n  段落 清零：\n    设 结果 为 0\n\n  段落 获取结果：\n    返回 结果\n\n设计算器1为计算器()\n计算器1.加(10)\n计算器1.乘(2)\n打印(计算器1.获取结果())",
-        "category": "类",
-    },
-    # ── 基础语法演示（来自 examples/basic.duan）──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "a = 123\nb = 3 + 5\nprint(a)\nprint(b)\nresult = a + b * 2\nprint(result)\nif a > b:\n    print('a大于b')\nelse:\n    print('a小于等于b')",
-        "output": "设 甲 为 123\n设 乙 为 3 加 5\n打印(甲)\n打印(乙)\n设 结果 为 甲 加 乙 乘 2\n打印(结果)\n如果 甲 大于 乙：\n  打印(\"a大于b\")\n否则：\n  打印(\"a小于等于b\")",
-        "category": "变量",
-    },
-    # ── 阶乘递归 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)\n\nresult = factorial(5)\nprint(f'阶乘(5) = {result}')",
-        "output": "段落 阶乘 接收 数：\n  如果 数 小于等于 1：\n    返回 1\n  返回 数 乘 阶乘(数 减 1)\n\n设 阶乘结果 为 阶乘(5)\n打印(f\"阶乘(5) = {阶乘结果}\")",
-        "category": "段落",
-    },
-    # ── 加法段落 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "def add(a, b):\n    return a + b\n\ns = add(3, 5)\nprint(s)",
-        "output": "段落 加法 接收 甲, 乙：\n  返回 甲 加 乙\n\n设 和 为 加法(3, 5)\n打印(和)",
-        "category": "段落",
-    },
-    # ── while循环 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "count = 0\nwhile count < 10:\n    print(count)\n    count += 1",
-        "output": "设 计数 为 0\n当 计数 小于 10：\n  打印(计数)\n  设 计数 为 计数 加 1",
-        "category": "循环",
-    },
-    # ── 列表操作 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码：",
-        "input": "nums = [1, 2, 3, 4, 5]\ntotal = 0\nfor n in nums:\n    total += n\nprint(f'总和: {total}')\nprint(f'平均: {total / len(nums)}')",
-        "output": "设 数字列表 为 [1, 2, 3, 4, 5]\n设 总和 为 0\n遍历 n 于 数字列表：\n  设 总和 为 总和 加 n\n打印(f\"总和: {总和}\")\n打印(f\"平均: {总和 除以 len(数字列表)}\")",
-        "category": "列表",
-    },
-    # ── 字典操作 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "scores = {'语文': 90, '数学': 85, '英语': 95}\nfor subject, score in scores.items():\n    print(f'{subject}: {score}')\ntotal = sum(scores.values())\nprint(f'总分: {total}')",
-        "output": "设 成绩 为 {\"语文\": 90, \"数学\": 85, \"英语\": 95}\n遍历 科目, 分数 于 成绩.项目()：\n  打印(f\"{科目}: {分数}\")\n设 总分 为 0\n遍历 分数 于 成绩.值()：\n  设 总分 为 总分 加 分数\n打印(f\"总分: {总分}\")",
-        "category": "字典",
-    },
-    # ── 异常处理 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "try:\n    result = 10 / 0\nexcept ZeroDivisionError as e:\n    print(f'错误: {e}')\nfinally:\n    print('计算结束')",
-        "output": "尝试：\n  设 结果 为 10 除以 0\n捕获 异常：\n  打印(\"错误: 除数不能为零\")\n打印(\"计算结束\")",
-        "category": "异常",
-    },
-    # ── 字符串操作 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "name = '世界'\ngreeting = f'你好, {name}!'\nprint(greeting)\nprint(greeting.upper())\nprint(len(greeting))",
-        "output": "定义 名字 等于 \"世界\"\n定义 问候 等于 f\"你好, {名字}!\"\n打印(问候)\n打印(问候.大写())\n打印(len(问候))",
-        "category": "字符串",
-    },
-    # ── 条件链 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "score = 85\nif score >= 90:\n    grade = 'A'\nelif score >= 80:\n    grade = 'B'\nelif score >= 70:\n    grade = 'C'\nelif score >= 60:\n    grade = 'D'\nelse:\n    grade = 'F'\nprint(f'等级: {grade}')",
-        "output": "设 分数 为 85\n如果 分数 大于等于 90：\n  设 等级 为 \"A\"\n否则如果 分数 大于等于 80：\n  设 等级 为 \"B\"\n否则如果 分数 大于等于 70：\n  设 等级 为 \"C\"\n否则如果 分数 大于等于 60：\n  设 等级 为 \"D\"\n否则：\n  设 等级 为 \"F\"\n打印(f\"等级: {等级}\")",
-        "category": "条件",
-    },
-    # ── 嵌套循环+break ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "for i in range(1, 10):\n    for j in range(1, 10):\n        if i * j > 50:\n            break\n        print(f'{i}x{j}={i*j}', end=' ')\n    print()",
-        "output": "遍历 i 于 1至 9：\n  遍历 j 于 1至 9：\n    如果 i 乘 j 大于 50：\n      跳出\n    打印(f\"{i}x{j}={i 乘 j}\")\n  打印(\"\")",
-        "category": "循环",
-    },
-    # ── 列表推导式 → 遍历 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "squares = [x**2 for x in range(1, 11)]\nprint(squares)\nevens = [x for x in squares if x % 2 == 0]\nprint(evens)",
-        "output": "设 平方列表 为 []\n遍历 x 于 1至 10：\n  平方列表.追加(x 乘 x)\n打印(平方列表)\n\n设 偶数列表 为 []\n遍历 x 于 平方列表：\n  如果 x 取余 2 等于 0：\n    偶数列表.追加(x)\n打印(偶数列表)",
-        "category": "列表",
-    },
-    # ── 布尔逻辑 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码：",
-        "input": "x = True\ny = False\nz = x and (not y or x)\nprint(z)\nif x and not y:\n    print('条件成立')",
-        "output": "设 x 为 真\n设 y 为 假\n设 z 为 x 且 (非 y 或 x)\n打印(z)\n如果 x 且 非 y：\n  打印(\"条件成立\")",
-        "category": "变量",
-    },
-    # ── 模块导入 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "from math_utils import add, multiply\nfrom string_utils import concat\n\nresult = add(3, 5)\ntext = concat('hello', 'world')\nprint(result, text)",
-        "output": "从 数学工具 导入 加法, 乘法\n从 字符串工具 导入 连接\n\n设 结果 为 加法(3, 5)\n设 文本 为 连接(\"hello\", \"world\")\n打印(结果)\n打印(文本)",
-        "category": "导入",
-    },
-    # ── 学生管理 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "class Student:\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n    def greet(self):\n        return f'我是{self.name}, 今年{self.age}岁'\n\nstudents = [Student('张三', 18), Student('李四', 20)]\nfor s in students:\n    print(s.greet())",
-        "output": "类 学生：\n  构造 接收 姓名, 年龄：\n    己.姓名 为 姓名\n    己.年龄 为 年龄\n\n  段落 问候：\n    返回 f\"我是{己.姓名}, 今年{己.年龄}岁\"\n\n设 学生列表 为 [新建学生(\"张三\", 18), 新建学生(\"李四\", 20)]\n遍历 s 于 学生列表：\n  打印(s.问候())",
-        "category": "类",
-    },
-    # ── 二分查找 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "def binary_search(arr, target):\n    left, right = 0, len(arr) - 1\n    while left <= right:\n        mid = (left + right) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            left = mid + 1\n        else:\n            right = mid - 1\n    return -1",
-        "output": "段落 二分查找 接收 列表, 目标：\n  设 左 为 0\n  设 右 为 len(列表) 减 1\n  当 左 小于等于 右：\n    设 中 为 (左 加 右) 除以 2\n    如果 列表[中] 等于 目标：\n      返回 中\n    否则如果 列表[中] 小于 目标：\n      设 左 为 中 加 1\n    否则：\n      设 右 为 中 减 1\n  返回 -1",
-        "category": "复合",
-    },
-    # ── 选择排序 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "def selection_sort(arr):\n    n = len(arr)\n    for i in range(n - 1):\n        min_idx = i\n        for j in range(i + 1, n):\n            if arr[j] < arr[min_idx]:\n                min_idx = j\n        arr[i], arr[min_idx] = arr[min_idx], arr[i]\n    return arr",
-        "output": "段落 选择排序 接收 列表：\n  设 长度 为 len(列表)\n  遍历 i 于 0至 长度 减 2：\n    设 最小索引 为 i\n    遍历 j 于 i 加 1至 长度 减 1：\n      如果 列表[j] 小于 列表[最小索引]：\n        设 最小索引 为 j\n    设 临时 为 列表[i]\n    列表[i] = 列表[最小索引]\n    列表[最小索引] = 临时\n  返回 列表",
-        "category": "复合",
-    },
-    # ── 线性搜索 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "def linear_search(arr, target):\n    for i in range(len(arr)):\n        if arr[i] == target:\n            return i\n    return -1\n\nresult = linear_search([3, 1, 4, 1, 5, 9], 5)\nprint(result)",
-        "output": "段落 线性查找 接收 列表, 目标：\n  遍历 i 于 0至 len(列表) 减 1：\n    如果 列表[i] 等于 目标：\n      返回 i\n  返回 -1\n\n设 结果 为 线性查找([3, 1, 4, 1, 5, 9], 5)\n打印(结果)",
-        "category": "复合",
-    },
-    # ── 回文检测 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码：",
-        "input": "def is_palindrome(s):\n    s = s.lower()\n    return s == s[::-1]\n\nprint(is_palindrome('racecar'))\nprint(is_palindrome('hello'))",
-        "output": "段落 是否回文 接收 文本：\n  设 文本 为 文本.小写()\n  设 反转 为 文本[::-1]\n  返回 文本 等于 反转\n\n打印(是否回文(\"racecar\"))\n打印(是否回文(\"hello\"))",
-        "category": "字符串",
-    },
-    # ── 计数器 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "text = 'hello world hello python world'\nwords = text.split()\ncounts = {}\nfor word in words:\n    if word in counts:\n        counts[word] += 1\n    else:\n        counts[word] = 1\nfor word, count in sorted(counts.items()):\n    print(f'{word}: {count}')",
-        "output": "定义 文本 等于 \"hello world hello python world\"\n设 词语列表 为 文本.分割()\n设 计数 为 {}\n遍历 词语 于 词语列表：\n  如果 词语 在 计数：\n    设 计数[词语] 为 计数[词语] 加 1\n  否则：\n    设 计数[词语] 为 1\n遍历 词语, 次数 于 计数.项目()：\n  打印(f\"{词语}: {次数}\")",
-        "category": "字典",
-    },
-    # ── GCD最大公约数 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "def gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a\n\nresult = gcd(48, 36)\nprint(f'GCD: {result}')",
-        "output": "段落 最大公约数 接收 a, b：\n  当 b 不等于 0：\n    设 临时 为 a\n    设 a 为 b\n    设 b 为 临时 取余 b\n  返回 a\n\n设 结果 为 最大公约数(48, 36)\n打印(f\"GCD: {结果}\")",
-        "category": "复合",
-    },
-    # ── 矩阵转置 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\ntransposed = []\nfor i in range(len(matrix[0])):\n    row = []\n    for j in range(len(matrix)):\n        row.append(matrix[j][i])\n    transposed.append(row)\nprint(transposed)",
-        "output": "设 矩阵 为 [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\n设 转置 为 []\n遍历 i 于 0至 len(矩阵[0]) 减 1：\n  设 行 为 []\n  遍历 j 于 0至 len(矩阵) 减 1：\n    行.追加(矩阵[j][i])\n  转置.追加(行)\n打印(转置)",
-        "category": "列表",
-    },
-    # ── 类继承 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "class Animal:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        pass\n\nclass Dog(Animal):\n    def speak(self):\n        return f'{self.name} says Woof!'\n\nd = Dog('Buddy')\nprint(d.speak())",
-        "output": "类 动物：\n  构造 接收 名字：\n    己.名字 为 名字\n  段落 发声：\n    返回 空\n\n类 狗(动物)：\n  段落 发声：\n    返回 f\"{己.名字} says Woof!\"\n\n设 d 为 新建狗(\"Buddy\")\n打印(d.发声())",
-        "category": "类",
-    },
-    # ── continue跳过 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码：",
-        "input": "for i in range(1, 21):\n    if i % 3 == 0:\n        continue\n    if i % 5 == 0:\n        break\n    print(i)",
-        "output": "遍历 i 于 1至 20：\n  如果 i 取余 3 等于 0：\n    跳过\n  如果 i 取余 5 等于 0：\n    跳出\n  打印(i)",
-        "category": "循环",
-    },
-    # ── 多条件组合 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "age = 25\nhas_license = True\nif age >= 18 and has_license:\n    print('可以驾驶')\nelif age >= 18 and not has_license:\n    print('需要考驾照')\nelse:\n    print('未成年')",
-        "output": "设 年龄 为 25\n设 有驾照 为 真\n如果 年龄 大于等于 18 且 有驾照：\n  打印(\"可以驾驶\")\n否则如果 年龄 大于等于 18 且 非 有驾照：\n  打印(\"需要考驾照\")\n否则：\n  打印(\"未成年\")",
-        "category": "条件",
-    },
-    # ── f-string格式化 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "name = '张三'\nage = 25\nheight = 1.75\nprint(f'姓名: {name}, 年龄: {age}岁, 身高: {height:.2f}米')",
-        "output": "定义 姓名 等于 \"张三\"\n设 年龄 为 25\n设 身高 为 1.75\n打印(f\"姓名: {姓名}, 年龄: {年龄}岁, 身高: {身高:.2f}米\")",
-        "category": "字符串",
-    },
-    # ── try-except嵌套 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "try:\n    nums = [1, 2, 3]\n    print(nums[5])\nexcept IndexError:\n    print('索引越界')\nexcept Exception as e:\n    print(f'未知错误: {e}')",
-        "output": "尝试：\n  设 列表 为 [1, 2, 3]\n  打印(列表[5])\n捕获 异常：\n  打印(\"索引越界\")",
-        "category": "异常",
-    },
-    # ── 导出模块 ──
-    {
-        "instruction": "用段言v3.2语法编写以下功能：",
-        "input": "# math_utils.py\ndef add(a, b):\n    return a + b\n\ndef multiply(a, b):\n    return a * b\n\n# main.py\nfrom math_utils import add, multiply\nprint(add(2, 3))\nprint(multiply(4, 5))",
-        "output": "# 数学工具.duan\n段落 加法 接收 a, b：\n  返回 a 加 b\n段落 乘法 接收 a, b：\n  返回 a 乘 b\n导出 加法, 乘法\n\n# 主.duan\n从 数学工具 导入 加法, 乘法\n打印(加法(2, 3))\n打印(乘法(4, 5))",
-        "category": "导入",
-    },
-    # ── 冒泡排序优化版 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "def bubble_sort_optimized(arr):\n    n = len(arr)\n    for i in range(n - 1):\n        swapped = False\n        for j in range(n - i - 1):\n            if arr[j] > arr[j + 1]:\n                arr[j], arr[j + 1] = arr[j + 1], arr[j]\n                swapped = True\n        if not swapped:\n            break\n    return arr",
-        "output": "段落 冒泡排序 接收 列表：\n  设 长度 为 len(列表)\n  遍历 i 于 0至 长度 减 2：\n    设 已交换 为 假\n    遍历 j 于 0至 长度 减 i 减 2：\n      如果 列表[j] 大于 列表[j 加 1]：\n        设 临时 为 列表[j]\n        列表[j] = 列表[j 加 1]\n        列表[j 加 1] = 临时\n        设 已交换 为 真\n    如果 非 已交换：\n      跳出\n  返回 列表",
-        "category": "复合",
-    },
-    # ── 统计字符 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "text = 'aabbbcccc'\ncounts = {}\nfor ch in text:\n    counts[ch] = counts.get(ch, 0) + 1\nfor ch in sorted(counts):\n    print(f'{ch}: {counts[ch]}')",
-        "output": "定义 文本 等于 \"aabbbcccc\"\n设 计数 为 {}\n遍历 字符 于 文本：\n  如果 字符 在 计数：\n    设 计数[字符] 为 计数[字符] 加 1\n  否则：\n    设 计数[字符] 为 1\n遍历 字符 于 计数.键().排序()：\n  打印(f\"{字符}: {计数[字符]}\")",
-        "category": "字典",
-    },
-    # ── 判断闰年 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "def is_leap_year(year):\n    if year % 400 == 0:\n        return True\n    if year % 100 == 0:\n        return False\n    if year % 4 == 0:\n        return True\n    return False\n\nprint(is_leap_year(2024))\nprint(is_leap_year(1900))\nprint(is_leap_year(2000))",
-        "output": "段落 是否闰年 接收 年份：\n  如果 年份 取余 400 等于 0：\n    返回 真\n  如果 年份 取余 100 等于 0：\n    返回 假\n  如果 年份 取余 4 等于 0：\n    返回 真\n  返回 假\n\n打印(是否闰年(2024))\n打印(是否闰年(1900))\n打印(是否闰年(2000))",
-        "category": "条件",
-    },
-    # ── 打印九九乘法表 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "for i in range(1, 10):\n    for j in range(1, i + 1):\n        print(f'{j}x{i}={i*j}', end=' ')\n    print()",
-        "output": "遍历 i 于 1至 9：\n  遍历 j 于 1至 i：\n    打印(f\"{j}x{i}={i 乘 j} \")\n  打印(\"\")",
-        "category": "循环",
-    },
-    # ── 字符串反转 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "def reverse_string(s):\n    result = ''\n    for ch in s:\n        result = ch + result\n    return result\n\nprint(reverse_string('hello'))",
-        "output": "段落 反转字符串 接收 文本：\n  定义 结果 等于 \"\"\n  遍历 字符 于 文本：\n    定义 结果 等于 字符 加 结果\n  返回 结果\n\n打印(反转字符串(\"hello\"))",
-        "category": "字符串",
-    },
-    # ── 列表求最大值 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码：",
-        "input": "def find_max(arr):\n    if not arr:\n        return None\n    max_val = arr[0]\n    for val in arr[1:]:\n        if val > max_val:\n            max_val = val\n    return max_val\n\nprint(find_max([3, 1, 4, 1, 5, 9, 2, 6]))",
-        "output": "段落 查找最大值 接收 列表：\n  如果 len(列表) 等于 0：\n    返回 空\n  设 最大值 为 列表[0]\n  遍历 值 于 列表[1:]：\n    如果 值 大于 最大值：\n      设 最大值 为 值\n  返回 最大值\n\n打印(查找最大值([3, 1, 4, 1, 5, 9, 2, 6]))",
-        "category": "复合",
-    },
-    # ── 打印星号三角形 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "n = 5\nfor i in range(1, n + 1):\n    print('*' * i)\nfor i in range(n - 1, 0, -1):\n    print('*' * i)",
-        "output": "设 n 为 5\n遍历 i 于 1至 n：\n  打印(\"*\" 乘 i)\n遍历 i 于 n 减 1至 1：\n  打印(\"*\" 乘 i)",
-        "category": "循环",
-    },
-    # ── 简单计算器段落 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "def calculate(a, op, b):\n    if op == '+':\n        return a + b\n    elif op == '-':\n        return a - b\n    elif op == '*':\n        return a * b\n    elif op == '/':\n        if b != 0:\n            return a / b\n        return None\n    return None\n\nprint(calculate(10, '+', 5))\nprint(calculate(10, '/', 3))",
-        "output": "段落 计算 接收 a, 运算符, b：\n  如果 运算符 等于 \"+\"：\n    返回 a 加 b\n  否则如果 运算符 等于 \"-\"：\n    返回 a 减 b\n  否则如果 运算符 等于 \"*\"：\n    返回 a 乘 b\n  否则如果 运算符 等于 \"/\"：\n    如果 b 不等于 0：\n      返回 a 除以 b\n    返回 空\n  返回 空\n\n打印(计算(10, \"+\", 5))\n打印(计算(10, \"/\", 3))",
-        "category": "条件",
-    },
-    # ── 银行账户类 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "class BankAccount:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n    def deposit(self, amount):\n        self.balance += amount\n        return self.balance\n    def withdraw(self, amount):\n        if amount <= self.balance:\n            self.balance -= amount\n            return True\n        return False\n    def get_balance(self):\n        return self.balance\n\nacc = BankAccount('张三', 1000)\nacc.deposit(500)\nacc.withdraw(200)\nprint(acc.get_balance())",
-        "output": "类 银行账户：\n  构造 接收 户主, 余额为0：\n    己.户主 为 户主\n    己.余额 为 余额\n\n  段落 存款 接收 金额：\n    设 己.余额 为 己.余额 加 金额\n    返回 己.余额\n\n  段落 取款 接收 金额：\n    如果 金额 小于等于 己.余额：\n      设 己.余额 为 己.余额 减 金额\n      返回 真\n    返回 假\n\n  段落 获取余额：\n    返回 己.余额\n\n设 账户 为 新建银行账户(\"张三\", 1000)\n账户.存款(500)\n账户.取款(200)\n打印(账户.获取余额())",
-        "category": "类",
-    },
-    # ── 列表过滤和映射 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n# 过滤偶数\nevens = list(filter(lambda x: x % 2 == 0, numbers))\nprint(evens)\n# 映射平方\nsquares = list(map(lambda x: x ** 2, evens))\nprint(squares)",
-        "output": "设 数字 为 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n设 偶数 为 []\n遍历 x 于 数字：\n  如果 x 取余 2 等于 0：\n    偶数.追加(x)\n打印(偶数)\n\n设 平方 为 []\n遍历 x 于 偶数：\n  平方.追加(x 乘 x)\n打印(平方)",
-        "category": "列表",
-    },
-    # ── 进制转换 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "def to_binary(n):\n    if n == 0:\n        return '0'\n    result = ''\n    while n > 0:\n        result = str(n % 2) + result\n        n = n // 2\n    return result\n\nprint(to_binary(10))\nprint(to_binary(255))",
-        "output": "段落 转二进制 接收 n：\n  如果 n 等于 0：\n    返回 \"0\"\n  定义 结果 等于 \"\"\n  当 n 大于 0：\n    定义 结果 等于 转字符串(n 取余 2) 加 结果\n    设 n 为 n 除以 2\n  返回 结果\n\n打印(转二进制(10))\n打印(转二进制(255))",
-        "category": "字符串",
-    },
-    # ── 多返回值/元组 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "def min_max(arr):\n    return min(arr), max(arr)\n\nmn, mx = min_max([3, 1, 4, 1, 5, 9])\nprint(f'min={mn}, max={mx}')",
-        "output": "段落 最小最大 接收 列表：\n  设 最小值 为 列表[0]\n  设 最大值 为 列表[0]\n  遍历 值 于 列表：\n    如果 值 小于 最小值：\n      设 最小值 为 值\n    如果 值 大于 最大值：\n      设 最大值 为 值\n  返回 [最小值, 最大值]\n\n设 结果 为 最小最大([3, 1, 4, 1, 5, 9])\n打印(f\"min={结果[0]}, max={结果[1]}\")",
-        "category": "复合",
-    },
-    # ── 抛出异常 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码：",
-        "input": "def divide(a, b):\n    if b == 0:\n        raise ValueError('除数不能为零')\n    return a / b\n\ntry:\n    print(divide(10, 0))\nexcept ValueError as e:\n    print(f'错误: {e}')",
-        "output": "段落 除法 接收 a, b：\n  如果 b 等于 0：\n    抛出 异常 \"除数不能为零\"\n  返回 a 除以 b\n\n尝试：\n  打印(除法(10, 0))\n捕获 异常：\n  打印(\"错误: 除数不能为零\")",
-        "category": "异常",
-    },
-    # ── 嵌套字典 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "students = {\n    '张三': {'语文': 90, '数学': 85},\n    '李四': {'语文': 88, '数学': 92}\n}\nfor name, scores in students.items():\n    total = sum(scores.values())\n    print(f'{name}: 总分{total}')",
-        "output": "设 学生 为 {\n  \"张三\": {\"语文\": 90, \"数学\": 85},\n  \"李四\": {\"语文\": 88, \"数学\": 92}\n}\n遍历 姓名, 成绩 于 学生.项目()：\n  设 总分 为 0\n  遍历 分数 于 成绩.值()：\n    设 总分 为 总分 加 分数\n  打印(f\"{姓名}: 总分{总分}\")",
-        "category": "字典",
-    },
-    # ── 导出和导入完整模块 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "# string_utils.py\ndef repeat(s, n):\n    return s * n\ndef capitalize(s):\n    return s.capitalize()\n\n# main.py\nfrom string_utils import repeat, capitalize\nprint(repeat('ab', 3))\nprint(capitalize('hello'))",
-        "output": "# 字符串工具.duan\n段落 重复 接收 文本, 次数：\n  返回 文本 乘 次数\n段落 首字母大写 接收 文本：\n  返回 文本.首字母大写()\n导出 重复, 首字母大写\n\n# 主程序.duan\n从 字符串工具 导入 重复, 首字母大写\n打印(重复(\"ab\", 3))\n打印(首字母大写(\"hello\"))",
-        "category": "导入",
-    },
-    # ── 检查素数 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n**0.5) + 1):\n        if n % i == 0:\n            return False\n    return True\n\nfor i in range(2, 20):\n    if is_prime(i):\n        print(i, end=' ')",
-        "output": "段落 是否素数 接收 n：\n  如果 n 小于 2：\n    返回 假\n  设 根 为 转整数(n 的 0.5 次方)\n  遍历 i 于 2至 根：\n    如果 n 取余 i 等于 0：\n      返回 假\n  返回 真\n\n遍历 i 于 2至 19：\n  如果 是否素数(i)：\n    打印(i)",
-        "category": "复合",
-    },
-    # ── 累加器段落 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "def accumulate(start, end, step=1):\n    total = 0\n    for i in range(start, end + 1, step):\n        total += i\n    return total\n\nprint(accumulate(1, 100))\nprint(accumulate(1, 100, 2))",
-        "output": "段落 累加 接收 开始, 结束, 步长为1：\n  设 总和 为 0\n  遍历 i 于 开始至 结束：\n    设 总和 为 总和 加 i\n    设 i 为 i 加 步长 减 1\n  返回 总和\n\n打印(累加(1, 100))\n打印(累加(1, 100, 2))",
-        "category": "段落",
-    },
-    # ── 暗坑：列表索引赋值 ──
-    {
-        "instruction": "请将以下代码翻译为段言（注意段言的列表索引赋值规则）：",
-        "input": "arr = [1, 2, 3]\narr[0] = 10\narr[1] = 20\nprint(arr)",
-        "output": "设 列表 为 [1, 2, 3]\n列表[0] = 10\n列表[1] = 20\n打印(列表)",
-        "category": "暗坑",
-    },
-    # ── 暗坑：运算用中文不用符号 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码（注意运算符要用中文）：",
-        "input": "a = 10\nb = 3\nprint(a + b)\nprint(a - b)\nprint(a * b)\nprint(a / b)\nprint(a % b)",
-        "output": "设 a 为 10\n设 b 为 3\n打印(a 加 b)\n打印(a 减 b)\n打印(a 乘 b)\n打印(a 除以 b)\n打印(a 取余 b)",
-        "category": "暗坑",
-    },
-    # ── 暗坑：比较运算用中文 ──
-    {
-        "instruction": "请将以下代码翻译为段言（比较运算符要用中文）：",
-        "input": "x = 5\ny = 10\nprint(x == y)\nprint(x != y)\nprint(x > y)\nprint(x < y)\nprint(x >= 5)\nprint(x <= y)",
-        "output": "设 x 为 5\n设 y 为 10\n打印(x 等于 y)\n打印(x 不等于 y)\n打印(x 大于 y)\n打印(x 小于 y)\n打印(x 大于等于 5)\n打印(x 小于等于 y)",
-        "category": "暗坑",
-    },
-    # ── 暗坑：变量名不能用内建函数名 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码（注意变量名不能和内建函数冲突）：",
-        "input": "list = [1, 2, 3]\nlen = 5\nprint(list)\nprint(len)",
-        "output": "设 列表 为 [1, 2, 3]\n设 长度 为 5\n打印(列表)\n打印(长度)",
-        "category": "暗坑",
-    },
-    # ── 字符串拼接 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "first = 'Hello'\nsecond = 'World'\nmessage = first + ', ' + second + '!'\nprint(message)\nprint(message * 2)",
-        "output": "定义 首 等于 \"Hello\"\n定义 次 等于 \"World\"\n定义 消息 等于 首 加 \", \" 加 次 加 \"!\"\n打印(消息)\n打印(消息 乘 2)",
-        "category": "字符串",
-    },
-    # ── None/空 判断 ──
-    {
-        "instruction": "请用段言v3.2语法编写以下功能：",
-        "input": "value = None\nif value is None:\n    print('空值')\nelse:\n    print('有值')\n\nempty_list = []\nif not empty_list:\n    print('空列表')",
-        "output": "设 值 为 空\n如果 值 等于 空：\n  打印(\"空值\")\n否则：\n  打印(\"有值\")\n\n设 空列表 为 []\n如果 len(空列表) 等于 0：\n  打印(\"空列表\")",
-        "category": "变量",
-    },
-    # ── 嵌套条件 ──
-    {
-        "instruction": "用段言v3.2语法重写以下Python代码。",
-        "input": "score = 75\nif score >= 60:\n    if score >= 80:\n        print('优秀')\n    else:\n        print('及格')\nelse:\n    if score >= 40:\n        print('不及格')\n    else:\n        print('很差')",
-        "output": "设 分数 为 75\n如果 分数 大于等于 60：\n  如果 分数 大于等于 80：\n    打印(\"优秀\")\n  否则：\n    打印(\"及格\")\n否则：\n  如果 分数 大于等于 40：\n    打印(\"不及格\")\n  否则：\n    打印(\"很差\")",
-        "category": "条件",
-    },
-    # ── 列表切片 ──
-    {
-        "instruction": "请将以下代码翻译为段言：",
-        "input": "arr = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\nprint(arr[:3])\nprint(arr[3:7])\nprint(arr[7:])\nprint(arr[-3:])\nprint(arr[::2])",
-        "output": "设 列表 为 [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]\n打印(列表[:3])\n打印(列表[3:7])\n打印(列表[7:])\n打印(列表[-3:])\n打印(列表[::2])",
-        "category": "列表",
-    },
-    # ── 字典遍历 ──
-    {
-        "instruction": "将Python翻译成段言。",
-        "input": "config = {'host': 'localhost', 'port': 8080, 'debug': True}\nfor key in config:\n    print(f'{key}: {config[key]}')\nprint(config.get('host'))\nprint(config.get('timeout', 30))",
-        "output": "设 配置 为 {\"host\": \"localhost\", \"port\": 8080, \"debug\": 真}\n遍历 键 于 配置.键()：\n  打印(f\"{键}: {配置[键]}\")\n打印(配置[\"host\"])\n如果 \"timeout\" 在 配置：\n  打印(配置[\"timeout\"])\n否则：\n  打印(30)",
-        "category": "字典",
-    },
-    # ── 打印三角形图案 ──
-    {
-        "instruction": "用段言v3.2语法表达以下Python代码：",
-        "input": "n = 5\nfor i in range(1, n + 1):\n    for j in range(n - i):\n        print(' ', end='')\n    for j in range(2 * i - 1):\n        print('*', end='')\n    print()",
-        "output": "设 n 为 5\n遍历 i 于 1至 n：\n  遍历 j 于 1至 n 减 i：\n    打印(\" \")\n  遍历 j 于 1至 2 乘 i 减 1：\n    打印(\"*\")\n  打印(\"\")",
-        "category": "循环",
-    },
+INSTRUCTION = "用段言v3.2语法重写以下Python代码。"
+
+# ═══════════════════════════════════════════════════════════════════
+# 1. 类定义与OOP (60 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+OOP_PAIRS = [
+    ("class Person:\n    def __init__(self, name):\n        self.name = name\n\np = Person(\"Alice\")\nprint(p.name)",
+     "类 人：\n    属性 名字\n    构造 接收 名字：\n        己名字 为 名字\n\n设 p 为 新建 人(\"Alice\")\n打印(p.名字)"),
+    ("class Dog:\n    def __init__(self, name, age):\n        self.name = name\n        self.age = age\n\nd = Dog(\"Rex\", 3)\nprint(d.name)\nprint(d.age)",
+     "类 狗：\n    属性 名字\n    属性 年龄\n    构造 接收 名字, 年龄：\n        己名字 为 名字\n        己年龄 为 年龄\n\n设 d 为 新建 狗(\"Rex\", 3)\n打印(d.名字)\n打印(d.年龄)"),
+    ("class Cat:\n    def __init__(self, name):\n        self.name = name\n    def meow(self):\n        print(f'{self.name}: meow!')",
+     "类 猫：\n    属性 名字\n    构造 接收 名字：\n        己名字 为 名字\n    段落 喵：\n        打印(f\"{己名字}: meow!\")"),
+    ("class Counter:\n    def __init__(self):\n        self.count = 0\n    def increment(self):\n        self.count += 1\n    def get(self):\n        return self.count",
+     "类 计数器：\n    属性 计数值\n    构造：\n        己计数值 为 0\n    段落 增加：\n        己计数值 加上 1\n    段落 获取：\n        返回 己计数值"),
+    ("class Rectangle:\n    def __init__(self, w, h):\n        self.width = w\n        self.height = h\n    def area(self):\n        return self.width * self.height\n    def perimeter(self):\n        return 2 * (self.width + self.height)",
+     "类 矩形：\n    属性 宽\n    属性 高\n    构造 接收 w, h：\n        己宽 为 w\n        己高 为 h\n    段落 面积：\n        返回 己宽 乘 己高\n    段落 周长：\n        返回 2 乘 (己宽 加 己高)"),
+    ("class BankAccount:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n    def deposit(self, amount):\n        self.balance += amount\n    def withdraw(self, amount):\n        if amount <= self.balance:\n            self.balance -= amount\n        else:\n            print('insufficient funds')",
+     "类 银行账户：\n    属性 户主\n    属性 余额\n    构造 接收 户主, 余额 等于 0：\n        己户主 为 户主\n        己余额 为 余额\n    段落 存款 接收 金额：\n        己余额 加上 金额\n    段落 取款 接收 金额：\n        如果 金额 小于等于 己余额：\n            己余额 减去 金额\n        否则：\n            打印(\"insufficient funds\")"),
+    ("class Stack:\n    def __init__(self):\n        self.items = []\n    def push(self, item):\n        self.items.append(item)\n    def pop(self):\n        if self.items:\n            return self.items.pop()\n        return None",
+     "类 栈：\n    属性 元素列表\n    构造：\n        己元素列表 为 []\n    段落 压入 接收 元素：\n        己元素列表.append(元素)\n    段落 弹出：\n        如果 己元素列表：\n            返回 己元素列表.pop()\n        返回 空"),
+    ("class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def distance_to(self, other):\n        return ((self.x - other.x)**2 + (self.y - other.y)**2)**0.5",
+     "类 点：\n    属性 x\n    属性 y\n    构造 接收 x, y：\n        己x 为 x\n        己y 为 y\n    段落 距离 接收 其他点：\n        返回 ((己x 减 其他点.x) 乘 (己x 减 其他点.x) 加 (己y 减 其他点.y) 乘 (己y 减 其他点.y)) ** 0.5"),
+    ("class Temperature:\n    def __init__(self, celsius):\n        self.celsius = celsius\n    def to_fahrenheit(self):\n        return self.celsius * 9/5 + 32\n    def to_kelvin(self):\n        return self.celsius + 273.15",
+     "类 温度：\n    属性 摄氏度\n    构造 接收 摄氏度：\n        己摄氏度 为 摄氏度\n    段落 转华氏：\n        返回 己摄氏度 乘 9 除以 5 加 32\n    段落 转开尔文：\n        返回 己摄氏度 加 273.15"),
+    ("class Book:\n    def __init__(self, title, author, pages):\n        self.title = title\n        self.author = author\n        self.pages = pages\n    def __str__(self):\n        return f'{self.title} by {self.author}'",
+     "类 书：\n    属性 书名\n    属性 作者\n    属性 页数\n    构造 接收 书名, 作者, 页数：\n        己书名 为 书名\n        己作者 为 作者\n        己页数 为 页数\n    段落 描述：\n        返回 f\"{己书名} by {己作者}\""),
+    ("class Student:\n    def __init__(self, name, scores):\n        self.name = name\n        self.scores = scores\n    def average(self):\n        return sum(self.scores) / len(self.scores)\n    def is_passing(self):\n        return self.average() >= 60",
+     "类 学生：\n    属性 姓名\n    属性 成绩列表\n    构造 接收 姓名, 成绩列表：\n        己姓名 为 姓名\n        己成绩列表 为 成绩列表\n    段落 平均分：\n        返回 sum(己成绩列表) 除以 len(己成绩列表)\n    段落 及格：\n        返回 己平均分() 大于等于 60"),
+    ("class Circle:\n    def __init__(self, radius):\n        self.radius = radius\n    def area(self):\n        return 3.14159 * self.radius ** 2\n    def circumference(self):\n        return 2 * 3.14159 * self.radius",
+     "类 圆：\n    属性 半径\n    构造 接收 半径：\n        己半径 为 半径\n    段落 面积：\n        返回 3.14159 乘 己半径 乘 己半径\n    段落 周长：\n        返回 2 乘 3.14159 乘 己半径"),
+    ("class Calculator:\n    def add(self, a, b):\n        return a + b\n    def subtract(self, a, b):\n        return a - b\n    def multiply(self, a, b):\n        return a * b\n    def divide(self, a, b):\n        if b != 0:\n            return a / b\n        return None",
+     "类 计算器：\n    段落 加 接收 a, b：\n        返回 a 加 b\n    段落 减 接收 a, b：\n        返回 a 减 b\n    段落 乘 接收 a, b：\n        返回 a 乘 b\n    段落 除 接收 a, b：\n        如果 b 不等于 0：\n            返回 a 除以 b\n        返回 空"),
+    ("class Employee:\n    def __init__(self, name, salary):\n        self.name = name\n        self.salary = salary\n    def get_raise(self, percent):\n        self.salary += self.salary * percent / 100",
+     "类 员工：\n    属性 姓名\n    属性 薪资\n    构造 接收 姓名, 薪资：\n        己姓名 为 姓名\n        己薪资 为 薪资\n    段落 加薪 接收 百分比：\n        己薪资 加上 己薪资 乘 百分比 除以 100"),
+    # Inheritance
+    ("class Animal:\n    def __init__(self, name):\n        self.name = name\n    def speak(self):\n        return f'{self.name} makes a sound'\n\nclass Dog(Animal):\n    def speak(self):\n        return f'{self.name} barks'\n\ndog = Dog(\"Rex\")\nprint(dog.speak())",
+     "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己名字 为 名字\n    段落 说话：\n        返回 f\"{己名字} makes a sound\"\n\n类 狗 继承 动物：\n    段落 说话：\n        返回 f\"{己名字} barks\"\n\n设 dog 为 新建 狗(\"Rex\")\n打印(dog.说话())"),
+    ("class Vehicle:\n    def __init__(self, brand, speed):\n        self.brand = brand\n        self.speed = speed\n    def describe(self):\n        return f'{self.brand} at {self.speed}km/h'\n\nclass Car(Vehicle):\n    def __init__(self, brand, speed, wheels):\n        super().__init__(brand, speed)\n        self.wheels = wheels",
+     "类 交通工具：\n    属性 品牌\n    属性 速度\n    构造 接收 品牌, 速度：\n        己品牌 为 品牌\n        己速度 为 速度\n    段落 描述：\n        返回 f\"{己品牌} at {己速度}km/h\"\n\n类 汽车 继承 交通工具：\n    属性 轮子数\n    构造 接收 品牌, 速度, 轮子数：\n        父.构造(品牌, 速度)\n        己轮子数 为 轮子数"),
+    ("class Shape:\n    def area(self):\n        return 0\n\nclass Circle(Shape):\n    def __init__(self, r):\n        self.r = r\n    def area(self):\n        return 3.14159 * self.r ** 2\n\nclass Square(Shape):\n    def __init__(self, s):\n        self.s = s\n    def area(self):\n        return self.s ** 2",
+     "类 形状：\n    段落 面积：\n        返回 0\n\n类 圆形 继承 形状：\n    属性 半径\n    构造 接收 r：\n        己半径 为 r\n    段落 面积：\n        返回 3.14159 乘 己半径 乘 己半径\n\n类 正方形 继承 形状：\n    属性 边长\n    构造 接收 s：\n        己边长 为 s\n    段落 面积：\n        返回 己边长 乘 己边长"),
+    ("class Bird:\n    def __init__(self, name, wingspan):\n        self.name = name\n        self.wingspan = wingspan\n    def fly(self):\n        return f'{self.name} is flying'\n\nclass Eagle(Bird):\n    def hunt(self):\n        return f'{self.name} is hunting'",
+     "类 鸟：\n    属性 名字\n    属性 翼展\n    构造 接收 名字, 翼展：\n        己名字 为 名字\n        己翼展 为 翼展\n    段落 飞行：\n        返回 f\"{己名字} is flying\"\n\n类 鹰 继承 鸟：\n    段落 狩猎：\n        返回 f\"{己名字} is hunting\""),
+    ("class Writer:\n    def __init__(self, name, books=None):\n        self.name = name\n        self.books = books if books else []\n    def add_book(self, title):\n        self.books.append(title)\n    def count_books(self):\n        return len(self.books)",
+     "类 作家：\n    属性 名字\n    属性 书列表\n    构造 接收 名字, 书列表 等于 空：\n        己名字 为 名字\n        如果 书列表：\n            己书列表 为 书列表\n        否则：\n            己书列表 为 []\n    段落 添加书 接收 书名：\n        己书列表.append(书名)\n    段落 书数：\n        返回 len(己书列表)"),
+    ("class Queue:\n    def __init__(self):\n        self.data = []\n    def enqueue(self, item):\n        self.data.append(item)\n    def dequeue(self):\n        if self.data:\n            return self.data.pop(0)\n        return None\n    def size(self):\n        return len(self.data)",
+     "类 队列：\n    属性 数据\n    构造：\n        己数据 为 []\n    段落 入队 接收 元素：\n        己数据.append(元素)\n    段落 出队：\n        如果 己数据：\n            返回 己数据.pop(0)\n        返回 空\n    段落 大小：\n        返回 len(己数据)"),
+    ("class Logger:\n    def __init__(self, name):\n        self.name = name\n        self.logs = []\n    def log(self, msg):\n        self.logs.append(msg)\n    def show(self):\n        for entry in self.logs:\n            print(entry)",
+     "类 日志器：\n    属性 名字\n    属性 日志列表\n    构造 接收 名字：\n        己名字 为 名字\n        己日志列表 为 []\n    段落 记录 接收 消息：\n        己日志列表.append(消息)\n    段落 显示：\n        遍历 条目 于 己日志列表：\n            打印(条目)"),
+    ("class Product:\n    def __init__(self, name, price, stock):\n        self.name = name\n        self.price = price\n        self.stock = stock\n    def buy(self, quantity):\n        if quantity <= self.stock:\n            self.stock -= quantity\n            return self.price * quantity\n        return 0",
+     "类 商品：\n    属性 名字\n    属性 价格\n    属性 库存\n    构造 接收 名字, 价格, 库存：\n        己名字 为 名字\n        己价格 为 价格\n        己库存 为 库存\n    段落 购买 接收 数量：\n        如果 数量 小于等于 己库存：\n            己库存 减去 数量\n            返回 己价格 乘 数量\n        返回 0"),
+    # Access control
+    ("class BankAccount:\n    def __init__(self, owner, balance):\n        self.owner = owner\n        self._balance = balance\n    def deposit(self, amount):\n        self._balance += amount\n    def get_balance(self):\n        return self._balance",
+     "类 银行账户：\n    公有 属性 户主\n    私有 属性 余额\n    构造 接收 户主, 余额：\n        己户主 为 户主\n        己余额 为 余额\n    公有 段落 存款 接收 金额：\n        己余额 加上 金额\n    公有 段落 查余额：\n        返回 己余额"),
+    ("class SecureBox:\n    def __init__(self, code):\n        self.__code = code\n        self._content = None\n    def set_content(self, item, code):\n        if code == self.__code:\n            self._content = item\n            return True\n        return False",
+     "类 安全箱：\n    私有 属性 密码\n    保护 属性 内容\n    构造 接收 密码：\n        己密码 为 密码\n        己内容 为 空\n    公有 段落 放入 接收 物品, 密码：\n        如果 密码 等于 己密码：\n            己内容 为 物品\n            返回 真\n        返回 假"),
+    # Static
+    ("class MathUtils:\n    @staticmethod\n    def square(x):\n        return x * x\n    @staticmethod\n    def cube(x):\n        return x * x * x",
+     "类 数学工具：\n    静态 段落 平方 接收 x：\n        返回 x 乘 x\n    静态 段落 立方 接收 x：\n        返回 x 乘 x 乘 x"),
+    ("class Counter:\n    total = 0\n    @classmethod\n    def increment(cls):\n        cls.total += 1\n    @classmethod\n    def get_total(cls):\n        return cls.total",
+     "类 计数器：\n    静态 属性 总数 等于 0\n    类方法 段落 增加：\n        计数器.总数 加上 1\n    类方法 段落 获取总数：\n        返回 计数器.总数"),
+    # Property
+    ("class Temperature:\n    def __init__(self, c):\n        self._celsius = c\n    @property\n    def fahrenheit(self):\n        return self._celsius * 9/5 + 32",
+     "类 温度：\n    私有 属性 摄氏度\n    构造 接收 c：\n        己摄氏度 为 c\n    特性 段落 华氏度：\n        返回 己摄氏度 乘 9 除以 5 加 32"),
+    # Complex classes
+    ("class ShoppingCart:\n    def __init__(self):\n        self.items = []\n        self.total = 0\n    def add(self, name, price, qty=1):\n        self.items.append({'name': name, 'price': price, 'qty': qty})\n        self.total += price * qty\n    def checkout(self):\n        return self.total",
+     "类 购物车：\n    属性 物品列表\n    属性 总价\n    构造：\n        己物品列表 为 []\n        己总价 为 0\n    段落 添加 接收 名称, 价格, 数量 等于 1：\n        己物品列表.append({\"name\": 名称, \"price\": 价格, \"qty\": 数量})\n        己总价 加上 价格 乘 数量\n    段落 结账：\n        返回 己总价"),
+    ("class Graph:\n    def __init__(self):\n        self.adj = {}\n    def add_edge(self, u, v):\n        if u not in self.adj:\n            self.adj[u] = []\n        self.adj[u].append(v)\n    def neighbors(self, u):\n        return self.adj.get(u, [])",
+     "类 图：\n    属性 邻接表\n    构造：\n        己邻接表 为 {}\n    段落 添加边 接收 u, v：\n        如果 u 不于 己邻接表：\n            己邻接表[u] = []\n        己邻接表[u].append(v)\n    段落 邻居 接收 u：\n        返回 己邻接表.get(u, [])"),
+    ("class Cache:\n    def __init__(self, capacity=10):\n        self.capacity = capacity\n        self.store = {}\n    def get(self, key):\n        return self.store.get(key, None)\n    def set(self, key, value):\n        if len(self.store) >= self.capacity:\n            oldest = list(self.store.keys())[0]\n            del self.store[oldest]\n        self.store[key] = value",
+     "类 缓存：\n    属性 容量\n    属性 存储\n    构造 接收 容量 等于 10：\n        己容量 为 容量\n        己存储 为 {}\n    段落 获取 接收 键：\n        返回 己存储.get(键, 空)\n    段落 设置 接收 键, 值：\n        如果 len(己存储) 大于等于 己容量：\n            设 最旧 为 list(己存储.keys())[0]\n            删除 己存储[最旧]\n        己存储[键] = 值"),
+    # More classes
+    ("class Greeter:\n    def __init__(self, name):\n        self.name = name\n    def greet(self):\n        return f'Hello, {self.name}!'",
+     "类 问候者：\n    属性 名字\n    构造 接收 名字：\n        己名字 为 名字\n    段落 问候：\n        返回 f\"Hello, {己名字}!\""),
+    ("class Node:\n    def __init__(self, value):\n        self.value = value\n        self.next = None",
+     "类 节点：\n    属性 值\n    属性 下一个\n    构造 接收 值：\n        己值 为 值\n        己下一个 为 空"),
+    ("class LinkedList:\n    def __init__(self):\n        self.head = None\n    def prepend(self, value):\n        node = Node(value)\n        node.next = self.head\n        self.head = node",
+     "类 链表：\n    属性 头\n    构造：\n        己头 为 空\n    段落 前插 接收 值：\n        设 node 为 新建 节点(值)\n        node.下一个 = 己头\n        己头 = node"),
+    ("class Inventory:\n    def __init__(self):\n        self.items = {}\n    def add(self, name, qty):\n        if name in self.items:\n            self.items[name] += qty\n        else:\n            self.items[name] = qty\n    def get(self, name):\n        return self.items.get(name, 0)",
+     "类 库存：\n    属性 物品字典\n    构造：\n        己物品字典 为 {}\n    段落 添加 接收 名称, 数量：\n        如果 名称 于 己物品字典：\n            己物品字典[名称] 加上 数量\n        否则：\n            己物品字典[名称] = 数量\n    段落 获取 接收 名称：\n        返回 己物品字典.get(名称, 0)"),
+    ("class Player:\n    def __init__(self, name, health=100):\n        self.name = name\n        self.health = health\n    def take_damage(self, dmg):\n        self.health -= dmg\n        if self.health <= 0:\n            print(f'{self.name} died')\n    def heal(self, amount):\n        self.health += amount",
+     "类 玩家：\n    属性 名字\n    属性 生命值\n    构造 接收 名字, 生命值 等于 100：\n        己名字 为 名字\n        己生命值 为 生命值\n    段落 受伤 接收 伤害：\n        己生命值 减去 伤害\n        如果 己生命值 小于等于 0：\n            打印(f\"{己名字} died\")\n    段落 治疗 接收 数量：\n        己生命值 加上 数量"),
+    ("class Observable:\n    def __init__(self):\n        self.observers = []\n    def subscribe(self, callback):\n        self.observers.append(callback)\n    def notify(self, data):\n        for cb in self.observers:\n            cb(data)",
+     "类 观察者：\n    属性 回调列表\n    构造：\n        己回调列表 为 []\n    段落 订阅 接收 回调：\n        己回调列表.append(回调)\n    段落 通知 接收 数据：\n        遍历 cb 于 己回调列表：\n            cb(数据)"),
+    ("class StateMachine:\n    def __init__(self):\n        self.state = 'idle'\n        self.transitions = {}\n    def add_transition(self, from_state, to_state, action):\n        self.transitions[(from_state, action)] = to_state\n    def perform(self, action):\n        key = (self.state, action)\n        if key in self.transitions:\n            self.state = self.transitions[key]",
+     "类 状态机：\n    属性 状态\n    属性 转换表\n    构造：\n        己状态 为 \"idle\"\n        己转换表 为 {}\n    段落 添加转换 接收 起始状态, 目标状态, 动作：\n        己转换表[(起始状态, 动作)] = 目标状态\n    段落 执行 接收 动作：\n        设 key 为 (己状态, 动作)\n        如果 key 于 己转换表：\n            己状态 = 己转换表[key]"),
+    ("class Stack:\n    def __init__(self):\n        self.items = []\n    def push(self, item):\n        self.items.append(item)\n    def pop(self):\n        if not self.items:\n            raise Exception('Stack underflow')\n        return self.items.pop()\n    def peek(self):\n        if not self.items:\n            return None\n        return self.items[-1]\n    def is_empty(self):\n        return len(self.items) == 0",
+     "类 栈：\n    属性 元素列表\n    构造：\n        己元素列表 为 []\n    段落 压入 接收 元素：\n        己元素列表.append(元素)\n    段落 弹出：\n        如果 非 己元素列表：\n            抛出 \"Stack underflow\"\n        返回 己元素列表.pop()\n    段落 窥顶：\n        如果 非 己元素列表：\n            返回 空\n        返回 己元素列表[-1]\n    段落 是否为空：\n        返回 len(己元素列表) 等于 0"),
+    ("class AutoId:\n    _counter = 0\n    def __init__(self, name):\n        self.id = AutoId._counter\n        self.name = name\n        AutoId._counter += 1",
+     "类 自增编号：\n    静态 属性 计数器 等于 0\n    属性 编号\n    属性 名字\n    构造 接收 名字：\n        己编号 为 自增编号.计数器\n        己名字 为 名字\n        自增编号.计数器 加上 1"),
+    ("class StringBuilder:\n    def __init__(self):\n        self.s = ''\n    def append(self, text):\n        self.s += text\n        return self\n    def to_string(self):\n        return self.s",
+     "类 字符串构建器：\n    属性 字符串\n    构造：\n        己字符串 为 \"\"\n    段落 追加 接收 文本：\n        己字符串 加上 文本\n        返回 己\n    段落 转字符串：\n        返回 己字符串"),
+    ("class Pipeline:\n    def __init__(self):\n        self.steps = []\n    def add_step(self, func):\n        self.steps.append(func)\n        return self\n    def run(self, data):\n        for step in self.steps:\n            data = step(data)\n        return data",
+     "类 管道：\n    属性 步骤列表\n    构造：\n        己步骤列表 为 []\n    段落 添加步骤 接收 函数：\n        己步骤列表.append(函数)\n        返回 己\n    段落 运行 接收 数据：\n        遍历 步骤 于 己步骤列表：\n            数据 = 步骤(数据)\n        返回 数据"),
+    ("class Validator:\n    def __init__(self, data):\n        self.data = data\n        self.errors = []\n    def required(self, field):\n        if field not in self.data or not self.data[field]:\n            self.errors.append(f'{field} is required')\n        return self\n    def is_valid(self):\n        return len(self.errors) == 0",
+     "类 验证器：\n    属性 数据\n    属性 错误列表\n    构造 接收 数据：\n        己数据 为 数据\n        己错误列表 为 []\n    段落 必填 接收 字段：\n        如果 字段 不于 己数据 或 非 己数据[字段]：\n            己错误列表.append(f\"{字段} is required\")\n        返回 己\n    段落 是否有效：\n        返回 len(己错误列表) 等于 0"),
+    ("class Tree:\n    def __init__(self, value):\n        self.value = value\n        self.children = []\n    def add_child(self, child):\n        self.children.append(child)\n    def traverse(self):\n        result = [self.value]\n        for child in self.children:\n            result.extend(child.traverse())\n        return result",
+     "类 树：\n    属性 值\n    属性 子节点\n    构造 接收 值：\n        己值 为 值\n        己子节点 为 []\n    段落 添加子节点 接收 子树：\n        己子节点.append(子树)\n    段落 遍历：\n        设 结果 为 [己值]\n        遍历 子节点 于 己子节点：\n            结果.extend(子节点.遍历())\n        返回 结果"),
+    ("class Base:\n    def __init__(self, x):\n        self.x = x\n    def show(self):\n        print(f'Base: {self.x}')\nclass Derived(Base):\n    def __init__(self, x, y):\n        super().__init__(x)\n        self.y = y\n    def show(self):\n        super().show()\n        print(f'Derived: {self.y}')",
+     "类 基类：\n    属性 x\n    构造 接收 x：\n        己x 为 x\n    段落 显示：\n        打印(f\"Base: {己x}\")\n\n类 派生类 继承 基类：\n    属性 y\n    构造 接收 x, y：\n        父.构造(x)\n        己y 为 y\n    段落 显示：\n        父.显示()\n        打印(f\"Derived: {己y}\")"),
+    ("class InvalidAgeError(Exception):\n    def __init__(self, age):\n        self.age = age\n        self.message = f'Invalid age: {age}'",
+     "类 年龄错误 继承 异常：\n    属性 年龄\n    属性 消息\n    构造 接收 年龄：\n        己年龄 为 年龄\n        己消息 为 f\"Invalid age: {年龄}\""),
+    ("class Account:\n    def __init__(self, owner, balance=0):\n        self.owner = owner\n        self.balance = balance\n        self.transactions = []\n    def deposit(self, amount):\n        self.balance += amount\n        self.transactions.append(('deposit', amount))\n    def withdraw(self, amount):\n        if amount <= self.balance:\n            self.balance -= amount\n            self.transactions.append(('withdraw', amount))\n            return True\n        return False",
+     "类 账户：\n    属性 户主\n    属性 余额\n    属性 交易记录\n    构造 接收 户主, 余额 等于 0：\n        己户主 为 户主\n        己余额 为 余额\n        己交易记录 为 []\n    段落 存款 接收 金额：\n        己余额 加上 金额\n        己交易记录.append((\"deposit\", 金额))\n    段落 取款 接收 金额：\n        如果 金额 小于等于 己余额：\n            己余额 减去 金额\n            己交易记录.append((\"withdraw\", 金额))\n            返回 真\n        返回 假"),
+    ("class Color:\n    def __init__(self, r, g, b):\n        self.r = r\n        self.g = g\n        self.b = b\n    def to_hex(self):\n        return f'#{self.r:02x}{self.g:02x}{self.b:02x}'\n    def brightness(self):\n        return (self.r * 299 + self.g * 587 + self.b * 114) / 1000",
+     "类 颜色：\n    属性 r\n    属性 g\n    属性 b\n    构造 接收 r, g, b：\n        己r 为 r\n        己g 为 g\n        己b 为 b\n    段落 转十六进制：\n        返回 f\"#{己r:02x}{己g:02x}{己b:02x}\"\n    段落 亮度：\n        返回 (己r 乘 299 加 己g 乘 587 加 己b 乘 114) 除以 1000"),
+    ("class Range2D:\n    def __init__(self, x1, y1, x2, y2):\n        self.x1 = x1\n        self.y1 = y1\n        self.x2 = x2\n        self.y2 = y2\n    def contains(self, x, y):\n        return self.x1 <= x <= self.x2 and self.y1 <= y <= self.y2\n    def area(self):\n        return (self.x2 - self.x1) * (self.y2 - self.y1)",
+     "类 二维范围：\n    属性 x1\n    属性 y1\n    属性 x2\n    属性 y2\n    构造 接收 x1, y1, x2, y2：\n        己x1 为 x1\n        己y1 为 y1\n        己x2 为 x2\n        己y2 为 y2\n    段落 包含 接收 x, y：\n        返回 己x1 小于等于 x 小于等于 己x2 且 己y1 小于等于 y 小于等于 己y2\n    段落 面积：\n        返回 (己x2 减 己x1) 乘 (己y2 减 己y1)"),
+    ("class Event:\n    def __init__(self, name, date, attendees=None):\n        self.name = name\n        self.date = date\n        self.attendees = attendees if attendees else []\n    def add_attendee(self, person):\n        self.attendees.append(person)\n    def count(self):\n        return len(self.attendees)\n    def summary(self):\n        return f'{self.name} on {self.date}: {len(self.attendees)} attendees'",
+     "类 活动：\n    属性 名字\n    属性 日期\n    属性 参与者\n    构造 接收 名字, 日期, 参与者 等于 空：\n        己名字 为 名字\n        己日期 为 日期\n        如果 参与者：\n            己参与者 为 参与者\n        否则：\n            己参与者 为 []\n    段落 添加参与者 接收 人：\n        己参与者.append(人)\n    段落 数量：\n        返回 len(己参与者)\n    段落 摘要：\n        返回 f\"{己名字} on {己日期}: {len(己参与者)} attendees\""),
+    ("class UniqueList:\n    def __init__(self):\n        self.data = []\n    def add(self, item):\n        if item not in self.data:\n            self.data.append(item)\n    def remove(self, item):\n        if item in self.data:\n            self.data.remove(item)\n    def contains(self, item):\n        return item in self.data",
+     "类 唯一列表：\n    属性 数据\n    构造：\n        己数据 为 []\n    段落 添加 接收 元素：\n        如果 元素 不于 己数据：\n            己数据.append(元素)\n    段落 移除 接收 元素：\n        如果 元素 于 己数据：\n            己数据.remove(元素)\n    段落 包含 接收 元素：\n        返回 元素 于 己数据"),
+    ("class Polynomial:\n    def __init__(self, coeffs):\n        self.coeffs = coeffs\n    def evaluate(self, x):\n        result = 0\n        for i, c in enumerate(self.coeffs):\n            result += c * x ** i\n        return result\n    def degree(self):\n        return len(self.coeffs) - 1",
+     "类 多项式：\n    属性 系数列表\n    构造 接收 系数列表：\n        己系数列表 为 系数列表\n    段落 求值 接收 x：\n        设 结果 为 0\n        遍历 i, c 于 enumerate(己系数列表)：\n            结果 加上 c 乘 x ** i\n        返回 结果\n    段落 次数：\n        返回 len(己系数列表) 减 1"),
+    ("class Encoder:\n    def __init__(self, shift):\n        self.shift = shift\n    def encode(self, text):\n        result = ''\n        for ch in text:\n            if ch.isalpha():\n                result += chr(ord(ch) + self.shift)\n            else:\n                result += ch\n        return result\n    def decode(self, text):\n        result = ''\n        for ch in text:\n            if ch.isalpha():\n                result += chr(ord(ch) - self.shift)\n            else:\n                result += ch\n        return result",
+     "类 编码器：\n    属性 偏移\n    构造 接收 偏移：\n        己偏移 为 偏移\n    段落 编码 接收 文本：\n        设 结果 为 \"\"\n        遍历 ch 于 文本：\n            如果 ch.isalpha()：\n                结果 加上 chr(ord(ch) 加 己偏移)\n            否则：\n                结果 加上 ch\n        返回 结果\n    段落 解码 接收 文本：\n        设 结果 为 \"\"\n        遍历 ch 于 文本：\n            如果 ch.isalpha()：\n                结果 加上 chr(ord(ch) 减 己偏移)\n            否则：\n                结果 加上 ch\n        返回 结果"),
+    ("class Database:\n    def __init__(self):\n        self.tables = {}\n    def create_table(self, name, columns):\n        self.tables[name] = {col: [] for col in columns}\n    def insert(self, table, row):\n        for col, val in row.items():\n            self.tables[table][col].append(val)\n    def select_all(self, table):\n        return self.tables.get(table, {})",
+     "类 数据库：\n    属性 表\n    构造：\n        己表 为 {}\n    段落 建表 接收 表名, 列列表：\n        己表[表名] = {col: [] 遍历 col 之 列列表}\n    段落 插入 接收 表名, 行：\n        遍历 列名, 值 于 行.items()：\n            己表[表名][列名].append(值)\n    段落 查询全部 接收 表名：\n        返回 己表.get(表名, {})"),
+    ("class Observer:\n    def __init__(self, name):\n        self.name = name\n    def update(self, message):\n        print(f'[{self.name}] {message}')\n\nclass Subject:\n    def __init__(self):\n        self.observers = []\n    def attach(self, observer):\n        self.observers.append(observer)\n    def detach(self, observer):\n        self.observers.remove(observer)\n    def notify(self, message):\n        for obs in self.observers:\n            obs.update(message)",
+     "类 观察者：\n    属性 名字\n    构造 接收 名字：\n        己名字 为 名字\n    段落 更新 接收 消息：\n        打印(f\"[{己名字}] {消息}\")\n\n类 主题：\n    属性 观察者列表\n    构造：\n        己观察者列表 为 []\n    段落 添加 接收 观察者：\n        己观察者列表.append(观察者)\n    段落 移除 接收 观察者：\n        己观察者列表.remove(观察者)\n    段落 通知 接收 消息：\n        遍历 obs 于 己观察者列表：\n            obs.更新(消息)"),
+    ("class Task:\n    def __init__(self, name, fn):\n        self.name = name\n        self.fn = fn\n        self.done = False\n    def execute(self):\n        result = self.fn()\n        self.done = True\n        return result",
+     "类 任务：\n    属性 名字\n    属性 函数\n    属性 完成\n    构造 接收 名字, 函数：\n        己名字 为 名字\n        己函数 为 函数\n        己完成 为 假\n    段落 执行：\n        设 结果 为 己函数()\n        己完成 为 真\n        返回 结果"),
+    ("class Sensor:\n    def __init__(self, name, threshold=50):\n        self.name = name\n        self.threshold = threshold\n        self.readings = []\n    def read(self, value):\n        self.readings.append(value)\n        if value > self.threshold:\n            print(f'{self.name} alert: {value}')",
+     "类 传感器：\n    属性 名字\n    属性 阈值\n    属性 读数列表\n    构造 接收 名字, 阈值 等于 50：\n        己名字 为 名字\n        己阈值 为 阈值\n        己读数列表 为 []\n    段落 读取 接收 数值：\n        己读数列表.append(数值)\n        如果 数值 大于 己阈值：\n            打印(f\"{己名字} alert: {数值}\")"),
+    ("class Playlist:\n    def __init__(self, name):\n        self.name = name\n        self.songs = []\n    def add_song(self, title):\n        self.songs.append(title)\n    def remove_song(self, title):\n        if title in self.songs:\n            self.songs.remove(title)\n    def count(self):\n        return len(self.songs)",
+     "类 播放列表：\n    属性 名字\n    属性 歌曲列表\n    构造 接收 名字：\n        己名字 为 名字\n        己歌曲列表 为 []\n    段落 添加歌曲 接收 标题：\n        己歌曲列表.append(标题)\n    段落 移除歌曲 接收 标题：\n        如果 标题 于 己歌曲列表：\n            己歌曲列表.remove(标题)\n    段落 数量：\n        返回 len(己歌曲列表)"),
+    ("class Config:\n    _instance = None\n    def __init__(self):\n        self.settings = {}\n    @classmethod\n    def get_instance(cls):\n        if cls._instance is None:\n            cls._instance = cls()\n        return cls._instance",
+     "类 配置：\n    静态 属性 实例 等于 空\n    属性 设置\n    构造：\n        己设置 为 {}\n    类方法 段落 获取实例：\n        如果 配置.实例 等于 空：\n            配置.实例 为 新建 配置()\n        返回 配置.实例"),
+    ("class Set:\n    def __init__(self):\n        self.elements = []\n    def add(self, item):\n        if item not in self.elements:\n            self.elements.append(item)\n    def remove(self, item):\n        if item in self.elements:\n            self.elements.remove(item)\n    def union(self, other):\n        result = Set()\n        for e in self.elements + other.elements:\n            result.add(e)\n        return result",
+     "类 集合：\n    属性 元素\n    构造：\n        己元素 为 []\n    段落 添加 接收 元素：\n        如果 元素 不于 己元素：\n            己元素.append(元素)\n    段落 移除 接收 元素：\n        如果 元素 于 己元素：\n            己元素.remove(元素)\n    段落 并集 接收 其他：\n        设 结果 为 新建 集合()\n        遍历 e 于 己元素 加 其他.元素：\n            结果.添加(e)\n        返回 结果"),
+    ("class Shape:\n    def area(self):\n        raise NotImplementedError()\nclass Rectangle(Shape):\n    def __init__(self, w, h):\n        self.w = w\n        self.h = h\n    def area(self):\n        return self.w * self.h",
+     "类 形状：\n    段落 面积：\n        抛出 \"NotImplementedError\"\n\n类 矩形 继承 形状：\n    属性 宽\n    属性 高\n    构造 接收 w, h：\n        己宽 为 w\n        己高 为 h\n    段落 面积：\n        返回 己宽 乘 己高"),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 2. f-string (80 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+FSTRING_PAIRS = [
+    ('print(f"Hello, {name}!")', '打印(f"Hello, {name}!")'),
+    ('print(f"{name} is {age} years old")', '打印(f"{name} is {age} years old")'),
+    ('print(f"Result: {x + y}")', '打印(f"Result: {x 加 y}")'),
+    ('print(f"Score: {score:.2f}")', '打印(f"Score: {score:.2f}")'),
+    ('print(f"Count: {len(items)}")', '打印(f"Count: {len(items)}")'),
+    ('print(f"Average: {sum(nums)/len(nums):.1f}")', '打印(f"Average: {sum(nums) 除以 len(nums):.1f}")'),
+    ('print(f"{name} scored {score}/{total}")', '打印(f"{name} scored {score}/{total}")'),
+    ('print(f"PI = {3.14159:.4f}")', '打印(f"PI = {3.14159:.4f}")'),
+    ('print(f"Type: {type(x).__name__}")', '打印(f"Type: {type(x).__name__}")'),
+    ('print(f"Price: ${price:.2f}")', '打印(f"Price: ${price:.2f}")'),
+    ('print(f"Progress: {done}/{total} ({done/total*100:.0f}%)")', '打印(f"Progress: {done}/{total} ({done 除以 total 乘 100:.0f}%)")'),
+    ('print(f"[{status}] {message}")', '打印(f"[{status}] {message}")'),
+    ('print(f"Date: {year}-{month:02d}-{day:02d}")', '打印(f"Date: {year}-{month:02d}-{day:02d}")'),
+    ('print(f"{x:>10}")', '打印(f"{x:>10}")'),
+    ('print(f"{x:<10}")', '打印(f"{x:<10}")'),
+    ('print(f"{x:^10}")', '打印(f"{x:^10}")'),
+    ('print(f"{x:0>5d}")', '打印(f"{x:0>5d}")'),
+    ('print(f"{x:,}")', '打印(f"{x:,}")'),
+    ('print(f"{x:e}")', '打印(f"{x:e}")'),
+    ('print(f"{x:.2%}")', '打印(f"{x:.2%}")'),
+    ('msg = f"User: {user}, Action: {action}"', '设 msg 为 f"User: {user}, Action: {action}"'),
+    ('msg = f"Error at line {line}: {error}"', '设 msg 为 f"Error at line {line}: {error}"'),
+    ('msg = f"{a} + {b} = {a + b}"', '设 msg 为 f"{a} + {b} = {a 加 b}"'),
+    ('msg = f"List: {items}"', '设 msg 为 f"List: {items}"'),
+    ('msg = f"Length: {len(s)} chars"', '设 msg 为 f"Length: {len(s)} chars"'),
+    ('msg = f"Max: {max(values)}, Min: {min(values)}"', '设 msg 为 f"Max: {max(values)}, Min: {min(values)}"'),
+    ('msg = f"Index [{i}]: {items[i]}"', '设 msg 为 f"Index [{i}]: {items[i]}"'),
+    ('print(f"{name.upper()}")', '打印(f"{name.upper()}")'),
+    ('print(f"Time: {hours:02d}:{minutes:02d}:{seconds:02d}")', '打印(f"Time: {hours:02d}:{minutes:02d}:{seconds:02d}")'),
+    ('print(f"Memory: {mem/1024/1024:.1f} MB")', '打印(f"Memory: {mem 除以 1024 除以 1024:.1f} MB")'),
+    ('print(f"File: {filename} ({size} bytes)")', '打印(f"File: {filename} ({size} bytes)")'),
+    ('print(f"{x} squared is {x**2}")', '打印(f"{x} squared is {x ** 2}")'),
+    ('print(f"{x} cubed is {x**3}")', '打印(f"{x} cubed is {x ** 3}")'),
+    ('print(f"{a} > {b}? {a > b}")', '打印(f"{a} > {b}? {a 大于 b}")'),
+    ('print(f"Abs: |{n}| = {abs(n)}")', '打印(f"Abs: |{n}| = {abs(n)}")'),
+    ('print(f"Round: {3.14159:.2f}")', '打印(f"Round: {3.14159:.2f}")'),
+    ('print(f"Power: {2**10:,}")', '打印(f"Power: {2 ** 10:,}")'),
+    ('print(f"Negative: {-x}")', '打印(f"Negative: {减 x}")'),
+    ('print(f"Division: {a}/{b} = {a/b:.3f}")', '打印(f"Division: {a}/{b} = {a 除以 b:.3f}")'),
+    ('print(f"Modulo: {a}%{b} = {a%b}")', '打印(f"Modulo: {a}%{b} = {a 模 b}")'),
+    ('print(f"Floor: {a}//{b} = {a//b}")', '打印(f"Floor: {a}//{b} = {a 除 b}")'),
+    ('print(f"Is {n} even? {n % 2 == 0}")', '打印(f"Is {n} even? {n 模 2 等于 0}")'),
+    ('print(f"Fibonacci({n}) = {fib(n)}")', '打印(f"Fibonacci({n}) = {fib(n)}")'),
+    ('print(f"Factorial({n}) = {fact}")', '打印(f"Factorial({n}) = {fact}")'),
+    ('print(f"Sum of {nums} = {sum(nums)}")', '打印(f"Sum of {nums} = {sum(nums)}")'),
+    ('print(f"Sorted: {sorted(arr)}")', '打印(f"Sorted: {sorted(arr)}")'),
+    ('print(f"Reversed: {list(reversed(arr))}")', '打印(f"Reversed: {list(reversed(arr))}")'),
+    ('print(f"Joined: {chr(45).join(items)}")', '打印(f"Joined: {chr(45).join(items)}")'),
+    ('print(f"Sliced: {s[1:4]}")', '打印(f"Sliced: {s[1:4]}")'),
+    ('print(f"Uppercase: {s.upper()}")', '打印(f"Uppercase: {s.upper()}")'),
+    ('print(f"Lowercase: {s.lower()}")', '打印(f"Lowercase: {s.lower()}")'),
+    ('print(f"Stripped: {s.strip()}")', '打印(f"Stripped: {s.strip()}")'),
+    ('print(f"Split: {s.split(chr(44))}")', '打印(f"Split: {s.split(chr(44))}")'),
+    ('print(f"Replaced: {s.replace(chr(111), chr(48))}")', '打印(f"Replaced: {s.replace(chr(111), chr(48))}")'),
+    ('print(f"Capitalized: {s.capitalize()}")', '打印(f"Capitalized: {s.capitalize()}")'),
+    ('print(f"Title: {s.title()}")', '打印(f"Title: {s.title()}")'),
+    ('print(f"Count of {c}: {s.count(c)}")', '打印(f"Count of {c}: {s.count(c)}")'),
+    ('print(f"Find at index: {s.find(c)}")', '打印(f"Find at index: {s.find(c)}")'),
+    ('print(f"Starts with: {s.startswith(p)}")', '打印(f"Starts with: {s.startswith(p)}")'),
+    ('print(f"Ends with: {s.endswith(p)}")', '打印(f"Ends with: {s.endswith(p)}")'),
+    ('print(f"Is digit? {s.isdigit()}")', '打印(f"Is digit? {s.isdigit()}")'),
+    ('print(f"Is alpha? {s.isalpha()}")', '打印(f"Is alpha? {s.isalpha()}")'),
+    ('print(f"Char at {i}: {s[i]}")', '打印(f"Char at {i}: {s[i]}")'),
+    ('print(f"ASCII: {ord(c)}")', '打印(f"ASCII: {ord(c)}")'),
+    ('print(f"Char: {chr(n)}")', '打印(f"Char: {chr(n)}")'),
+    ('print(f"Formatted: {x:,.2f}")', '打印(f"Formatted: {x:,.2f}")'),
+    ('print(f"Scientific: {x:.2e}")', '打印(f"Scientific: {x:.2e}")'),
+    ('print(f"Binary: {bin(255)}")', '打印(f"Binary: {bin(255)}")'),
+    ('print(f"Hex: {hex(255)}")', '打印(f"Hex: {hex(255)}")'),
+    ('print(f"Octal: {oct(n)}")', '打印(f"Octal: {oct(n)}")'),
+    ('print(f"Temperature: {temp}C / {temp*9//5+32}F")', '打印(f"Temperature: {temp}C / {temp 乘 9 除以 5 加 32}F")'),
+    ('print(f"Random: {random.randint(1, 100)}")', '打印(f"Random: {random.randint(1, 100)}")'),
+    ('result = f"{x} * {y} = {x * y}"', '设 result 为 f"{x} * {y} = {x 乘 y}"'),
+    ('result = f"{x} - {y} = {x - y}"', '设 result 为 f"{x} - {y} = {x 减 y}"'),
+    ('result = f"{x} / {y} = {x / y}"', '设 result 为 f"{x} / {y} = {x 除以 y}"'),
+    ('result = f"{x} % {y} = {x % y}"', '设 result 为 f"{x} % {y} = {x 模 y}"'),
+    ('result = f"{x} // {y} = {x // y}"', '设 result 为 f"{x} // {y} = {x 除 y}"'),
+    ('result = f"{x} ** {y} = {x ** y}"', '设 result 为 f"{x} ** {y} = {x ** y}"'),
+    ('result = f"{x} & {y} = {x & y}"', '设 result 为 f"{x} & {y} = {x & y}"'),
+    ('result = f"{x} | {y} = {x | y}"', '设 result 为 f"{x} | {y} = {x | y}"'),
+    ('result = f"{x} ^ {y} = {x ^ y}"', '设 result 为 f"{x} ^ {y} = {x ^ y}"'),
+    ('result = f"~{x} = {~x}"', '设 result 为 f"~{x} = {~x}"'),
+    ('result = f"{x} << {y} = {x << y}"', '设 result 为 f"{x} << {y} = {x << y}"'),
+    ('result = f"{x} >> {y} = {x >> y}"', '设 result 为 f"{x} >> {y} = {x >> y}"'),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 3. List Comprehension (80 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+LISTCOMP_PAIRS = [
+    ('squares = [x**2 for x in range(10)]', '设 平方列表 为 [x 乘 x 遍历 x 之 range(10)]'),
+    ('evens = [x for x in range(20) if x % 2 == 0]', '设 偶数列表 为 [x 遍历 x 之 range(20) 若 x 模 2 等于 0]'),
+    ('names = [s.name for s in students]', '设 名字列表 为 [s.名字 遍历 s 之 学生列表]'),
+    ('upper = [s.upper() for s in words]', '设 大写列表 为 [s.upper() 遍历 s 之 单词列表]'),
+    ('lengths = [len(s) for s in strings]', '设 长度列表 为 [len(s) 遍历 s 之 字符串列表]'),
+    ('doubled = [x * 2 for x in nums]', '设 双倍列表 为 [x 乘 2 遍历 x 之 数字列表]'),
+    ('negatives = [-x for x in nums]', '设 负数列表 为 [减 x 遍历 x 之 数字列表]'),
+    ('abs_vals = [abs(x) for x in nums]', '设 绝对值列表 为 [abs(x) 遍历 x 之 数字列表]'),
+    ('pairs = [(x, y) for x in range(3) for y in range(3)]', '设 对列表 为 [(x, y) 遍历 x 之 range(3) 遍历 y 之 range(3)]'),
+    ('flat = [item for row in matrix for item in row]', '设 扁平列表 为 [item 遍历 row 之 矩阵 遍历 item 之 row]'),
+    ('filtered = [x for x in data if x > 0]', '设 正数列表 为 [x 遍历 x 之 数据 若 x 大于 0]'),
+    ('valid = [s for s in strings if s]', '设 有效列表 为 [s 遍历 s 之 字符串列表 若 s]'),
+    ('int_strs = [str(x) for x in nums]', '设 字符串列表 为 [str(x) 遍历 x 之 数字列表]'),
+    ('floats = [float(x) for x in strs]', '设 浮点列表 为 [float(x) 遍历 x 之 字符串列表]'),
+    ('ints = [int(x) for x in strs if x.isdigit()]', '设 整数列表 为 [int(x) 遍历 x 之 字符串列表 若 x.isdigit()]'),
+    ('sorted_pairs = [(k, v) for k, v in d.items() if v > 0]', '设 排序对 为 [(k, v) 遍历 k, v 之 d.items() 若 v 大于 0]'),
+    ('keys = [k for k, v in d.items() if v == target]', '设 键列表 为 [k 遍历 k, v 之 d.items() 若 v 等于 target]'),
+    ('values = [v for k, v in d.items()]', '设 值列表 为 [v 遍历 k, v 之 d.items()]'),
+    ('odd_squares = [x**2 for x in range(20) if x % 2 != 0]', '设 奇平方 为 [x 乘 x 遍历 x 之 range(20) 若 x 模 2 不等于 0]'),
+    ('even_cubes = [x**3 for x in range(10) if x % 2 == 0]', '设 偶立方 为 [x 乘 x 乘 x 遍历 x 之 range(10) 若 x 模 2 等于 0]'),
+    ('first_chars = [s[0] for s in words if s]', '设 首字母 为 [s[0] 遍历 s 之 单词列表 若 s]'),
+    ('last_chars = [s[-1] for s in words if s]', '设 尾字母 为 [s[-1] 遍历 s 之 单词列表 若 s]'),
+    ('reversed_list = [s[::-1] for s in words]', '设 反转列表 为 [s[::-1] 遍历 s 之 单词列表]'),
+    ('upper_list = [s.upper() for s in words if len(s) > 3]', '设 大写列表 为 [s.upper() 遍历 s 之 单词列表 若 len(s) 大于 3]'),
+    ('squared_evens = [x**2 for x in nums if x % 2 == 0]', '设 偶平方 为 [x 乘 x 遍历 x 之 数字列表 若 x 模 2 等于 0]'),
+    ('cubed_odds = [x**3 for x in nums if x % 2 != 0]', '设 奇立方 为 [x 乘 x 乘 x 遍历 x 之 数字列表 若 x 模 2 不等于 0]'),
+    ('indexed = [(i, v) for i, v in enumerate(items)]', '设 索引列表 为 [(i, v) 遍历 i, v 之 enumerate(items)]'),
+    ('zipped = [a + b for a, b in zip(list1, list2)]', '设 拼接列表 为 [a 加 b 遍历 a, b 之 zip(list1, list2)]'),
+    ('sums = [sum(row) for row in matrix]', '设 行和列表 为 [sum(row) 遍历 row 之 矩阵]'),
+    ('maxes = [max(row) for row in matrix]', '设 行最大值 为 [max(row) 遍历 row 之 矩阵]'),
+    ('mins = [min(row) for row in matrix]', '设 行最小值 为 [min(row) 遍历 row 之 矩阵]'),
+    ('avg = [sum(row)/len(row) for row in matrix]', '设 行均值 为 [sum(row) 除以 len(row) 遍历 row 之 矩阵]'),
+    ('non_none = [x for x in data if x is not None]', '设 非空列表 为 [x 遍历 x 之 数据 若 x 不等于 空]'),
+    ('non_empty = [s for s in strings if s != ""]', '设 非空串 为 [s 遍历 s 之 字符串列表 若 s 不等于 ""]'),
+    ('positive = [x for x in nums if x > 0]', '设 正数列表 为 [x 遍历 x 之 数字列表 若 x 大于 0]'),
+    ('negative = [x for x in nums if x < 0]', '设 负数列表 为 [x 遍历 x 之 数字列表 若 x 小于 0]'),
+    ('zero_filtered = [x for x in nums if x != 0]', '设 非零列表 为 [x 遍历 x 之 数字列表 若 x 不等于 0]'),
+    ('in_range = [x for x in nums if 0 <= x <= 100]', '设 范围内 为 [x 遍历 x 之 数字列表 若 0 小于等于 x 小于等于 100]'),
+    ('div_by_3 = [x for x in range(100) if x % 3 == 0]', '设 三的倍数 为 [x 遍历 x 之 range(100) 若 x 模 3 等于 0]'),
+    ('div_by_5 = [x for x in range(100) if x % 5 == 0]', '设 五的倍数 为 [x 遍历 x 之 range(100) 若 x 模 5 等于 0]'),
+    ('div_by_15 = [x for x in range(100) if x % 3 == 0 and x % 5 == 0]', '设 十五倍数 为 [x 遍历 x 之 range(100) 若 x 模 3 等于 0 且 x 模 5 等于 0]'),
+    ('length_gt3 = [s for s in words if len(s) > 3]', '设 长于3 为 [s 遍历 s 之 单词列表 若 len(s) 大于 3]'),
+    ('length_eq4 = [s for s in words if len(s) == 4]', '设 四字 为 [s 遍历 s 之 单词列表 若 len(s) 等于 4]'),
+    ('mapped = [f(x) for x in data]', '设 映射列表 为 [f(x) 遍历 x 之 数据]'),
+    ('applied = [func(x, y) for x, y in pairs]', '设 应用列表 为 [func(x, y) 遍历 x, y 之 对列表]'),
+    ('formatted = [f"{x:.2f}" for x in nums]', '设 格式化列表 为 [f"{x:.2f}" 遍历 x 之 数字列表]'),
+    ('stripped = [s.strip() for s in strings]', '设 去空格 为 [s.strip() 遍历 s 之 字符串列表]'),
+    ('split_flat = [word for s in strings for word in s.split()]', '设 分词平坦 为 [word 遍历 s 之 字符串列表 遍历 word 之 s.split()]'),
+    ('nested = [[x for x in row if x > 0] for row in matrix]', '设 嵌套正数 为 [[x 遍历 x 之 row 若 x 大于 0] 遍历 row 之 矩阵]'),
+    ('to_dict = {k: v for k, v in pairs}', '设 字典 为 {k: v 遍历 k, v 之 对列表}'),
+    ('filtered_dict = {k: v for k, v in d.items() if v > 0}', '设 筛选字典 为 {k: v 遍历 k, v 之 d.items() 若 v 大于 0}'),
+    ('index_map = {v: i for i, v in enumerate(items)}', '设 索引映射 为 {v: i 遍历 i, v 之 enumerate(items)}'),
+    ('word_count = {w: words.count(w) for w in set(words)}', '设 词频 为 {w: words.count(w) 遍历 w 之 set(words)}'),
+    ('inverted = {v: k for k, v in d.items()}', '设 反转字典 为 {v: k 遍历 k, v 之 d.items()}'),
+    ('merged = {k: v for d in dicts for k, v in d.items()}', '设 合并字典 为 {k: v 遍历 d 之 字典列表 遍历 k, v 之 d.items()}'),
+    ('char_count = {c: s.count(c) for c in s}', '设 字符统计 为 {c: s.count(c) 遍历 c 之 s}'),
+    ('len_map = {s: len(s) for s in strings}', '设 长度映射 为 {s: len(s) 遍历 s 之 字符串列表}'),
+    ('set_from_list = {x for x in data}', '设 集合 为 {x 遍历 x 之 数据}'),
+    ('filtered_set = {x for x in data if x > 0}', '设 筛选集合 为 {x 遍历 x 之 数据 若 x 大于 0}'),
+    ('chars = {c for c in string}', '设 字符集 为 {c 遍历 c 之 字符串}'),
+    ('unique_pairs = {(x, y) for x in a for y in b if x != y}', '设 唯一对 为 {(x, y) 遍历 x 之 a 遍历 y 之 b 若 x 不等于 y}'),
+    ('even_set = {x for x in nums if x % 2 == 0}', '设 偶数集 为 {x 遍历 x 之 数字列表 若 x 模 2 等于 0}'),
+    ('odd_set = {x for x in nums if x % 2 != 0}', '设 奇数集 为 {x 遍历 x 之 数字列表 若 x 模 2 不等于 0}'),
+    ('first_10 = [x for i, x in enumerate(data) if i < 10]', '设 前十个 为 [x 遍历 i, x 之 enumerate(data) 若 i 小于 10]'),
+    ('every_other = [x for i, x in enumerate(data) if i % 2 == 0]', '设 隔行取 为 [x 遍历 i, x 之 enumerate(data) 若 i 模 2 等于 0]'),
+    ('result = [x * y for x, y in zip(a, b)]', '设 结果 为 [x 乘 y 遍历 x, y 之 zip(a, b)]'),
+    ('result = [x + y for x, y in zip(a, b)]', '设 结果 为 [x 加 y 遍历 x, y 之 zip(a, b)]'),
+    ('result = [x - y for x, y in zip(a, b)]', '设 结果 为 [x 减 y 遍历 x, y 之 zip(a, b)]'),
+    ('concat = [a[i] + b[i] for i in range(len(a))]', '设 拼接 为 [a[i] 加 b[i] 遍历 i 之 range(len(a))]'),
+    ('element_wise = [a[i] * b[i] for i in range(len(a))]', '设 逐元素 为 [a[i] 乘 b[i] 遍历 i 之 range(len(a))]'),
+    ('normalized = [x / max_val for x in data]', '设 归一化 为 [x 除以 最大值 遍历 x 之 数据]'),
+    ('scaled = [x * factor for x in data]', '设 缩放 为 [x 乘 系数 遍历 x 之 数据]'),
+    ('shifted = [x + offset for x in data]', '设 偏移 为 [x 加 偏移量 遍历 x 之 数据]'),
+    ('clamped = [max(0, min(100, x)) for x in data]', '设 截断 为 [max(0, min(100, x)) 遍历 x 之 数据]'),
+    ('starts_a = [s for s in words if s.startswith("a")]', '设 a开头 为 [s 遍历 s 之 单词列表 若 s.startswith("a")]'),
+    ('contains_sub = [s for s in words if "sub" in s]', '设 含sub 为 [s 遍历 s 之 单词列表 若 "sub" 于 s]'),
+    ('unique = [x for i, x in enumerate(data) if x not in data[:i]]', '设 去重列表 为 [x 遍历 i, x 之 enumerate(data) 若 x 不于 data[:i]]'),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 4. try/except (80 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+TRY_EXCEPT_PAIRS = [
+    ('try:\n    x = int(input())\nexcept ValueError:\n    x = 0', '尝试：\n    设 x 为 int(输入())\n捕获 值异常：\n    设 x 为 0'),
+    ('try:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    result = 0', '尝试：\n    设 result 为 10 除以 0\n捕获 算术异常：\n    设 result 为 0'),
+    ('try:\n    f = open("data.txt")\n    content = f.read()\nexcept FileNotFoundError:\n    content = ""', '尝试：\n    设 f 为 读取文件("data.txt")\n    设 content 为 f.read()\n捕获 IO异常：\n    设 content 为 ""'),
+    ('try:\n    value = int(s)\nexcept ValueError:\n    value = 0\n    print("Invalid input")', '尝试：\n    设 value 为 int(s)\n捕获 值异常：\n    设 value 为 0\n    打印("Invalid input")'),
+    ('try:\n    result = a / b\nexcept ZeroDivisionError:\n    print("Cannot divide by zero")\n    result = 0', '尝试：\n    设 result 为 a 除以 b\n捕获 算术异常：\n    打印("Cannot divide by zero")\n    设 result 为 0'),
+    ('try:\n    idx = lst[index]\nexcept IndexError:\n    idx = None', '尝试：\n    设 idx 为 lst[index]\n捕获 索引异常：\n    设 idx 为 空'),
+    ('try:\n    val = d[key]\nexcept KeyError:\n    val = None', '尝试：\n    设 val 为 d[key]\n捕获 键异常：\n    设 val 为 空'),
+    ('try:\n    result = function()\nexcept Exception as e:\n    print(f"Error: {e}")\n    result = None', '尝试：\n    设 result 为 function()\n捕获 异常 e：\n    打印(f"Error: {e}")\n    设 result 为 空'),
+    ('try:\n    x = 1 / 0\nexcept:\n    x = float("inf")', '尝试：\n    设 x 为 1 除以 0\n捕获 异常：\n    设 x 为 float("inf")'),
+    ('try:\n    result = risky_operation()\nexcept Exception as e:\n    print(f"Error occurred: {e}")\n    result = None\nfinally:\n    print("Cleanup")', '尝试：\n    设 result 为 risky_operation()\n捕获 异常 e：\n    打印(f"Error occurred: {e}")\n    设 result 为 空\n最终：\n    打印("Cleanup")'),
+    ('try:\n    f = open("file.txt", "w")\n    f.write("hello")\nfinally:\n    f.close()', '尝试：\n    设 f 为 打开文件("file.txt", "w")\n    f.write("hello")\n最终：\n    f.close()'),
+    ('try:\n    result = parse(data)\nexcept TypeError:\n    result = None\nexcept ValueError:\n    result = None\nexcept Exception:\n    result = None', '尝试：\n    设 result 为 parse(data)\n捕获 类型异常：\n    设 result 为 空\n捕获 值异常：\n    设 result 为 空\n捕获 异常：\n    设 result 为 空'),
+    ('try:\n    os.remove("temp.txt")\nexcept FileNotFoundError:\n    pass', '尝试：\n    删除文件("temp.txt")\n捕获 IO异常：\n    跳过'),
+    ('try:\n    import custom_module\nexcept ImportError:\n    custom_module = None', '尝试：\n    导入 custom_module\n捕获 导入异常：\n    设 custom_module 为 空'),
+    ('try:\n    conn = connect_db()\n    cursor = conn.cursor()\n    cursor.execute(query)\nexcept Exception as e:\n    print(f"DB Error: {e}")\nfinally:\n    conn.close()', '尝试：\n    设 conn 为 connect_db()\n    设 cursor 为 conn.cursor()\n    cursor.execute(query)\n捕获 异常 e：\n    打印(f"DB Error: {e}")\n最终：\n    conn.close()'),
+    ('try:\n    num = int(text)\n    if num < 0:\n        raise ValueError("Negative number")\nexcept ValueError as e:\n    num = 0\n    print(f"Invalid: {e}")', '尝试：\n    设 num 为 int(text)\n    如果 num 小于 0：\n        抛出 新建 值异常("Negative number")\n捕获 值异常 e：\n    设 num 为 0\n    打印(f"Invalid: {e}")'),
+    ('try:\n    result = dangerous_function()\nexcept Exception:\n    result = default_value', '尝试：\n    设 result 为 dangerous_function()\n捕获 异常：\n    设 result 为 默认值'),
+    ('try:\n    value = dict[key]\nexcept KeyError:\n    value = default', '尝试：\n    设 value 为 dict[key]\n捕获 键异常：\n    设 value 为 默认值'),
+    ('try:\n    index = list.index(item)\nexcept ValueError:\n    index = -1', '尝试：\n    设 index 为 list.index(item)\n捕获 值异常：\n    设 index 为 减 1'),
+    ('try:\n    with open("file.txt") as f:\n        data = f.read()\nexcept IOError:\n    data = ""', '尝试：\n    使用 读取文件("file.txt") 为 f：\n        设 data 为 f.read()\n捕获 IO异常：\n    设 data 为 ""'),
+    ('try:\n    value = max(lst)\nexcept ValueError:\n    value = 0', '尝试：\n    设 value 为 max(lst)\n捕获 值异常：\n    设 value 为 0'),
+    ('try:\n    mean = sum(data) / len(data)\nexcept ZeroDivisionError:\n    mean = 0', '尝试：\n    设 mean 为 sum(data) 除以 len(data)\n捕获 算术异常：\n    设 mean 为 0'),
+    ('try:\n    percentage = (part / whole) * 100\nexcept ZeroDivisionError:\n    percentage = 0', '尝试：\n    设 percentage 为 (part 除以 whole) 乘 100\n捕获 算术异常：\n    设 percentage 为 0'),
+    ('try:\n    x, y, z = values\nexcept ValueError:\n    x, y, z = 0, 0, 0', '尝试：\n    设 x, y, z 为 values\n捕获 值异常：\n    设 x, y, z 为 0, 0, 0'),
+    ('try:\n    value = getattr(obj, attr)\nexcept AttributeError:\n    value = None', '尝试：\n    设 value 为 getattr(obj, attr)\n捕获 属性异常：\n    设 value 为 空'),
+    ('try:\n    result = operation()\nexcept KeyboardInterrupt:\n    print("Interrupted by user")\n    result = None', '尝试：\n    设 result 为 operation()\n捕获 中断异常：\n    打印("Interrupted by user")\n    设 result 为 空'),
+    ('try:\n    val = list.pop()\nexcept IndexError:\n    val = None', '尝试：\n    设 val 为 list.pop()\n捕获 索引异常：\n    设 val 为 空'),
+    ('try:\n    assert x > 0, "x must be positive"\nexcept AssertionError:\n    x = 1', '尝试：\n    assert x 大于 0, "x must be positive"\n捕获 断言异常：\n    设 x 为 1'),
+    ('try:\n    conn.ping()\nexcept Exception:\n    conn = reconnect()', '尝试：\n    conn.ping()\n捕获 异常：\n    设 conn 为 reconnect()'),
+    ('try:\n    big_list = list(range(1000000))\nexcept MemoryError:\n    big_list = []', '尝试：\n    设 big_list 为 list(range(1000000))\n捕获 内存异常：\n    设 big_list 为 []'),
+    ('try:\n    ratio = width / height\nexcept ZeroDivisionError:\n    ratio = 1.0\nfinally:\n    print(f"Ratio: {ratio}")', '尝试：\n    设 ratio 为 width 除以 height\n捕获 算术异常：\n    设 ratio 为 1.0\n最终：\n    打印(f"Ratio: {ratio}")'),
+    ('try:\n    match = re.search(pattern, text)\n    result = match.group(1)\nexcept (AttributeError, IndexError):\n    result = None', '尝试：\n    设 match 为 re.search(pattern, text)\n    设 result 为 match.group(1)\n捕获 (属性异常, 索引异常)：\n    设 result 为 空'),
+    ('try:\n    item = items[0]\n    second = items[1]\nexcept IndexError:\n    item = None\n    second = None', '尝试：\n    设 item 为 items[0]\n    设 second 为 items[1]\n捕获 索引异常：\n    设 item 为 空\n    设 second 为 空'),
+    ('try:\n    num = int(s)\n    if num == 0:\n        raise ValueError("zero")\n    result = 100 / num\nexcept ValueError:\n    result = 0\nexcept ZeroDivisionError:\n    result = float("inf")', '尝试：\n    设 num 为 int(s)\n    如果 num 等于 0：\n        抛出 新建 值异常("zero")\n    设 result 为 100 除以 num\n捕获 值异常：\n    设 result 为 0\n捕获 算术异常：\n    设 result 为 float("inf")'),
+    ('try:\n    lock.acquire()\n    do_work()\nfinally:\n    lock.release()', '尝试：\n    lock.acquire()\n    do_work()\n最终：\n    lock.release()'),
+    ('try:\n    data = json.loads(line)\nexcept json.JSONDecodeError:\n    continue', '尝试：\n    设 data 为 json.loads(line)\n捕获 异常：\n    跳过'),
+    ('try:\n    result = mapping[key]\nexcept KeyError:\n    result = mapping.get(key, default)', '尝试：\n    设 result 为 mapping[key]\n捕获 键异常：\n    设 result 为 mapping.get(key, default)'),
+    ('try:\n    os.makedirs(path)\nexcept FileExistsError:\n    pass', '尝试：\n    创建目录(path)\n捕获 IO异常：\n    跳过'),
+    ('try:\n    key = next(iter(d))\nexcept StopIteration:\n    key = None', '尝试：\n    设 key 为 next(iter(d))\n捕获 异常：\n    设 key 为 空'),
+    ('try:\n    sock.connect((host, port))\nexcept ConnectionRefusedError:\n    print("Connection refused")', '尝试：\n    sock.connect((host, port))\n捕获 连接异常：\n    打印("Connection refused")'),
+    ('try:\n    img = Image.open(path)\nexcept FileNotFoundError:\n    img = None\n    print("Image not found")', '尝试：\n    设 img 为 Image.open(path)\n捕获 IO异常：\n    设 img 为 空\n    打印("Image not found")'),
+    ('try:\n    subprocess.run(cmd, check=True)\nexcept subprocess.CalledProcessError:\n    print("Command failed")', '尝试：\n    subprocess.run(cmd, check=True)\n捕获 异常：\n    打印("Command failed")'),
+    ('try:\n    socket.inet_aton(ip)\nexcept OSError:\n    valid = False', '尝试：\n    socket.inet_aton(ip)\n捕获 异常：\n    设 valid 为 假'),
+    ('try:\n    import tkinter\nexcept ImportError:\n    tkinter = None\n    print("GUI not available")', '尝试：\n    导入 tkinter\n捕获 导入异常：\n    设 tkinter 为 空\n    打印("GUI not available")'),
+    ('try:\n    from Crypto.Cipher import AES\nexcept ImportError:\n    AES = None', '尝试：\n    导入 Crypto.Cipher AES\n捕获 导入异常：\n    设 AES 为 空'),
+    ('try:\n    response = requests.get(url, timeout=5)\nexcept requests.Timeout:\n    response = None\nexcept requests.ConnectionError:\n    response = None', '尝试：\n    设 response 为 requests.get(url, timeout=5)\n捕获 异常：\n    设 response 为 空\n捕获 异常：\n    设 response 为 空'),
+    ('try:\n    user = db.get_user(user_id)\nexcept Exception:\n    user = None\n    print("User not found")', '尝试：\n    设 user 为 db.get_user(user_id)\n捕获 异常：\n    设 user 为 空\n    打印("User not found")'),
+    ('try:\n    f = open(path, "r")\n    try:\n        data = f.read()\n    finally:\n        f.close()\nexcept IOError:\n    data = ""', '尝试：\n    设 f 为 打开文件(path, "r")\n    尝试：\n        设 data 为 f.read()\n    最终：\n        f.close()\n捕获 IO异常：\n    设 data 为 ""'),
+    ('try:\n    response = urllib.request.urlopen(url)\nexcept urllib.error.URLError:\n    response = None', '尝试：\n    设 response 为 urllib.request.urlopen(url)\n捕获 异常：\n    设 response 为 空'),
+    ('try:\n    ip = socket.gethostbyname(hostname)\nexcept socket.gaierror:\n    ip = "127.0.0.1"', '尝试：\n    设 ip 为 socket.gethostbyname(hostname)\n捕获 异常：\n    设 ip 为 "127.0.0.1"'),
+    ('try:\n    data = base64.b64decode(encoded)\nexcept Exception:\n    data = b""', '尝试：\n    设 data 为 base64.b64decode(encoded)\n捕获 异常：\n    设 data 为 b""'),
+    ('try:\n    text.encode("ascii")\nexcept UnicodeEncodeError:\n    text = text.encode("utf-8", errors="ignore").decode("ascii")', '尝试：\n    text.encode("ascii")\n捕获 异常：\n    设 text 为 text.encode("utf-8", errors="ignore").decode("ascii")'),
+    ('try:\n    f = open(path)\n    lines = f.readlines()\nexcept UnicodeDecodeError:\n    lines = []\n    print("Encoding error")', '尝试：\n    设 f 为 读取文件(path)\n    设 lines 为 f.readlines()\n捕获 异常：\n    设 lines 为 []\n    打印("Encoding error")'),
+    ('try:\n    result = requests.get(url).json()\nexcept (ValueError, KeyError) as e:\n    result = {}\n    print(f"Parse failed: {e}")', '尝试：\n    设 result 为 requests.get(url).json()\n捕获 异常 e：\n    设 result 为 {}\n    打印(f"Parse failed: {e}")'),
+    ('try:\n    config.read("config.ini")\nexcept Exception:\n    config["default"] = {"value": "0"}', '尝试：\n    config.read("config.ini")\n捕获 异常：\n    config["default"] = {"value": "0"}'),
+    ('try:\n    shutil.copy(src, dst)\nexcept shutil.Error as e:\n    print(f"Copy error: {e}")', '尝试：\n    shutil.copy(src, dst)\n捕获 异常 e：\n    打印(f"Copy error: {e}")'),
+    ('try:\n    compiled = re.compile(pattern)\nexcept re.error:\n    compiled = None', '尝试：\n    设 compiled 为 re.compile(pattern)\n捕获 异常：\n    设 compiled 为 空'),
+    ('try:\n    data = struct.unpack(fmt, raw)\nexcept struct.error:\n    data = None', '尝试：\n    设 data 为 struct.unpack(fmt, raw)\n捕获 异常：\n    设 data 为 空'),
+    ('try:\n    number = float(text)\nexcept (ValueError, TypeError):\n    number = 0.0', '尝试：\n    设 number 为 float(text)\n捕获 (值异常, 类型异常)：\n    设 number 为 0.0'),
+    ('try:\n    obj = MyClass(arg)\nexcept Exception as e:\n    obj = None\n    print(f"Construction failed: {e}")', '尝试：\n    设 obj 为 新建 MyClass(arg)\n捕获 异常 e：\n    设 obj 为 空\n    打印(f"Construction failed: {e}")'),
+    ('try:\n    value = int(input("Enter number: "))\nexcept ValueError:\n    print("Not a number")\n    value = 0\nelse:\n    print(f"You entered {value}")', '尝试：\n    设 value 为 int(输入("Enter number: "))\n捕获 值异常：\n    打印("Not a number")\n    设 value 为 0\n否则：\n    打印(f"You entered {value}")'),
+    ('try:\n    result = 1 / x\nexcept ZeroDivisionError:\n    result = float("inf")\nelse:\n    result = result * 2', '尝试：\n    设 result 为 1 除以 x\n捕获 算术异常：\n    设 result 为 float("inf")\n否则：\n    设 result 为 result 乘 2'),
+    ('try:\n    os.chdir(path)\nexcept FileNotFoundError:\n    os.makedirs(path)\n    os.chdir(path)', '尝试：\n    os.chdir(path)\n捕获 IO异常：\n    创建目录(path)\n    os.chdir(path)'),
+    ('try:\n    num = int(text, base)\nexcept ValueError:\n    num = 0\nexcept TypeError:\n    num = int(text, 10)', '尝试：\n    设 num 为 int(text, base)\n捕获 值异常：\n    设 num 为 0\n捕获 类型异常：\n    设 num 为 int(text, 10)'),
+    ('try:\n    date = datetime.strptime(s, "%Y-%m-%d")\nexcept ValueError:\n    date = None', '尝试：\n    设 date 为 datetime.strptime(s, "%Y-%m-%d")\n捕获 值异常：\n    设 date 为 空'),
+    ('try:\n    process = subprocess.Popen(cmd)\nexcept FileNotFoundError:\n    process = None\n    print("Command not found")', '尝试：\n    设 process 为 subprocess.Popen(cmd)\n捕获 IO异常：\n    设 process 为 空\n    打印("Command not found")'),
+    ('try:\n    with open("config.json") as f:\n        config = json.load(f)\nexcept FileNotFoundError:\n    config = {"default": True}\nexcept json.JSONDecodeError:\n    config = {"default": True}\n    print("Invalid JSON")', '尝试：\n    使用 读取文件("config.json") 为 f：\n        设 config 为 json.load(f)\n捕获 IO异常：\n    设 config 为 {"default": 真}\n捕获 异常：\n    设 config 为 {"default": 真}\n    打印("Invalid JSON")'),
+    ('try:\n    signal.signal(signal.SIGINT, handler)\nexcept ValueError:\n    pass', '尝试：\n    signal.signal(signal.SIGINT, handler)\n捕获 值异常：\n    跳过'),
+    ('try:\n    with open(path, "rb") as f:\n        data = pickle.load(f)\nexcept (FileNotFoundError, pickle.PickleError):\n    data = {}', '尝试：\n    使用 打开文件(path, "rb") 为 f：\n        设 data 为 pickle.load(f)\n捕获 (IO异常, 异常)：\n    设 data 为 {}'),
+    ('try:\n    result = reduce(lambda a, b: a + b, data)\nexcept TypeError:\n    result = 0', '尝试：\n    设 result 为 reduce(接收 a, b：返回 a 加 b, data)\n捕获 类型异常：\n    设 result 为 0'),
+    ('try:\n    precision = len(str(float_value).split(".")[1])\nexcept IndexError:\n    precision = 0', '尝试：\n    设 precision 为 len(str(float_value).split(".")[1])\n捕获 索引异常：\n    设 precision 为 0'),
+    ('try:\n    tree = ET.fromstring(xml_str)\nexcept ET.ParseError:\n    tree = None', '尝试：\n    设 tree 为 ET.fromstring(xml_str)\n捕获 异常：\n    设 tree 为 空'),
+    ('try:\n    data = yaml.safe_load(f)\nexcept yaml.YAMLError:\n    data = {}', '尝试：\n    设 data 为 yaml.safe_load(f)\n捕获 异常：\n    设 data 为 {}'),
+    ('try:\n    data = pickle.load(f)\nexcept (pickle.PickleError, EOFError):\n    data = None', '尝试：\n    设 data 为 pickle.load(f)\n捕获 (异常, 异常)：\n    设 data 为 空'),
+    ('try:\n    ast = json.loads(text)\nexcept json.JSONDecodeError as e:\n    print(f"Parse error: {e}")\n    ast = None', '尝试：\n    设 ast 为 json.loads(text)\n捕获 异常 e：\n    打印(f"Parse error: {e}")\n    设 ast 为 空'),
+    ('try:\n    flag = os.O_CREAT | os.O_EXCL\n    fd = os.open(path, flag)\nexcept FileExistsError:\n    print("File already exists")', '尝试：\n    设 flag 为 os.O_CREAT 或 os.O_EXCL\n    设 fd 为 os.open(path, flag)\n捕获 IO异常：\n    打印("File already exists")'),
+    ('try:\n    url = urllib.parse.urlparse(raw_url)\nexcept Exception:\n    url = None', '尝试：\n    设 url 为 urllib.parse.urlparse(raw_url)\n捕获 异常：\n    设 url 为 空'),
+    ('try:\n    item = queue.get_nowait()\nexcept queue.Empty:\n    item = None', '尝试：\n    设 item 为 queue.get_nowait()\n捕获 异常：\n    设 item 为 空'),
+    ('try:\n    config = json.loads(line)\nexcept json.JSONDecodeError as e:\n    print(f"Parse error: {e}")\n    config = None', '尝试：\n    设 config 为 json.loads(line)\n捕获 异常 e：\n    打印(f"Parse error: {e}")\n    设 config 为 空'),
+    ('try:\n    index = string.index(sub)\nexcept ValueError:\n    index = -1', '尝试：\n    设 index 为 string.index(sub)\n捕获 值异常：\n    设 index 为 减 1'),
+    ('try:\n    result = math.sqrt(-1)\nexcept ValueError:\n    result = 0', '尝试：\n    设 result 为 math.sqrt(减 1)\n捕获 值异常：\n    设 result 为 0'),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 5. Dict operations (60 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+DICT_PAIRS = [
+    ('d = {}', '设 d 为 {}'),
+    ('d = {"name": "Alice", "age": 25}', '设 d 为 {"name": "Alice", "age": 25}'),
+    ('d["key"] = "value"', 'd["key"] = "value"'),
+    ('d["name"] = "Bob"', 'd["name"] = "Bob"'),
+    ('value = d["key"]', '设 value 为 d["key"]'),
+    ('value = d.get("key", "default")', '设 value 为 d.get("key", "default")'),
+    ('d.update({"a": 1, "b": 2})', 'd.update({"a": 1, "b": 2})'),
+    ('del d["key"]', '删除 d["key"]'),
+    ('if "key" in d:', '如果 "key" 于 d：'),
+    ('if "key" not in d:', '如果 "key" 不于 d：'),
+    ('keys = list(d.keys())', '设 keys 为 list(d.keys())'),
+    ('values = list(d.values())', '设 values 为 list(d.values())'),
+    ('items = list(d.items())', '设 items 为 list(d.items())'),
+    ('for k, v in d.items():\n    print(k, v)', '遍历 k, v 于 d.items()：\n    打印(k, v)'),
+    ('for k in d:\n    print(k)', '遍历 k 于 d：\n    打印(k)'),
+    ('d.pop("key")', 'd.pop("key")'),
+    ('d.pop("key", None)', 'd.pop("key", 空)'),
+    ('d.clear()', 'd.clear()'),
+    ('d.copy()', 'd.copy()'),
+    ('merged = {**d1, **d2}', '设 合并 为 {**d1, **d2}'),
+    ('d.setdefault("key", [])', 'd.setdefault("key", [])'),
+    ('d.fromkeys(keys, 0)', 'd.fromkeys(keys, 0)'),
+    ('len(d)', 'len(d)'),
+    ('d = {k: v for k, v in pairs}', '设 d 为 {k: v 遍历 k, v 之 pairs}'),
+    ('d = {i: i**2 for i in range(10)}', '设 d 为 {i: i 乘 i 遍历 i 之 range(10)}'),
+    ('d = {x: x * 2 for x in nums}', '设 d 为 {x: x 乘 2 遍历 x 之 nums}'),
+    ('d = {k: v for k, v in d.items() if v > 0}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 v 大于 0}'),
+    ('d = {k: len(v) for k, v in data.items()}', '设 d 为 {k: len(v) 遍历 k, v 之 data.items()}'),
+    ('d = {k: v for k, v in d.items() if k in allowed}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k 于 允许列表}'),
+    ('d = {k: v.upper() for k, v in d.items()}', '设 d 为 {k: v.upper() 遍历 k, v 之 d.items()}'),
+    ('d = {str(k): v for k, v in d.items()}', '设 d 为 {str(k): v 遍历 k, v 之 d.items()}'),
+    ('d = {k.lower(): v for k, v in d.items()}', '设 d 为 {k.lower(): v 遍历 k, v 之 d.items()}'),
+    ('d = {k: v for k, v in sorted(d.items())}', '设 d 为 {k: v 遍历 k, v 之 sorted(d.items())}'),
+    ('d = {k: v for k, v in sorted(d.items(), key=lambda x: x[1])}', '设 d 为 {k: v 遍历 k, v 之 sorted(d.items(), key=接收 x：返回 x[1])}'),
+    ('d = {k: v for k, v in sorted(d.items(), key=lambda x: x[1], reverse=True)}', '设 d 为 {k: v 遍历 k, v 之 sorted(d.items(), key=接收 x：返回 x[1], reverse=True)}'),
+    ('d = {k: v for k, v in d.items() if isinstance(v, int)}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 isinstance(v, int)}'),
+    ('d = {k: v for k, v in d.items() if isinstance(v, str)}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 isinstance(v, str)}'),
+    ('d = {k: v for k, v in d.items() if isinstance(v, list)}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 isinstance(v, list)}'),
+    ('d = {k: v for k, v in d.items() if isinstance(v, dict)}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 isinstance(v, dict)}'),
+    ('d = {k: v for k, v in d.items() if v}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 v}'),
+    ('d = {k: v for k, v in d.items() if not v}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 非 v}'),
+    ('d = {k: v for k, v in d.items() if k}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k}'),
+    ('d = {k: v for k, v in d.items() if k and v}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k 且 v}'),
+    ('d = {k: v for k, v in d.items() if k or v}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k 或 v}'),
+    ('d = {k: v for k, v in d.items() if k == "name"}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k 等于 "name"}'),
+    ('d = {k: v for k, v in d.items() if k != "name"}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k 不等于 "name"}'),
+    ('d = {k: v for k, v in d.items() if k in allowed}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k 于 允许列表}'),
+    ('d = {k: v for k, v in d.items() if k not in forbidden}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k 不于 禁止列表}'),
+    ('d = {k: v for k, v in d.items() if v > 0}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 v 大于 0}'),
+    ('d = {k: v for k, v in d.items() if v < 0}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 v 小于 0}'),
+    ('d = {k: v for k, v in d.items() if v is not None}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 v 不等于 空}'),
+    ('d = {k: v for k, v in d.items() if v != 0}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 v 不等于 0}'),
+    ('d = {k: v for k, v in d.items() if v != ""}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 v 不等于 ""}'),
+    ('d = {k: v for k, v in d.items() if isinstance(v, (int, float))}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 isinstance(v, (int, float))}'),
+    ('d = {k: v for k, v in d.items() if len(str(v)) > 3}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 len(str(v)) 大于 3}'),
+    ('d = {k: v for k, v in d.items() if k.startswith("a")}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 k.startswith("a")}'),
+    ('d = {k: v for k, v in d.items() if not isinstance(v, None)}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 非 isinstance(v, 空)}'),
+    ('d = {k: v for k, v in d.items() if not (k and v)}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 非 (k 且 v)}'),
+    ('d = {k: v for k, v in d.items() if not (k or v)}', '设 d 为 {k: v 遍历 k, v 之 d.items() 若 非 (k 或 v)}'),
+    ('result = {k: v for k, v in d.items() if v == target}', '设 result 为 {k: v 遍历 k, v 之 d.items() 若 v 等于 target}'),
+    ('result = {k: v for k, v in d.items() if v >= threshold}', '设 result 为 {k: v 遍历 k, v 之 d.items() 若 v 大于等于 阈值}'),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 6. Lambda / Higher-order functions (50 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+LAMBDA_PAIRS = [
+    ('f = lambda x: x * 2', '设 f 为 接收 x：返回 x 乘 2'),
+    ('f = lambda x, y: x + y', '设 f 为 接收 x, y：返回 x 加 y'),
+    ('f = lambda x: x ** 2', '设 f 为 接收 x：返回 x 乘 x'),
+    ('f = lambda x: x ** 3', '设 f 为 接收 x：返回 x 乘 x 乘 x'),
+    ('f = lambda x: abs(x)', '设 f 为 接收 x：返回 abs(x)'),
+    ('f = lambda x: -x', '设 f 为 接收 x：返回 减 x'),
+    ('f = lambda x: x / 2', '设 f 为 接收 x：返回 x 除以 2'),
+    ('f = lambda x: x % 2', '设 f 为 接收 x：返回 x 模 2'),
+    ('f = lambda x: x > 0', '设 f 为 接收 x：返回 x 大于 0'),
+    ('f = lambda x: x < 0', '设 f 为 接收 x：返回 x 小于 0'),
+    ('f = lambda x: x == 0', '设 f 为 接收 x：返回 x 等于 0'),
+    ('f = lambda x: x != 0', '设 f 为 接收 x：返回 x 不等于 0'),
+    ('f = lambda x: x is None', '设 f 为 接收 x：返回 x 等于 空'),
+    ('f = lambda x: x is not None', '设 f 为 接收 x：返回 x 不等于 空'),
+    ('f = lambda x: bool(x)', '设 f 为 接收 x：返回 bool(x)'),
+    ('f = lambda x: str(x)', '设 f 为 接收 x：返回 str(x)'),
+    ('f = lambda x: int(x)', '设 f 为 接收 x：返回 int(x)'),
+    ('f = lambda x: float(x)', '设 f 为 接收 x：返回 float(x)'),
+    ('f = lambda x: len(x)', '设 f 为 接收 x：返回 len(x)'),
+    ('f = lambda x: type(x)', '设 f 为 接收 x：返回 type(x)'),
+    ('f = lambda x: not x', '设 f 为 接收 x：返回 非 x'),
+    ('f = lambda x: x and True', '设 f 为 接收 x：返回 x 且 真'),
+    ('f = lambda x: x or False', '设 f 为 接收 x：返回 x 或 假'),
+    ('f = lambda x: x if x > 0 else 0', '设 f 为 接收 x：返回 x 如果 x 大于 0 否则 0'),
+    ('f = lambda x: x if x else 1', '设 f 为 接收 x：返回 x 如果 x 否则 1'),
+    ('f = lambda x: x if x is not None else 0', '设 f 为 接收 x：返回 x 如果 x 不等于 空 否则 0'),
+    ('f = lambda x: x if x == 0 else 1', '设 f 为 接收 x：返回 x 如果 x 等于 0 否则 1'),
+    ('f = lambda x: x if x != 0 else 1', '设 f 为 接收 x：返回 x 如果 x 不等于 0 否则 1'),
+    ('f = lambda x: x if x > 0 else -x', '设 f 为 接收 x：返回 x 如果 x 大于 0 否则 减 x'),
+    ('f = lambda x: x if x < 0 else 0', '设 f 为 接收 x：返回 x 如果 x 小于 0 否则 0'),
+    ('f = lambda x: x if x >= 0 else 0', '设 f 为 接收 x：返回 x 如果 x 大于等于 0 否则 0'),
+    ('f = lambda x: x if x <= 0 else 0', '设 f 为 接收 x：返回 x 如果 x 小于等于 0 否则 0'),
+    ('result = sorted(data, key=lambda x: x[0])', '设 result 为 sorted(data, key=接收 x：返回 x[0])'),
+    ('result = sorted(data, key=lambda x: x[1])', '设 result 为 sorted(data, key=接收 x：返回 x[1])'),
+    ('result = sorted(data, key=lambda x: x.name)', '设 result 为 sorted(data, key=接收 x：返回 x.名字)'),
+    ('result = sorted(data, key=lambda x: len(x))', '设 result 为 sorted(data, key=接收 x：返回 len(x))'),
+    ('result = sorted(data, key=lambda x: abs(x))', '设 result 为 sorted(data, key=接收 x：返回 abs(x))'),
+    ('result = sorted(data, key=lambda x: -x)', '设 result 为 sorted(data, key=接收 x：返回 减 x)'),
+    ('result = sorted(data, key=lambda x: x, reverse=True)', '设 result 为 sorted(data, key=接收 x：返回 x, reverse=True)'),
+    ('result = filter(lambda x: x > 0, data)', '设 result 为 筛选(接收 x：返回 x 大于 0, data)'),
+    ('result = map(lambda x: x * 2, data)', '设 result 为 映射(接收 x：返回 x 乘 2, data)'),
+    ('result = reduce(lambda a, b: a + b, data)', '设 result 为 reduce(接收 a, b：返回 a 加 b, data)'),
+    ('result = filter(lambda x: x % 2 == 0, data)', '设 result 为 筛选(接收 x：返回 x 模 2 等于 0, data)'),
+    ('result = map(lambda x: x ** 2, data)', '设 result 为 映射(接收 x：返回 x 乘 x, data)'),
+    ('result = reduce(lambda a, b: a * b, data)', '设 result 为 reduce(接收 a, b：返回 a 乘 b, data)'),
+    ('result = filter(lambda x: x is not None, data)', '设 result 为 筛选(接收 x：返回 x 不等于 空, data)'),
+    ('result = map(lambda x: str(x), data)', '设 result 为 映射(接收 x：返回 str(x), data)'),
+    ('result = filter(lambda x: len(x) > 3, data)', '设 result 为 筛选(接收 x：返回 len(x) 大于 3, data)'),
+    ('result = map(lambda x: x.upper(), data)', '设 result 为 映射(接收 x：返回 x.upper(), data)'),
+    ('result = sorted(data, key=lambda x: x[0], reverse=True)', '设 result 为 sorted(data, key=接收 x：返回 x[0], reverse=True)'),
+    ('result = sorted(data, key=lambda x: x[1], reverse=True)', '设 result 为 sorted(data, key=接收 x：返回 x[1], reverse=True)'),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 7. with statement / file ops (30 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+WITH_PAIRS = [
+    ('with open("file.txt") as f:\n    data = f.read()', '使用 读取文件("file.txt") 为 f：\n    设 data 为 f.read()'),
+    ('with open("file.txt", "w") as f:\n    f.write("hello")', '使用 打开文件("file.txt", "w") 为 f：\n    f.write("hello")'),
+    ('with open("file.txt", "a") as f:\n    f.write("world")', '使用 打开文件("file.txt", "a") 为 f：\n    f.write("world")'),
+    ('with open("file.txt", "r") as f:\n    lines = f.readlines()', '使用 打开文件("file.txt", "r") 为 f：\n    设 lines 为 f.readlines()'),
+    ('with open("data.csv") as f:\n    for line in f:\n        print(line.strip())', '使用 读取文件("data.csv") 为 f：\n    遍历 line 于 f：\n        打印(line.strip())'),
+    ('with open("input.txt") as fin, open("output.txt", "w") as fout:\n    for line in fin:\n        fout.write(line.upper())', '使用 读取文件("input.txt") 为 fin, 打开文件("output.txt", "w") 为 fout：\n    遍历 line 于 fin：\n        fout.write(line.upper())'),
+    ('with open("file.txt", "rb") as f:\n    data = f.read()', '使用 打开文件("file.txt", "rb") 为 f：\n    设 data 为 f.read()'),
+    ('with open("file.txt", "wb") as f:\n    f.write(data)', '使用 打开文件("file.txt", "wb") 为 f：\n    f.write(data)'),
+    ('with open("file.txt") as f:\n    content = f.read()\n    print(len(content))', '使用 读取文件("file.txt") 为 f：\n    设 content 为 f.read()\n    打印(len(content))'),
+    ('with open("file.txt") as f:\n    text = f.read().strip()', '使用 读取文件("file.txt") 为 f：\n    设 text 为 f.read().strip()'),
+    ('with open("file.txt") as f:\n    words = f.read().split()', '使用 读取文件("file.txt") 为 f：\n    设 words 为 f.read().split()'),
+    ('with open("file.txt") as f:\n    first_line = f.readline()', '使用 读取文件("file.txt") 为 f：\n    设 first_line 为 f.readline()'),
+    ('with open("file.txt") as f:\n    first_line = f.readline().strip()', '使用 读取文件("file.txt") 为 f：\n    设 first_line 为 f.readline().strip()'),
+    ('with open("file.txt") as f:\n    lines = [line.strip() for line in f]', '使用 读取文件("file.txt") 为 f：\n    设 lines 为 [line.strip() 遍历 line 之 f]'),
+    ('with open("file.txt") as f:\n    lines = [line.strip() for line in f if line.strip()]', '使用 读取文件("file.txt") 为 f：\n    设 lines 为 [line.strip() 遍历 line 之 f 若 line.strip()]'),
+    ('with open("file.txt") as f:\n    lines = [line.strip() for line in f if not line.startswith("#")]', '使用 读取文件("file.txt") 为 f：\n    设 lines 为 [line.strip() 遍历 line 之 f 若 非 line.startswith("#")]'),
+    ('with open("log.txt", "w") as f:\n    for i in range(100):\n        f.write(f"Line {i}: {i ** 2}\\n")', '使用 打开文件("log.txt", "w") 为 f：\n    遍历 i 于 range(100)：\n        f.write(f"Line {i}: {i ** 2}\\n")'),
+    ('with open("numbers.txt") as f:\n    numbers = [int(line.strip()) for line in f if line.strip().isdigit()]\nprint(sum(numbers))', '使用 读取文件("numbers.txt") 为 f：\n    设 numbers 为 [int(line.strip()) 遍历 line 之 f 若 line.strip().isdigit()]\n打印(sum(numbers))'),
+    ('with open("input.txt") as f:\n    lines = [line.strip() for line in f if line.strip()]\nfor line in lines:\n    parts = line.split(",")\n    if len(parts) >= 2:\n        print(f"{parts[0]}: {parts[1]}")', '使用 读取文件("input.txt") 为 f：\n    设 lines 为 [line.strip() 遍历 line 之 f 若 line.strip()]\n遍历 line 于 lines：\n    设 parts 为 line.split(",")\n    如果 len(parts) 大于等于 2：\n        打印(f"{parts[0]}: {parts[1]}")'),
+    ('with open("data.csv") as f:\n    header = f.readline().strip().split(",")\n    for line in f:\n        values = line.strip().split(",")\n        row = dict(zip(header, values))\n        print(row)', '使用 读取文件("data.csv") 为 f：\n    设 header 为 f.readline().strip().split(",")\n    遍历 line 于 f：\n        设 values 为 line.strip().split(",")\n        设 row 为 dict(zip(header, values))\n        打印(row)'),
+    ('content = read_file("data.txt")', '设 content 为 读取文件("data.txt")'),
+    ('write_file("output.txt", "hello world")', '写入文件("output.txt", "hello world")'),
+    ('append_file("log.txt", "new entry")', '追加文件("log.txt", "new entry")'),
+    ('if file_exists("config.json"):\n    print("found")', '如果 文件存在("config.json")：\n    打印("found")'),
+    ('if dir_exists("output"):\n    print("dir exists")', '如果 目录存在("output")：\n    打印("dir exists")'),
+    ('create_dir("output")', '创建目录("output")'),
+    ('files = list_dir(".")', '设 files 为 列出目录(".")'),
+    ('delete_file("temp.txt")', '删除文件("temp.txt")'),
+    ('delete_dir("old_folder")', '删除目录("old_folder")'),
+    ('abspath = get_absolute_path("file.txt")', '设 abspath 为 绝对路径("file.txt")'),
+]
+
+# ═══════════════════════════════════════════════════════════════════
+# 8. Complex multi-feature code (40 samples)
+# ═══════════════════════════════════════════════════════════════════
+
+COMPLEX_PAIRS = [
+    # Algorithm implementations
+    ('def quick_sort(arr):\n    if len(arr) <= 1:\n        return arr\n    pivot = arr[0]\n    left = [x for x in arr[1:] if x < pivot]\n    right = [x for x in arr[1:] if x >= pivot]\n    return quick_sort(left) + [pivot] + quick_sort(right)',
+     '段落 快速排序 接收 arr：\n    如果 len(arr) 小于等于 1：\n        返回 arr\n    设 基准 为 arr[0]\n    设 左为 为 [x 遍历 x 之 arr[1:] 若 x 小于 基准]\n    设 右为 为 [x 遍历 x 之 arr[1:] 若 x 大于等于 基准]\n    返回 快速排序(左为) 加 [基准] 加 快速排序(右为)'),
+    ('def merge_sort(arr):\n    if len(arr) <= 1:\n        return arr\n    mid = len(arr) // 2\n    left = merge_sort(arr[:mid])\n    right = merge_sort(arr[mid:])\n    result = []\n    i = j = 0\n    while i < len(left) and j < len(right):\n        if left[i] <= right[j]:\n            result.append(left[i])\n            i += 1\n        else:\n            result.append(right[j])\n            j += 1\n    result.extend(left[i:])\n    result.extend(right[j:])\n    return result',
+     '段落 归并排序 接收 arr：\n    如果 len(arr) 小于等于 1：\n        返回 arr\n    设 中间 为 len(arr) 除 2\n    设 左为 为 归并排序(arr[:中间])\n    设 右为 为 归并排序(arr[中间:])\n    设 结果 为 []\n    设 i, j 为 0, 0\n    当 i 小于 len(左为) 且 j 小于 len(右为)：\n        如果 左为[i] 小于等于 右为[j]：\n            结果.append(左为[i])\n            i 加上 1\n        否则：\n            结果.append(右为[j])\n            j 加上 1\n    结果.extend(左为[i:])\n    结果.extend(右为[j:])\n    返回 结果'),
+    ('def bfs(graph, start):\n    visited = set()\n    queue = [start]\n    visited.add(start)\n    result = []\n    while queue:\n        node = queue.pop(0)\n        result.append(node)\n        for neighbor in graph.get(node, []):\n            if neighbor not in visited:\n                visited.add(neighbor)\n                queue.append(neighbor)\n    return result',
+     '段落 广度搜索 接收 图, 起点：\n    设 已访问 为 set()\n    设 队列 为 [起点]\n    已访问.add(起点)\n    设 结果 为 []\n    当 队列：\n        设 节点 为 队列.pop(0)\n        结果.append(节点)\n        遍历 邻居 于 图.get(节点, [])：\n            如果 邻居 不于 已访问：\n                已访问.add(邻居)\n                队列.append(邻居)\n    返回 结果'),
+    ('def dfs(graph, start, visited=None):\n    if visited is None:\n        visited = set()\n    visited.add(start)\n    result = [start]\n    for neighbor in graph.get(start, []):\n        if neighbor not in visited:\n            result.extend(dfs(graph, neighbor, visited))\n    return result',
+     '段落 深度搜索 接收 图, 起点, 已访问 等于 空：\n    如果 已访问 等于 空：\n        设 已访问 为 set()\n    已访问.add(起点)\n    设 结果 为 [起点]\n    遍历 邻居 于 图.get(起点, [])：\n        如果 邻居 不于 已访问：\n            结果.extend(深度搜索(图, 邻居, 已访问))\n    返回 结果'),
+    ('def word_frequency(text):\n    words = text.lower().split()\n    freq = {}\n    for word in words:\n        if word in freq:\n            freq[word] += 1\n        else:\n            freq[word] = 1\n    return sorted(freq.items(), key=lambda x: x[1], reverse=True)',
+     '段落 词频统计 接收 文本：\n    设 单词列表 为 文本.lower().split()\n    设 频率 为 {}\n    遍历 word 于 单词列表：\n        如果 word 于 频率：\n            频率[word] 加上 1\n        否则：\n            频率[word] = 1\n    返回 sorted(频率.items(), key=接收 x：返回 x[1], reverse=True)'),
+    ('def group_by(items, key_func):\n    groups = {}\n    for item in items:\n        key = key_func(item)\n        if key not in groups:\n            groups[key] = []\n        groups[key].append(item)\n    return groups',
+     '段落 分组 接收 物品列表, 键函数：\n    设 分组结果 为 {}\n    遍历 item 于 物品列表：\n        设 键 为 键函数(item)\n        如果 键 不于 分组结果：\n            分组结果[键] = []\n        分组结果[键].append(item)\n    返回 分组结果'),
+    ('def flatten(nested):\n    result = []\n    for item in nested:\n        if isinstance(item, list):\n            result.extend(flatten(item))\n        else:\n            result.append(item)\n    return result',
+     '段落 扁平化 接收 嵌套列表：\n    设 结果 为 []\n    遍历 item 于 嵌套列表：\n        如果 isinstance(item, list)：\n            结果.extend(扁平化(item))\n        否则：\n            结果.append(item)\n    返回 结果'),
+    ('def chunk(items, size):\n    return [items[i:i+size] for i in range(0, len(items), size)]',
+     '段落 分块 接收 物品列表, 大小：\n    返回 [items[i:i 加 大小] 遍历 i 之 range(0, len(items), 大小)]'),
+    ('def unique_preserve(items):\n    seen = set()\n    result = []\n    for item in items:\n        if item not in seen:\n            seen.add(item)\n            result.append(item)\n    return result',
+     '段落 去重保留 接收 物品列表：\n    设 已见 为 set()\n    设 结果 为 []\n    遍历 item 于 物品列表：\n        如果 item 不于 已见：\n            已见.add(item)\n            结果.append(item)\n    返回 结果'),
+    ('def camel_to_snake(s):\n    result = ""\n    for i, ch in enumerate(s):\n        if ch.isupper() and i > 0:\n            result += "_" + ch.lower()\n        else:\n            result += ch\n    return result',
+     '段落 驼峰转下划线 接收 s：\n    设 结果 为 ""\n    遍历 i, ch 于 enumerate(s)：\n        如果 ch.isupper() 且 i 大于 0：\n            结果 加上 "_" 加 ch.lower()\n        否则：\n            结果 加上 ch\n    返回 结果'),
+    ('def title_case(s):\n    words = s.split()\n    result = []\n    for word in words:\n        if word:\n            result.append(word[0].upper() + word[1:].lower())\n    return " ".join(result)',
+     '段落 标题大写 接收 s：\n    设 单词列表 为 s.split()\n    设 结果 为 []\n    遍历 word 于 单词列表：\n        如果 word：\n            结果.append(word[0].upper() 加 word[1:].lower())\n    返回 " ".join(结果)'),
+    ('def is_prime(n):\n    if n < 2:\n        return False\n    for i in range(2, int(n ** 0.5) + 1):\n        if n % i == 0:\n            return False\n    return True',
+     '段落 是否素数 接收 n：\n    如果 n 小于 2：\n        返回 假\n    遍历 i 于 range(2, int(n ** 0.5) 加 1)：\n        如果 n 模 i 等于 0：\n            返回 假\n    返回 真'),
+    ('def fibonacci(n):\n    if n <= 0:\n        return []\n    if n == 1:\n        return [0]\n    result = [0, 1]\n    for i in range(2, n):\n        result.append(result[-1] + result[-2])\n    return result',
+     '段落 斐波那契 接收 n：\n    如果 n 小于等于 0：\n        返回 []\n    如果 n 等于 1：\n        返回 [0]\n    设 结果 为 [0, 1]\n    遍历 i 于 range(2, n)：\n        结果.append(结果[-1] 加 结果[-2])\n    返回 结果'),
+    ('def gcd(a, b):\n    while b:\n        a, b = b, a % b\n    return a',
+     '段落 最大公约数 接收 a, b：\n    当 b：\n        设 a, b 为 b, a 模 b\n    返回 a'),
+    ('def lcm(a, b):\n    return a * b // gcd(a, b)',
+     '段落 最小公倍数 接收 a, b：\n    返回 a 乘 b 除 最大公约数(a, b)'),
+    ('def mean(numbers):\n    return sum(numbers) / len(numbers)',
+     '段落 均值 接收 数字列表：\n    返回 sum(数字列表) 除以 len(数字列表)'),
+    ('def median(numbers):\n    sorted_nums = sorted(numbers)\n    n = len(sorted_nums)\n    if n % 2 == 0:\n        return (sorted_nums[n//2 - 1] + sorted_nums[n//2]) / 2\n    else:\n        return sorted_nums[n//2]',
+     '段落 中位数 接收 数字列表：\n    设 排序后 为 sorted(数字列表)\n    设 n 为 len(排序后)\n    如果 n 模 2 等于 0：\n        返回 (排序后[n 除 2 减 1] 加 排序后[n 除 2]) 除以 2\n    否则：\n        返回 排序后[n 除 2]'),
+    ('def mode(numbers):\n    freq = {}\n    for n in numbers:\n        freq[n] = freq.get(n, 0) + 1\n    max_freq = max(freq.values())\n    return [k for k, v in freq.items() if v == max_freq]',
+     '段落 众数 接收 数字列表：\n    设 频率 为 {}\n    遍历 n 于 数字列表：\n        频率[n] = 频率.get(n, 0) 加 1\n    设 最大频率 为 max(频率.values())\n    返回 [k 遍历 k, v 之 频率.items() 若 v 等于 最大频率]'),
+    ('def variance(numbers):\n    m = mean(numbers)\n    return sum((x - m) ** 2 for x in numbers) / len(numbers)',
+     '段落 方差 接收 数字列表：\n    设 m 为 均值(数字列表)\n    返回 sum((x 减 m) 乘 (x 减 m) 遍历 x 之 数字列表) 除以 len(数字列表)'),
+    ('def matrix_multiply(a, b):\n    rows_a = len(a)\n    cols_a = len(a[0])\n    cols_b = len(b[0])\n    result = [[0] * cols_b for _ in range(rows_a)]\n    for i in range(rows_a):\n        for j in range(cols_b):\n            for k in range(cols_a):\n                result[i][j] += a[i][k] * b[k][j]\n    return result',
+     '段落 矩阵乘法 接收 a, b：\n    设 行a 为 len(a)\n    设 列a 为 len(a[0])\n    设 列b 为 len(b[0])\n    设 结果 为 [[0] 乘 列b 遍历 _ 之 range(行a)]\n    遍历 i 于 range(行a)：\n        遍历 j 于 range(列b)：\n            遍历 k 于 range(列a)：\n                结果[i][j] 加上 a[i][k] 乘 b[k][j]\n    返回 结果'),
+    ('def transpose(matrix):\n    return [[matrix[j][i] for j in range(len(matrix))] for i in range(len(matrix[0]))]',
+     '段落 转置 接收 矩阵：\n    返回 [[矩阵[j][i] 遍历 j 之 range(len(矩阵))] 遍历 i 之 range(len(矩阵[0]))]'),
+    ('def matrix_add(a, b):\n    return [[a[i][j] + b[i][j] for j in range(len(a[0]))] for i in range(len(a))]',
+     '段落 矩阵加法 接收 a, b：\n    返回 [[a[i][j] 加 b[i][j] 遍历 j 之 range(len(a[0]))] 遍历 i 之 range(len(a))]'),
+    # Data structures
+    ('class HashMap:\n    def __init__(self, size=100):\n        self.size = size\n        self.table = [[] for _ in range(size)]\n    def _hash(self, key):\n        return hash(key) % self.size\n    def put(self, key, value):\n        h = self._hash(key)\n        for i, (k, v) in enumerate(self.table[h]):\n            if k == key:\n                self.table[h][i] = (key, value)\n                return\n        self.table[h].append((key, value))\n    def get(self, key):\n        h = self._hash(key)\n        for k, v in self.table[h]:\n            if k == key:\n                return v\n        return None',
+     '类 哈希表：\n    属性 大小\n    属性 表\n    构造 接收 大小 等于 100：\n        己大小 为 大小\n        己表 为 [[] 遍历 _ 之 range(大小)]\n    段落 哈希 接收 键：\n        返回 hash(键) 模 己大小\n    段落 放入 接收 键, 值：\n        设 h 为 己哈希(键)\n        遍历 i, (k, v) 于 enumerate(己表[h])：\n            如果 k 等于 键：\n                己表[h][i] = (键, 值)\n                返回\n        己表[h].append((键, 值))\n    段落 获取 接收 键：\n        设 h 为 己哈希(键)\n        遍历 k, v 于 己表[h]：\n            如果 k 等于 键：\n                返回 v\n        返回 空'),
+    ('class LRUCache:\n    def __init__(self, capacity):\n        self.capacity = capacity\n        self.cache = {}\n        self.order = []\n    def get(self, key):\n        if key not in self.cache:\n            return None\n        self.order.remove(key)\n        self.order.append(key)\n        return self.cache[key]\n    def put(self, key, value):\n        if key in self.cache:\n            self.order.remove(key)\n        elif len(self.cache) >= self.capacity:\n            oldest = self.order.pop(0)\n            del self.cache[oldest]\n        self.cache[key] = value\n        self.order.append(key)',
+     '类 LRU缓存：\n    属性 容量\n    属性 缓存\n    属性 顺序\n    构造 接收 容量：\n        己容量 为 容量\n        己缓存 为 {}\n        己顺序 为 []\n    段落 获取 接收 键：\n        如果 键 不于 己缓存：\n            返回 空\n        己顺序.remove(键)\n        己顺序.append(键)\n        返回 己缓存[键]\n    段落 放入 接收 键, 值：\n        如果 键 于 己缓存：\n            己顺序.remove(键)\n        如果 len(己缓存) 大于等于 己容量：\n            设 最旧 为 己顺序.pop(0)\n            删除 己缓存[最旧]\n        己缓存[键] = 值\n        己顺序.append(键)'),
+    # Decorators
+    ('def log_call(func):\n    def wrapper(*args, **kwargs):\n        print(f"Calling {func.__name__}")\n        result = func(*args, **kwargs)\n        print(f"Done {func.__name__}")\n        return result\n    return wrapper\n\n@log_call\ndef greet(name):\n    print(f"Hello, {name}")',
+     '段落 日志调用 接收 函数：\n    段落 包装 接收 *args, **kwargs：\n        打印(f"Calling {函数.__name__}")\n        设 result 为 函数(*args, **kwargs)\n        打印(f"Done {函数.__name__}")\n        返回 result\n    返回 包装\n\n@日志调用 标注\n段落 问候 接收 名字：\n    打印(f"Hello, {名字}")'),
+    ('def timer(func):\n    def wrapper(*args, **kwargs):\n        start = time.time()\n        result = func(*args, **kwargs)\n        elapsed = time.time() - start\n        print(f"{func.__name__}: {elapsed:.2f}s")\n        return result\n    return wrapper',
+     '段落 计时 接收 函数：\n    段落 包装 接收 *args, **kwargs：\n        设 start 为 time.time()\n        设 result 为 函数(*args, **kwargs)\n        设 elapsed 为 time.time() 减 start\n        打印(f"{函数.__name__}: {elapsed:.2f}s")\n        返回 result\n    返回 包装'),
+    ('def retry(max_attempts=3):\n    def decorator(func):\n        def wrapper(*args, **kwargs):\n            for attempt in range(max_attempts):\n                try:\n                    return func(*args, **kwargs)\n                except Exception as e:\n                    if attempt == max_attempts - 1:\n                        raise\n                    print(f"Retry {attempt + 1}/{max_attempts}")\n        return wrapper\n    return decorator',
+     '段落 重试 接收 最大次数 等于 3：\n    段落 装饰器 接收 函数：\n        段落 包装 接收 *args, **kwargs：\n            遍历 attempt 于 range(最大次数)：\n                尝试：\n                    返回 函数(*args, **kwargs)\n                捕获 异常 e：\n                    如果 attempt 等于 最大次数 减 1：\n                        抛出 e\n                    打印(f"Retry {attempt 加 1}/{最大次数}")\n        返回 包装\n    返回 装饰器'),
+    # Complex class with multiple features
+    ('class DataProcessor:\n    def __init__(self, data):\n        self.data = data\n        self.results = []\n    def filter(self, predicate):\n        self.data = [x for x in self.data if predicate(x)]\n        return self\n    def map(self, func):\n        self.data = [func(x) for x in self.data]\n        return self\n    def reduce(self, func, initial):\n        result = initial\n        for x in self.data:\n            result = func(result, x)\n        return result\n    def collect(self):\n        return self.data',
+     '类 数据处理器：\n    属性 数据\n    属性 结果\n    构造 接收 数据：\n        己数据 为 数据\n        己结果 为 []\n    段落 筛选 接收 谓词：\n        己数据 为 [x 遍历 x 之 己数据 若 谓词(x)]\n        返回 己\n    段落 映射 接收 函数：\n        己数据 为 [函数(x) 遍历 x 之 己数据]\n        返回 己\n    段落 归约 接收 函数, 初始值：\n        设 result 为 初始值\n        遍历 x 于 己数据：\n            设 result 为 函数(result, x)\n        返回 result\n    段落 收集：\n        返回 己数据'),
+    ('class EventBus:\n    def __init__(self):\n        self.handlers = {}\n    def on(self, event, handler):\n        if event not in self.handlers:\n            self.handlers[event] = []\n        self.handlers[event].append(handler)\n    def off(self, event, handler):\n        if event in self.handlers:\n            self.handlers[event].remove(handler)\n    def emit(self, event, data=None):\n        for handler in self.handlers.get(event, []):\n            handler(data)',
+     '类 事件总线：\n    属性 处理器\n    构造：\n        己处理器 为 {}\n    段落 订阅 接收 事件, 处理器：\n        如果 事件 不于 己处理器：\n            己处理器[事件] = []\n        己处理器[事件].append(处理器)\n    段落 取消订阅 接收 事件, 处理器：\n        如果 事件 于 己处理器：\n            己处理器[事件].remove(处理器)\n    段落 发射 接收 事件, 数据 等于 空：\n        遍历 处理器 于 己处理器.get(事件, [])：\n            处理器(数据)'),
+    ('class State:\n    def __init__(self, initial):\n        self.value = initial\n        self.history = [initial]\n    def set(self, new_value):\n        self.value = new_value\n        self.history.append(new_value)\n    def undo(self):\n        if len(self.history) > 1:\n            self.history.pop()\n            self.value = self.history[-1]\n    def reset(self):\n        self.value = self.history[0]\n        self.history = [self.value]',
+     '类 状态：\n    属性 值\n    属性 历史\n    构造 接收 初始值：\n        己值 为 初始值\n        己历史 为 [初始值]\n    段落 设置 接收 新值：\n        己值 为 新值\n        己历史.append(新值)\n    段落 撤销：\n        如果 len(己历史) 大于 1：\n            己历史.pop()\n            己值 为 己历史[-1]\n    段落 重置：\n        己值 为 己历史[0]\n        己历史 为 [己值]'),
+    ('class CSVWriter:\n    def __init__(self, filename):\n        self.filename = filename\n        self.rows = []\n    def write_header(self, headers):\n        self.rows.append(headers)\n    def write_row(self, row):\n        self.rows.append(row)\n    def save(self):\n        with open(self.filename, "w") as f:\n            for row in self.rows:\n                f.write(",".join(str(v) for v in row) + "\\n")',
+     '类 CSV写入器：\n    属性 文件名\n    属性 行列表\n    构造 接收 文件名：\n        己文件名 为 文件名\n        己行列表 为 []\n    段落 写表头 接收 表头：\n        己行列表.append(表头)\n    段落 写行 接收 行：\n        己行列表.append(行)\n    段落 保存：\n        使用 打开文件(己文件名, "w") 为 f：\n            遍历 row 于 己行列表：\n                f.write(",".join(str(v) 遍历 v 之 row) 加 "\\n")'),
+    ('class JSONStore:\n    def __init__(self, filename):\n        self.filename = filename\n        self.data = {}\n    def load(self):\n        try:\n            with open(self.filename) as f:\n                self.data = json.load(f)\n        except FileNotFoundError:\n            self.data = {}\n    def save(self):\n        with open(self.filename, "w") as f:\n            json.dump(self.data, f)\n    def get(self, key, default=None):\n        return self.data.get(key, default)\n    def set(self, key, value):\n        self.data[key] = value',
+     '类 JSON存储：\n    属性 文件名\n    属性 数据\n    构造 接收 文件名：\n        己文件名 为 文件名\n        己数据 为 {}\n    段落 加载：\n        尝试：\n            使用 读取文件(己文件名) 为 f：\n                己数据 为 json.load(f)\n        捕获 IO异常：\n            己数据 为 {}\n    段落 保存：\n        使用 打开文件(己文件名, "w") 为 f：\n            json.dump(己数据, f)\n    段落 获取 接收 键, 默认值 等于 空：\n        返回 己数据.get(键, 默认值)\n    段落 设置 接收 键, 值：\n        己数据[键] = 值'),
+    ('class RingBuffer:\n    def __init__(self, capacity):\n        self.capacity = capacity\n        self.buffer = [None] * capacity\n        self.head = 0\n        self.size = 0\n    def push(self, item):\n        self.buffer[self.head] = item\n        self.head = (self.head + 1) % self.capacity\n        if self.size < self.capacity:\n            self.size += 1\n    def get_all(self):\n        if self.size < self.capacity:\n            return self.buffer[:self.size]\n        return self.buffer[self.head:] + self.buffer[:self.head]',
+     '类 环形缓冲区：\n    属性 容量\n    属性 缓冲区\n    属性 头\n    属性 大小\n    构造 接收 容量：\n        己容量 为 容量\n        己缓冲区 为 [空] 乘 容量\n        己头 为 0\n        己大小 为 0\n    段落 压入 接收 元素：\n        己缓冲区[己头] = 元素\n        己头 = (己头 加 1) 模 己容量\n        如果 己大小 小于 己容量：\n            己大小 加上 1\n    段落 获取全部：\n        如果 己大小 小于 己容量：\n            返回 己缓冲区[:己大小]\n        返回 己缓冲区[己头:] 加 己缓冲区[:己头]'),
+    ('class TextProcessor:\n    def __init__(self, text):\n        self.text = text\n    def words(self):\n        return self.text.split()\n    def sentences(self):\n        return [s.strip() for s in self.text.split(".") if s.strip()]\n    def word_count(self):\n        return len(self.words())\n    def char_count(self):\n        return len(self.text)\n    def unique_words(self):\n        return set(self.words())',
+     '类 文本处理器：\n    属性 文本\n    构造 接收 文本：\n        己文本 为 文本\n    段落 单词：\n        返回 己文本.split()\n    段落 句子：\n        返回 [s.strip() 遍历 s 之 己文本.split(".") 若 s.strip()]\n    段落 词数：\n        返回 len(己单词())\n    段落 字数：\n        返回 len(己文本)\n    段落 唯一词：\n        返回 set(己单词())'),
+    ('class NumberSeries:\n    def __init__(self, start, step):\n        self.current = start\n        self.step = step\n    def next(self):\n        result = self.current\n        self.current += self.step\n        return result\n    def reset(self):\n        self.current -= self.step * 10\n    def peek(self):\n        return self.current',
+     '类 数字序列：\n    属性 当前值\n    属性 步长\n    构造 接收 起始, 步长：\n        己当前值 为 起始\n        己步长 为 步长\n    段落 下一个：\n        设 result 为 己当前值\n        己当前值 加上 己步长\n        返回 result\n    段落 重置：\n        己当前值 减去 己步长 乘 10\n    段落 窥视：\n        返回 己当前值'),
+    ('def dijkstra(graph, start):\n    distances = {node: float("inf") for node in graph}\n    distances[start] = 0\n    visited = set()\n    while len(visited) < len(graph):\n        min_node = None\n        min_dist = float("inf")\n        for node in distances:\n            if node not in visited and distances[node] < min_dist:\n                min_node = node\n                min_dist = distances[node]\n        if min_node is None:\n            break\n        visited.add(min_node)\n        for neighbor, weight in graph[min_node].items():\n            new_dist = distances[min_node] + weight\n            if new_dist < distances[neighbor]:\n                distances[neighbor] = new_dist\n    return distances',
+     '段落 最短路径 接收 图, 起点：\n    设 距离 为 {node: float("inf") 遍历 node 之 图}\n    距离[起点] = 0\n    设 已访问 为 set()\n    当 len(已访问) 小于 len(图)：\n        设 最近节点 为 空\n        设 最近距离 为 float("inf")\n        遍历 node 于 距离：\n            如果 node 不于 已访问 且 距离[node] 小于 最近距离：\n                设 最近节点 为 node\n                设 最近距离 为 距离[node]\n        如果 最近节点 等于 空：\n            跳出\n        已访问.add(最近节点)\n        遍历 邻居, 权重 于 图[最近节点].items()：\n            设 新距离 为 距离[最近节点] 加 权重\n            如果 新距离 小于 距离[邻居]：\n                距离[邻居] = 新距离\n    返回 距离'),
+    ('def binary_search(arr, target):\n    left = 0\n    right = len(arr) - 1\n    while left <= right:\n        mid = (left + right) // 2\n        if arr[mid] == target:\n            return mid\n        elif arr[mid] < target:\n            left = mid + 1\n        else:\n            right = mid - 1\n    return -1',
+     '段落 二分查找 接收 arr, target：\n    设 left 为 0\n    设 right 为 len(arr) 减 1\n    当 left 小于等于 right：\n        设 mid 为 (left 加 right) 除 2\n        如果 arr[mid] 等于 target：\n            返回 mid\n        否则如果 arr[mid] 小于 target：\n            设 left 为 mid 加 1\n        否则：\n            设 right 为 mid 减 1\n    返回 减 1'),
+    ('def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if arr[j] > arr[j+1]:\n                arr[j], arr[j+1] = arr[j+1], arr[j]\n    return arr',
+     '段落 冒泡排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 range(n)：\n        遍历 j 于 range(0, n 减 i 减 1)：\n            如果 arr[j] 大于 arr[j 加 1]：\n                设 tmp 为 arr[j]\n                arr[j] = arr[j 加 1]\n                arr[j 加 1] = tmp\n    返回 arr'),
+    ('def insertion_sort(arr):\n    for i in range(1, len(arr)):\n        key = arr[i]\n        j = i - 1\n        while j >= 0 and arr[j] > key:\n            arr[j + 1] = arr[j]\n            j -= 1\n        arr[j + 1] = key\n    return arr',
+     '段落 插入排序 接收 arr：\n    遍历 i 于 range(1, len(arr))：\n        设 key 为 arr[i]\n        设 j 为 i 减 1\n        当 j 大于等于 0 且 arr[j] 大于 key：\n            arr[j 加 1] = arr[j]\n            j 减去 1\n        arr[j 加 1] = key\n    返回 arr'),
+    ('def selection_sort(arr):\n    for i in range(len(arr)):\n        min_idx = i\n        for j in range(i+1, len(arr)):\n            if arr[j] < arr[min_idx]:\n                min_idx = j\n        arr[i], arr[min_idx] = arr[min_idx], arr[i]\n    return arr',
+     '段落 选择排序 接收 arr：\n    遍历 i 于 range(len(arr))：\n        设 最小索引 为 i\n        遍历 j 于 range(i 加 1, len(arr))：\n            如果 arr[j] 小于 arr[最小索引]：\n                设 最小索引 为 j\n        设 tmp 为 arr[i]\n        arr[i] = arr[最小索引]\n        arr[最小索引] = tmp\n    返回 arr'),
+    ('def linear_search(arr, target):\n    for i in range(len(arr)):\n        if arr[i] == target:\n            return i\n    return -1',
+     '段落 线性查找 接收 arr, target：\n    遍历 i 于 range(len(arr))：\n        如果 arr[i] 等于 target：\n            返回 i\n    返回 减 1'),
+    ('def reverse_string(s):\n    result = ""\n    for i in range(len(s)-1, -1, -1):\n        result += s[i]\n    return result',
+     '段落 反转字符串 接收 s：\n    设 结果 为 ""\n    遍历 i 于 range(len(s) 减 1, 减 1, 减 1)：\n        结果 加上 s[i]\n    返回 结果'),
+    ('def count_occurrences(text, sub):\n    count = 0\n    pos = 0\n    while True:\n        pos = text.find(sub, pos)\n        if pos == -1:\n            break\n        count += 1\n        pos += 1\n    return count',
+     '段落 计数出现 接收 文本, 子串：\n    设 计数 为 0\n    设 位置 为 0\n    当 真：\n        设 位置 为 文本.find(子串, 位置)\n        如果 位置 等于 减 1：\n            跳出\n        计数 加上 1\n        位置 加上 1\n    返回 计数'),
+    ('def anagram_check(s1, s2):\n    return sorted(s1) == sorted(s2)',
+     '段落 字母异位词 接收 s1, s2：\n    返回 sorted(s1) 等于 sorted(s2)'),
+    ('def palindrome_check(s):\n    s = s.lower().replace(" ", "")\n    return s == s[::-1]',
+     '段落 回文检查 接收 s：\n    设 s 为 s.lower().replace(" ", "")\n    返回 s 等于 s[::-1]'),
+    ('def merge_dicts(*dicts):\n    result = {}\n    for d in dicts:\n        result.update(d)\n    return result',
+     '段落 合并字典 接收 *字典列表：\n    设 结果 为 {}\n    遍历 d 于 字典列表：\n        结果.update(d)\n    返回 结果'),
+    ('def deep_copy(obj):\n    if isinstance(obj, dict):\n        return {k: deep_copy(v) for k, v in obj.items()}\n    elif isinstance(obj, list):\n        return [deep_copy(v) for v in obj]\n    else:\n        return obj',
+     '段落 深拷贝 接收 obj：\n    如果 isinstance(obj, dict)：\n        返回 {k: 深拷贝(v) 遍历 k, v 之 obj.items()}\n    否则如果 isinstance(obj, list)：\n        返回 [深拷贝(v) 遍历 v 之 obj]\n    否则：\n        返回 obj'),
+    ('def memoize(func):\n    cache = {}\n    def wrapper(*args):\n        if args not in cache:\n            cache[args] = func(*args)\n        return cache[args]\n    return wrapper',
+     '段落 记忆化 接收 函数：\n    设 缓存 为 {}\n    段落 包装 接收 *args：\n        如果 args 不于 缓存：\n            缓存[args] = 函数(*args)\n        返回 缓存[args]\n    返回 包装'),
+    ('def compose(*functions):\n    def composed(x):\n        for func in reversed(functions):\n            x = func(x)\n        return x\n    return composed',
+     '段落 组合 接收 *函数列表：\n    段落 组合后 接收 x：\n        遍历 func 于 reversed(函数列表)：\n            设 x 为 func(x)\n        返回 x\n    返回 组合后'),
+    ('def partial(func, *args, **kwargs):\n    def wrapper(*more_args, **more_kwargs):\n        return func(*args, *more_args, **{**kwargs, **more_kwargs})\n    return wrapper',
+     '段落 偏函数 接收 函数, *args, **kwargs：\n    段落 包装 接收 *更多参数, **更多关键字：\n        返回 函数(*args, *更多参数, **{**kwargs, **更多关键字})\n    返回 包装'),
+    ('class BloomFilter:\n    def __init__(self, size, hash_count):\n        self.size = size\n        self.hash_count = hash_count\n        self.bits = [False] * size\n    def add(self, item):\n        for i in range(self.hash_count):\n            h = hash(str(item) + str(i)) % self.size\n            self.bits[h] = True\n    def contains(self, item):\n        for i in range(self.hash_count):\n            h = hash(str(item) + str(i)) % self.size\n            if not self.bits[h]:\n                return False\n        return True',
+     '类 布隆过滤器：\n    属性 大小\n    属性 哈希数\n    属性 位\n    构造 接收 大小, 哈希数：\n        己大小 为 大小\n        己哈希数 为 哈希数\n        己位 为 [假] 乘 大小\n    段落 添加 接收 元素：\n        遍历 i 于 range(己哈希数)：\n            设 h 为 hash(str(元素) 加 str(i)) 模 己大小\n            己位[h] = 真\n    段落 包含 接收 元素：\n        遍历 i 于 range(己哈希数)：\n            设 h 为 hash(str(元素) 加 str(i)) 模 己大小\n            如果 非 己位[h]：\n                返回 假\n        返回 真'),
+    ('class PriorityQueue:\n    def __init__(self):\n        self.items = []\n    def push(self, item, priority):\n        self.items.append((priority, item))\n        self.items.sort(key=lambda x: x[0])\n    def pop(self):\n        if self.items:\n            return self.items.pop(0)[1]\n        return None',
+     '类 优先队列：\n    属性 元素列表\n    构造：\n        己元素列表 为 []\n    段落 压入 接收 元素, 优先级：\n        己元素列表.append((优先级, 元素))\n        己元素列表.sort(key=接收 x：返回 x[0])\n    段落 弹出：\n        如果 己元素列表：\n            返回 己元素列表.pop(0)[1]\n        返回 空'),
 ]
 
 
-def load_existing_dataset():
-    """加载现有数据集"""
-    data = []
-    with open(_DATASET_PATH, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                data.append(json.loads(line))
-    print(f"现有数据集: {len(data)} 条")
-    return data
+# ═══════════════════════════════════════════════════════════════════
+# Build dataset
+# ═══════════════════════════════════════════════════════════════════
 
-
-def augment(data):
-    """添加增强数据"""
-    print(f"增强数据: {len(ENHANCED_PAIRS)} 条")
-    
-    # 随机打乱增强数据
-    enhanced = ENHANCED_PAIRS.copy()
-    random.seed(42)
-    random.shuffle(enhanced)
-    
-    # 合并
-    all_data = data + enhanced
-    print(f"合并后总数: {len(all_data)} 条")
-    
-    # 统计类别
-    categories = {}
-    for item in all_data:
-        cat = item.get("category", "未知")
-        categories[cat] = categories.get(cat, 0) + 1
-    print("类别分布:")
-    for cat, cnt in sorted(categories.items(), key=lambda x: -x[1]):
-        print(f"  {cat}: {cnt}")
-    
-    return all_data
-
-
-def save_dataset(data, path):
-    """保存数据集"""
-    with open(path, "w", encoding="utf-8") as f:
-        for item in data:
-            f.write(json.dumps(item, ensure_ascii=False) + "\n")
-    print(f"已保存到: {path} ({len(data)} 条)")
+def build_samples():
+    """Build all new samples and return as list of dicts."""
+    samples = []
+    category_map = [
+        (OOP_PAIRS, "类"),
+        (FSTRING_PAIRS, "字符串"),
+        (LISTCOMP_PAIRS, "列表"),
+        (TRY_EXCEPT_PAIRS, "异常"),
+        (DICT_PAIRS, "字典"),
+        (LAMBDA_PAIRS, "函数"),
+        (WITH_PAIRS, "文件"),
+        (COMPLEX_PAIRS, "复合"),
+    ]
+    for pairs, category in category_map:
+        for py, duan in pairs:
+            samples.append({
+                "instruction": INSTRUCTION,
+                "input": py,
+                "output": duan,
+                "category": category,
+            })
+    return samples
 
 
 def main():
-    print("=" * 60)
-    print("段言数据增强")
-    print("=" * 60)
-    
-    # 加载现有数据
-    data = load_existing_dataset()
-    
-    # 增强
-    enhanced_data = augment(data)
-    
-    # 保存
-    save_dataset(enhanced_data, _OUTPUT_PATH)
-    
-    print()
-    print("增强完成！")
-    print(f"  原始: {len(data)} 条")
-    print(f"  增强: {len(ENHANCED_PAIRS)} 条")
-    print(f"  总计: {len(enhanced_data)} 条")
-    print()
-    print("下一步：")
-    print(f"  使用增强数据集训练:")
-    print(f"  python train_cpu_lora.py --dataset {os.path.basename(_OUTPUT_PATH)}")
+    samples = build_samples()
+    print(f"Generated {len(samples)} new samples")
+    print(f"  OOP/类:           {len(OOP_PAIRS)}")
+    print(f"  f-string/字符串:  {len(FSTRING_PAIRS)}")
+    print(f"  list comp/列表:   {len(LISTCOMP_PAIRS)}")
+    print(f"  try/except/异常:  {len(TRY_EXCEPT_PAIRS)}")
+    print(f"  dict/字典:        {len(DICT_PAIRS)}")
+    print(f"  lambda/函数:      {len(LAMBDA_PAIRS)}")
+    print(f"  with/文件:        {len(WITH_PAIRS)}")
+    print(f"  complex/复合:     {len(COMPLEX_PAIRS)}")
+
+    # Write new samples to file
+    output_path = os.path.join(_SCRIPT_DIR, "sft_dataset_new.jsonl")
+    with open(output_path, "w", encoding="utf-8") as f:
+        for s in samples:
+            f.write(json.dumps(s, ensure_ascii=False) + "\n")
+    print(f"\nNew samples written to {output_path}")
+
+    # Merge with original dataset
+    original_path = os.path.join(_SCRIPT_DIR, "sft_dataset.jsonl")
+    with open(original_path, "r", encoding="utf-8") as f:
+        original = [json.loads(line) for line in f if line.strip()]
+    print(f"Original dataset: {len(original)} samples")
+
+    merged = original + samples
+    merged_path = os.path.join(_SCRIPT_DIR, "sft_dataset.jsonl")
+    with open(merged_path, "w", encoding="utf-8") as f:
+        for s in merged:
+            f.write(json.dumps(s, ensure_ascii=False) + "\n")
+    print(f"Merged dataset: {len(merged)} samples written to {merged_path}")
 
 
 if __name__ == "__main__":

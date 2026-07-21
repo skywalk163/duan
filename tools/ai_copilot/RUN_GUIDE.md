@@ -6,16 +6,19 @@
 
 - **基础模型**：Qwen2.5-0.5B-Instruct（0.5B 参数，CPU 也能跑）
 - **训练方法**：LoRA 微调（只训练 q/v/k/o_proj，参数量 ~0.1%）
-- **数据集**：881 条 Python→段言 对照（`sft_dataset.jsonl`）
+- **数据集**：946 条 Python→段言 对照（`sft_dataset.jsonl`）
+- **数据集 v2 扩充**：新增 494 条覆盖类/OOP、f-string、列表推导、异常处理、lambda、with、复合算法
 - **2步验证训练**：28 秒完成，LoRA 权重 2.1MB
-- **全量训练 CPU 估算**：~5.1 小时（不推荐）
-- **全量训练 GPU 估算**：~8 分钟（RTX 3060） / ~3 分钟（RTX 4090）
+- **全量训练 CPU 估算**：~5.5 小时（不推荐）
+- **全量训练 GPU 估算**：~9 分钟（RTX 3060） / ~3 分钟（RTX 4090）
 
 ## 文件结构
 
 ```
 tools/ai_copilot/
-├── sft_dataset.jsonl           # 训练数据（881 条 Python→段言 对照）
+├── sft_dataset.jsonl           # 训练数据（946 条 Python→段言 对照，v2 扩充后）
+├── sft_dataset_new.jsonl       # v2 新增样本（494 条，已合并到 sft_dataset.jsonl）
+├── augment_dataset.py           # 数据集增强脚本 v2
 ├── train_cpu_lora.py           # CPU 训练脚本（已验证可用）
 ├── train_gpu_lora.py           # GPU 训练脚本（推荐，速度提升 30 倍）
 ├── download_model.py           # 模型下载脚本
