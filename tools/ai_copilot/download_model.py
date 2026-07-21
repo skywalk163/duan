@@ -9,6 +9,7 @@
 用法：
     python download_model.py
     python download_model.py --model qwen2.5-0.5b
+    python download_model.py --model qwen3.5-2b     # Qwen3.5-2B（需 transformers>=5.0）
     python download_model.py --model qwen2.5-1.5b   # 更大但更强
 """
 
@@ -34,6 +35,11 @@ MODELS = {
         "hf_id": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
         "size_gb": 3.0,
         "desc": "1.5B 代码专用模型，代码生成能力强",
+    },
+    "qwen3.5-2b": {
+        "hf_id": "Qwen/Qwen3.5-2B-Instruct",
+        "size_gb": 4.5,
+        "desc": "2B 参数，Dense 架构，需 transformers>=5.0，GPU LoRA ~5GB 显存",
     },
 }
 

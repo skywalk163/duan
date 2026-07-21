@@ -49,20 +49,53 @@ _DEFAULT_MODEL_PATH = os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
 
 
 def _find_lora_path():
-    """自动检测 LoRA 权重路径，优先 GPU 训练产物"""
-    for name in ("qwen2.5_0.5b_duan_gpu", "qwen2.5_0.5b_duan_cpu"):
+    """自动检测 LoRA 权重路径，优先 GPU 训练产物，支持多模型"""
+    for name in (
+        "qwen3.5_2b_duan_gpu",
+        "qwen2.5_1.5b_duan_gpu",
+        "qwen2.5_0.5b_duan_gpu",
+        "qwen2.5_0.5b_duan_cpu",
+    ):
         p = os.path.join(_SCRIPT_DIR, "output", name, "final")
         if os.path.isdir(p):
+            print(f"[自动检测] LoRA 路径: {p}", file=sys.stderr)
             return p
     return os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_gpu", "final")
+
+
+def _find_merged_path():
+    """自动检测合并后模型路径，支持多模型"""
+    for name in (
+        "duan_translator_merged_3.5_2b",
+        "duan_translator_merged_1.5b",
+        "duan_translator_merged_0.5b",
+        "duan_translator_merged",
+    ):
+        p = os.path.join(_SCRIPT_DIR, "output", name)
+        if os.path.isdir(p):
+            print(f"[自动检测] 合并模型路径: {p}", file=sys.stderr)
+            return p
+    return os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged")
+
+
+def _detect_base_model(lora_path: str) -> str:
+    """根据 LoRA 路径推断对应的基础模型路径"""
+    lp = lora_path.replace(os.sep, "/").lower()
+    if "qwen3.5_2b" in lp or "qwen3_5_2b" in lp:
+        return os.path.join(_SCRIPT_DIR, "model_cache", "qwen3.5-2b")
+    elif "qwen2.5_1.5b" in lp:
+        return os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-1.5b")
+    else:
+        return os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
 
 
 _LORA_PATH = _find_lora_path()
 _MERGED_PATH = os.environ.get(
     "DUAN_MERGED_MODEL",
-    os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged"),
+    _find_merged_path(),
 )
-
+# 基础模型路径根据 LoRA 路径自动推断
+_DEFAULT_MODEL_PATH = _detect_base_model(_LORA_PATH)
 SYSTEM_PROMPT = (
     "你是段言（DuanLang）编程语言 v3.2 的翻译专家。"
     "段言是一种中文编程语言，使用中文关键字。"
@@ -221,14 +254,14 @@ def get_transformer_pipeline(use_finetuned: bool = True):
             tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
         elif os.path.exists(_LORA_PATH):
             from peft import PeftModel
-            print(f"[transformers] 加载基础模型 + LoRA: {_DEFAULT_MODEL_PATH} + {_LORA_PATH}", file=sys.stderr)
-            model_path = _DEFAULT_MODEL_PATH
+            base_model_path = _detect_base_model(_LORA_PATH)
+            print(f"[transformers] 加载基础模型 + LoRA: {base_model_path} + {_LORA_PATH}", file=sys.stderr)
             base = AutoModelForCausalLM.from_pretrained(
-                model_path, dtype=torch.float32, trust_remote_code=True
+                base_model_path, dtype=torch.float32, trust_remote_code=True
             )
             model = PeftModel.from_pretrained(base, _LORA_PATH)
             model = model.merge_and_unload()
-            tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+            tokenizer = AutoTokenizer.from_pretrained(base_model_path, trust_remote_code=True)
         else:
             print(f"[transformers] 未找到微调模型，使用基础模型: {_DEFAULT_MODEL_PATH}", file=sys.stderr)
             model_path = _DEFAULT_MODEL_PATH
@@ -485,6 +518,12 @@ def main():
     )
     parser.add_argument("input", nargs="?", help="需求描述或 Python 代码")
     parser.add_argument(
+        "--preset",
+        choices=["qwen2.5-0.5b", "qwen2.5-1.5b", "qwen3.5-2b"],
+        default=None,
+        help="指定模型预设，覆盖自动检测",
+    )
+    parser.add_argument(
         "--backend", choices=["ollama", "transformers"],
         default="ollama", help="推理后端（默认 ollama）",
     )
@@ -521,6 +560,20 @@ def main():
 
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
+
+    # ── 应用模型预设（覆盖全局变量）──
+    global _LORA_PATH, _MERGED_PATH, _DEFAULT_MODEL_PATH
+    if args.preset:
+        preset_map = {
+            "qwen2.5-0.5b": ("qwen2.5_0.5b_duan_gpu", "duan_translator_merged_0.5b", "qwen2.5-0.5b"),
+            "qwen2.5-1.5b": ("qwen2.5_1.5b_duan_gpu", "duan_translator_merged_1.5b", "qwen2.5-1.5b"),
+            "qwen3.5-2b":   ("qwen3.5_2b_duan_gpu",   "duan_translator_merged_3.5_2b", "qwen3.5-2b"),
+        }
+        lora_dir, merged_dir, model_dir = preset_map[args.preset]
+        _LORA_PATH = os.path.join(_SCRIPT_DIR, "output", lora_dir, "final")
+        _MERGED_PATH = os.path.join(_SCRIPT_DIR, "output", merged_dir)
+        _DEFAULT_MODEL_PATH = os.path.join(_SCRIPT_DIR, "model_cache", model_dir)
+        print(f"[预设] {args.preset}: lora={_LORA_PATH}, merged={_MERGED_PATH}", file=sys.stderr)
 
     # 交互模式
     if args.interactive:

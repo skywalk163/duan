@@ -24,16 +24,47 @@ _TRAIN_ERROR = os.path.join(_SCRIPT_DIR, "train_error.log")
 
 
 def _find_lora_path():
-    """自动检测 LoRA 权重路径，优先 GPU 训练产物"""
-    for name in ("qwen2.5_0.5b_duan_gpu", "qwen2.5_0.5b_duan_cpu"):
+    """自动检测 LoRA 权重路径，优先 GPU 训练产物，支持多模型"""
+    for name in (
+        "qwen3.5_2b_duan_gpu",
+        "qwen2.5_1.5b_duan_gpu",
+        "qwen2.5_0.5b_duan_gpu",
+        "qwen2.5_0.5b_duan_cpu",
+    ):
         p = os.path.join(_SCRIPT_DIR, "output", name, "final")
         if os.path.isdir(p):
             return p
     return os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_gpu", "final")
 
 
+def _find_merged_path():
+    """自动检测合并后模型路径，支持多模型"""
+    for name in (
+        "duan_translator_merged_3.5_2b",
+        "duan_translator_merged_1.5b",
+        "duan_translator_merged_0.5b",
+        "duan_translator_merged",
+    ):
+        p = os.path.join(_SCRIPT_DIR, "output", name)
+        if os.path.isdir(p):
+            return p
+    return os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged")
+
+
+def _detect_base_model(lora_path: str) -> str:
+    """根据 LoRA 路径推断对应的基础模型路径"""
+    lp = lora_path.replace(os.sep, "/").lower()
+    if "qwen3.5_2b" in lp or "qwen3_5_2b" in lp:
+        return os.path.join(_SCRIPT_DIR, "model_cache", "qwen3.5-2b")
+    elif "qwen2.5_1.5b" in lp:
+        return os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-1.5b")
+    else:
+        return os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
+
+
 _LORA_OUTPUT = _find_lora_path()
-_MERGED_OUTPUT = os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged")
+_MERGED_OUTPUT = _find_merged_path()
+_BASE_MODEL_PATH = _detect_base_model(_LORA_OUTPUT)
 
 # 测试用例
 TEST_CASES = [
@@ -193,7 +224,7 @@ def test_inference():
     from transformers import AutoModelForCausalLM, AutoTokenizer
     from peft import PeftModel
 
-    model_path = os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
+    model_path = _BASE_MODEL_PATH
 
     # 加载 tokenizer
     tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)

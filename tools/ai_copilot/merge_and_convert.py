@@ -7,11 +7,15 @@
 GGUF 格式（供 ollama / llama.cpp 使用）。
 
 用法：
-    # 只合并 LoRA（默认）
+    # 只合并 LoRA（默认，自动检测模型）
     python merge_and_convert.py --merge-only
 
     # 合并 + 转 GGUF
     python merge_and_convert.py --convert-gguf
+
+    # 使用预设（自动设置 base-model / lora-path / output-dir）
+    python merge_and_convert.py --preset qwen3.5-2b --convert-gguf
+    python merge_and_convert.py --preset qwen2.5-0.5b --merge-only
 
     # 指定路径
     python merge_and_convert.py --base-model ./model_cache/qwen2.5-0.5b --lora-path ./output/qwen2.5_0.5b_duan_gpu/final
@@ -33,12 +37,41 @@ _DEFAULT_BASE_MODEL = os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
 
 
 def _find_lora_path():
-    """自动检测 LoRA 权重路径，优先 GPU 训练产物"""
-    for name in ("qwen2.5_0.5b_duan_gpu", "qwen2.5_0.5b_duan_cpu"):
+    """自动检测 LoRA 权重路径，优先 GPU 训练产物，支持多模型"""
+    # 按优先级检测所有已知模型的 GPU/CPU 输出目录
+    candidates = [
+        ("qwen3.5_2b_duan_gpu", "qwen3.5-2b"),
+        ("qwen2.5_1.5b_duan_gpu", "qwen2.5-1.5b"),
+        ("qwen2.5_0.5b_duan_gpu", "qwen2.5-0.5b"),
+        ("qwen2.5_0.5b_duan_cpu", "qwen2.5-0.5b"),
+    ]
+    for name, label in candidates:
         p = os.path.join(_SCRIPT_DIR, "output", name, "final")
         if os.path.isdir(p):
+            print(f"[自动检测] LoRA 路径: {p} ({label})")
             return p
+    # 默认回退
     return os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_gpu", "final")
+
+
+# 模型预设：与 train_gpu_lora.py 中的 MODEL_PRESETS 保持一致
+MERGE_PRESETS = {
+    "qwen2.5-0.5b": {
+        "base_model": os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b"),
+        "lora_dir": "qwen2.5_0.5b_duan_gpu",
+        "merged_dir": "duan_translator_merged_0.5b",
+    },
+    "qwen2.5-1.5b": {
+        "base_model": os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-1.5b"),
+        "lora_dir": "qwen2.5_1.5b_duan_gpu",
+        "merged_dir": "duan_translator_merged_1.5b",
+    },
+    "qwen3.5-2b": {
+        "base_model": os.path.join(_SCRIPT_DIR, "model_cache", "qwen3.5-2b"),
+        "lora_dir": "qwen3.5_2b_duan_gpu",
+        "merged_dir": "duan_translator_merged_3.5_2b",
+    },
+}
 
 
 _DEFAULT_LORA_PATH = _find_lora_path()
@@ -104,7 +137,7 @@ SYSTEM \"\"\"你是段言（DuanLang）编程语言 v3.2 的翻译专家。你�
 
 PARAMETER temperature 0.1
 PARAMETER top_p 0.9
-PARAMETER num_ctx 1024
+PARAMETER num_ctx 4096
 PARAMETER stop "<|im_end|>"
 PARAMETER stop "<|endoftext|>"
 """)
@@ -201,6 +234,12 @@ def main():
         description="段言翻译器 — LoRA 合并 + GGUF 转换"
     )
     parser.add_argument(
+        "--preset",
+        choices=list(MERGE_PRESETS.keys()),
+        default=None,
+        help="模型预设，自动设置 base-model / lora-path / output-dir",
+    )
+    parser.add_argument(
         "--base-model", default=_DEFAULT_BASE_MODEL,
         help="基础模型路径",
     )
@@ -230,13 +269,27 @@ def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
+    # ── 应用模型预设 ──
+    if args.preset:
+        preset = MERGE_PRESETS[args.preset]
+        args.base_model = preset["base_model"]
+        args.lora_path = os.path.join(_SCRIPT_DIR, "output", preset["lora_dir"], "final")
+        args.output_dir = os.path.join(_SCRIPT_DIR, "output", preset["merged_dir"])
+        print(f"[预设] {args.preset}")
+        print(f"  base_model: {args.base_model}")
+        print(f"  lora_path: {args.lora_path}")
+        print(f"  output_dir: {args.output_dir}")
+        print()
+
     # 检查路径
     if not os.path.exists(args.base_model):
         print(f"[ERROR] 基础模型不存在: {args.base_model}")
+        if args.preset:
+            print("请先运行: python download_model.py")
         sys.exit(1)
     if not os.path.exists(args.lora_path):
         print(f"[ERROR] LoRA 权重不存在: {args.lora_path}")
-        print("请先运行: python train_cpu_lora.py")
+        print("请先运行: python train_gpu_lora.py --preset " + (args.preset or "qwen2.5-0.5b"))
         sys.exit(1)
 
     # 合并

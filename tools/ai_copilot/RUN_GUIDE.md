@@ -4,15 +4,32 @@
 
 ## 快速总结
 
-- **基础模型**：Qwen2.5-0.5B-Instruct（0.5B 参数，CPU 也能跑）
-- **训练方法**：LoRA 微调（只训练 q/v/k/o_proj，参数量 ~0.1%）
+- **支持模型**：
+  - Qwen2.5-0.5B-Instruct（0.5B 参数，CPU 也能跑）
+  - Qwen2.5-1.5B-Instruct（1.5B 参数，需 GPU）
+  - Qwen3.5-2B-Instruct（2B Dense 架构，需 GPU + transformers>=5.0）
+- **训练方法**：LoRA 微调（只训练 q/v/k/o_proj 等投影层，参数量 ~0.1%）
 - **数据集**：978 条 Python→段言 对照（`sft_dataset.jsonl`）
 - **数据集 v2 扩充**：新增 494 条覆盖类/OOP、f-string、列表推导、异常处理、lambda、with、复合算法
 - **数据集 v3 扩充**：新增 32 条长代码样本（Python 49-99 行），覆盖多类协作、设计模式、数据管线、算法实现、游戏逻辑、Web 后端、数学计算
 - **max_len**：8192（v3 提升，覆盖系统提示+长代码样本，v2 为 1024）
 - **2步验证训练**：28 秒完成，LoRA 权重 2.1MB
 - **全量训练 CPU 估算**：~5.5 小时（不推荐）
-- **全量训练 GPU 估算**：~9 分钟（RTX 3060） / ~3 分钟（RTX 4090）
+- **全量训练 GPU 估算**：~9 分钟（0.5B / RTX 3060） / ~3 分钟（0.5B / RTX 4090） / ~25 分钟（3.5-2B / RTX 3060）
+
+### 模型预设对照
+
+| 预设名 | 模型 | 参数量 | 显存需求 (LoRA bf16) | QLoRA | 备注 |
+|--------|------|--------|----------------------|-------|------|
+| `qwen2.5-0.5b` | Qwen2.5-0.5B-Instruct | 0.5B | ~5 GB | 支持 | 默认，CPU 可跑 |
+| `qwen2.5-1.5b` | Qwen2.5-1.5B-Instruct | 1.5B | ~10 GB | 支持 | 需 GPU |
+| `qwen3.5-2b` | Qwen3.5-2B-Instruct | 2B | ~5 GB | 不建议 | 需 transformers>=5.0 |
+
+> **Qwen3.5-2B 注意事项**：
+> - 需安装 `transformers>=5.0`：`pip install "transformers>=5.0"`
+> - 官方不建议使用 QLoRA（量化差异异常），故预设中 `allow_qlora=False`，脚本会自动拒绝 `--qlora` 参数
+> - Dense 架构，显存效率优于同参数量的 MoE 模型
+> - LoRA rank=32 / alpha=64 / lr=1e-4（比 0.5B 的默认值更大，适配 2B 模型）
 
 ## 文件结构
 
@@ -24,18 +41,25 @@ tools/ai_copilot/
 ├── augment_dataset.py           # 数据集增强脚本 v2
 ├── augment_long_samples.py      # 长样本增强脚本 v3
 ├── train_cpu_lora.py           # CPU 训练脚本（已验证可用）
-├── train_gpu_lora.py           # GPU 训练脚本（推荐，速度提升 30 倍）
-├── download_model.py           # 模型下载脚本
-├── local_infer.py              # 推理脚本（支持 ollama / transformers 后端）
-├── merge_and_convert.py        # LoRA 合并 & GGUF 转换
+├── train_gpu_lora.py           # GPU 训练脚本（推荐，速度提升 30 倍，支持多模型预设）
+├── download_model.py           # 模型下载脚本（支持 qwen2.5-0.5b / 1.5b / qwen3.5-2b）
+├── local_infer.py              # 推理脚本（支持 ollama / transformers 后端，自动检测模型）
+├── merge_and_convert.py        # LoRA 合并 & GGUF 转换（支持 --preset 多模型）
+├── auto_finish.py              # 训练自动完成脚本（自动检测多模型路径）
 ├── fix_gguf_rope.py            # GGUF 修复脚本（修复 rope.freq_base=0.0）
 ├── create_ollama_model.sh      # 一键创建 ollama 模型（修复 + 量化）
 ├── model_cache/
-│   └── qwen2.5-0.5b/           # 基础模型（~1GB）
+│   ├── qwen2.5-0.5b/           # 基础模型（~1GB）
+│   ├── qwen2.5-1.5b/           # 基础模型（~3GB）
+│   └── qwen3.5-2b/             # 基础模型（~4.5GB）
 └── output/
     ├── smoke_test/             # 2步验证训练产物
-    ├── qwen2.5_0.5b_duan_gpu/  # GPU 全量训练产物
-    └── duan_translator_merged/ # 合并后模型 + GGUF（.gitignore 排除）
+    ├── qwen2.5_0.5b_duan_gpu/  # 0.5B GPU 全量训练产物
+    ├── qwen2.5_1.5b_duan_gpu/  # 1.5B GPU 全量训练产物
+    ├── qwen3.5_2b_duan_gpu/    # 3.5-2B GPU 全量训练产物
+    ├── duan_translator_merged_0.5b/   # 0.5B 合并后模型 + GGUF
+    ├── duan_translator_merged_1.5b/   # 1.5B 合并后模型 + GGUF
+    └── duan_translator_merged_3.5_2b/ # 3.5-2B 合并后模型 + GGUF
 ```
 
 ## 环境准备
@@ -62,8 +86,11 @@ pip install torch --index-url https://download.pytorch.org/whl/cu121
 # 安装其余依赖
 pip install transformers peft datasets accelerate
 
-# 如需 QLoRA 4bit 量化训练（显存不够时）
+# 如需 QLoRA 4bit 量化训练（显存不够时，仅 Qwen2.5 系列）
 pip install bitsandbytes
+
+# Qwen3.5-2B 额外要求
+pip install "transformers>=5.0"
 ```
 
 ## 下载模型
@@ -71,8 +98,14 @@ pip install bitsandbytes
 ```bash
 cd tools/ai_copilot
 
-# 使用 HF 镜像下载（国内推荐）
+# 下载 Qwen2.5-0.5B（默认，~1GB）
 HF_ENDPOINT=https://hf-mirror.com python download_model.py --model qwen2.5-0.5b
+
+# 下载 Qwen2.5-1.5B（~3GB）
+HF_ENDPOINT=https://hf-mirror.com python download_model.py --model qwen2.5-1.5b
+
+# 下载 Qwen3.5-2B（~4.5GB）
+HF_ENDPOINT=https://hf-mirror.com python download_model.py --model qwen3.5-2b
 ```
 
 如果下载超时，可以手动用 curl 下载：
@@ -103,17 +136,24 @@ python train_cpu_lora.py --max-steps 2 --batch-size 2 --grad-accum 1 --max-len 2
 ### 全量训练（GPU 推荐）
 
 ```bash
-# 标准 GPU 训练（~8 分钟，RTX 3060）
+# 标准 GPU 训练（默认 Qwen2.5-0.5B，~8 分钟 RTX 3060）
 python train_gpu_lora.py
+
+# 使用 Qwen3.5-2B 预设（自动配置参数，~25 分钟 RTX 3060）
+python train_gpu_lora.py --preset qwen3.5-2b
+
+# 使用 Qwen2.5-1.5B 预设
+python train_gpu_lora.py --preset qwen2.5-1.5b
 
 # 快速验证（GPU 上 2 步）
 python train_gpu_lora.py --max-steps 2
+python train_gpu_lora.py --preset qwen3.5-2b --max-steps 2
 
-# QLoRA 4bit 量化（显存 < 4GB 时）
+# QLoRA 4bit 量化（显存 < 4GB 时，仅 Qwen2.5 系列）
 python train_gpu_lora.py --qlora
 
-# 使用更大模型（效果更好）
-python train_gpu_lora.py --model-path ./model_cache/qwen2.5-1.5b
+# Qwen3.5-2B 不支持 QLoRA，以下命令会报错并退出
+# python train_gpu_lora.py --preset qwen3.5-2b --qlora  # ❌ 会报错
 
 # 自定义参数
 python train_gpu_lora.py --epochs 5 --lora-rank 32 --batch-size 16
@@ -133,9 +173,14 @@ python train_cpu_lora.py --epochs 3
 ```bash
 # 训练后测试推理
 python train_gpu_lora.py --test-infer
+python train_gpu_lora.py --preset qwen3.5-2b --test-infer
 
-# 或单独推理
+# 或单独推理（自动检测模型）
 python local_infer.py --fine-tuned "写一个冒泡排序"
+
+# 指定模型预设
+python local_infer.py --fine-tuned --preset qwen3.5-2b "写一个冒泡排序"
+python local_infer.py --fine-tuned --preset qwen2.5-0.5b "写一个冒泡排序"
 ```
 
 ### 方法 2：自定义推理脚本
@@ -166,15 +211,16 @@ print(tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_t
 
 | 参数 | CPU 默认 | GPU 默认 | 说明 |
 |------|----------|----------|------|
+| `--preset` | N/A | N/A | 模型预设（qwen2.5-0.5b / qwen2.5-1.5b / qwen3.5-2b），自动配置所有参数 |
 | `--epochs` | 3 | 3 | 训练轮数 |
-| `--lora-rank` | 8 | 16 | LoRA 秩，越大效果越好但越慢 |
-| `--lora-alpha` | 16 | 32 | LoRA alpha，通常 = rank × 2 |
-| `--lr` | 2e-4 | 2e-4 | 学习率 |
-| `--max-len` | 512 | 512 | 最大序列长度 |
-| `--batch-size` | 1 | 8 | 批大小 |
-| `--grad-accum` | 16 | 2 | 梯度累积步数 |
+| `--lora-rank` | 8 | 16 | LoRA 秩，越大效果越好但越慢（qwen3.5-2b 预设为 32） |
+| `--lora-alpha` | 16 | 32 | LoRA alpha，通常 = rank × 2（qwen3.5-2b 预设为 64） |
+| `--lr` | 2e-4 | 2e-4 | 学习率（qwen3.5-2b 预设为 1e-4） |
+| `--max-len` | 512 | 8192 | 最大序列长度 |
+| `--batch-size` | 1 | 2 | 批大小（qwen3.5-2b 预设为 1） |
+| `--grad-accum` | 16 | 8 | 梯度累积步数（qwen3.5-2b 预设为 16） |
 | `--max-steps` | -1 | -1 | 最大步数（正数覆盖 epochs） |
-| `--qlora` | N/A | False | 4bit 量化训练 |
+| `--qlora` | N/A | False | 4bit 量化训练（仅 Qwen2.5 系列，Qwen3.5 会报错拒绝） |
 
 ## 预期效果
 
@@ -190,7 +236,9 @@ print(tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_t
 ## 后续步骤
 
 1. **合并 LoRA**：`python merge_and_convert.py --merge-only`
+   - 指定模型：`python merge_and_convert.py --preset qwen3.5-2b --merge-only`
 2. **转 GGUF**：`python merge_and_convert.py --convert-gguf`
+   - 指定模型：`python merge_and_convert.py --preset qwen3.5-2b --convert-gguf`
 3. **集成到 CLI**：`duan ai local "写一个冒泡排序"`
 4. **部署到 ollama**：详见下方 [ollama 部署指南](#ollama-部署指南)
 
@@ -391,8 +439,11 @@ python local_infer.py --fine-tuned "写一个冒泡排序"
 | CPU (i5-8250U, 24GB RAM) | Qwen2.5-0.5B | Q4_K_M | 0.01 tok/s | ~6 分钟（不可用） |
 | GPU (RTX 3060 12GB) | Qwen2.5-0.5B | Q4_K_M | 预估 50+ tok/s | ~2 秒 |
 | GPU (RTX 4090 24GB) | Qwen2.5-0.5B | Q4_K_M | 预估 100+ tok/s | ~1 秒 |
+| GPU (RTX 3060 12GB) | Qwen3.5-2B | Q8_0 | 预估 40+ tok/s | ~2 秒 |
+| GPU (RTX 4090 24GB) | Qwen3.5-2B | Q8_0 | 预估 80+ tok/s | ~1 秒 |
 
 > 0.5B 模型在任意 GPU 上都极快。如果 CPU 推理太慢，务必使用 GPU 环境。
+> Qwen3.5-2B 效果优于 0.5B（更强的代码理解能力），推荐在有 GPU 的环境下使用。
 
 ### 迁移到另一台机器
 
@@ -447,4 +498,26 @@ OSError: [WinError 126] 找不到指定的模块
 
 ### 显存不足
 
-**解决**：使用 QLoRA 4bit 量化 `--qlora`，或减小 `--batch-size` 和 `--max-len`
+**解决**：使用 QLoRA 4bit 量化 `--qlora`（仅 Qwen2.5 系列），或减小 `--batch-size` 和 `--max-len`
+
+### Qwen3.5-2B 特有问题
+
+**问题：`KeyError: 'qwen3'` 或模型加载失败**
+
+确保已安装 `transformers>=5.0`：
+
+```bash
+pip install "transformers>=5.0"
+```
+
+**问题：`--qlora` 报错 "Qwen3.5 系列不建议使用 QLoRA"**
+
+这是预期行为。Qwen3.5 官方不建议 QLoRA（量化差异异常），请使用默认的 bf16 LoRA 模式。如果显存不够，尝试减小 `--batch-size` 和 `--max-len`，或换用 Qwen2.5 系列。
+
+**问题：Qwen3.5 GGUF 转换失败**
+
+Qwen3.5 模型架构较新，需要较新版本的 llama.cpp。请确保 `llama.cpp` 已更新到最新版本：
+
+```bash
+cd llama.cpp && git pull && pip install -r requirements.txt
+```
