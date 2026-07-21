@@ -46,7 +46,18 @@ sys.path.insert(0, _SCRIPT_DIR)
 _DEFAULT_MODEL_OLLAMA = "qwen2.5-coder:1.5b"
 _FINETUNED_OLLAMA = "duan-translator"
 _DEFAULT_MODEL_PATH = os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
-_LORA_PATH = os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_cpu", "final")
+
+
+def _find_lora_path():
+    """自动检测 LoRA 权重路径，优先 GPU 训练产物"""
+    for name in ("qwen2.5_0.5b_duan_gpu", "qwen2.5_0.5b_duan_cpu"):
+        p = os.path.join(_SCRIPT_DIR, "output", name, "final")
+        if os.path.isdir(p):
+            return p
+    return os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_gpu", "final")
+
+
+_LORA_PATH = _find_lora_path()
 _MERGED_PATH = os.environ.get(
     "DUAN_MERGED_MODEL",
     os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged"),

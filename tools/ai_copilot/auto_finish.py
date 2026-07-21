@@ -21,7 +21,18 @@ import time
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _TRAIN_OUTPUT = os.path.join(_SCRIPT_DIR, "train_output.log")
 _TRAIN_ERROR = os.path.join(_SCRIPT_DIR, "train_error.log")
-_LORA_OUTPUT = os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_cpu", "final")
+
+
+def _find_lora_path():
+    """自动检测 LoRA 权重路径，优先 GPU 训练产物"""
+    for name in ("qwen2.5_0.5b_duan_gpu", "qwen2.5_0.5b_duan_cpu"):
+        p = os.path.join(_SCRIPT_DIR, "output", name, "final")
+        if os.path.isdir(p):
+            return p
+    return os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_gpu", "final")
+
+
+_LORA_OUTPUT = _find_lora_path()
 _MERGED_OUTPUT = os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged")
 
 # 测试用例

@@ -9,7 +9,7 @@ Qwen2.5-0.5B-Instruct（或更大模型）进行 LoRA/QLoRA 微调。
 与 train_cpu_lora.py 的区别：
   - 使用 bf16 混合精度（GPU 原生支持，速度提升 2-3 倍）
   - 更大 batch_size（16 vs 1），充分利用 GPU 并行
-  - 更大 max_len（512 vs 256），覆盖更长代码样本
+  - 更大 max_len（1024 vs 256），覆盖系统提示+完整代码样本
   - 更多 LoRA target modules（all-linear），效果更好
   - 支持 QLoRA 4bit 量化（显存不够时的降级方案）
   - 支持 gradient_checkpointing（省显存，适合大模型）
@@ -287,7 +287,7 @@ def train(
     lora_rank: int = 16,
     lora_alpha: int = 32,
     lr: float = 2e-4,
-    max_len: int = 512,
+    max_len: int = 1024,
     batch_size: int = 8,
     grad_accum: int = 2,
     warmup_ratio: float = 0.05,
@@ -569,7 +569,7 @@ def main():
     parser.add_argument("--lora-rank", type=int, default=16, help="LoRA rank（默认 16）")
     parser.add_argument("--lora-alpha", type=int, default=32, help="LoRA alpha（默认 32）")
     parser.add_argument("--lr", type=float, default=2e-4, help="学习率（默认 2e-4）")
-    parser.add_argument("--max-len", type=int, default=512, help="最大序列长度（默认 512）")
+    parser.add_argument("--max-len", type=int, default=1024, help="最大序列长度（默认 1024，覆盖系统提示+代码）")
     parser.add_argument("--batch-size", type=int, default=8, help="batch size（默认 8）")
     parser.add_argument("--grad-accum", type=int, default=2, help="梯度累积步数（默认 2）")
     parser.add_argument("--save-steps", type=int, default=50, help="保存间隔（默认 50）")

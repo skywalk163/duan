@@ -14,7 +14,7 @@ GGUF 格式（供 ollama / llama.cpp 使用）。
     python merge_and_convert.py --convert-gguf
 
     # 指定路径
-    python merge_and_convert.py --base-model ./model_cache/qwen2.5-0.5b --lora-path ./output/qwen2.5_0.5b_duan_cpu/final
+    python merge_and_convert.py --base-model ./model_cache/qwen2.5-0.5b --lora-path ./output/qwen2.5_0.5b_duan_gpu/final
 
 前置条件（GGUF 转换）：
     git clone https://github.com/ggerganov/llama.cpp
@@ -30,7 +30,18 @@ from pathlib import Path
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _DEFAULT_BASE_MODEL = os.path.join(_SCRIPT_DIR, "model_cache", "qwen2.5-0.5b")
-_DEFAULT_LORA_PATH = os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_cpu", "final")
+
+
+def _find_lora_path():
+    """自动检测 LoRA 权重路径，优先 GPU 训练产物"""
+    for name in ("qwen2.5_0.5b_duan_gpu", "qwen2.5_0.5b_duan_cpu"):
+        p = os.path.join(_SCRIPT_DIR, "output", name, "final")
+        if os.path.isdir(p):
+            return p
+    return os.path.join(_SCRIPT_DIR, "output", "qwen2.5_0.5b_duan_gpu", "final")
+
+
+_DEFAULT_LORA_PATH = _find_lora_path()
 _DEFAULT_MERGED_DIR = os.path.join(_SCRIPT_DIR, "output", "duan_translator_merged")
 
 
