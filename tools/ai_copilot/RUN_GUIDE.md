@@ -23,11 +23,11 @@
 |--------|------|--------|----------------------|-------|------|
 | `qwen2.5-0.5b` | Qwen2.5-0.5B-Instruct | 0.5B | ~5 GB | 支持 | 默认，CPU 可跑 |
 | `qwen2.5-1.5b` | Qwen2.5-1.5B-Instruct | 1.5B | ~10 GB | 支持 | 需 GPU |
-| `qwen3.5-2b` | Qwen3.5-2B-Instruct | 2B | ~5 GB | 不建议 | 需 transformers>=5.0 |
+| `qwen3.5-2b` | Qwen3.5-2B-Instruct | 2B | ~5 GB | ~3 GB | 需 transformers>=5.0 |
 
 > **Qwen3.5-2B 注意事项**：
 > - 需安装 `transformers>=5.0`：`pip install "transformers>=5.0"`
-> - 官方不建议使用 QLoRA（量化差异异常），故预设中 `allow_qlora=False`，脚本会自动拒绝 `--qlora` 参数
+> - QLoRA 模式可用但官方不建议（量化差异可能偏高），显存不足时可使用 `--qlora`
 > - Dense 架构，显存效率优于同参数量的 MoE 模型
 > - LoRA rank=32 / alpha=64 / lr=1e-4（比 0.5B 的默认值更大，适配 2B 模型）
 
@@ -83,11 +83,13 @@ pip install transformers peft datasets accelerate
 # 安装 GPU 版 PyTorch（根据 CUDA 版本）
 pip install torch --index-url https://download.pytorch.org/whl/cu121
 
-# 安装其余依赖
-pip install transformers peft datasets accelerate
+# 安装全部 GPU 训练依赖（包含 bitsandbytes, torchao）
+pip install -r requirements-gpu.txt
 
-# 如需 QLoRA 4bit 量化训练（显存不够时，仅 Qwen2.5 系列）
-pip install bitsandbytes
+# 或手动安装核心依赖
+pip install transformers peft datasets accelerate
+pip install bitsandbytes       # QLoRA 4bit 量化训练需要
+pip install "torchao>=0.16.0"  # peft 依赖，版本过低会导致 LoRA 创建失败
 
 # Qwen3.5-2B 额外要求
 pip install "transformers>=5.0"
@@ -149,11 +151,11 @@ python train_gpu_lora.py --preset qwen2.5-1.5b
 python train_gpu_lora.py --max-steps 2
 python train_gpu_lora.py --preset qwen3.5-2b --max-steps 2
 
-# QLoRA 4bit 量化（显存 < 4GB 时，仅 Qwen2.5 系列）
+# QLoRA 4bit 量化（显存 < 4GB 时，所有模型均可用）
 python train_gpu_lora.py --qlora
 
-# Qwen3.5-2B 不支持 QLoRA，以下命令会报错并退出
-# python train_gpu_lora.py --preset qwen3.5-2b --qlora  # ❌ 会报错
+# Qwen3.5-2B + QLoRA（显存不足时，会有警告但可继续）
+python train_gpu_lora.py --preset qwen3.5-2b --qlora
 
 # 自定义参数
 python train_gpu_lora.py --epochs 5 --lora-rank 32 --batch-size 16
@@ -220,7 +222,7 @@ print(tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_t
 | `--batch-size` | 1 | 2 | 批大小（qwen3.5-2b 预设为 1） |
 | `--grad-accum` | 16 | 8 | 梯度累积步数（qwen3.5-2b 预设为 16） |
 | `--max-steps` | -1 | -1 | 最大步数（正数覆盖 epochs） |
-| `--qlora` | N/A | False | 4bit 量化训练（仅 Qwen2.5 系列，Qwen3.5 会报错拒绝） |
+| `--qlora` | N/A | False | 4bit 量化训练（所有模型可用，Qwen3.5 会警告） |
 
 ## 预期效果
 
@@ -498,7 +500,37 @@ OSError: [WinError 126] 找不到指定的模块
 
 ### 显存不足
 
-**解决**：使用 QLoRA 4bit 量化 `--qlora`（仅 Qwen2.5 系列），或减小 `--batch-size` 和 `--max-len`
+**解决**：使用 QLoRA 4bit 量化 `--qlora`（所有模型均可用），或减小 `--batch-size` 和 `--max-len`
+
+### torchao 版本不兼容
+
+**报错**：`ImportError: Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported`
+
+**原因**：peft 依赖 torchao，低版本会触发 `is_torchao_available()` 中的版本检查异常。
+
+**解决**：
+
+```bash
+pip install "torchao>=0.16.0"
+```
+
+或使用 `requirements-gpu.txt` 一键安装全部依赖：
+
+```bash
+pip install -r requirements-gpu.txt
+```
+
+### bitsandbytes 未安装
+
+**报错**：`[WARN] bitsandbytes 未安装（仅 QLoRA 模式需要）`
+
+**说明**：这只是一个警告，不影响 bf16 LoRA 训练。仅当使用 `--qlora` 时才需要安装。
+
+**解决**（如需 QLoRA）：
+
+```bash
+pip install bitsandbytes
+```
 
 ### Qwen3.5-2B 特有问题
 
@@ -510,9 +542,9 @@ OSError: [WinError 126] 找不到指定的模块
 pip install "transformers>=5.0"
 ```
 
-**问题：`--qlora` 报错 "Qwen3.5 系列不建议使用 QLoRA"**
+**问题：Qwen3.5-2B + QLoRA 效果不佳**
 
-这是预期行为。Qwen3.5 官方不建议 QLoRA（量化差异异常），请使用默认的 bf16 LoRA 模式。如果显存不够，尝试减小 `--batch-size` 和 `--max-len`，或换用 Qwen2.5 系列。
+Qwen3.5 官方不建议 QLoRA（量化差异可能偏高）。脚本会输出警告但允许继续训练。如效果不佳，请换用 bf16 LoRA 模式（去掉 `--qlora`），或减小 `--batch-size` 和 `--max-len`。
 
 **问题：Qwen3.5 GGUF 转换失败**
 

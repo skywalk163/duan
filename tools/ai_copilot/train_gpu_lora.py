@@ -11,14 +11,14 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
   - 更大 batch_size（16 vs 1），充分利用 GPU 并行
   - 更大 max_len（8192 vs 256），覆盖系统提示+长代码样本
   - 更多 LoRA target modules（all-linear），效果更好
-  - 支持 QLoRA 4bit 量化（显存不够时的降级方案，Qwen3.5 不建议）
+  - 支持 QLoRA 4bit 量化（显存不够时的降级方案，所有模型均可用）
   - 支持 gradient_checkpointing（省显存，适合大模型）
   - 支持模型预设（--preset），自动配置不同模型的训练参数
 
 支持的模型预设：
-  qwen2.5-0.5b  — Qwen2.5-0.5B-Instruct (0.5B, LoRA ~5GB)
-  qwen2.5-1.5b  — Qwen2.5-1.5B-Instruct (1.5B, LoRA ~10GB)
-  qwen3.5-2b    — Qwen3.5-2B-Instruct (2B Dense, LoRA ~5GB, 需 transformers>=5.0)
+  qwen2.5-0.5b  — Qwen2.5-0.5B-Instruct (0.5B, LoRA ~5GB, QLoRA ~3GB)
+  qwen2.5-1.5b  — Qwen2.5-1.5B-Instruct (1.5B, LoRA ~10GB, QLoRA ~4GB)
+  qwen3.5-2b    — Qwen3.5-2B-Instruct (2B Dense, LoRA ~5GB, QLoRA ~3GB, 需 transformers>=5.0)
 
 预计训练时间（978 条 × 3 epochs = 2934 样本）：
   Qwen2.5-0.5B / RTX 3060 (12GB):  ~9 分钟
@@ -31,7 +31,8 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
   Qwen2.5-0.5B QLoRA 4bit: ~3 GB
   Qwen2.5-1.5B LoRA bf16:  ~10 GB
   Qwen2.5-1.5B QLoRA 4bit: ~4 GB
-  Qwen3.5-2B   LoRA bf16:  ~5 GB   (不建议 QLoRA)
+  Qwen3.5-2B   LoRA bf16:  ~5 GB
+  Qwen3.5-2B   QLoRA 4bit: ~3 GB   (官方不建议，但显存不足时可用)
 
 用法：
     # 标准训练（默认 Qwen2.5-0.5B）
@@ -43,7 +44,7 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
     # 快速验证（2步）
     python train_gpu_lora.py --max-steps 2
 
-    # QLoRA 4bit 量化训练（显存不够时，不支持 Qwen3.5）
+    # QLoRA 4bit 量化训练（显存不够时，所有模型均可用）
     python train_gpu_lora.py --qlora
 
     # 使用更大模型
@@ -63,8 +64,11 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
     # Qwen3.5 需要 transformers >= 5.0
     pip install transformers>=5.0
 
-    # 如需 QLoRA（仅 Qwen2.5 系列）
+    # 如需 QLoRA 4bit 量化训练（显存不够时）
     pip install bitsandbytes
+
+    # 如需 Qwen3.5-2B，还需确保 torchao >= 0.16.0
+    pip install "torchao>=0.16.0"
 """
 
 import argparse
@@ -116,8 +120,8 @@ MODEL_PRESETS = {
         "lora_rank": 32,
         "lora_alpha": 64,
         "lr": 1e-4,
-        "allow_qlora": False,  # Qwen3.5 不建议 QLoRA（量化差异异常）
-        "desc": "Qwen3.5-2B-Instruct (2B Dense, LoRA ~5GB, 需 transformers>=5.0)",
+        "allow_qlora": True,  # 允许 QLoRA（官方不建议但显存不足时可用）
+        "desc": "Qwen3.5-2B-Instruct (2B Dense, LoRA ~5GB / QLoRA ~3GB, 需 transformers>=5.0)",
     },
 }
 
@@ -220,7 +224,24 @@ def check_environment(require_gpu: bool = True) -> bool:
         import bitsandbytes
         print(f"  [OK] bitsandbytes {bitsandbytes.__version__}")
     except ImportError:
-        print("  [WARN] bitsandbytes 未安装（仅 QLoRA 模式需要）")
+        print("  [WARN] bitsandbytes 未安装（仅 QLoRA 模式需要，安装: pip install bitsandbytes）")
+
+    # torchao（peft 依赖，版本不兼容会导致 LoRA 创建失败）
+    try:
+        import torchao
+        version = getattr(torchao, "__version__", "unknown")
+        print(f"  [OK] torchao {version}")
+        # peft 要求 torchao >= 0.16.0，低版本会触发 ImportError
+        if version != "unknown":
+            try:
+                major, minor = version.split(".")[:2]
+                if int(major) == 0 and int(minor) < 16:
+                    print(f"  [WARN] torchao 版本过低 ({version})，peft 需要 >= 0.16.0")
+                    print(f"         升级: pip install \"torchao>=0.16.0\"")
+            except (ValueError, IndexError):
+                pass
+    except ImportError:
+        print("  [INFO] torchao 未安装（非必须，但 peft 可能需要）")
 
     # 数据集
     if os.path.exists(_DATASET_PATH):
@@ -642,7 +663,7 @@ def main():
         "--dataset", default=None,
         help="自定义数据集路径（默认 sft_dataset.jsonl）",
     )
-    parser.add_argument("--qlora", action="store_true", help="使用 QLoRA 4bit 量化训练（省显存，不支持 Qwen3.5）")
+    parser.add_argument("--qlora", action="store_true", help="使用 QLoRA 4bit 量化训练（省显存，所有模型可用）")
     parser.add_argument("--no-gc", action="store_true", help="禁用 gradient checkpointing")
     parser.add_argument("--dry-run", action="store_true", help="只检查环境不训练")
     parser.add_argument("--test-infer", action="store_true", help="训练后测试推理")
@@ -670,16 +691,15 @@ def main():
         print(f"  lora_rank={args.lora_rank}, lora_alpha={args.lora_alpha}, lr={args.lr}")
         print()
 
-    # ── QLoRA 安全检查 ──
+    # ── QLoRA 检查与警告 ──
     if args.qlora:
-        # 检测是否为不支持 QLoRA 的模型
+        # 检测是否为 Qwen3.5（官方不建议 QLoRA，但显存不足时可用）
         model_path_lower = args.model_path.lower().replace(os.sep, "/")
         is_qwen35 = "qwen3.5" in model_path_lower or "qwen3_5" in model_path_lower
-        preset_no_qlora = args.preset and not MODEL_PRESETS[args.preset]["allow_qlora"]
-        if is_qwen35 or preset_no_qlora:
-            print("[ERROR] Qwen3.5 系列不建议使用 QLoRA（量化差异高于正常水平）")
-            print("        请使用 bf16 LoRA 模式（默认），或换用 Qwen2.5 系列模型")
-            sys.exit(1)
+        if is_qwen35:
+            print("[WARN] Qwen3.5 系列官方不建议使用 QLoRA（量化差异可能高于正常水平）")
+            print("       但显存不足时仍可使用，如效果不佳请换用 bf16 LoRA 模式")
+            print("       继续使用 QLoRA 训练...\n")
 
     # 环境检查
     if not check_environment(require_gpu=not args.no_gpu_required):

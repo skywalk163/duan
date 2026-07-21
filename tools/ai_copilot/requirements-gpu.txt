@@ -1,0 +1,23 @@
+# 段言翻译器 GPU LoRA 微调依赖
+#
+# 安装方式：
+#   pip install -r requirements-gpu.txt
+#
+# 注意：torch 需根据 CUDA 版本单独安装，例如：
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121
+
+# 核心依赖
+transformers>=4.44.0
+peft>=0.13.0
+datasets>=2.20.0
+accelerate>=0.34.0
+
+# QLoRA 4bit 量化训练（显存不足时使用，所有模型均可用）
+bitsandbytes>=0.43.0
+
+# peft 依赖：torchao 必须 >= 0.16.0，否则 LoRA 模块创建会报 ImportError
+# 报错信息：Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported
+torchao>=0.16.0
+
+# Qwen3.5-2B 额外要求（如使用 --preset qwen3.5-2b）
+# transformers>=5.0
