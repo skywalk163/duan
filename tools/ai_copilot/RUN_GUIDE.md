@@ -6,8 +6,10 @@
 
 - **基础模型**：Qwen2.5-0.5B-Instruct（0.5B 参数，CPU 也能跑）
 - **训练方法**：LoRA 微调（只训练 q/v/k/o_proj，参数量 ~0.1%）
-- **数据集**：946 条 Python→段言 对照（`sft_dataset.jsonl`）
+- **数据集**：978 条 Python→段言 对照（`sft_dataset.jsonl`）
 - **数据集 v2 扩充**：新增 494 条覆盖类/OOP、f-string、列表推导、异常处理、lambda、with、复合算法
+- **数据集 v3 扩充**：新增 32 条长代码样本（Python 49-99 行），覆盖多类协作、设计模式、数据管线、算法实现、游戏逻辑、Web 后端、数学计算
+- **max_len**：8192（v3 提升，覆盖系统提示+长代码样本，v2 为 1024）
 - **2步验证训练**：28 秒完成，LoRA 权重 2.1MB
 - **全量训练 CPU 估算**：~5.5 小时（不推荐）
 - **全量训练 GPU 估算**：~9 分钟（RTX 3060） / ~3 分钟（RTX 4090）
@@ -16,9 +18,11 @@
 
 ```
 tools/ai_copilot/
-├── sft_dataset.jsonl           # 训练数据（946 条 Python→段言 对照，v2 扩充后）
+├── sft_dataset.jsonl           # 训练数据（978 条 Python→段言 对照，v3 扩充后）
 ├── sft_dataset_new.jsonl       # v2 新增样本（494 条，已合并到 sft_dataset.jsonl）
+├── sft_dataset_long.jsonl      # v3 长样本（32 条，Python 49-99 行，已合并到 sft_dataset.jsonl）
 ├── augment_dataset.py           # 数据集增强脚本 v2
+├── augment_long_samples.py      # 长样本增强脚本 v3
 ├── train_cpu_lora.py           # CPU 训练脚本（已验证可用）
 ├── train_gpu_lora.py           # GPU 训练脚本（推荐，速度提升 30 倍）
 ├── download_model.py           # 模型下载脚本
@@ -294,7 +298,7 @@ SYSTEM """你是段言（DuanLang）编程语言 v3.2 的翻译专家。你的�
 
 PARAMETER temperature 0.1
 PARAMETER top_p 0.9
-PARAMETER num_ctx 1024
+PARAMETER num_ctx 4096
 PARAMETER stop "<|im_end|>"
 EOF
 ```
@@ -306,7 +310,7 @@ EOF
 | `FROM` | `./duan_translator_fixed.gguf` | 指向修复后的 GGUF 文件 |
 | `TEMPLATE` | ChatML 格式 | Qwen2.5 的对话模板，`<\|im_start\|>` / `<\|im_end\|>` |
 | `temperature` | 0.1 | 低温度保证翻译稳定性 |
-| `num_ctx` | 1024 | 上下文窗口，代码翻译够用 |
+| `num_ctx` | 4096 | 上下文窗口，长代码翻译需要更大窗口（v3 训练 max_len=8192，推理 4096 够用） |
 | `stop` | `<\|im_end\|>` | 生成终止符 |
 
 > **注意**：TEMPLATE 中不要有多余的 `{{ end }}`。Qwen2.5 的 ChatML 模板在 assistant 标签后直接结束，不需要 `{{ end }}` 闭合。多余的 `{{ end }}` 会导致 `template error: unexpected {{end}}`。
