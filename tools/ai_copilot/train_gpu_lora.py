@@ -377,13 +377,16 @@ def check_environment(require_gpu: bool = True) -> bool:
         print("  [INFO] torchao 未安装（非必须，但 peft 可能需要）")
 
     # unsloth（可选，省显存 + 加速）
+    # 注意：只用 find_spec 检测是否安装，不触发 import（避免初始化报错）
     try:
-        import unsloth
-        version = getattr(unsloth, "__version__", "unknown")
-        print(f"  [OK] unsloth {version}")
+        import importlib.util
+        if importlib.util.find_spec("unsloth"):
+            print(f"  [OK] unsloth 已安装（可用 --unsloth 启用）")
+        else:
+            raise ImportError
     except ImportError:
         print("  [INFO] unsloth 未安装（可选，安装后可用 --unsloth 省显存加速）")
-        print("         安装: pip install \"unsloth\"")
+        print("         安装: pip install unsloth")
 
     # 数据集
     if os.path.exists(_DATASET_PATH):
@@ -550,8 +553,19 @@ def train(
     # ════════════════════════════════════════════════════════════
     if use_unsloth:
         # ── Unsloth 路径：节省 30-50% 显存，速度提升 2x ──
-        from unsloth import FastLanguageModel
+        # Unsloth 必须在 transformers/peft 之前导入才能生效
+        # Kaggle Python 3.12 可能不兼容，导入失败时自动降级到标准模式
+        try:
+            from unsloth import FastLanguageModel
+        except (ImportError, NameError, Exception) as e:
+            print(f"  [WARN] Unsloth 导入失败: {e}")
+            print(f"  [WARN] 自动降级到标准 HF+PEFT 模式")
+            print(f"         Unsloth 可能与当前 Python/transformers 版本不兼容")
+            print(f"         可去掉 --unsloth 使用标准模式训练")
+            use_unsloth = False
 
+    if use_unsloth:
+        # ── Unsloth 路径：节省 30-50% 显存，速度提升 2x ──
         print("  [Unsloth] 使用 Unsloth 优化后端（省显存 + 加速）")
 
         # Unsloth 自动处理：量化加载、设备分配、梯度检查点、混合精度
