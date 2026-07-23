@@ -26,13 +26,26 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
   Qwen3.5-2B   / RTX 3060 (12GB):  ~25 分钟
   Qwen3.5-2B   / RTX 4090 (24GB):  ~8 分钟
 
-显存需求（max_len=8192, gradient_checkpointing=on）：
-  Qwen2.5-0.5B LoRA bf16:  ~5 GB
-  Qwen2.5-0.5B QLoRA 4bit: ~3 GB
-  Qwen2.5-1.5B LoRA bf16:  ~10 GB
-  Qwen2.5-1.5B QLoRA 4bit: ~4 GB
-  Qwen3.5-2B   LoRA bf16:  ~5 GB
-  Qwen3.5-2B   QLoRA 4bit: ~3 GB   (官方不建议，但显存不足时可用)
+支持的平台/GPU：
+  RTX 3060/4060/4070/4090 (12-24GB)  — 默认参数直接跑
+  Kaggle T4 (16GB)                     — 默认参数直接跑（T4 不支持 bf16，自动切 fp16）
+  Google Colab T4 (16GB)              — 同上
+  8GB 显存 GPU (如 GTX 1070/2060)     — 用 --qlora + --max-len 1024 可跑
+
+显存需求（gradient_checkpointing=on）：
+  Qwen2.5-0.5B LoRA fp16  (max_len=2048): ~4.5 GB   ← T4/8GB 显卡推荐
+  Qwen2.5-0.5B LoRA bf16  (max_len=8192): ~5 GB
+  Qwen2.5-0.5B QLoRA 4bit (max_len=8192): ~3 GB
+  Qwen2.5-1.5B LoRA fp16  (max_len=1024): ~7 GB   ← 8GB 显卡勉强可跑
+  Qwen2.5-1.5B QLoRA 4bit (max_len=8192): ~4 GB
+  Qwen3.5-2B   LoRA fp16  (max_len=2048): ~5 GB
+  Qwen3.5-2B   QLoRA 4bit (max_len=8192): ~3 GB
+
+T4 注意事项：
+  - T4 是 Turing 架构（compute capability 7.5），不支持原生 bf16
+  - 脚本自动检测 GPU 并切换为 fp16 模式
+  - QLoRA 的 compute_dtype 也会自动适配为 fp16
+  - T4 16GB 显存可跑所有预设的 LoRA 模式（0.5B/1.5B/3.5-2B）
 
 用法：
     # 标准训练（默认 Qwen2.5-0.5B）
@@ -46,6 +59,9 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
 
     # QLoRA 4bit 量化训练（显存不够时，所有模型均可用）
     python train_gpu_lora.py --qlora
+
+    # 8GB 显存推荐配置（如 GTX 1070/2060）
+    python train_gpu_lora.py --qlora --max-len 1024 --batch-size 1
 
     # 使用更大模型
     python train_gpu_lora.py --model-path ./model_cache/qwen2.5-1.5b
@@ -172,6 +188,43 @@ SYSTEM_PROMPT = (
 
 
 # ═══════════════════════════════════════════════════════════════════
+# GPU 能力检测
+# ═══════════════════════════════════════════════════════════════════
+
+def get_gpu_capability() -> tuple:
+    """检测 GPU 的 compute capability 和是否支持 bf16。
+    
+    Returns:
+        (major, minor) — compute capability, 如 (8, 6) 表示 SM 8.6
+        如果无 GPU 返回 (0, 0)
+    """
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return torch.cuda.get_device_capability(0)
+    except Exception:
+        pass
+    return (0, 0)
+
+
+def supports_bf16() -> bool:
+    """检测当前 GPU 是否支持原生 bf16（需要 Ampere+, SM >= 8.0）。"""
+    major, _ = get_gpu_capability()
+    return major >= 8
+
+
+def get_train_dtype():
+    """获取训练精度：bf16 优先，T4 等不支持时回退到 fp16。"""
+    import torch
+    if not torch.cuda.is_available():
+        return torch.float32
+    if supports_bf16():
+        return torch.bfloat16
+    print("  [INFO] GPU 不支持 bf16（Turing 架构如 T4），使用 fp16 替代")
+    return torch.float16
+
+
+# ═══════════════════════════════════════════════════════════════════
 # 第 1 步：环境检查
 # ═══════════════════════════════════════════════════════════════════
 
@@ -190,7 +243,10 @@ def check_environment(require_gpu: bool = True) -> bool:
         if torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9
-            print(f"  [OK] GPU: {gpu_name} ({gpu_mem:.1f} GB)")
+            major, minor = torch.cuda.get_device_capability(0)
+            print(f"  [OK] GPU: {gpu_name} ({gpu_mem:.1f} GB, SM {major}.{minor})")
+            if not supports_bf16():
+                print(f"  [INFO] 此 GPU 不支持原生 bf16（需 SM >= 8.0），将自动使用 fp16")
         else:
             if require_gpu:
                 print("  [FAIL] 未检测到 GPU，此脚本需要 GPU 环境")
@@ -389,6 +445,14 @@ def train(
     print(f"  模型路径: {model_path}")
     print(f"  QLoRA 4bit: {'是' if use_qlora else '否'}")
 
+    # 自动检测 GPU 精度能力（T4 不支持 bf16，自动切 fp16）
+    train_dtype = get_train_dtype()
+    use_fp16 = (train_dtype == torch.float16)
+    if use_fp16:
+        print("  [INFO] 使用 fp16 精度（GPU 不支持 bf16）")
+    else:
+        print("  [INFO] 使用 bf16 精度")
+
     tokenizer = AutoTokenizer.from_pretrained(
         model_path, trust_remote_code=True
     )
@@ -396,12 +460,12 @@ def train(
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    # 加载模型 —— GPU 模式使用 bf16 或 4bit 量化
+    # 加载模型 —— GPU 模式使用 bf16/fp16 或 4bit 量化
     if use_qlora:
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
+            bnb_4bit_compute_dtype=train_dtype,  # T4 用 fp16, Ampere+ 用 bf16
             bnb_4bit_use_double_quant=True,
         )
         model = AutoModelForCausalLM.from_pretrained(
@@ -413,10 +477,10 @@ def train(
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
-            dtype=torch.bfloat16,
+            dtype=train_dtype,  # 自动选择 bf16 或 fp16
             trust_remote_code=True,
         )
-        print("  [LoRA] 模型已 bf16 加载")
+        print(f"  [LoRA] 模型已 {'fp16' if use_fp16 else 'bf16'} 加载")
 
     # 自动选择设备
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -481,11 +545,12 @@ def train(
     # GPU 速度估算
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
+        gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9
         # 粗略估算：0.5B 模型 ~0.1秒/样本, 1.5B ~0.3秒/样本
         param_count = sum(p.numel() for p in model.parameters()) / 1e9
         sec_per_sample = max(0.05, param_count * 0.2)
         est_time = total_samples * sec_per_sample
-        print(f"  GPU: {gpu_name}")
+        print(f"  GPU: {gpu_name} ({gpu_mem:.1f} GB)")
         print(f"  预计总步数: ~{total_steps}")
         print(f"  预计时间: ~{est_time:.0f} 秒 ({est_time / 60:.1f} 分钟)")
     else:
@@ -494,8 +559,17 @@ def train(
 
     print(f"  batch_size: {batch_size} x grad_accum: {grad_accum} = 等效 batch {batch_size * grad_accum}")
     print(f"  epochs: {epochs}, lr: {lr}, LoRA rank: {lora_rank}")
-    print(f"  precision: bf16, QLoRA: {use_qlora}")
+    # 显示精度模式
+    use_fp16_mode = use_fp16 if 'use_fp16' in dir() else (not supports_bf16())
+    if use_fp16_mode:
+        print(f"  precision: fp16, QLoRA: {use_qlora}")
+    else:
+        print(f"  precision: bf16, QLoRA: {use_qlora}")
     print()
+
+    # 根据 GPU 能力选择精度（T4 不支持 bf16，使用 fp16）
+    use_bf16 = torch.cuda.is_available() and supports_bf16()
+    use_fp16_flag = torch.cuda.is_available() and not use_bf16
 
     training_args = TrainingArguments(
         output_dir=checkpoint_dir,
@@ -509,8 +583,8 @@ def train(
         logging_steps=5,
         save_steps=save_steps,
         save_total_limit=3,
-        bf16=torch.cuda.is_available(),  # GPU 用 bf16
-        fp16=False,
+        bf16=use_bf16,      # Ampere+ 用 bf16
+        fp16=use_fp16_flag,  # T4 等 Turing 架构用 fp16
         gradient_checkpointing=gradient_checkpointing,
         report_to="none",
         seed=42,
@@ -539,6 +613,8 @@ def train(
     print(f"\nLoRA 权重保存到: {final_dir}")
 
     # 保存训练信息
+    gpu_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
+    gpu_caps = get_gpu_capability()
     info = {
         "model_path": model_path,
         "dataset_path": _DATASET_PATH,
@@ -551,8 +627,10 @@ def train(
         "batch_size": batch_size,
         "grad_accum": grad_accum,
         "use_qlora": use_qlora,
+        "precision": "fp16" if (torch.cuda.is_available() and not supports_bf16()) else ("bf16" if torch.cuda.is_available() else "fp32"),
+        "gpu": gpu_name,
+        "gpu_compute_capability": f"{gpu_caps[0]}.{gpu_caps[1]}",
         "training_time_seconds": elapsed,
-        "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU",
         "system_prompt": SYSTEM_PROMPT,
     }
     info_path = os.path.join(output_dir, "training_info.json")
@@ -577,7 +655,11 @@ def test_inference(model_path: str, lora_path: str):
     print("=" * 60)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dtype = torch.bfloat16 if torch.cuda.is_available() else torch.float32
+    # 推理精度也需适配 GPU 能力（T4 用 fp16，Ampere+ 用 bf16）
+    if torch.cuda.is_available():
+        dtype = torch.bfloat16 if supports_bf16() else torch.float16
+    else:
+        dtype = torch.float32
 
     tokenizer = AutoTokenizer.from_pretrained(
         model_path, trust_remote_code=True
@@ -690,6 +772,38 @@ def main():
         print(f"  max_len={args.max_len}, batch_size={args.batch_size}, grad_accum={args.grad_accum}")
         print(f"  lora_rank={args.lora_rank}, lora_alpha={args.lora_alpha}, lr={args.lr}")
         print()
+
+    # ── T4 / 低显存 GPU 自动调参 ──
+    # T4 (16GB) 支持 max_len=8192 + batch_size=2
+    # 8GB 显存 GPU 需要降低 max_len 或使用 QLoRA
+    try:
+        import torch
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_mem_gb = torch.cuda.get_device_properties(0).total_memory / 1e9
+            major, minor = torch.cuda.get_device_capability(0)
+            is_t4 = "T4" in gpu_name or "Tesla T4" in gpu_name
+
+            if is_t4 or gpu_mem_gb < 10:
+                # T4 或低显存 GPU：自动调整参数
+                if not args.qlora and gpu_mem_gb < 10:
+                    # 8GB 以下非 QLoRA：降低 max_len 避免显存溢出
+                    if args.max_len > 1024:
+                        print(f"[自适应] GPU 显存 {gpu_mem_gb:.1f}GB < 10GB，max_len {args.max_len}→1024")
+                        args.max_len = 1024
+                    if args.batch_size > 1:
+                        print(f"[自适应] batch_size {args.batch_size}→1（低显存）")
+                        args.batch_size = 1
+
+                if is_t4:
+                    print(f"[T4 检测] Tesla T4 ({gpu_mem_gb:.1f}GB, SM {major}.{minor})")
+                    print(f"  bf16 不支持，自动切换 fp16")
+                    print(f"  当前配置: max_len={args.max_len}, batch_size={args.batch_size}, QLoRA={args.qlora}")
+                    if not args.qlora and args.max_len > 2048:
+                        print(f"  [建议] max_len={args.max_len} 可能偏大，T4 fp16 模式建议 --max-len 2048 或 --qlora")
+                        print(f"  [建议] 如显存不足，加 --qlora 可降至 ~3GB 显存")
+    except ImportError:
+        pass
 
     # ── QLoRA 检查与警告 ──
     if args.qlora:
