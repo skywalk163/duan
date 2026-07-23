@@ -24,21 +24,25 @@ MODELS = {
     "qwen2.5-0.5b": {
         "hf_id": "Qwen/Qwen2.5-0.5B-Instruct",
         "size_gb": 1.0,
+        "min_transformers": "4.44.0",
         "desc": "0.5B 参数，CPU 训练/推理最快，适合 11GB 内存环境",
     },
     "qwen2.5-1.5b": {
         "hf_id": "Qwen/Qwen2.5-1.5B-Instruct",
         "size_gb": 3.0,
+        "min_transformers": "4.44.0",
         "desc": "1.5B 参数，效果更好但训练慢约 3 倍",
     },
     "qwen2.5-coder-1.5b": {
         "hf_id": "Qwen/Qwen2.5-Coder-1.5B-Instruct",
         "size_gb": 3.0,
+        "min_transformers": "4.44.0",
         "desc": "1.5B 代码专用模型，代码生成能力强",
     },
     "qwen3.5-2b": {
         "hf_id": "Qwen/Qwen3.5-2B",
         "size_gb": 4.5,
+        "min_transformers": "5.0.0",
         "desc": "2B 参数，多模态架构（Gated DeltaNet + MoE），需 transformers>=5.0，GPU LoRA ~5GB 显存",
     },
 }
@@ -62,6 +66,8 @@ def download_model(model_key: str, cache_dir: str = None):
     print(f"  参数量: {model_key}")
     print(f"  大小:   ~{info['size_gb']} GB")
     print(f"  说明:   {info['desc']}")
+    if min_ver != "4.0.0":
+        print(f"  要求:   transformers >= {min_ver}")
     print(f"  目标:   {cache_dir}")
     print("=" * 60)
 
@@ -72,6 +78,25 @@ def download_model(model_key: str, cache_dir: str = None):
         print("\n[ERROR] transformers 未安装")
         print("  请先运行: pip install transformers")
         sys.exit(1)
+
+    # 检查 transformers 版本是否满足模型要求
+    min_ver = info.get("min_transformers", "4.0.0")
+    try:
+        import transformers
+        current_ver = transformers.__version__
+        from packaging.version import Version
+        if Version(current_ver) < Version(min_ver):
+            print(f"\n[ERROR] transformers 版本过低: {current_ver}")
+            print(f"  模型 {model_key} ({hf_id}) 需要 transformers >= {min_ver}")
+            print(f"  请升级: pip install --upgrade transformers")
+            print(f"  如 PyPI 版本仍不够新，可从源码安装:")
+            print(f"  pip install git+https://github.com/huggingface/transformers.git")
+            sys.exit(1)
+        else:
+            print(f"  [OK] transformers {current_ver} (需要 >= {min_ver})")
+    except ImportError:
+        # packaging 可能不可用，用简单版本比较兜底
+        pass
 
     # 检查目录是否已有模型
     if os.path.exists(cache_dir) and os.path.exists(os.path.join(cache_dir, "config.json")):

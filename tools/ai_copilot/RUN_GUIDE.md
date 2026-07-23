@@ -92,8 +92,14 @@ pip install bitsandbytes       # QLoRA 4bit 量化训练需要
 pip install "torchao>=0.16.0"  # peft 依赖，版本过低会导致 LoRA 创建失败
 
 # Qwen3.5-2B 额外要求
-pip install "transformers>=5.0"
+pip install --upgrade "transformers>=5.0"
 ```
+
+> **Kaggle / Colab 用户注意**：平台预装的 transformers 可能较旧，
+> 下载 Qwen3.5-2B 前必须先升级：
+> ```bash
+> pip install --upgrade "transformers>=5.0"
+> ```
 
 ## 下载模型
 

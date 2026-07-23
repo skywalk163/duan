@@ -8,10 +8,12 @@
 
 # 核心依赖
 # Qwen3.5-2B 需要 transformers>=5.0，实测 5.14.1 可用
+# Kaggle/Colab 预装版本可能较旧，安装后会自动升级
 transformers>=5.0,<6.0
 peft>=0.13.0
 datasets>=2.20.0
 accelerate>=0.34.0
+packaging>=23.0
 
 # QLoRA 4bit 量化训练（显存不足时使用，所有模型均可用）
 bitsandbytes>=0.43.0
