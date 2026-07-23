@@ -532,7 +532,8 @@ def train(
         tokenizer.pad_token = tokenizer.eos_token
         tokenizer.pad_token_id = tokenizer.eos_token_id
 
-    # 加载模型 —— GPU 模式使用 bf16/fp16 或 4bit 量化
+    # 加载模型 —— 训练时用 fp32 加载，由 Trainer 的混合精度（fp16/bf16）处理前向/反向
+    # 不要用 fp16 加载模型权重！否则 fp16 权重 + fp16 混合精度 = 双重精度损失 → grad_norm=nan
     if use_qlora:
         bnb_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -554,10 +555,10 @@ def train(
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
-            dtype=train_dtype,  # 自动选择 bf16 或 fp16
+            dtype=torch.float32,  # fp32 加载权重，Trainer 的 fp16/bf16 混合精度负责前向/反向
             trust_remote_code=True,
         )
-        print(f"  [LoRA] 模型已 {'fp16' if use_fp16 else 'bf16'} 加载")
+        print(f"  [LoRA] 模型已 fp32 加载（训练时由 Trainer 混合精度处理）")
 
     # 设备分配：
     #   - 单 GPU: 手动 .to(device)
@@ -621,6 +622,8 @@ def train(
 
     total_samples = len(train_dataset) * epochs
     total_steps = total_samples // (batch_size * grad_accum) + 1
+    if use_multi_gpu:
+        total_steps = total_steps // gpu_count  # DDP 每步处理 gpu_count 倍数据
     if max_steps > 0:
         total_steps = max_steps
 
@@ -665,18 +668,19 @@ def train(
 
     training_args = TrainingArguments(
         output_dir=checkpoint_dir,
-        num_train_epochs=epochs,
-        max_steps=max_steps,
+        num_train_epochs=epochs if max_steps <= 0 else 1,
+        max_steps=max_steps if max_steps > 0 else -1,
         per_device_train_batch_size=batch_size,
         gradient_accumulation_steps=grad_accum,
         learning_rate=lr,
         lr_scheduler_type="cosine",
-        warmup_ratio=warmup_ratio,
+        warmup_steps=max(1, int(total_steps * 0.05)),  # warmup 5% 步数，至少 1 步
         logging_steps=5,
         save_steps=save_steps,
         save_total_limit=3,
         bf16=use_bf16,      # Ampere+ 用 bf16
         fp16=use_fp16_flag,  # T4 等 Turing 架构用 fp16
+        max_grad_norm=1.0,   # 梯度裁剪，防止 grad_norm=nan
         gradient_checkpointing=gradient_checkpointing,
         report_to="none",
         seed=42,
