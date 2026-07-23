@@ -146,10 +146,64 @@ PARAMETER stop "<|endoftext|>"
     return output_dir
 
 
+# convert_hf_to_gguf.py 直接支持的格式
+_GGUF_DIRECT_TYPES = {"f32", "f16", "bf16", "q8_0", "tq1_0", "tq2_0", "auto"}
+
+
+def _find_llama_cpp():
+    """查找 llama.cpp 根目录，返回 (convert_script, llama_quantize_bin)"""
+    convert_script = None
+    llama_quantize = None
+
+    # 候选 llama.cpp 根目录
+    candidates = [
+        os.path.join(_SCRIPT_DIR, "..", "..", "llama.cpp"),
+        os.path.join(os.path.expanduser("~"), "llama.cpp"),
+    ]
+    for root in candidates:
+        cs = os.path.join(root, "convert_hf_to_gguf.py")
+        if os.path.exists(cs):
+            convert_script = cs
+            # 查找 llama-quantize 二进制
+            for name in ["llama-quantize", "llama-quantize.exe", "quantize", "quantize.exe"]:
+                p = os.path.join(root, "build", "bin", name)
+                if os.path.exists(p):
+                    llama_quantize = p
+                    break
+                # 某些构建布局
+                p = os.path.join(root, name)
+                if os.path.exists(p):
+                    llama_quantize = p
+                    break
+            break
+
+    # 尝试 PATH 中的 convert_hf_to_gguf.py
+    if convert_script is None:
+        for name in ["convert_hf_to_gguf.py"]:
+            import shutil as _sh
+            found = _sh.which(name)
+            if found:
+                convert_script = found
+                break
+
+    # 尝试 PATH 中的 llama-quantize
+    if llama_quantize is None:
+        import shutil as _sh
+        for name in ["llama-quantize", "llama-quantize.exe"]:
+            found = _sh.which(name)
+            if found:
+                llama_quantize = found
+                break
+
+    return convert_script, llama_quantize
+
+
 def convert_to_gguf(model_dir: str, output_gguf: str = None, quantize: str = "q4_k_m"):
     """将合并后的模型转换为 GGUF 格式
 
-    需要 llama.cpp 的 convert_hf_to_gguf.py 脚本。
+    两步流程：
+      1. convert_hf_to_gguf.py 只支持基础格式 (f32/f16/bf16/q8_0)
+      2. 高级量化 (q4_K_M/q5_K_M 等) 需要先用 f16 导出，再用 llama-quantize 量化
     """
     print("\n" + "=" * 60)
     print("转换为 GGUF 格式")
@@ -158,40 +212,17 @@ def convert_to_gguf(model_dir: str, output_gguf: str = None, quantize: str = "q4
     if output_gguf is None:
         output_gguf = os.path.join(model_dir, "duan_translator.gguf")
 
-    # 查找 llama.cpp 的转换脚本
-    convert_script = None
-    candidates = [
-        os.path.join(_SCRIPT_DIR, "..", "..", "llama.cpp", "convert_hf_to_gguf.py"),
-        os.path.join(os.path.expanduser("~"), "llama.cpp", "convert_hf_to_gguf.py"),
-        "convert_hf_to_gguf.py",  # 如果在 PATH 中
-    ]
-    for candidate in candidates:
-        if os.path.exists(candidate):
-            convert_script = candidate
-            break
-
-    # 尝试 pip 安装的 llama_cpp
-    if convert_script is None:
-        try:
-            import llama_cpp
-            # 有些版本附带转换脚本
-            convert_script = os.path.join(
-                os.path.dirname(llama_cpp.__file__),
-                "convert_hf_to_gguf.py",
-            )
-            if not os.path.exists(convert_script):
-                convert_script = None
-        except ImportError:
-            pass
+    convert_script, llama_quantize = _find_llama_cpp()
 
     if convert_script is None:
         print("[WARN] 未找到 llama.cpp 转换脚本")
         print("\n请手动安装 llama.cpp:")
         print("  git clone https://github.com/ggerganov/llama.cpp")
-        print("  cd llama.cpp")
-        print("  pip install -r requirements.txt")
+        print("  cd llama.cpp && pip install -r requirements.txt")
         print(f"\n然后运行:")
-        print(f"  python llama.cpp/convert_hf_to_gguf.py {model_dir} --outfile {output_gguf} --outtype {quantize}")
+        print(f"  python llama.cpp/convert_hf_to_gguf.py {model_dir} --outfile {output_gguf} --outtype f16")
+        if quantize not in _GGUF_DIRECT_TYPES:
+            print(f"  llama-quantize {output_gguf} {output_gguf.replace('.gguf', f'_{quantize}.gguf')} {quantize}")
         print(f"\n或者使用 Python 直接推理（不需要 GGUF）:")
         print(f"  python local_infer.py --fine-tuned")
         return False
@@ -202,21 +233,69 @@ def convert_to_gguf(model_dir: str, output_gguf: str = None, quantize: str = "q4
     print(f"  转换脚本: {convert_script}")
     print()
 
-    cmd = [
-        sys.executable, convert_script,
-        model_dir,
-        "--outfile", output_gguf,
-        "--outtype", quantize,
-    ]
+    # 判断是否需要两步（高级量化需要先 f16 再 llama-quantize）
+    needs_two_step = quantize not in _GGUF_DIRECT_TYPES
 
-    result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
-    if result.returncode != 0:
-        print(f"[ERROR] GGUF 转换失败:")
-        print(result.stdout)
-        print(result.stderr)
-        return False
+    if needs_two_step:
+        # ── 第一步：convert_hf_to_gguf.py 导出 f16 ──
+        f16_gguf = output_gguf.replace(".gguf", "_f16.gguf")
+        print(f"  [步骤 1/2] 导出 f16 GGUF...")
+        cmd = [
+            sys.executable, convert_script,
+            model_dir,
+            "--outfile", f16_gguf,
+            "--outtype", "f16",
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        if result.returncode != 0:
+            print(f"[ERROR] f16 转换失败:")
+            print(result.stdout)
+            print(result.stderr)
+            return False
+        f16_size = os.path.getsize(f16_gguf) / (1024 * 1024)
+        print(f"  [OK] f16 GGUF: {f16_gguf} ({f16_size:.0f} MB)")
 
-    print(f"  GGUF 转换完成: {output_gguf}")
+        # ── 第二步：llama-quantize 量化 ──
+        if llama_quantize is None:
+            print(f"\n  [WARN] 未找到 llama-quantize 二进制")
+            print(f"  f16 GGUF 已生成: {f16_gguf}")
+            print(f"  请手动编译 llama.cpp 后运行:")
+            print(f"    cd llama.cpp && make")
+            print(f"    llama-quantize {f16_gguf} {output_gguf} {quantize}")
+            return False
+
+        print(f"  [步骤 2/2] 量化为 {quantize}...")
+        cmd = [llama_quantize, f16_gguf, output_gguf, quantize]
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        if result.returncode != 0:
+            print(f"[ERROR] 量化失败:")
+            print(result.stdout)
+            print(result.stderr)
+            return False
+
+        # 清理中间文件
+        try:
+            os.remove(f16_gguf)
+            print(f"  [OK] 已清理中间文件: {f16_gguf}")
+        except OSError:
+            pass
+
+    else:
+        # ── 基础格式直接转换 ──
+        cmd = [
+            sys.executable, convert_script,
+            model_dir,
+            "--outfile", output_gguf,
+            "--outtype", quantize,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        if result.returncode != 0:
+            print(f"[ERROR] GGUF 转换失败:")
+            print(result.stdout)
+            print(result.stderr)
+            return False
+
+    print(f"\n  GGUF 转换完成: {output_gguf}")
     size_mb = os.path.getsize(output_gguf) / (1024 * 1024)
     print(f"  文件大小: {size_mb:.0f} MB")
 
