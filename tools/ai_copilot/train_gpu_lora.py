@@ -38,13 +38,15 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
   例如: --preset qwen3.5-2b --max-len 2048
         max_len 使用命令行的 2048，其余参数用预设值
 
-显存需求（gradient_checkpointing=on）：
-  Qwen2.5-0.5B LoRA fp16  (max_len=2048): ~4.5 GB   ← T4/8GB 显卡推荐
-  Qwen2.5-0.5B LoRA bf16  (max_len=8192): ~5 GB
+显存需求（gradient_checkpointing=on, fp32 加载 + fp16 混合精度）：
+  Qwen2.5-0.5B LoRA fp16  (max_len=2048): ~5 GB   ← T4/8GB 显卡推荐
+  Qwen2.5-0.5B LoRA fp16  (max_len=4096): ~11 GB  ← T4 16GB 实测安全上限
+  Qwen2.5-0.5B LoRA fp16  (max_len=8192): OOM on T4 ← 需 --qlora 或 24GB 显卡
   Qwen2.5-0.5B QLoRA 4bit (max_len=8192): ~3 GB
-  Qwen2.5-1.5B LoRA fp16  (max_len=1024): ~7 GB   ← 8GB 显卡勉强可跑
+  Qwen2.5-1.5B LoRA fp16  (max_len=1024): ~8 GB   ← 8GB 显卡勉强可跑
   Qwen2.5-1.5B QLoRA 4bit (max_len=8192): ~4 GB
-  Qwen3.5-2B   LoRA fp16  (max_len=2048): ~5 GB
+  Qwen3.5-2B   LoRA fp16  (max_len=2048): ~6 GB
+  Qwen3.5-2B   LoRA fp16  (max_len=4096): ~11 GB  ← T4 16GB 安全上限
   Qwen3.5-2B   QLoRA 4bit (max_len=8192): ~3 GB
 
 T4 注意事项：
@@ -902,8 +904,10 @@ def main():
         args.lr = 2e-4
 
     # ── T4 / 低显存 GPU 自动调参 ──
-    # T4 (16GB) 支持 max_len=8192 + batch_size=2
-    # 8GB 显存 GPU 需要降低 max_len 或使用 QLoRA
+    # fp32 加载模型后显存翻倍，T4 (16GB) 实测：
+    #   max_len=4096, batch_size=1 → ~11GB（安全）
+    #   max_len=8192, batch_size=1 → OOM
+    # 因此 T4 强制限制：max_len ≤ 4096, batch_size ≤ 1
     try:
         import torch
         if torch.cuda.is_available():
@@ -913,23 +917,24 @@ def main():
             is_t4 = "T4" in gpu_name or "Tesla T4" in gpu_name
 
             if is_t4 or gpu_mem_gb < 10:
-                # T4 或低显存 GPU：自动调整参数
-                if not args.qlora and gpu_mem_gb < 10:
-                    # 8GB 以下非 QLoRA：降低 max_len 避免显存溢出
-                    if args.max_len > 1024:
-                        print(f"[自适应] GPU 显存 {gpu_mem_gb:.1f}GB < 10GB，max_len {args.max_len}→1024")
-                        args.max_len = 1024
+                # T4 或低显存 GPU：强制降低参数
+                if not args.qlora:
+                    # T4 (16GB) fp32 模式：max_len 上限 4096
+                    t4_max_len_limit = 4096 if is_t4 else 1024
+                    if args.max_len > t4_max_len_limit:
+                        print(f"[自适应] GPU {'T4' if is_t4 else gpu_mem_gb:.0f+'GB'}, max_len {args.max_len}→{t4_max_len_limit}（fp32 加载显存翻倍）")
+                        args.max_len = t4_max_len_limit
                     if args.batch_size > 1:
                         print(f"[自适应] batch_size {args.batch_size}→1（低显存）")
                         args.batch_size = 1
 
                 if is_t4:
                     print(f"[T4 检测] Tesla T4 ({gpu_mem_gb:.1f}GB, SM {major}.{minor})")
-                    print(f"  bf16 不支持，自动切换 fp16")
+                    print(f"  bf16 不支持，自动切换 fp16 混合精度")
+                    print(f"  fp32 加载 + fp16 混合精度训练")
                     print(f"  当前配置: max_len={args.max_len}, batch_size={args.batch_size}, QLoRA={args.qlora}")
-                    if not args.qlora and args.max_len > 2048:
-                        print(f"  [建议] max_len={args.max_len} 可能偏大，T4 fp16 模式建议 --max-len 2048 或 --qlora")
-                        print(f"  [建议] 如显存不足，加 --qlora 可降至 ~3GB 显存")
+                    if not args.qlora:
+                        print(f"  [提示] 如需 max_len=8192，加 --qlora 可降至 ~3GB 显存")
     except ImportError:
         pass
 
