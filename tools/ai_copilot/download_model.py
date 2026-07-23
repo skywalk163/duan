@@ -66,6 +66,7 @@ def download_model(model_key: str, cache_dir: str = None):
     print(f"  参数量: {model_key}")
     print(f"  大小:   ~{info['size_gb']} GB")
     print(f"  说明:   {info['desc']}")
+    min_ver = info.get("min_transformers", "4.0.0")
     if min_ver != "4.0.0":
         print(f"  要求:   transformers >= {min_ver}")
     print(f"  目标:   {cache_dir}")
@@ -80,7 +81,6 @@ def download_model(model_key: str, cache_dir: str = None):
         sys.exit(1)
 
     # 检查 transformers 版本是否满足模型要求
-    min_ver = info.get("min_transformers", "4.0.0")
     try:
         import transformers
         current_ver = transformers.__version__

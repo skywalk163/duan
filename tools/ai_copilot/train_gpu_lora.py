@@ -28,9 +28,15 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
 
 支持的平台/GPU：
   RTX 3060/4060/4070/4090 (12-24GB)  — 默认参数直接跑
-  Kaggle T4 (16GB)                     — 默认参数直接跑（T4 不支持 bf16，自动切 fp16）
+  Kaggle 双 T4 (2x16GB)               — 自动检测双 GPU，启用 DDP 分布式训练
+  Kaggle 单 T4 (16GB)                  — 默认参数直接跑（T4 不支持 bf16，自动切 fp16）
   Google Colab T4 (16GB)              — 同上
   8GB 显存 GPU (如 GTX 1070/2060)     — 用 --qlora + --max-len 1024 可跑
+
+参数优先级：
+  命令行参数 > --preset 预设值 > 内置默认值
+  例如: --preset qwen3.5-2b --max-len 2048
+        max_len 使用命令行的 2048，其余参数用预设值
 
 显存需求（gradient_checkpointing=on）：
   Qwen2.5-0.5B LoRA fp16  (max_len=2048): ~4.5 GB   ← T4/8GB 显卡推荐
@@ -46,6 +52,13 @@ T4 注意事项：
   - 脚本自动检测 GPU 并切换为 fp16 模式
   - QLoRA 的 compute_dtype 也会自动适配为 fp16
   - T4 16GB 显存可跑所有预设的 LoRA 模式（0.5B/1.5B/3.5-2B）
+
+Kaggle 双 T4 DDP 注意事项：
+  - Kaggle 提供双 T4 环境，脚本自动检测多 GPU 并启用 DDP
+  - DDP 模式下每个 GPU 各跑一份模型副本，数据并行
+  - 等效 batch = per_device_batch_size × num_gpus × grad_accum
+  - DDP 下不要手动 .to(device)，Trainer 自动处理设备分配
+  - 如需禁用多 GPU，设置环境变量 CUDA_VISIBLE_DEVICES=0
 
 用法：
     # 标准训练（默认 Qwen2.5-0.5B）
@@ -120,7 +133,7 @@ MODEL_PRESETS = {
         "output_dir": os.path.join(_SCRIPT_DIR, "output", "qwen2.5_1.5b_duan_gpu"),
         "max_len": 8192,
         "batch_size": 1,
-        "grad_accum": 16,
+        "grad_accum": 4,
         "lora_rank": 16,
         "lora_alpha": 32,
         "lr": 2e-4,
@@ -132,7 +145,7 @@ MODEL_PRESETS = {
         "output_dir": os.path.join(_SCRIPT_DIR, "output", "qwen3.5_2b_duan_gpu"),
         "max_len": 8192,
         "batch_size": 1,
-        "grad_accum": 16,
+        "grad_accum": 4,
         "lora_rank": 32,
         "lora_alpha": 64,
         "lr": 1e-4,
@@ -224,6 +237,46 @@ def get_train_dtype():
     return torch.float16
 
 
+def get_gpu_count():
+    """检测可用 GPU 数量。"""
+    try:
+        import torch
+        if torch.cuda.is_available():
+            return torch.cuda.device_count()
+    except Exception:
+        pass
+    return 0
+
+
+def detect_kaggle_multi_t4():
+    """检测是否运行在 Kaggle 双 T4 环境中。
+
+    Kaggle 提供的双 T4 环境特征:
+    - 2 块 Tesla T4 GPU
+    - 路径 /kaggle/working 或环境变量 KAGGLE_KERNEL_RUN_TYPE 存在
+    """
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            return False
+        gpu_count = torch.cuda.device_count()
+        if gpu_count < 2:
+            return False
+        # 检查是否所有 GPU 都是 T4
+        all_t4 = all(
+            "T4" in torch.cuda.get_device_name(i)
+            for i in range(gpu_count)
+        )
+        # 检查 Kaggle 环境标志
+        is_kaggle = (
+            os.path.exists("/kaggle/working")
+            or os.environ.get("KAGGLE_KERNEL_RUN_TYPE") is not None
+        )
+        return all_t4 and is_kaggle
+    except Exception:
+        return False
+
+
 # ═══════════════════════════════════════════════════════════════════
 # 第 1 步：环境检查
 # ═══════════════════════════════════════════════════════════════════
@@ -241,10 +294,20 @@ def check_environment(require_gpu: bool = True) -> bool:
         import torch
         print(f"  [OK] PyTorch {torch.__version__}")
         if torch.cuda.is_available():
+            gpu_count = torch.cuda.device_count()
             gpu_name = torch.cuda.get_device_name(0)
             gpu_mem = torch.cuda.get_device_properties(0).total_memory / 1e9
             major, minor = torch.cuda.get_device_capability(0)
-            print(f"  [OK] GPU: {gpu_name} ({gpu_mem:.1f} GB, SM {major}.{minor})")
+            if gpu_count > 1:
+                print(f"  [OK] 检测到 {gpu_count} 块 GPU:")
+                for i in range(gpu_count):
+                    name_i = torch.cuda.get_device_name(i)
+                    mem_i = torch.cuda.get_device_properties(i).total_memory / 1e9
+                    print(f"         GPU {i}: {name_i} ({mem_i:.1f} GB)")
+                if detect_kaggle_multi_t4():
+                    print(f"  [OK] Kaggle 双 T4 环境检测到，将启用 DDP 分布式训练")
+            else:
+                print(f"  [OK] GPU: {gpu_name} ({gpu_mem:.1f} GB, SM {major}.{minor})")
             if not supports_bf16():
                 print(f"  [INFO] 此 GPU 不支持原生 bf16（需 SM >= 8.0），将自动使用 fp16")
         else:
@@ -439,11 +502,20 @@ def train(
     )
     from peft import LoraConfig, get_peft_model, TaskType
 
+    # 检测多 GPU 环境
+    gpu_count = get_gpu_count()
+    use_multi_gpu = gpu_count > 1
+    is_kaggle_dual_t4 = detect_kaggle_multi_t4()
+
     print("\n" + "=" * 60)
     print("第 2 步：加载模型")
     print("=" * 60)
     print(f"  模型路径: {model_path}")
     print(f"  QLoRA 4bit: {'是' if use_qlora else '否'}")
+    if use_multi_gpu:
+        print(f"  [多GPU] 检测到 {gpu_count} 块 GPU，将启用 DDP 分布式训练")
+        if is_kaggle_dual_t4:
+            print(f"  [Kaggle] 双 T4 环境已确认")
 
     # 自动检测 GPU 精度能力（T4 不支持 bf16，自动切 fp16）
     train_dtype = get_train_dtype()
@@ -474,6 +546,11 @@ def train(
             trust_remote_code=True,
         )
         print("  [QLoRA] 模型已 4bit 量化加载")
+        # QLoRA 多 GPU: bitsandbytes 量化模型已在 GPU 0 上，不手动 .to()
+        if use_multi_gpu:
+            print(f"  [WARN] QLoRA + 多 GPU: bitsandbytes 量化模型仅在 GPU 0 上运行")
+            print(f"         多 GPU 并行不生效，建议去掉 --qlora 以使用双 T4 DDP")
+            use_multi_gpu = False  # QLoRA 降级为单 GPU
     else:
         model = AutoModelForCausalLM.from_pretrained(
             model_path,
@@ -482,10 +559,15 @@ def train(
         )
         print(f"  [LoRA] 模型已 {'fp16' if use_fp16 else 'bf16'} 加载")
 
-    # 自动选择设备
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model = model.to(device)
-    print(f"  设备: {device}")
+    # 设备分配：
+    #   - 单 GPU: 手动 .to(device)
+    #   - 多 GPU (DDP): 由 Trainer 自动处理，不手动 .to(device)
+    if use_multi_gpu:
+        print(f"  设备: DDP 自动分配 ({gpu_count} GPUs)")
+    else:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model = model.to(device)
+        print(f"  设备: {device}")
     print(f"  模型参数量: {sum(p.numel() for p in model.parameters()) / 1e6:.1f}M")
 
     # gradient checkpointing（省显存，大模型推荐）
@@ -550,14 +632,24 @@ def train(
         param_count = sum(p.numel() for p in model.parameters()) / 1e9
         sec_per_sample = max(0.05, param_count * 0.2)
         est_time = total_samples * sec_per_sample
-        print(f"  GPU: {gpu_name} ({gpu_mem:.1f} GB)")
+        if use_multi_gpu:
+            est_time = est_time / gpu_count  # 多 GPU 近似线性加速
+            print(f"  GPU: {gpu_count}x {gpu_name} ({gpu_mem:.1f} GB each)")
+            print(f"  [DDP] 数据并行，每 GPU 独立跑一份模型副本")
+        else:
+            print(f"  GPU: {gpu_name} ({gpu_mem:.1f} GB)")
         print(f"  预计总步数: ~{total_steps}")
         print(f"  预计时间: ~{est_time:.0f} 秒 ({est_time / 60:.1f} 分钟)")
     else:
         print(f"  预计总步数: ~{total_steps}")
         print(f"  [WARN] CPU 模式，预计 ~{total_samples * 7 / 3600:.1f} 小时")
 
-    print(f"  batch_size: {batch_size} x grad_accum: {grad_accum} = 等效 batch {batch_size * grad_accum}")
+    effective_batch = batch_size * grad_accum
+    if use_multi_gpu:
+        effective_batch *= gpu_count
+        print(f"  batch_size: {batch_size} x grad_accum: {grad_accum} x GPUs: {gpu_count} = 等效 batch {effective_batch}")
+    else:
+        print(f"  batch_size: {batch_size} x grad_accum: {grad_accum} = 等效 batch {effective_batch}")
     print(f"  epochs: {epochs}, lr: {lr}, LoRA rank: {lora_rank}")
     # 显示精度模式
     use_fp16_mode = use_fp16 if 'use_fp16' in dir() else (not supports_bf16())
@@ -591,6 +683,8 @@ def train(
         dataloader_num_workers=0,
         remove_unused_columns=False,
         optim="adamw_torch",
+        # DDP 多 GPU 配置
+        ddp_find_unused_parameters=False,  # gradient_checkpointing + LoRA 需设 False
     )
 
     trainer = Trainer(
@@ -629,6 +723,10 @@ def train(
         "use_qlora": use_qlora,
         "precision": "fp16" if (torch.cuda.is_available() and not supports_bf16()) else ("bf16" if torch.cuda.is_available() else "fp32"),
         "gpu": gpu_name,
+        "gpu_count": gpu_count,
+        "ddp_enabled": use_multi_gpu,
+        "kaggle_dual_t4": is_kaggle_dual_t4,
+        "effective_batch_size": batch_size * grad_accum * (gpu_count if use_multi_gpu else 1),
         "gpu_compute_capability": f"{gpu_caps[0]}.{gpu_caps[1]}",
         "training_time_seconds": elapsed,
         "system_prompt": SYSTEM_PROMPT,
@@ -723,19 +821,19 @@ def main():
     )
     parser.add_argument(
         "--model-path", default=_DEFAULT_MODEL_PATH,
-        help=f"预训练模型路径（默认 {_DEFAULT_MODEL_PATH}，--preset 会覆盖）",
+        help=f"预训练模型路径（默认 {_DEFAULT_MODEL_PATH}，--preset 会自动设置）",
     )
     parser.add_argument(
         "--output-dir", default=_DEFAULT_OUTPUT_DIR,
-        help=f"输出目录（默认 {_DEFAULT_OUTPUT_DIR}，--preset 会覆盖）",
+        help=f"输出目录（默认 {_DEFAULT_OUTPUT_DIR}，--preset 会自动设置）",
     )
     parser.add_argument("--epochs", type=int, default=3, help="训练轮数（默认 3）")
-    parser.add_argument("--lora-rank", type=int, default=16, help="LoRA rank（默认 16）")
-    parser.add_argument("--lora-alpha", type=int, default=32, help="LoRA alpha（默认 32）")
-    parser.add_argument("--lr", type=float, default=2e-4, help="学习率（默认 2e-4）")
-    parser.add_argument("--max-len", type=int, default=8192, help="最大序列长度（默认 8192，覆盖长代码样本）")
-    parser.add_argument("--batch-size", type=int, default=2, help="batch size（默认 2，max_len=8192 时显存友好）")
-    parser.add_argument("--grad-accum", type=int, default=8, help="梯度累积步数（默认 8，等效 batch=16）")
+    parser.add_argument("--lora-rank", type=int, default=None, help="LoRA rank（默认 16，--preset 可覆盖）")
+    parser.add_argument("--lora-alpha", type=int, default=None, help="LoRA alpha（默认 32，--preset 可覆盖）")
+    parser.add_argument("--lr", type=float, default=None, help="学习率（默认 2e-4，--preset 可覆盖）")
+    parser.add_argument("--max-len", type=int, default=None, help="最大序列长度（默认 8192，--preset 可覆盖；命令行优先）")
+    parser.add_argument("--batch-size", type=int, default=None, help="batch size（默认 2，--preset 可覆盖；命令行优先）")
+    parser.add_argument("--grad-accum", type=int, default=None, help="梯度累积步数（默认 8，--preset 可覆盖；命令行优先）")
     parser.add_argument("--save-steps", type=int, default=50, help="保存间隔（默认 50）")
     parser.add_argument(
         "--max-steps", type=int, default=-1,
@@ -755,23 +853,49 @@ def main():
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
 
-    # ── 应用模型预设 ──
+    # ── 应用模型预设（命令行参数优先于预设值）──
     if args.preset:
         preset = MODEL_PRESETS[args.preset]
+        print(f"[预设] {args.preset}: {preset['desc']}")
+
+        # model_path / output_dir: 预设总是覆盖（用户极少手动指定）
         args.model_path = preset["model_path"]
         args.output_dir = preset["output_dir"]
-        args.max_len = preset["max_len"]
-        args.batch_size = preset["batch_size"]
-        args.grad_accum = preset["grad_accum"]
-        args.lora_rank = preset["lora_rank"]
-        args.lora_alpha = preset["lora_alpha"]
-        args.lr = preset["lr"]
-        print(f"[预设] {args.preset}: {preset['desc']}")
+
+        # 训练参数: 仅当用户未通过命令行显式指定时，才使用预设值
+        # argparse default=None 表示用户未指定，非 None 表示用户显式传入了
+        if args.max_len is None:
+            args.max_len = preset["max_len"]
+        if args.batch_size is None:
+            args.batch_size = preset["batch_size"]
+        if args.grad_accum is None:
+            args.grad_accum = preset["grad_accum"]
+        if args.lora_rank is None:
+            args.lora_rank = preset["lora_rank"]
+        if args.lora_alpha is None:
+            args.lora_alpha = preset["lora_alpha"]
+        if args.lr is None:
+            args.lr = preset["lr"]
+
         print(f"  model_path={args.model_path}")
         print(f"  output_dir={args.output_dir}")
         print(f"  max_len={args.max_len}, batch_size={args.batch_size}, grad_accum={args.grad_accum}")
         print(f"  lora_rank={args.lora_rank}, lora_alpha={args.lora_alpha}, lr={args.lr}")
         print()
+
+    # ── 无 preset 时回退到内置默认值 ──
+    if args.max_len is None:
+        args.max_len = 8192
+    if args.batch_size is None:
+        args.batch_size = 2
+    if args.grad_accum is None:
+        args.grad_accum = 8
+    if args.lora_rank is None:
+        args.lora_rank = 16
+    if args.lora_alpha is None:
+        args.lora_alpha = 32
+    if args.lr is None:
+        args.lr = 2e-4
 
     # ── T4 / 低显存 GPU 自动调参 ──
     # T4 (16GB) 支持 max_len=8192 + batch_size=2
