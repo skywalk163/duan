@@ -551,6 +551,19 @@ def train(
     else:
         print("  [INFO] 使用 bf16 精度")
 
+    # ── Qwen3.5 MoE 保护：fp16 直接加载会导致 grad_norm=nan ──
+    # Qwen3.5 是 MoE 架构，gating 网络对精度极敏感：
+    #   fp16 加载 → gate softmax 溢出 → NaN 传播 → loss=0
+    # T4（无 bf16）必须用 QLoRA（NF4 量化对 MoE gate 更友好）
+    # bf16 GPU 可直接 fp32 加载 + bf16 AMP
+    model_path_lower = model_path.lower().replace(os.sep, "/")
+    is_qwen35 = "qwen3.5" in model_path_lower or "qwen3_5" in model_path_lower
+    if is_qwen35 and use_fp16 and not use_qlora and not use_unsloth:
+        print("  [AUTO] Qwen3.5 MoE + T4(fp16) 检测到 → 自动启用 QLoRA")
+        print("         原因: MoE gating 网络对 fp16 精度敏感，直接 fp16 加载会导致 NaN")
+        print("         QLoRA NF4 量化在 compute 阶段恢复 fp16，对 gate 更稳定")
+        use_qlora = True
+
     # ════════════════════════════════════════════════════════════
     # 模型加载 — 两条路径：Unsloth（优化） / 标准 HF+PEFT
     # ════════════════════════════════════════════════════════════
