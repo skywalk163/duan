@@ -21,3 +21,8 @@ bitsandbytes>=0.43.0
 # peft 依赖：torchao 必须 >= 0.16.0，否则 LoRA 模块创建会报 ImportError
 # 报错信息：Found an incompatible version of torchao. Found version 0.10.0, but only versions above 0.16.0 are supported
 torchao>=0.16.0
+
+# Unsloth 优化后端（可选，省 30-50% 显存 + 2x 加速）
+# 安装后可用 --unsloth 参数启用
+# 注意：Unsloth 可能与 transformers 6.x 不兼容，如遇冲突请降级 transformers
+unsloth>=2025.3.19
