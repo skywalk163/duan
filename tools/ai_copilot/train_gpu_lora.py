@@ -639,9 +639,10 @@ def train(
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 quantization_config=bnb_config,
+                attn_implementation="sdpa",
                 trust_remote_code=True,
             )
-            print("  [QLoRA] 模型已 4bit 量化加载")
+            print("  [QLoRA] 模型已 4bit 量化加载, SDPA attention")
             if use_multi_gpu:
                 print(f"  [WARN] QLoRA + 多 GPU: bitsandbytes 量化模型仅在 GPU 0 上运行")
                 print(f"         多 GPU 并行不生效，建议去掉 --qlora 以使用双 T4 DDP")
@@ -652,12 +653,13 @@ def train(
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
                 dtype=load_dtype,
+                attn_implementation="sdpa",
                 trust_remote_code=True,
             )
             if use_fp16:
-                print(f"  [LoRA] 模型已 fp16 加载（T4 模式: fp16 权重 + LoRA fp32 参数, 无 AMP）")
+                print(f"  [LoRA] 模型已 fp16 加载 + SDPA attention（T4 模式: fp16 权重 + LoRA fp32 参数, 无 AMP）")
             else:
-                print(f"  [LoRA] 模型已 fp32 加载（bf16 GPU: fp32 权重 + bf16 AMP）")
+                print(f"  [LoRA] 模型已 fp32 加载 + SDPA attention（bf16 GPU: fp32 权重 + bf16 AMP）")
 
         # 设备分配
         if use_multi_gpu:
@@ -766,6 +768,17 @@ def train(
     use_bf16 = torch.cuda.is_available() and supports_bf16()
     use_fp16_amp = False  # 默认关闭 AMP；T4 不用 AMP，bf16 GPU 用 bf16 AMP
 
+    # ── 优化器选择 ──
+    # 8-bit AdamW (bitsandbytes): 优化器状态用 8-bit 存储，省 ~75% 显存
+    #   QLoRA / Unsloth 时启用（这些场景已依赖 bitsandbytes）
+    #   标准 LoRA + fp32 权重时用 32-bit adamw_torch（精度优先）
+    if use_qlora or use_unsloth:
+        optim_name = "adamw_8bit"
+        print(f"  [OPTIM] adamw_8bit (8-bit AdamW, 省 ~75% 优化器显存)")
+    else:
+        optim_name = "adamw_torch"
+        print(f"  [OPTIM] adamw_torch (32-bit AdamW)")
+
     training_args = TrainingArguments(
         output_dir=checkpoint_dir,
         num_train_epochs=epochs if max_steps <= 0 else 1,
@@ -786,7 +799,7 @@ def train(
         seed=42,
         dataloader_num_workers=0,
         remove_unused_columns=False,
-        optim="adamw_torch",
+        optim=optim_name,
         ddp_find_unused_parameters=False,
     )
 
