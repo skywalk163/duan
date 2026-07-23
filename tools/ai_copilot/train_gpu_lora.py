@@ -554,15 +554,29 @@ def train(
     # ── Qwen3.5 MoE 保护：fp16 直接加载会导致 grad_norm=nan ──
     # Qwen3.5 是 MoE 架构，gating 网络对精度极敏感：
     #   fp16 加载 → gate softmax 溢出 → NaN 传播 → loss=0
-    # T4（无 bf16）必须用 QLoRA（NF4 量化对 MoE gate 更友好）
-    # bf16 GPU 可直接 fp32 加载 + bf16 AMP
+    #
+    # 策略：
+    #   多 GPU (双 T4):  fp32 加载 + DDP（每卡 ~12GB, 16GB 够用）
+    #   单 GPU (T4):     QLoRA NF4（fp32 2B + 长序列可能 OOM）
+    #   bf16 GPU:        fp32 加载 + bf16 AMP（原生支持）
     model_path_lower = model_path.lower().replace(os.sep, "/")
     is_qwen35 = "qwen3.5" in model_path_lower or "qwen3_5" in model_path_lower
     if is_qwen35 and use_fp16 and not use_qlora and not use_unsloth:
-        print("  [AUTO] Qwen3.5 MoE + T4(fp16) 检测到 → 自动启用 QLoRA")
-        print("         原因: MoE gating 网络对 fp16 精度敏感，直接 fp16 加载会导致 NaN")
-        print("         QLoRA NF4 量化在 compute 阶段恢复 fp16，对 gate 更稳定")
-        use_qlora = True
+        if use_multi_gpu:
+            # 多 GPU：fp32 加载保持 DDP，限制 max_len 适配显存
+            print("  [AUTO] Qwen3.5 MoE + 多GPU + T4(fp16) → 使用 fp32 加载保持 DDP")
+            print("         原因: MoE gating 对 fp16 敏感, fp32 加载可避免 NaN")
+            print("         DDP 双卡并行 > QLoRA 单卡量化")
+            use_fp16 = False  # 强制 fp32 加载
+            if max_len > 2048:
+                print(f"         max_len {max_len}→2048（fp32 模型显存适配）")
+                max_len = 2048
+        else:
+            # 单 GPU：QLoRA 避免 fp32 OOM
+            print("  [AUTO] Qwen3.5 MoE + 单GPU + T4(fp16) → 自动启用 QLoRA")
+            print("         原因: MoE gating 网络对 fp16 精度敏感，直接 fp16 加载会导致 NaN")
+            print("         QLoRA NF4 量化在 compute 阶段恢复 fp16，对 gate 更稳定")
+            use_qlora = True
 
     # ════════════════════════════════════════════════════════════
     # 模型加载 — 两条路径：Unsloth（优化） / 标准 HF+PEFT
@@ -696,8 +710,10 @@ def train(
             )
             if use_fp16:
                 print(f"  [LoRA] 模型已 fp16 加载 + SDPA attention（T4 模式: fp16 权重 + LoRA fp32 参数, 无 AMP）")
-            else:
+            elif supports_bf16():
                 print(f"  [LoRA] 模型已 fp32 加载 + SDPA attention（bf16 GPU: fp32 权重 + bf16 AMP）")
+            else:
+                print(f"  [LoRA] 模型已 fp32 加载 + SDPA attention（T4 MoE 保护: fp32 权重, 无 AMP）")
 
         # 设备分配
         if use_multi_gpu:
@@ -808,9 +824,9 @@ def train(
 
     # ── 优化器选择 ──
     # 8-bit AdamW (bitsandbytes): 优化器状态用 8-bit 存储，省 ~75% 显存
-    #   QLoRA / Unsloth 时启用（这些场景已依赖 bitsandbytes）
-    #   标准 LoRA + fp32 权重时用 32-bit adamw_torch（精度优先）
-    if use_qlora or use_unsloth:
+    #   QLoRA / Unsloth / Qwen3.5 fp32 时启用（大模型省显存）
+    #   小模型标准 LoRA 用 32-bit adamw_torch（精度优先）
+    if use_qlora or use_unsloth or is_qwen35:
         optim_name = "adamw_8bit"
         print(f"  [OPTIM] adamw_8bit (8-bit AdamW, 省 ~75% 优化器显存)")
     else:
