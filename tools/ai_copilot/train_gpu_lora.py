@@ -627,6 +627,31 @@ def train(
 
     else:
         # ── 标准 HF + PEFT 路径 ──
+        # 屏蔽 unsloth_zoo 的 monkey-patch（避免 KeyError: 'input_embeds'）
+        # unsloth_zoo 在 import 时会 patch transformers 的 Qwen3.5 attention 逻辑，
+        # 导致标准 HF 路径传 input_ids 时因缺少 input_embeds key 而崩溃
+        import importlib
+        import importlib.util as _ilu
+        if _ilu.find_spec("unsloth_zoo"):
+            # 1) 清除已加载的 unsloth_zoo 相关模块
+            for _mod in list(sys.modules.keys()):
+                if "unsloth_zoo" in _mod:
+                    del sys.modules[_mod]
+            # 2) 阻止重新导入（设为 None 后 import 会报 ModuleNotFoundError）
+            sys.modules["unsloth_zoo"] = None
+            # 3) 重载 Qwen3.5 模型模块，恢复未被 patch 的原始函数
+            _qwen35_mod = "transformers.models.qwen3_5.modeling_qwen3_5"
+            if _qwen35_mod in sys.modules:
+                importlib.reload(sys.modules[_qwen35_mod])
+            # 4) 也重载 masking 相关模块（create_causal_mask 可能定义在此）
+            for _mod_name in list(sys.modules.keys()):
+                if "transformers" in _mod_name and "mask" in _mod_name:
+                    try:
+                        importlib.reload(sys.modules[_mod_name])
+                    except Exception:
+                        pass
+            print("  [FIX] 已屏蔽 unsloth_zoo monkey-patch，恢复标准 HF 路径")
+
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
         from peft import LoraConfig, get_peft_model, TaskType
 
