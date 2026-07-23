@@ -38,17 +38,20 @@ Qwen2.5-0.5B-Instruct / Qwen3.5-2B-Instruct 等模型进行 LoRA 微调。
   例如: --preset qwen3.5-2b --max-len 2048
         max_len 使用命令行的 2048，其余参数用预设值
 
-显存需求（gradient_checkpointing=on, fp32 加载 + fp16 混合精度）：
+显存需求（gradient_checkpointing=on）：
   标准模式 (HF + PEFT):
-    Qwen2.5-0.5B LoRA fp16  (max_len=2048): ~5 GB   ← T4/8GB 显卡推荐
-    Qwen2.5-0.5B LoRA fp16  (max_len=4096): ~11 GB  ← T4 16GB 实测安全上限
-    Qwen2.5-0.5B LoRA fp16  (max_len=8192): OOM on T4 ← 需 --qlora 或 24GB 显卡
-    Qwen2.5-0.5B QLoRA 4bit (max_len=8192): ~3 GB
-    Qwen2.5-1.5B LoRA fp16  (max_len=1024): ~8 GB   ← 8GB 显卡勉强可跑
-    Qwen2.5-1.5B QLoRA 4bit (max_len=8192): ~4 GB
-    Qwen3.5-2B   LoRA fp16  (max_len=2048): ~6 GB
-    Qwen3.5-2B   LoRA fp16  (max_len=4096): ~11 GB  ← T4 16GB 安全上限
-    Qwen3.5-2B   QLoRA 4bit (max_len=8192): ~3 GB
+    T4 fp16 权重策略: fp16 模型 + fp32 LoRA 参数, 无 AMP
+      Qwen2.5-0.5B LoRA  (max_len=8192): ~3 GB   ← T4 16GB 轻松跑
+      Qwen2.5-1.5B LoRA  (max_len=4096): ~6 GB   ← T4 可跑
+      Qwen3.5-2B   LoRA  (max_len=4096): ~5 GB   ← T4 可跑
+    bf16 GPU 策略: fp32 模型 + bf16 AMP
+      Qwen2.5-0.5B LoRA  (max_len=8192): ~5 GB
+      Qwen2.5-1.5B LoRA  (max_len=8192): ~10 GB
+      Qwen3.5-2B   LoRA  (max_len=8192): ~6 GB
+    QLoRA 4bit (所有 GPU):
+      Qwen2.5-0.5B QLoRA (max_len=8192): ~3 GB
+      Qwen2.5-1.5B QLoRA (max_len=8192): ~4 GB
+      Qwen3.5-2B   QLoRA (max_len=8192): ~3 GB
 
   Unsloth 模式 (--unsloth, 省 30-50% 显存 + 2x 加速):
     Qwen2.5-0.5B LoRA      (max_len=8192): ~3 GB   ← T4 16GB 轻松跑
@@ -621,8 +624,11 @@ def train(
             tokenizer.pad_token = tokenizer.eos_token
             tokenizer.pad_token_id = tokenizer.eos_token_id
 
-        # 训练时用 fp32 加载，由 Trainer 的混合精度（fp16/bf16）处理前向/反向
-        # 不要用 fp16 加载模型权重！否则 fp16 权重 + fp16 混合精度 = 双重精度损失 → grad_norm=nan
+        # 模型加载精度策略：
+        #   bf16 GPU (Ampere+): fp32 加载 + bf16 AMP → 标准混合精度训练
+        #   fp16 GPU (T4):      fp16 加载 + 关闭 AMP → LoRA 参数自带 fp32，无需 AMP
+        #     （之前 fp16 权重 + fp16 AMP = 双重精度损失 → grad_norm=nan，
+        #      关闭 AMP 后 LoRA 的 fp32 参数足够稳定）
         if use_qlora:
             bnb_config = BitsAndBytesConfig(
                 load_in_4bit=True,
@@ -641,12 +647,17 @@ def train(
                 print(f"         多 GPU 并行不生效，建议去掉 --qlora 以使用双 T4 DDP")
                 use_multi_gpu = False
         else:
+            # T4 用 fp16 加载（1GB），bf16 GPU 用 fp32 加载（2GB）+ AMP
+            load_dtype = train_dtype if use_fp16 else torch.float32
             model = AutoModelForCausalLM.from_pretrained(
                 model_path,
-                dtype=torch.float32,
+                dtype=load_dtype,
                 trust_remote_code=True,
             )
-            print(f"  [LoRA] 模型已 fp32 加载（训练时由 Trainer 混合精度处理）")
+            if use_fp16:
+                print(f"  [LoRA] 模型已 fp16 加载（T4 模式: fp16 权重 + LoRA fp32 参数, 无 AMP）")
+            else:
+                print(f"  [LoRA] 模型已 fp32 加载（bf16 GPU: fp32 权重 + bf16 AMP）")
 
         # 设备分配
         if use_multi_gpu:
@@ -740,16 +751,20 @@ def train(
         print(f"  batch_size: {batch_size} x grad_accum: {grad_accum} = 等效 batch {effective_batch}")
     print(f"  epochs: {epochs}, lr: {lr}, LoRA rank: {lora_rank}")
     # 显示精度模式
-    use_fp16_mode = use_fp16 if 'use_fp16' in dir() else (not supports_bf16())
-    if use_fp16_mode:
-        print(f"  precision: fp16, QLoRA: {use_qlora}")
+    if use_unsloth:
+        print(f"  precision: unsloth-auto, QLoRA: {use_qlora}")
+    elif use_fp16:
+        print(f"  precision: fp16 权重 + fp32 LoRA (无 AMP), QLoRA: {use_qlora}")
     else:
-        print(f"  precision: bf16, QLoRA: {use_qlora}")
+        print(f"  precision: fp32 权重 + bf16 AMP, QLoRA: {use_qlora}")
     print()
 
-    # 根据 GPU 能力选择精度（T4 不支持 bf16，使用 fp16）
+    # 根据 GPU 能力选择训练策略：
+    #   bf16 GPU (Ampere+): fp32 权重 + bf16 AMP → 标准混合精度
+    #   fp16 GPU (T4):      fp16 权重 + 关闭 AMP → LoRA 参数 fp32, 不需 AMP
+    #     （fp16 权重 + fp16 AMP = 双重精度损失 → grad_norm=nan）
     use_bf16 = torch.cuda.is_available() and supports_bf16()
-    use_fp16_flag = torch.cuda.is_available() and not use_bf16
+    use_fp16_amp = False  # 默认关闭 AMP；T4 不用 AMP，bf16 GPU 用 bf16 AMP
 
     training_args = TrainingArguments(
         output_dir=checkpoint_dir,
@@ -759,21 +774,20 @@ def train(
         gradient_accumulation_steps=grad_accum,
         learning_rate=lr,
         lr_scheduler_type="cosine",
-        warmup_steps=max(1, int(total_steps * 0.05)),  # warmup 5% 步数，至少 1 步
+        warmup_steps=max(1, int(total_steps * 0.05)),
         logging_steps=5,
         save_steps=save_steps,
         save_total_limit=3,
-        bf16=use_bf16,      # Ampere+ 用 bf16
-        fp16=use_fp16_flag,  # T4 等 Turing 架构用 fp16
-        max_grad_norm=1.0,   # 梯度裁剪，防止 grad_norm=nan
+        bf16=use_bf16,          # Ampere+ 启用 bf16 AMP
+        fp16=use_fp16_amp,      # T4 关闭 AMP（LoRA 参数已是 fp32）
+        max_grad_norm=1.0,
         gradient_checkpointing=gradient_checkpointing,
         report_to="none",
         seed=42,
         dataloader_num_workers=0,
         remove_unused_columns=False,
         optim="adamw_torch",
-        # DDP 多 GPU 配置
-        ddp_find_unused_parameters=False,  # gradient_checkpointing + LoRA 需设 False
+        ddp_find_unused_parameters=False,
     )
 
     trainer = Trainer(
@@ -811,7 +825,7 @@ def train(
         "grad_accum": grad_accum,
         "use_qlora": use_qlora,
         "use_unsloth": use_unsloth,
-        "precision": "fp16" if (torch.cuda.is_available() and not supports_bf16()) else ("bf16" if torch.cuda.is_available() else "fp32"),
+        "precision": "unsloth-auto" if use_unsloth else ("fp16-no-amp" if use_fp16 else "fp32-bf16-amp"),
         "gpu": gpu_name,
         "gpu_count": gpu_count,
         "ddp_enabled": use_multi_gpu,
@@ -989,11 +1003,10 @@ def main():
         args.lr = 2e-4
 
     # ── T4 / 低显存 GPU 自动调参 ──
-    # fp32 加载模型后显存翻倍，T4 (16GB) 实测：
-    #   标准模式: max_len=4096, batch_size=1 → ~11GB（安全）
-    #   标准模式: max_len=8192 → OOM
-    #   Unsloth 模式: 省 30-50% 显存，max_len=8192 可跑
-    # 因此 T4 强制限制：标准模式 max_len ≤ 4096，Unsloth 模式不限制
+    # T4 (16GB) 策略：
+    #   标准模式 (fp16 权重, 无 AMP): max_len=8192 ~3GB 权重 + 激活值, 可跑
+    #   QLoRA 模式: max_len=8192 ~1GB 权重, 轻松跑
+    #   Unsloth 模式: 自动优化, 不限制
     try:
         import torch
         if torch.cuda.is_available():
@@ -1003,34 +1016,27 @@ def main():
             is_t4 = "T4" in gpu_name or "Tesla T4" in gpu_name
 
             if is_t4 or gpu_mem_gb < 10:
-                # T4 或低显存 GPU：强制降低参数
-                if not args.qlora:
-                    # 标准模式: T4 max_len 上限 4096；Unsloth 模式不限
-                    if args.unsloth:
-                        t4_max_len_limit = 8192  # Unsloth 省显存，8192 可跑
+                # T4 或低显存 GPU：调整参数
+                if not args.qlora and not args.unsloth:
+                    # 标准模式: T4 用 fp16 权重（~1GB），max_len=8192 可跑
+                    if is_t4:
+                        t4_max_len_limit = 8192
                     else:
-                        t4_max_len_limit = 4096 if is_t4 else 1024
-
+                        t4_max_len_limit = 1024  # 8GB 显卡保守
                     if args.max_len > t4_max_len_limit:
-                        mode_tag = "Unsloth" if args.unsloth else "标准"
-                        print(f"[自适应] GPU {'T4' if is_t4 else f'{gpu_mem_gb:.0f}GB'}, {mode_tag}模式, max_len {args.max_len}→{t4_max_len_limit}")
+                        print(f"[自适应] GPU {'T4' if is_t4 else f'{gpu_mem_gb:.0f}GB'}, max_len {args.max_len}→{t4_max_len_limit}")
                         args.max_len = t4_max_len_limit
-                    if args.batch_size > 1 and not args.unsloth:
+                    if not is_t4 and args.batch_size > 1:
                         print(f"[自适应] batch_size {args.batch_size}→1（低显存）")
                         args.batch_size = 1
 
                 if is_t4:
                     print(f"[T4 检测] Tesla T4 ({gpu_mem_gb:.1f}GB, SM {major}.{minor})")
                     if args.unsloth:
-                        print(f"  [Unsloth] bf16 不支持但 Unsloth 自动处理 fp16 混合精度")
-                        print(f"  [Unsloth] gradient checkpointing 使用 unsloth 优化模式")
-                        print(f"  当前配置: max_len={args.max_len}, batch_size={args.batch_size}")
+                        print(f"  [Unsloth] 自动处理精度和显存优化")
                     else:
-                        print(f"  bf16 不支持，自动切换 fp16 混合精度")
-                        print(f"  fp32 加载 + fp16 混合精度训练")
-                        print(f"  当前配置: max_len={args.max_len}, batch_size={args.batch_size}, QLoRA={args.qlora}")
-                    if not args.qlora and not args.unsloth:
-                        print(f"  [提示] 如需 max_len=8192，加 --qlora 或 --unsloth 可降低显存")
+                        print(f"  fp16 权重 + fp32 LoRA 参数 (无 AMP, 避免 grad_norm=nan)")
+                    print(f"  当前配置: max_len={args.max_len}, batch_size={args.batch_size}, QLoRA={args.qlora}")
     except ImportError:
         pass
 
