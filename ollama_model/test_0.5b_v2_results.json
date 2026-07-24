@@ -1,0 +1,92 @@
+[
+  {
+    "test": "基础函数",
+    "output": "返回 a 加 b",
+    "tokens": 5,
+    "time": 0.8995943069458008
+  },
+  {
+    "test": "条件判断",
+    "output": "设 x 为 10\n如果 x 大于 5：\n    打印(\"big\")\n否则：\n    打印(\"small\")",
+    "tokens": 33,
+    "time": 1.5678448677062988
+  },
+  {
+    "test": "for循环",
+    "output": "遍历 i 于 0至4：\n    打印(i)",
+    "tokens": 17,
+    "time": 1.0302493572235107
+  },
+  {
+    "test": "列表操作",
+    "output": "设 lst 为 [1, 2, 3]\n遍历 x 于 lst：\n    定义 lst 等于 [lst 遍历 x 之 ]\n设 lst 为 [1, 2, 3]\n设 len_ 为 0\n遍历 x 于 lst：\n    len_ 加上 1\n打印(len_)",
+    "tokens": 79,
+    "time": 2.677938222885132
+  },
+  {
+    "test": "类定义",
+    "output": "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己名字 为 名字\n    段落 喵：\n        打印(f\"{己名字} says woof\")",
+    "tokens": 53,
+    "time": 2.3432726860046387
+  },
+  {
+    "test": "冒泡排序",
+    "output": "段落 冒泡排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 range(n)：\n        遍历 j 于 range(0, n 减 i减1)：\n            如果 arr[j] 大于 arr[j 加 1]：\n                定义 tmp 等于 arr[j]\n                arr[j] = arr[j 加 1]\n                arr[j 加 1] = tmp\n    返回 arr",
+    "tokens": 103,
+    "time": 3.9452226161956787
+  },
+  {
+    "test": "递归",
+    "output": "段落 负数 接收 n：\n    如果 n 小于等于 1：\n        返回 1\n    返回 n 乘 负数 函数(n 减 1)",
+    "tokens": 44,
+    "time": 2.147113800048828
+  },
+  {
+    "test": "f-string",
+    "output": "设 name 为 \"Alice\"\n设 age 为 30\n打印(f\"My name is {name}, I am {age} years old\")",
+    "tokens": 32,
+    "time": 1.7862880229949951
+  },
+  {
+    "test": "类继承",
+    "output": "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己名字 为 名字\n类 猫 继承 动物：\n    静态 段落 说：\n        打印(f\"{己名字} says meow\")",
+    "tokens": 67,
+    "time": 3.0393877029418945
+  },
+  {
+    "test": "异常处理",
+    "output": "尝试：\n    设 x 为 1 模 0\n捕获 异常 e：\n    打印(f\"Error: {e}\")\n最终：\n    打印(\"Done\")",
+    "tokens": 42,
+    "time": 2.3981311321258545
+  },
+  {
+    "test": "列表推导",
+    "output": "设 平方列表 为 []\n遍历 x 于 10：\n    如果 x 取余 2 等于 0：\n        定义 新列表 等于 [x 拨回 2]\n    否则：\n        定义 新列表 等于 [n 拨回 n 拨回 2]\n打印(平方列表)",
+    "tokens": 86,
+    "time": 3.919619083404541
+  },
+  {
+    "test": "with语句",
+    "output": "使用 打开文件(\"file.txt\", \"r\") 为 f：\n    设 content 为 f.read()\n    打印(content)",
+    "tokens": 31,
+    "time": 2.150632381439209
+  },
+  {
+    "test": "字典操作",
+    "output": "设 d 为 {\"a\": 1, \"b\": 2}\n遍历 k, v 于 d.items()：\n    打印(f\"{k}: {v}\")",
+    "tokens": 39,
+    "time": 2.8961925506591797
+  },
+  {
+    "test": "lambda/高阶函数",
+    "output": "设 evens 为 []\n遍历 n 于 nums：\n    如果 n 是奇数：\n        evens.追加(n)\n打印(evens)",
+    "tokens": 33,
+    "time": 2.4091954231262207
+  },
+  {
+    "test": "装饰器",
+    "output": "段落 间隔计时 接收 函数：\n    段落 包装 接收 *args, **kwargs：\n        打印(\"Start\")\n        设 result 为 函数(*args, **kwargs)\n        打印(\"End\")\n        返回 result\n    返回 包装\n\n段落 给定 名字 接收 罗列：\n    设 print_ 字 为 f\"Hello {名字}\"\n    返回 print_",
+    "tokens": 99,
+    "time": 5.600594997406006
+  }
+]

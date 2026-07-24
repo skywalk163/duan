@@ -162,3 +162,12 @@ tools/ai_copilot/benchmark/
 tools/ai_copilot/sft_dataset_new.jsonl
 tools/ai_copilot/sft_dataset_long.jsonl
 !tools/ai_copilot/sft_dataset.jsonl
+
+# Ollama 模型文件（GGUF/safetensors 大文件，不入库）
+ollama_model/*.gguf
+ollama_model/merged_0.5b/
+ollama_model/merged_2b/
+# 保留 Modelfile、测试脚本和测试结果 JSON
+!ollama_model/Modelfile*
+!ollama_model/test_*.py
+!ollama_model/test_*_results.json

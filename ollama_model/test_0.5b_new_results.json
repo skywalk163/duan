@@ -1,0 +1,107 @@
+[
+  {
+    "test": "基础函数",
+    "output": "段落 加法 接收 a, b：\n    返回 a 加 b",
+    "tokens": 17,
+    "time": 2.652780771255493,
+    "done_reason": "stop"
+  },
+  {
+    "test": "条件判断",
+    "output": "定义 x 等于 10\n如果 x 大于 5：\n    打印(\"big\")\n否则：\n    打印(\"small\")",
+    "tokens": 35,
+    "time": 3.659783363342285,
+    "done_reason": "stop"
+  },
+  {
+    "test": "for循环",
+    "output": "遍历 i 于 0至4：\n    打印(i)",
+    "tokens": 17,
+    "time": 2.2315964698791504,
+    "done_reason": "stop"
+  },
+  {
+    "test": "列表操作",
+    "output": "设 lst 为 []\n定义 设 i 为 0\n当 i 小于 len(lst)：\n    lst.追加(列表[i])\n    i 加上 1\n打印(len(lst))",
+    "tokens": 43,
+    "time": 4.121708869934082,
+    "done_reason": "stop"
+  },
+  {
+    "test": "类定义",
+    "output": "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 喊叫：\n        打印(f\"{己.名字} says woof\")",
+    "tokens": 56,
+    "time": 5.3306238651275635,
+    "done_reason": "stop"
+  },
+  {
+    "test": "冒泡排序",
+    "output": "段落 撑排序 接收 arr：\n    设 n 为 len(arr)\n    遍历 i 于 0至n减2：\n        设 j 为 n 减 i\n        如果 arr[j] 大于 arr[j 加 1]：\n            定义 tmp 等于 arr[j]\n            arr[j] = arr[j 加 1]\n            arr[j 加 1] = tmp\n    返回 arr",
+    "tokens": 96,
+    "time": 8.396458625793457,
+    "done_reason": "stop"
+  },
+  {
+    "test": "递归",
+    "output": "段落 负数 接收 n：\n    如果 n 小于等于 1：\n        返回 1\n    返回 n 乘 负数 函数(n 减 1)",
+    "tokens": 44,
+    "time": 4.560056686401367,
+    "done_reason": "stop"
+  },
+  {
+    "test": "f-string",
+    "output": "定义 名字 等于 \"Alice\"\n定义 年龄 等于 30\n打印(f\"My name is {名字}, I am {年龄} years old\")",
+    "tokens": 39,
+    "time": 4.310255527496338,
+    "done_reason": "stop"
+  },
+  {
+    "test": "类继承",
+    "output": "类 动物：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n类 猫 继承 动物：\n    静态 段落 谜：\n        打印(f\"{己.名字} says meow\")",
+    "tokens": 70,
+    "time": 6.433974981307983,
+    "done_reason": "stop"
+  },
+  {
+    "test": "异常处理",
+    "output": "尝试：\n    设 x 为 1 模 0\n捕获 异常 e：\n    打印(f\"Error: {e}\")\n最终：\n    打印(\"Done\")",
+    "tokens": 42,
+    "time": 4.433808326721191,
+    "done_reason": "stop"
+  },
+  {
+    "test": "列表推导",
+    "output": "设 squares 为 []\n遍历 x 于 range(10)：\n    如果 x 取余 2 等于 0：\n        定义 squares_为 [x 遍历 y 之 squares]\n        设 squares_为 squares_\n        打印(squares_)\n打印(squares_)",
+    "tokens": 68,
+    "time": 5.998562335968018,
+    "done_reason": "stop"
+  },
+  {
+    "test": "with语句",
+    "output": "使用 读取文件(\"file.txt\", \"r\") 为 f：\n    设 content 为 f.read()\n    打印(content)",
+    "tokens": 31,
+    "time": 3.5596067905426025,
+    "done_reason": "stop"
+  },
+  {
+    "test": "字典操作",
+    "output": "设 d 为 {\"a\": 1, \"b\": 2}\n遍历 k, v 于 d.items()：\n    打印(f\"{k}: {v}\")",
+    "tokens": 39,
+    "time": 4.156440734863281,
+    "done_reason": "stop"
+  },
+  {
+    "test": "lambda/高阶函数",
+    "output": "设 数字列表 为 [1, 2, 3, 4, 5]\n设 奇数列表 为 list(过滤(lambda x：x 取余 2 等于 0, 数字列表))\n打印(奇数列表)",
+    "tokens": 60,
+    "time": 5.715184688568115,
+    "done_reason": "stop"
+  },
+  {
+    "test": "装饰器",
+    "output": "段落 计时器 接收 func：\n    段落 包装 接收 *args, **kwargs：\n        打印(\"Start\")\n        设 result 为 func(*args, **kwargs)\n        打印(\"End\")\n        返回 result\n    返回 包装\n\n@定时器\n段落 喂 greet 接收 名字：\n    打印(f\"Hello {名字}\")",
+    "tokens": 91,
+    "time": 7.981234550476074,
+    "done_reason": "stop"
+  }
+]

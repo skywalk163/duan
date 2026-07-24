@@ -1,0 +1,107 @@
+[
+  {
+    "test": "基础函数",
+    "output": "def add(x, y):\n    return x + y",
+    "tokens": 13,
+    "time": 4.675647497177124,
+    "done_reason": "stop"
+  },
+  {
+    "test": "条件判断",
+    "output": "def translate_py_to_duanlang(code):\n    lines = code.strip().split('\\n')\n    translated_lines = []\n    \n    for line in lines:\n        if not line.strip():\n            continue\n            \n        # 处理变量赋值\n        if '=' in line and not any(kw in line for kw in ['if', 'else', 'print']):\n            parts = line.split('=')\n            var_name = parts[0].strip()\n            value = parts[1].strip().strip('\"').strip(\"'\")\n            \n            # 检查是否已有变量定义，避免重复\n            if not any(f\"{var_name} = \" in d for d in translated_lines):\n                translated_lines.append(f\"x = {value}\")\n        \n        elif line.startswith('if ') or line.startswith('else:'):\n            condition_part = line[3:].strip()  # 去掉 'if' 或 'else:'\n            \n            if not any(kw in line for kw in ['print']):\n                translated_lines.append(f\"段落 {line.strip()}\")\n        \n        elif line.startswith('print('):\n            print_args = line[7:].strip()\n            translated_lines.append(f\"打印(x)\")\n        \n        else:\n            # 其他语句直接翻译\n            if 'len' in line or '长度' in line:\n                translated_lines.append(\"用 len()\")\n            elif '列表索引赋值' in line:\n                translated_lines.append(f\"lst[0] = {line.strip()}\")\n            else:\n                # 简单处理，直接映射关键字\n                if 'if' in line and not any(kw in line for kw in ['else', 'print']):\n                    condition_part = line[3:].strip()\n                    translated_lines.append(f\"如果 {condition_part}\")\n                elif 'else:' in line:\n                    translated_lines.append(\"否则\")\n                else:\n                    # 默认处理为段落定义或简单语句\n                    if any(kw in line for kw in ['if', 'else']):\n                        condition_part = line[3:].strip()\n                        translated_lines.append(f\"如果 {condition_part}\")\n                    elif any(kw in line for kw in ['print']):\n                        print_args = line[7:].strip()\n                        translated_lines.append(f\"打印(x)\")\n                    else:\n                        # 其他语句，尝试直接翻译或作为段落定义\n                        if 'len' in line or '长度' in line:\n                            translated_lines.append(\"用 len()\")\n                        elif '列表索引赋值' in line:\n                            translated_lines.append(f\"lst[0] = {line.strip()}\")\n                        else:\n                            # 尝试作为段落定义处理\n                            if any(kw in line for kw in ['if', 'else']):\n                                condition_part = line[3:].strip()\n                                translated_lines.append(f\"如果 {condition_part}\")\n                            elif any(kw in line for kw in ['print']):\n                                print_args = line[7:].strip()\n                                translated_lines.append(f\"打印(x)\")\n                            else:\n                                # 默认处理为段落定义或简单语句\n                                if 'len' in line or '长度' in line:\n                                    translated_lines.append(\"用 len()\")\n                                elif '列表索引赋值' in line:\n                                    translated_lines.append(f\"lst[0] = {line.strip()}\")\n                                else:\n                                    # 尝试作为段落定义处理\n                                    if any(kw in line for kw in ['if', 'else']):\n                                        condition_part = line[3:].strip()\n                                        translated_lines.append(f\"如果 {condition_part}\")\n                                    elif any(kw in line for kw in ['print']):\n                                        print_args = line[7:].strip()\n                                        translated_lines.append(f\"打印(x)\")\n                                    else:\n                                        # 默认处理为段落定义或简单语句\n                                        if 'len' in line or '长度' in line:\n                                            translated_lines.append(\"用 len()\")\n                                        elif '列表索引赋值' in line:\n                                            translated_lines.append(f\"lst[0] = {line.strip()}\")\n                                        else:\n                                            # 尝试作为段落定义处理\n                                            if any(kw in line for kw in ['if', 'else']):\n                                                condition_part = line[3:].strip()\n                                                translated_lines.append(f\"如果 {condition_part}\")\n                                            elif any(kw in line for kw in ['print']):\n                                                print_args = line[7:].strip()\n                                                translated_lines.append(f\"打印(x)\")\n                                            else:\n                                                # 默认处理为段落定义或简单语句\n                                                if 'len' in line or '长度' in line:\n                                                    translated_lines.append(\"用 len()\")\n                                                elif '列表索引赋值' in line:\n                                                    translated_lines.append(f\"lst[0",
+    "tokens": 1024,
+    "time": 81.14864659309387,
+    "done_reason": "length"
+  },
+  {
+    "test": "for循环",
+    "output": "def main():\n    for i in range(5):\n        print(i)",
+    "tokens": 18,
+    "time": 3.2234017848968506,
+    "done_reason": "stop"
+  },
+  {
+    "test": "列表操作",
+    "output": "def main():\n    lst = []\n    lst.append(10)\n    print(len(lst))",
+    "tokens": 23,
+    "time": 2.9976651668548584,
+    "done_reason": "stop"
+  },
+  {
+    "test": "类定义",
+    "output": "class 狗类：\n    构造方法接收参数：名\n        属性 名 赋值 己.名 为 参数值\n    段落 叫 方法 接收 参数：\n        打印 f\"{己.名}说汪\"",
+    "tokens": 58,
+    "time": 5.871447801589966,
+    "done_reason": "stop"
+  },
+  {
+    "test": "冒泡排序",
+    "output": "def bubble_sort(arr):\n    n = len(arr)\n    for i in range(n):\n        for j in range(0, n-i-1):\n            if 段言(arr)[j] > 段言(arr)[j+1]:\n                arr[j], arr[j+1] = 段言(arr)[j+1], 段言(arr)[j]\n    return arr",
+    "tokens": 86,
+    "time": 8.800611734390259,
+    "done_reason": "stop"
+  },
+  {
+    "test": "递归",
+    "output": "def 阶乘 (n):\n    if n <= 1:\n        return 1\n    return n * 阶乘 (n - 1)",
+    "tokens": 35,
+    "time": 4.709211587905884,
+    "done_reason": "stop"
+  },
+  {
+    "test": "f-string",
+    "output": "def main():\n    name = \"Alice\"\n    age = 30\n    print(f\"My name is {name}, I am {age} years old\")\n\nif __name__ == \"__main__\":\n    main()",
+    "tokens": 50,
+    "time": 6.152536630630493,
+    "done_reason": "stop"
+  },
+  {
+    "test": "类继承",
+    "output": "class 动物类：\n    构造方法接收参数：\n        属性 名 赋值 参数：\n            self.名字 = 名字\n    \n    段落 名 方法 调用 接收 参数：\n        print(f\"{self.名字}说喵\")",
+    "tokens": 60,
+    "time": 7.995337009429932,
+    "done_reason": "stop"
+  },
+  {
+    "test": "异常处理",
+    "output": "尝试：\n    try:\n        x = 1 / 0\n    except ZeroDivisionError as e:\n        print(f\"Error: {e}\")\n    finally:\n        print(\"Done\")",
+    "tokens": 45,
+    "time": 7.57810378074646,
+    "done_reason": "stop"
+  },
+  {
+    "test": "列表推导",
+    "output": "def squares():\n    lst = []\n    for i in range(10):\n        if i % 2 == 0:\n            lst.append(i * i)\n    return lst\n\nsquares = [x**2 for x in range(10)]",
+    "tokens": 58,
+    "time": 8.916292667388916,
+    "done_reason": "stop"
+  },
+  {
+    "test": "with语句",
+    "output": "使用 文件 读取 (\"file.txt\") 为 变量：\n尝试：/捕获 异常类型 [e]：/最终：\n打开文件 (\"file.txt\", \"w\")\n打印 (content)",
+    "tokens": 45,
+    "time": 7.594378471374512,
+    "done_reason": "stop"
+  },
+  {
+    "test": "字典操作",
+    "output": "class DuanLang:\n    def __init__(self):\n        self.x = 10\n        self.s = \"hello\"\n    \n    def get_paragraph(self, name, param=None):\n        if param is None:\n            return \"\"\n        else:\n            return f\"{name}({param})\"\n\n    def condition_check(self, value):\n        if value == True:\n            return \"True\"\n        elif value == False:\n            return \"False\"\n        else:\n            return \"Empty\"\n\n    def loop_range(self, n):\n        for i in range(n + 1):\n            if i % 2 == 0:\n                continue\n            print(f\"{i}\")\n\n    def arithmetic_ops(self, a, b):\n        result = a + b\n        return f\"{a} + {b} = {result}\"\n\n    def comparison_ops(self, a, b):\n        if a > b:\n            return \"大于\"\n        elif a < b:\n            return \"小于\"\n        else:\n            return \"等于\"\n\n    def logical_ops(self, a, b):\n        if a and b:\n            return \"且\"\n        elif not a or not b:\n            return \"或\"\n        else:\n            return \"非\"\n\n    def list_index_assignment(self, lst, index, value):\n        lst[index] = value\n\n    def print_value(self, x):\n        print(x)\n\n    def f_string_format(self, var):\n        return f\"{var}\"\n\n    def list_comprehension(self, items, condition):\n        return [expr for item in items if condition(item)]\n\n    def dict_comprehension(self, d_items, condition):\n        return {k: v for k, v in d.items() if condition(k)}\n\n    def set_comprehension(self, items, condition):\n        return {expr for item in items if condition(item)}\n\n    class MyClass:\n        def __init__(self):\n            self.prop = \"属性\"\n\n        def method(self, param=None):\n            if param is None:\n                return \"\"\n            else:\n                return f\"{self.method_name}({param})\"\n\n        @staticmethod\n        def static_method(param):\n            return f\"静态{param}\"\n\n    class ChildClass(MyClass):\n        def __init__(self, parent_class=\"父类\"):\n            super().__init__()\n            self.parent = parent_class\n\n        def method(self, param=None):\n            if param is None:\n                return \"\"\n            else:\n                return f\"{self.method_name}({param})\"\n\n    class ProtectedClass(MyClass):\n        @property\n        def prop(self):\n            return \"私有属性\"\n\n    try:\n        result = 10 + 20\n    except ValueError as e:\n        print(f\"捕获异常：{e}\")\n    finally:\n        print(\"最终执行\")\n\n    with open(\"file.txt\", \"w\") as f:\n        f.write(\"Hello World\")\n\n    def lambda_func(x):\n        return x * 2\n\n    def filter_data(data, predicate):\n        return [item for item in data if predicate(item)]\n\n    def map_data(data, func):\n        return [func(item) for item in data]\n\n    def reduce_data(data, func):\n        return sum(func(item) for item in data)\n\n    def sorted_list(items, key=lambda x: x[0]):\n        return sorted(items, key=key)\n\n    def read_file(filename):\n        with open(filename, \"r\") as f:\n            content = f.read()\n        return content\n\n    def write_file(filename, content):\n        with open(filename, \"w\") as f:\n            f.write(content)\n\n    @staticmethod\n    def decorator(func):\n        def wrapper(*args, **kwargs):\n            return func(*args, **kwargs)\n        return wrapper\n\nd = {\"a\": 1, \"b\": 2}\nfor k, v in d.items():\n    print(f\"{k}: {v}\")",
+    "tokens": 889,
+    "time": 126.02727246284485,
+    "done_reason": "stop"
+  },
+  {
+    "test": "lambda/高阶函数",
+    "output": "def main():\n    nums = [1, 2, 3, 4, 5]\n    evens = [x for x in nums if x % 2 == 0]\n    print(evens)\n\nif __name__ == \"__main__\":\n    main()",
+    "tokens": 63,
+    "time": 14.643689155578613,
+    "done_reason": "stop"
+  },
+  {
+    "test": "装饰器",
+    "output": "def timer(func):\n    def wrapper(*args, **kwargs):\n        print(\"Start\")\n        result = func(*args, **kwargs)\n        print(\"End\")\n        return result\n    return wrapper\n\n@timer\ndef greet(name):\n    print(f\"Hello {name}\")",
+    "tokens": 63,
+    "time": 15.775177001953125,
+    "done_reason": "stop"
+  }
+]

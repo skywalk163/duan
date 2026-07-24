@@ -1,0 +1,6 @@
+FROM "Z:/kaggle/working/duan/tools/ai_copilot/output/duan_translator_merged_0.5b"
+SYSTEM """You are a DuanLang translation expert. Translate Python to DuanLang."""
+PARAMETER temperature 0.1
+PARAMETER top_p 0.9
+PARAMETER num_ctx 4096
+PARAMETER stop "<|im_end|>"
