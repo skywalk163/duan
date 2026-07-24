@@ -72,31 +72,13 @@ def download_model(model_key: str, cache_dir: str = None):
     print(f"  目标:   {cache_dir}")
     print("=" * 60)
 
-    # 检查是否已安装 transformers
+    # 检查是否已安装 huggingface_hub
     try:
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from huggingface_hub import snapshot_download
     except ImportError:
-        print("\n[ERROR] transformers 未安装")
-        print("  请先运行: pip install transformers")
+        print("\n[ERROR] huggingface_hub 未安装")
+        print("  请先运行: pip install huggingface_hub")
         sys.exit(1)
-
-    # 检查 transformers 版本是否满足模型要求
-    try:
-        import transformers
-        current_ver = transformers.__version__
-        from packaging.version import Version
-        if Version(current_ver) < Version(min_ver):
-            print(f"\n[ERROR] transformers 版本过低: {current_ver}")
-            print(f"  模型 {model_key} ({hf_id}) 需要 transformers >= {min_ver}")
-            print(f"  请升级: pip install --upgrade transformers")
-            print(f"  如 PyPI 版本仍不够新，可从源码安装:")
-            print(f"  pip install git+https://github.com/huggingface/transformers.git")
-            sys.exit(1)
-        else:
-            print(f"  [OK] transformers {current_ver} (需要 >= {min_ver})")
-    except ImportError:
-        # packaging 可能不可用，用简单版本比较兜底
-        pass
 
     # 检查目录是否已有模型
     if os.path.exists(cache_dir) and os.path.exists(os.path.join(cache_dir, "config.json")):
@@ -113,43 +95,29 @@ def download_model(model_key: str, cache_dir: str = None):
 
     t0 = time.time()
 
+    # 用 snapshot_download 直接下载原始文件，绕过 torch/torchvision 导入链
+    # 避免 Kaggle 环境 torchvision 与 torch 版本不兼容导致 from_pretrained 崩溃
     try:
-        print("[1/2] 下载 Tokenizer...")
-        tokenizer = AutoTokenizer.from_pretrained(
-            hf_id, trust_remote_code=True
+        print("[1/1] 下载模型文件（snapshot_download）...")
+        snapshot_download(
+            repo_id=hf_id,
+            local_dir=cache_dir,
+            local_dir_use_symlinks=False,
         )
-        tokenizer.save_pretrained(cache_dir)
-        print(f"  ✓ Tokenizer 保存完成")
-
-        print("[2/2] 下载模型权重...")
-        model = AutoModelForCausalLM.from_pretrained(
-            hf_id,
-            dtype="auto",
-            trust_remote_code=True,
-        )
-        model.save_pretrained(cache_dir)
-        print(f"  ✓ 模型权重保存完成")
+        print(f"  ✓ 模型文件保存完成")
 
     except Exception as e:
         print(f"\n[ERROR] 下载失败: {e}")
         print("\n尝试使用 HuggingFace 镜像:")
         os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
-        print("[1/2] 下载 Tokenizer（镜像）...")
-        tokenizer = AutoTokenizer.from_pretrained(
-            hf_id, trust_remote_code=True
+        print("[1/1] 下载模型文件（镜像）...")
+        snapshot_download(
+            repo_id=hf_id,
+            local_dir=cache_dir,
+            local_dir_use_symlinks=False,
         )
-        tokenizer.save_pretrained(cache_dir)
-        print(f"  ✓ Tokenizer 保存完成")
-
-        print("[2/2] 下载模型权重（镜像）...")
-        model = AutoModelForCausalLM.from_pretrained(
-            hf_id,
-            dtype="auto",
-            trust_remote_code=True,
-        )
-        model.save_pretrained(cache_dir)
-        print(f"  ✓ 模型权重保存完成")
+        print(f"  ✓ 模型文件保存完成")
 
     elapsed = time.time() - t0
     print(f"\n下载完成！耗时 {elapsed:.0f} 秒")
