@@ -161,6 +161,16 @@ tools/ai_copilot/benchmark/
 # 只保留合并后的主数据集，中间产物不入库
 tools/ai_copilot/sft_dataset_new.jsonl
 tools/ai_copilot/sft_dataset_long.jsonl
+tools/ai_copilot/sft_dataset_v5.jsonl
+tools/ai_copilot/sft_dataset.jsonl.*_backup
+# 逐轮修复脚本（中间产物，不入库）
+tools/ai_copilot/fix_dataset_v6_pass*.py
+tools/ai_copilot/fix_dataset_v6_final.py
+tools/ai_copilot/fix_dataset_v6.py
+tools/ai_copilot/verify_dataset_v6.py
+tools/ai_copilot/augment_*.py
+tools/ai_copilot/export_remaining.py
+tools/ai_copilot/diagnose_remaining.py
 !tools/ai_copilot/sft_dataset.jsonl
 
 # Ollama 模型文件（GGUF/safetensors 大文件，不入库）
