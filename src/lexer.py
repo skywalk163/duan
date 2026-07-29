@@ -28,7 +28,7 @@ OPERATOR_VERBS = frozenset({
 
 # 常见复合词保护列表（这些词包含运算符动词或中文数字，但应该作为整体识别）
 COMMON_COMPOUND_WORDS = frozenset({
-    '追加', '加入', '减少', '减去', '乘法', '除法', '模式', '幂次',
+    '追加', '加入', '减少', '乘法', '除法', '模式', '幂次',
     '当前', '当然', '应当', '当选', '当家',
     '加入', '加快', '加强', '加减',
     '减少', '减弱', '减速',
@@ -42,7 +42,7 @@ COMMON_COMPOUND_WORDS = frozenset({
     # C FFI 指针/数组/错误处理（第二阶段）
     '设置', '设置数组', '设指针', '设指针值', '设系统', '设系统错误码',
     '创建数组', '释放内存', '分配内存', '取地址', '解引用', '指针偏移',
-    '外部错误', '捕获', 'FFI错误', '系统错误码',
+    '外部错误', 'FFI错误', '系统错误码',
     # C FFI 第三阶段
     '创建回调', '枚举值', '联合体成员', '跨平台库', '库路径', '按值传递', '结构体值',
     # C FFI 第四阶段
@@ -282,6 +282,14 @@ class Lexer:
             if _main_loop_safety > 1000000:
                 raise RuntimeError(f"词法分析主循环超出安全上限 ({_main_loop_safety}次迭代), 位置: {i}, 字符: {repr(source[i:i+30])}")
             
+            # 处理字符串（必须在换行处理之前，因为字符串可能包含换行符）
+            if source[i] in '"\'「『':
+                token, consumed = self._tokenize_string(source, i, line, col)
+                tokens.append(token)
+                col += consumed
+                i += consumed
+                continue
+            
             # 处理换行
             if source[i] == '\n':
                 tokens.append(Token(TokenType.NEWLINE, '\n', line, col))
@@ -342,6 +350,14 @@ class Lexer:
                     i += 1
                 continue
             
+            # 处理以点号开头的浮点数（如 .5）
+            if source[i] == '.' and i + 1 < n and _is_ascii_digit(source[i + 1]):
+                token, consumed = self._tokenize_number(source, i, line, col)
+                tokens.append(token)
+                col += consumed
+                i += consumed
+                continue
+            
             # 处理符号
             token, consumed = self._try_match_symbol(source, i, line, col)
             if token:
@@ -379,17 +395,17 @@ class Lexer:
                     i += consumed
                     continue
             
-            # 处理字符串
-            if source[i] in '"\'「『':
-                token, consumed = self._tokenize_string(source, i, line, col)
+            # 处理数字
+            if _is_ascii_digit(source[i]):
+                token, consumed = self._tokenize_number(source, i, line, col)
                 tokens.append(token)
                 col += consumed
                 i += consumed
                 continue
             
-            # 处理数字
-            if _is_ascii_digit(source[i]):
-                token, consumed = self._tokenize_number(source, i, line, col)
+            # 处理 f-string：f"..." 或 f'...'
+            if source[i] == 'f' and i + 1 < n and source[i+1] in '"\'':
+                token, consumed = self._tokenize_fstring(source, i, line, col)
                 tokens.append(token)
                 col += consumed
                 i += consumed
@@ -697,6 +713,91 @@ class Lexer:
             value = ''.join(chars)
             return Token(TokenType.STRING, value, line, start_col), j - i + 1
     
+    def _tokenize_fstring(self, source: str, i: int, line: int, col: int) -> Tuple[Token, int]:
+        """处理 f-string：f"..." 或 f'...'，支持嵌套 {expr} 和内部引号"""
+        start_col = col
+        # 跳过 f 前缀
+        i += 1
+        col += 1
+        quote_char = source[i]
+        
+        j = i + 1
+        chars = []
+        brace_depth = 0
+        # 追踪花括号内的引号状态
+        inner_quote = None
+        
+        while j < len(source):
+            ch = source[j]
+            
+            # 处理转义字符
+            if ch == '\\' and j + 1 < len(source):
+                chars.append(ch)
+                chars.append(source[j + 1])
+                j += 2
+                continue
+            
+            # 处理花括号内的引号
+            if brace_depth > 0:
+                if inner_quote is not None:
+                    # 在花括号内的字符串中
+                    if ch == '\\' and j + 1 < len(source):
+                        chars.append(ch)
+                        chars.append(source[j + 1])
+                        j += 2
+                        continue
+                    if ch == inner_quote:
+                        inner_quote = None
+                    chars.append(ch)
+                    j += 1
+                    continue
+                elif ch in '"\'':
+                    # 进入花括号内的字符串
+                    inner_quote = ch
+                    chars.append(ch)
+                    j += 1
+                    continue
+            
+            # 处理花括号
+            if ch == '{':
+                if j + 1 < len(source) and source[j + 1] == '{':
+                    # 转义的花括号 {{
+                    chars.append('{')
+                    chars.append('{')
+                    j += 2
+                    continue
+                brace_depth += 1
+                chars.append(ch)
+                j += 1
+                continue
+            elif ch == '}':
+                if j + 1 < len(source) and source[j + 1] == '}':
+                    # 转义的花括号 }}
+                    chars.append('}')
+                    chars.append('}')
+                    j += 2
+                    continue
+                if brace_depth > 0:
+                    brace_depth -= 1
+                chars.append(ch)
+                j += 1
+                continue
+            
+            # 在花括号深度为0时，遇到匹配的引号则结束
+            if brace_depth == 0 and ch == quote_char:
+                j += 1  # 跳过闭合引号
+                break
+            
+            # 处理换行（f-string 不支持裸换行，但数据集中可能有）
+            chars.append(ch)
+            j += 1
+        
+        if j >= len(source) and (brace_depth > 0 or source[j - 1] != quote_char):
+            raise LexerError(f"f-string未闭合: 以 f'{quote_char}' 开头的f-string缺少匹配的引号", line, start_col)
+        
+        value = ''.join(chars)
+        return Token(TokenType.FSTRING, value, line, start_col), j - i + 1
+    
     def _tokenize_number(self, source: str, i: int, line: int, col: int) -> Tuple[Token, int]:
         """处理数字"""
         start = i
@@ -786,6 +887,19 @@ class Lexer:
             j = i + 1
             while j < n and (_is_ascii_alnum_f(source[j]) or source[j] == '_'):
                 j += 1
+
+            # 检查是否紧跟汉字（如 evennum集），如果是则合并
+            # 但只合并非关键字的汉字，避免破坏 left至right 这类范围表达式
+            while j < n and _is_han(source[j]):
+                # 检查从 j 开始的汉字序列是否是关键字
+                k = j
+                while k < n and _is_han(source[k]):
+                    k += 1
+                han_seq = source[j:k]
+                # 如果汉字序列是关键字，则不合并
+                if han_seq in ALL_KEYWORDS:
+                    break
+                j = k
 
             word = source[i:j]
             if word in ALL_KEYWORDS:

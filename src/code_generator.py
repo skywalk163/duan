@@ -11,8 +11,8 @@ import ast_nodes as ast_nodes_module
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, BreakStmt, ContinueStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
-from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
+from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral
 
 
 # =============================================================================
@@ -70,6 +70,9 @@ class PythonCodeGenerator:
         # 是否在函数/段落内部（控制 return 生成）
         self._in_function: bool = False
         
+        # 是否在循环内部（控制 break/continue 生成）
+        self._in_loop: bool = False
+        
         # 方法名映射（中文到英文）
         self.method_name_map = {
             '追加': 'append',
@@ -109,6 +112,8 @@ class PythonCodeGenerator:
             '减': '-',
             '乘': '*',
             '除': '/',
+            '除以': '/',
+            '整除': '//',  # 整数除法（对应Python的//）
             '模': '%',
             '幂': '**',
             '%': '%',
@@ -122,6 +127,7 @@ class PythonCodeGenerator:
             '且': 'and',
             '与': 'and',
             '或': 'or',
+            '非': 'not',
         }
         
         # 内置函数映射
@@ -180,6 +186,19 @@ class PythonCodeGenerator:
             '序列化JSON': '_duan_builtin.序列化JSON',
             '美化JSON': '_duan_builtin.美化JSON',
 
+            # 函数式编程
+            '筛选': 'filter',
+            '映射': 'map',
+            '归约': 'functools.reduce',
+            '折叠': 'functools.reduce',
+            '排序': 'sorted',
+            '反转': 'reversed',
+            '枚举': 'enumerate',
+            '打包': 'zip',
+
+            # 文件操作
+            '打开文件': 'open',
+
             # 字符串工具
             '转整数': '_duan_builtin.转整数',
             '转浮点': '_duan_builtin.转浮点',
@@ -191,6 +210,7 @@ class PythonCodeGenerator:
             '字符串长度': '_duan_builtin.字符串长度',
             '字符串获取': '_duan_builtin.字符串获取',
             '字符串包含': '_duan_builtin.字符串包含',
+            '包含': '_duan_builtin.包含',
             '字符串替换': '_duan_builtin.字符串替换',
             '字符串分割': '_duan_builtin.字符串分割',
             '分割字符串': '_duan_builtin.分割字符串',
@@ -294,6 +314,7 @@ class PythonCodeGenerator:
     def generate(self, module: Module) -> str:
         """生成Python代码"""
         self.output_lines = []
+        self.indent_level = 0  # 重置缩进级别，防止跨条目状态污染
         
         # 添加文件头
         self._add_line("# 由段言编译器生成")
@@ -343,8 +364,8 @@ class PythonCodeGenerator:
         self._add_line("    except:")
         self._add_line("        import types")
         self._add_line("        _duan_builtin = types.ModuleType('_duan_builtin')")
-        self._add_line("        _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
-        self._add_line("        _duan_builtin._读文件 = lambda path: open(path, 'r', encoding='utf-8').read()")
+        self._add_line("        _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read() if __import__('os').path.isfile(path) else ''")
+        self._add_line("        _duan_builtin._读文件 = lambda path: open(path, 'r', encoding='utf-8').read() if __import__('os').path.isfile(path) else ''")
         self._add_line("        _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content) or None")
         self._add_line("        _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
         self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
@@ -360,11 +381,18 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.序列化JSON = lambda v, i=None: (__import__('json').dumps(v, ensure_ascii=False, indent=i) if i is not None else __import__('json').dumps(v, ensure_ascii=False))")
         self._add_line("        _duan_builtin.美化JSON = lambda v: __import__('json').dumps(v, ensure_ascii=False, indent=2)")
         self._add_line("        _duan_builtin.转字符串 = str")
+        self._add_line("        _duan_builtin.转整数 = int")
+        self._add_line("        _duan_builtin.转浮点 = float")
+        self._add_line("        _duan_builtin.chr = chr")
+        self._add_line("        _duan_builtin.bin = bin")
+        self._add_line("        _duan_builtin.hex = hex")
+        self._add_line("        _duan_builtin.oct = oct")
         self._add_line("        _duan_builtin.列表创建 = list")
         self._add_line("        _duan_builtin.列表长度 = len")
         self._add_line("        _duan_builtin.列 = lambda *args: list(args)")
         self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
+        self._add_line("        _duan_builtin.包含 = lambda sub, s: sub in s")
         self._add_line("        _duan_builtin.字符串长度 = len")
         self._add_line("        _duan_builtin.截取 = lambda s, start, end: s[start:end]")
         self._add_line("        _duan_builtin.转大写 = lambda s: s.upper()")
@@ -393,11 +421,18 @@ class PythonCodeGenerator:
         self._add_line("    _duan_builtin.序列化JSON = lambda v, i=None: (__import__('json').dumps(v, ensure_ascii=False, indent=i) if i is not None else __import__('json').dumps(v, ensure_ascii=False))")
         self._add_line("    _duan_builtin.美化JSON = lambda v: __import__('json').dumps(v, ensure_ascii=False, indent=2)")
         self._add_line("    _duan_builtin.转字符串 = str")
+        self._add_line("    _duan_builtin.转整数 = int")
+        self._add_line("    _duan_builtin.转浮点 = float")
+        self._add_line("    _duan_builtin.chr = chr")
+        self._add_line("    _duan_builtin.bin = bin")
+        self._add_line("    _duan_builtin.hex = hex")
+        self._add_line("    _duan_builtin.oct = oct")
         self._add_line("    _duan_builtin.列表创建 = list")
         self._add_line("    _duan_builtin.列表长度 = len")
         self._add_line("    _duan_builtin.列 = lambda *args: list(args)")
         self._add_line("    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
         self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
+        self._add_line("    _duan_builtin.包含 = lambda sub, s: sub in s")
         self._add_line("    _duan_builtin.字符串长度 = len")
         self._add_line("    _duan_builtin.截取 = lambda s, start, end: s[start:end]")
         self._add_line("    _duan_builtin.转大写 = lambda s: s.upper()")
@@ -485,9 +520,17 @@ class PythonCodeGenerator:
             # Python通过 __all__ 或直接定义来实现导出
             self._generate_export_stmt(stmt)
         elif isinstance(stmt, BreakStmt):
-            self._add_line("break")
+            if self._in_loop:
+                self._add_line("break")
+            else:
+                self._add_line("pass")
         elif isinstance(stmt, ContinueStmt):
-            self._add_line("continue")
+            if self._in_loop:
+                self._add_line("continue")
+            else:
+                self._add_line("pass")
+        elif isinstance(stmt, PassStmt):
+            self._add_line("pass")
         elif isinstance(stmt, TypeCheckToggleStmt):
             # 类型检查开关
             self._runtime_type_check = stmt.enable
@@ -538,6 +581,9 @@ class PythonCodeGenerator:
         elif isinstance(stmt, CompoundAssignment):
             # 复合赋值语句：甲 加上 1 → 甲 += 1
             self._generate_compound_assignment(stmt)
+        elif isinstance(stmt, IndexedCompoundAssignment):
+            # 索引复合赋值：甲[丁] 加上 1 → 甲[丁] += 1
+            self._generate_indexed_compound_assignment(stmt)
         elif isinstance(stmt, Assignment):
             # 普通赋值语句：甲 = 值
             target = self._generate_expr(stmt.target)
@@ -633,6 +679,10 @@ class PythonCodeGenerator:
             # 花括号代码块
             for s in stmt.statements:
                 self._generate_statement(s)
+        elif isinstance(stmt, (IndexAccess, MemberAccess, ParagraphCall)):
+            # 表达式语句（如 obj[key].append(v) 或 obj.method()）
+            expr_str = self._generate_expr(stmt)
+            self._add_line(expr_str)
         else:
             raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
@@ -640,6 +690,10 @@ class PythonCodeGenerator:
         """生成变量声明"""
         name = self._sanitize_name(stmt.name)
         value = self._generate_expr(stmt.value)
+        
+        # 处理 己.xxx 形式的属性赋值
+        if name.startswith('己.'):
+            name = 'self.' + name[2:]
         
         type_annotation = ''
         if stmt.type_annotation:
@@ -734,8 +788,11 @@ class PythonCodeGenerator:
         var_name = self._sanitize_name(stmt.variable)
         iterable = self._generate_expr(stmt.iterable)
         
-        self._add_line(f"for {var_name} in {iterable}:")
+        for_keyword = "async for" if getattr(stmt, 'is_async', False) else "for"
+        self._add_line(f"{for_keyword} {var_name} in {iterable}:")
         
+        old_in_loop = self._in_loop
+        self._in_loop = True
         self.indent_level += 1
         if stmt.body:
             for s in stmt.body:
@@ -743,6 +800,7 @@ class PythonCodeGenerator:
         else:
             self._add_line("pass")
         self.indent_level -= 1
+        self._in_loop = old_in_loop
     
     def _generate_while_stmt(self, stmt: WhileStmt):
         """生成当循环"""
@@ -750,6 +808,8 @@ class PythonCodeGenerator:
         
         self._add_line(f"while {condition}:")
         
+        old_in_loop = self._in_loop
+        self._in_loop = True
         self.indent_level += 1
         if stmt.body:
             for s in stmt.body:
@@ -757,6 +817,7 @@ class PythonCodeGenerator:
         else:
             self._add_line("pass")
         self.indent_level -= 1
+        self._in_loop = old_in_loop
     
     def _generate_c_for_stmt(self, stmt):
         """生成C风格for循环：init; while(cond){ body; incr; }"""
@@ -766,6 +827,8 @@ class PythonCodeGenerator:
         # 生成while循环
         condition = self._generate_expr(stmt.condition) if stmt.condition else 'True'
         self._add_line(f"while {condition}:")
+        old_in_loop = self._in_loop
+        self._in_loop = True
         self.indent_level += 1
         if stmt.body:
             for s in stmt.body:
@@ -776,6 +839,7 @@ class PythonCodeGenerator:
         if stmt.increment:
             self._generate_statement(stmt.increment)
         self.indent_level -= 1
+        self._in_loop = old_in_loop
         self._add_line("")
 
     def _generate_paragraph(self, stmt: Paragraph):
@@ -823,7 +887,8 @@ class PythonCodeGenerator:
             return_type_annotation = f" -> {python_return_type}"
         
         # 函数定义
-        self._add_line(f"def {name}({params_str}){return_type_annotation}:")
+        def_prefix = "async def" if '异步' in (stmt.modifiers or []) else "def"
+        self._add_line(f"{def_prefix} {name}({params_str}){return_type_annotation}:")
         
         old_in_function = self._in_function
         self._in_function = True
@@ -880,10 +945,17 @@ class PythonCodeGenerator:
                     self._add_line("except (ctypes.ArgumentError, OSError, RuntimeError):")
             elif stmt.catch_type and stmt.catch_var:
                 # 捕获指定类型 + 变量：except 值错误 as 错误:
-                self._add_line(f"except {stmt.catch_type} as {stmt.catch_var}:")
+                # 支持多类型捕获：(Type1, Type2) 格式
+                ct = stmt.catch_type
+                if ',' in ct:
+                    ct = f"({ct})"
+                self._add_line(f"except {ct} as {stmt.catch_var}:")
             elif stmt.catch_type:
                 # 捕获指定类型无变量：except 值错误:
-                self._add_line(f"except {stmt.catch_type}:")
+                ct = stmt.catch_type
+                if ',' in ct:
+                    ct = f"({ct})"
+                self._add_line(f"except {ct}:")
             elif stmt.catch_var:
                 # 无类型有变量（向后兼容）：except Exception as 错误:
                 self._add_line(f"except Exception as {stmt.catch_var}:")
@@ -912,10 +984,18 @@ class PythonCodeGenerator:
     
     def _generate_throw_stmt(self, stmt: ThrowStmt):
         """生成抛出异常语句"""
+        if stmt.value is None:
+            # 裸抛出：重新抛出当前异常
+            self._add_line("raise")
+            return
         value = self._generate_expr(stmt.value)
         # 确保抛出的是合法异常对象（Python 3 不允许 raise 字符串）
+        from_part = ""
+        if stmt.from_expr:
+            from_val = self._generate_expr(stmt.from_expr)
+            from_part = f" from {from_val}"
         self._add_line(f"_duan_exc = {value}")
-        self._add_line("raise _duan_exc if isinstance(_duan_exc, BaseException) else Exception(_duan_exc)")
+        self._add_line(f"raise _duan_exc if isinstance(_duan_exc, BaseException) else Exception(_duan_exc){from_part}")
     
     def _generate_self_assignment(self, stmt):
         """生成self赋值语句"""
@@ -932,6 +1012,8 @@ class PythonCodeGenerator:
             '减': '-=',
             '乘': '*=',
             '除': '/=',
+            '除以': '/=',
+            '整除': '//=',  # 整数除法复合赋值
             '模': '%=',
             '幂': '**=',
         }
@@ -939,12 +1021,37 @@ class PythonCodeGenerator:
         value = self._generate_expr(stmt.value)
         self._add_line(f"{target} {py_op} {value}")
 
-    def _generate_indexed_assignment(self, stmt):
-        """生成索引赋值语句：甲[丁] = 值"""
+    def _generate_indexed_compound_assignment(self, stmt):
+        """生成索引复合赋值语句：甲[丁] 加上 1 → 甲[丁] += 1"""
         target = self._sanitize_name(stmt.target)
         index = self._generate_expr(stmt.index)
+        py_ops = {
+            '加': '+=',
+            '减': '-=',
+            '乘': '*=',
+            '除': '/=',
+            '除以': '/=',
+            '整除': '//=',  # 整数除法复合赋值
+            '模': '%=',
+            '幂': '**=',
+        }
+        py_op = py_ops.get(stmt.operator, '+=')
         value = self._generate_expr(stmt.value)
-        self._add_line(f"{target}[{index}] = {value}")
+        self._add_line(f"{target}[{index}] {py_op} {value}")
+
+    def _generate_indexed_assignment(self, stmt):
+        """生成索引赋值语句：甲[丁] = 值 或 甲[i][j] = 值"""
+        if isinstance(stmt.target, ASTNode):
+            target = self._generate_expr(stmt.target)
+        else:
+            target = self._sanitize_name(stmt.target)
+        value = self._generate_expr(stmt.value)
+        # 多重索引时 index=None，target 已经是 IndexAccess 节点
+        if stmt.index is not None:
+            index = self._generate_expr(stmt.index)
+            self._add_line(f"{target}[{index}] = {value}")
+        else:
+            self._add_line(f"{target} = {value}")
 
     def _generate_class_definition(self, stmt):
         """生成类定义"""
@@ -1147,6 +1254,10 @@ class PythonCodeGenerator:
     def _generate_with_stmt(self, stmt: WithStmt):
         """生成上下文管理语句"""
         context_expr = self._generate_expr(stmt.context_expr)
+        # 在 with 语句中，读取文件(...) 应替换为 open(...)
+        context_expr = context_expr.replace('_duan_builtin.读取文件', 'open').replace('读取文件', 'open')
+        # 写入文件(...) 也应替换为 open(..., 'w')
+        context_expr = context_expr.replace('_duan_builtin.写入文件', 'open').replace('写入文件', 'open')
         if stmt.variable:
             var_name = self._sanitize_name(stmt.variable)
             self._add_line(f"with {context_expr} as {var_name}:")
@@ -1178,9 +1289,19 @@ class PythonCodeGenerator:
             if decorator_name == '抽象':
                 self._needs_abc = True
         else:
-            # 自定义装饰器
+            # 自定义装饰器（支持带参数：@decorator(args)）
             sanitized = self._sanitize_name(decorator_name)
-            self._add_line(f"@{sanitized}")
+            if stmt.args:
+                args_parts = []
+                for a in stmt.args:
+                    if isinstance(a, KeywordArg):
+                        args_parts.append(f"{a.name}={self._generate_expr(a.value)}")
+                    else:
+                        args_parts.append(self._generate_expr(a))
+                args_str = ', '.join(args_parts)
+                self._add_line(f"@{sanitized}({args_str})")
+            else:
+                self._add_line(f"@{sanitized}")
         
         if isinstance(stmt.paragraph, Paragraph):
             self._generate_paragraph(stmt.paragraph)
@@ -1197,6 +1318,7 @@ class PythonCodeGenerator:
 
         # 静态方法不需要 self 参数
         is_static = getattr(method, 'is_static', False)
+        is_classmethod = getattr(method, 'is_classmethod', False)
         if is_static:
             params = []
         else:
@@ -1213,13 +1335,19 @@ class PythonCodeGenerator:
             for param in method.parameters:
                 param_name = self._sanitize_name(param.name)
                 self._current_method_params.add(param.name)
-                params.append(param_name)
+                if param.default_value:
+                    default = self._generate_expr(param.default_value)
+                    params.append(f"{param_name}={default}")
+                else:
+                    params.append(param_name)
 
         params_str = ', '.join(params)
 
         # 方法定义（必须包含括号）
         if is_static:
             self._add_line(f"@staticmethod")
+        if is_classmethod:
+            self._add_line(f"@classmethod")
         self._add_line(f"def {method_name}({params_str}):")
 
         old_in_function = self._in_function
@@ -1324,6 +1452,11 @@ class PythonCodeGenerator:
             # 检查是否是中文数字
             if expr.name in self.chinese_numbers:
                 return str(self.chinese_numbers[expr.name])
+            # 己 → self，己.attr → self.attr
+            if name == '己':
+                return 'self'
+            if name.startswith('己.'):
+                return 'self.' + name[2:]
             # 类方法中，如果引用的是类属性且不是参数名，添加 self. 前缀
             if self._in_class_method and expr.name in self._class_attr_names and expr.name not in self._current_method_params:
                 return f"self.{name}"
@@ -1343,7 +1476,7 @@ class PythonCodeGenerator:
         elif isinstance(expr, UnaryOp):
             operand = self._generate_expr(expr.operand)
             op = self.operator_map.get(expr.operator, expr.operator)
-            return f"({op}{operand})"
+            return f"({op} {operand})"
         
         elif isinstance(expr, ParagraphCall):
             name = self._sanitize_name(expr.name)
@@ -1357,8 +1490,13 @@ class PythonCodeGenerator:
                 if self._in_class_method and expr.name in self._class_method_names:
                     py_name = f"self.{name}"
             
-            # 参数
-            args = [self._generate_expr(arg) for arg in expr.args]
+            # 参数（支持关键字参数）
+            args = []
+            for arg in expr.args:
+                if isinstance(arg, KeywordArg):
+                    args.append(f"{arg.name}={self._generate_expr(arg.value)}")
+                else:
+                    args.append(self._generate_expr(arg))
             args_str = ', '.join(args)
             
             return f"{py_name}({args_str})"
@@ -1380,10 +1518,19 @@ class PythonCodeGenerator:
             return result
         
         elif isinstance(expr, IndexAccess):
-            # 索引访问：obj[index]
+            # 索引访问：obj[index] 或 obj[start:stop:step]（切片）
             obj = self._generate_expr(expr.obj)
-            index = self._generate_expr(expr.index)
-            return f"{obj}[{index}]"
+            if isinstance(expr.index, SliceExpr):
+                start = self._generate_expr(expr.index.start) if expr.index.start else ''
+                stop = self._generate_expr(expr.index.stop) if expr.index.stop else ''
+                step = self._generate_expr(expr.index.step) if expr.index.step else ''
+                if step:
+                    return f"{obj}[{start}:{stop}:{step}]"
+                else:
+                    return f"{obj}[{start}:{stop}]"
+            else:
+                index = self._generate_expr(expr.index)
+                return f"{obj}[{index}]"
         
         elif isinstance(expr, ClassInstantiation):
             # 类实例化：类名(参数...)
@@ -1411,15 +1558,25 @@ class PythonCodeGenerator:
             if full_access in module_member_map:
                 mapped = module_member_map[full_access]
                 if expr.is_method_call:
-                    args = [self._generate_expr(arg) for arg in expr.args]
+                    args = []
+                    for arg in expr.args:
+                        if isinstance(arg, KeywordArg):
+                            args.append(f"{arg.name}={self._generate_expr(arg.value)}")
+                        else:
+                            args.append(self._generate_expr(arg))
                     args_str = ', '.join(args)
                     return f"{mapped}({args_str})"
                 else:
                     return mapped
             
             if expr.is_method_call:
-                # 方法调用
-                args = [self._generate_expr(arg) for arg in expr.args]
+                # 方法调用（支持关键字参数）
+                args = []
+                for arg in expr.args:
+                    if isinstance(arg, KeywordArg):
+                        args.append(f"{arg.name}={self._generate_expr(arg.value)}")
+                    else:
+                        args.append(self._generate_expr(arg))
                 args_str = ', '.join(args)
 
                 # 特殊处理：父.构造(...) -> super().__init__(...)
@@ -1442,33 +1599,97 @@ class PythonCodeGenerator:
             elements = [self._generate_expr(e) for e in expr.elements]
             return f"[{', '.join(elements)}]"
         
+        elif isinstance(expr, TupleLiteral):
+            # 元组字面量
+            elements = [self._generate_expr(e) for e in expr.elements]
+            if len(elements) == 1:
+                return f"({elements[0]},)"
+            return f"({', '.join(elements)})"
+        
+        elif isinstance(expr, SetLiteral):
+            # 集合字面量
+            if not expr.elements:
+                return "set()"
+            elements = [self._generate_expr(e) for e in expr.elements]
+            return f"{{{', '.join(elements)}}}"
+        
         elif isinstance(expr, StringInterpolation):
             # 字符串插值 -> f-string
             parts = []
             for part in expr.parts:
                 if isinstance(part, str):
-                    parts.append(part)
+                    # 转义特殊字符（反斜杠、换行、回车、制表符）
+                    escaped = part.replace('\\', '\\\\').replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+                    parts.append(escaped)
+                elif isinstance(part, tuple):
+                    # 带格式说明符的表达式：(expr_node, format_spec)
+                    expr_code = self._generate_expr(part[0])
+                    parts.append('{' + expr_code + ':' + part[1] + '}')
                 elif isinstance(part, ASTNode):
                     # 生成表达式代码并放入花括号
                     expr_code = self._generate_expr(part)
                     parts.append('{' + expr_code + '}')
-            # 转义已有的花括号
             fstr = ''.join(parts)
-            # 确保字符串内的引号转义
-            fstr = fstr.replace('\\', '\\\\')
-            return f'f"{fstr}"'
+            # 选择合适的外层引号：如果内容包含双引号，使用单引号避免冲突
+            if '"' in fstr:
+                if "'" in fstr:
+                    # 两种引号都有，转义双引号并保留双引号外层
+                    fstr = fstr.replace('"', '\\"')
+                    return f'f"{fstr}"'
+                else:
+                    return f"f'{fstr}'"
+            else:
+                return f'f"{fstr}"'
         
         elif isinstance(expr, ListComprehension):
-            # 列表推导 -> [expr for var in iterable if condition]
+            # 列表推导 -> [expr for var in iterable if condition ...]
             expression = self._generate_expr(expr.expression)
-            variable = self._sanitize_name(expr.variable)
-            iterable = self._generate_expr(expr.iterable)
-            result = f"[{expression} for {variable} in {iterable}"
-            if expr.condition:
-                condition = self._generate_expr(expr.condition)
-                result += f" if {condition}"
-            result += "]"
-            return result
+            if expr.generators and len(expr.generators) > 1:
+                # 多重generator
+                parts = []
+                for var, it, cond in expr.generators:
+                    var_name = self._sanitize_name(var)
+                    it_str = self._generate_expr(it)
+                    part = f"for {var_name} in {it_str}"
+                    if cond:
+                        cond_str = self._generate_expr(cond)
+                        part += f" if {cond_str}"
+                    parts.append(part)
+                return f"[{expression} {' '.join(parts)}]"
+            else:
+                variable = self._sanitize_name(expr.variable)
+                iterable = self._generate_expr(expr.iterable)
+                result = f"[{expression} for {variable} in {iterable}"
+                if expr.condition:
+                    condition = self._generate_expr(expr.condition)
+                    result += f" if {condition}"
+                result += "]"
+                return result
+        
+        elif isinstance(expr, SetComprehension):
+            # 集合推导 -> {expr for var in iterable if condition ...}
+            expression = self._generate_expr(expr.expression)
+            if expr.generators and len(expr.generators) > 1:
+                # 多重generator
+                parts = []
+                for var, it, cond in expr.generators:
+                    var_name = self._sanitize_name(var)
+                    it_str = self._generate_expr(it)
+                    part = f"for {var_name} in {it_str}"
+                    if cond:
+                        cond_str = self._generate_expr(cond)
+                        part += f" if {cond_str}"
+                    parts.append(part)
+                return f"{{{expression} {' '.join(parts)}}}"
+            else:
+                variable = self._sanitize_name(expr.variable)
+                iterable = self._generate_expr(expr.iterable)
+                result = f"{{{expression} for {variable} in {iterable}"
+                if expr.condition:
+                    condition = self._generate_expr(expr.condition)
+                    result += f" if {condition}"
+                result += "}"
+                return result
         
         elif isinstance(expr, LambdaExpression):
             # 匿名函数 -> lambda params: body
@@ -1477,21 +1698,40 @@ class PythonCodeGenerator:
             return f"lambda {params}: {body}"
         
         elif isinstance(expr, DictComprehension):
-            # 字典推导 -> {key: value for var in iterable if condition}
+            # 字典推导 -> {key: value for var in iterable if condition ...}
             key = self._generate_expr(expr.key_expr)
             val = self._generate_expr(expr.value_expr)
-            var_name = self._sanitize_name(expr.variable)
-            iterable = self._generate_expr(expr.iterable)
-            result = f"{{{key}: {val} for {var_name} in {iterable}"
-            if expr.condition:
-                condition = self._generate_expr(expr.condition)
-                result += f" if {condition}"
-            result += "}"
-            return result
+            if expr.generators and len(expr.generators) > 1:
+                # 多重generator
+                parts = []
+                for var, it, cond in expr.generators:
+                    var_name = self._sanitize_name(var)
+                    it_str = self._generate_expr(it)
+                    part = f"for {var_name} in {it_str}"
+                    if cond:
+                        cond_str = self._generate_expr(cond)
+                        part += f" if {cond_str}"
+                    parts.append(part)
+                return f"{{{key}: {val} {' '.join(parts)}}}"
+            else:
+                var_name = self._sanitize_name(expr.variable)
+                iterable = self._generate_expr(expr.iterable)
+                result = f"{{{key}: {val} for {var_name} in {iterable}"
+                if expr.condition:
+                    condition = self._generate_expr(expr.condition)
+                    result += f" if {condition}"
+                result += "}"
+                return result
 
         elif isinstance(expr, DictLiteral):
-            # 字典字面量 -> {key: val, key2: val2, ...}
-            items = [f"{self._generate_expr(k)}: {self._generate_expr(v)}" for k, v in expr.entries]
+            # 字典字面量 -> {key: val, key2: val2, ...} 或 {**d1, key: val}
+            items = []
+            for k, v in expr.entries:
+                if k is None:
+                    # **展开
+                    items.append(f"**{self._generate_expr(v)}")
+                else:
+                    items.append(f"{self._generate_expr(k)}: {self._generate_expr(v)}")
             return f"{{{', '.join(items)}}}"
 
         elif isinstance(expr, ConditionalExpression):
@@ -1504,14 +1744,23 @@ class PythonCodeGenerator:
             else:
                 return f"({then_expr} if {condition} else None)"
 
+        elif isinstance(expr, AssignmentExpression):
+            # 赋值表达式（海象运算符） -> (name := value)
+            name = self._sanitize_name(expr.name)
+            value = self._generate_expr(expr.value)
+            return f"({name} := {value})"
+
         elif isinstance(expr, RangeExpr):
             # 范围表达式 -> range(start, end+1) 或 range(start, end+1, step)
+            # 处理递减范围：当 start>end 时，自动将步长取反
             start = self._generate_expr(expr.start)
             end = self._generate_expr(expr.end)
             if expr.step:
                 step = self._generate_expr(expr.step)
-                return f"range({start}, ({end}) + 1, {step})"
-            return f"range({start}, ({end}) + 1)"
+                # 运行时判断方向：start<=end 时正常步长，否则步长取反
+                return f"range({start}, ({end}) + (1 if ({start}) <= ({end}) else -1), ({step}) if ({start}) <= ({end}) else -({step}))"
+            else:
+                return f"range({start}, ({end}) + 1)"
 
         elif isinstance(expr, AwaitExpr):
             # 等待表达式 → await expression

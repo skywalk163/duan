@@ -69,15 +69,17 @@ class IfStmt(ASTNode):
 
 
 class ForeachStmt(ASTNode):
-    __slots__ = ('variable', 'iterable', 'body')
+    __slots__ = ('variable', 'iterable', 'body', 'is_async')
     """遍历循环"""
-    def __init__(self, variable: str, iterable: ASTNode, body: List[ASTNode]):
+    def __init__(self, variable: str, iterable: ASTNode, body: List[ASTNode], is_async: bool = False):
         self.variable = variable
         self.iterable = iterable
         self.body = body
+        self.is_async = is_async
     
     def __repr__(self):
-        return f"ForeachStmt({self.variable} in {self.iterable})"
+        prefix = "AsyncForeachStmt" if self.is_async else "ForeachStmt"
+        return f"{prefix}({self.variable} in {self.iterable})"
 
 
 class WhileStmt(ASTNode):
@@ -186,6 +188,18 @@ class ParagraphCall(ASTNode):
         return f"《{self.name}》({', '.join(map(str, self.args))})"
 
 
+class SliceExpr(ASTNode):
+    __slots__ = ('start', 'stop', 'step')
+    """切片表达式: start:stop:step"""
+    def __init__(self, start: ASTNode = None, stop: ASTNode = None, step: ASTNode = None):
+        self.start = start
+        self.stop = stop
+        self.step = step
+    
+    def __repr__(self):
+        return f"{self.start or ''}:{self.stop or ''}:{self.step or ''}"
+
+
 class IndexAccess(ASTNode):
     __slots__ = ('obj', 'index')
     """索引访问（字符串/列表索引）"""
@@ -195,6 +209,17 @@ class IndexAccess(ASTNode):
     
     def __repr__(self):
         return f"{self.obj}[{self.index}]"
+
+
+class AssignmentExpression(ASTNode):
+    __slots__ = ('name', 'value')
+    """赋值表达式（海象运算符等价物）：设 n 为 len(data) → n := len(data)"""
+    def __init__(self, name: str, value: ASTNode):
+        self.name = name
+        self.value = value
+    
+    def __repr__(self):
+        return f"设 {self.name} 为 {self.value}"
 
 
 class BreakStmt(ASTNode):
@@ -209,6 +234,13 @@ class ContinueStmt(ASTNode):
     """跳过语句"""
     def __repr__(self):
         return "跳过"
+
+
+class PassStmt(ASTNode):
+    __slots__ = ()
+    """空语句（pass）"""
+    def __repr__(self):
+        return "pass"
 
 
 class TypeCheckToggleStmt(ASTNode):
@@ -254,12 +286,15 @@ class CatchClause(ASTNode):
 
 
 class ThrowStmt(ASTNode):
-    __slots__ = ('value',)
+    __slots__ = ('value', 'from_expr')
     """抛出异常语句"""
-    def __init__(self, value: ASTNode):
+    def __init__(self, value: ASTNode, from_expr: ASTNode = None):
         self.value = value
+        self.from_expr = from_expr
     
     def __repr__(self):
+        if self.from_expr:
+            return f"ThrowStmt({self.value} from {self.from_expr})"
         return f"ThrowStmt({self.value})"
 
 
@@ -331,12 +366,13 @@ class AttributeDeclaration(ASTNode):
 
 
 class MethodDefinition(ASTNode):
-    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor', 'generic_params', 'access_modifier', 'is_static')
+    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor', 'generic_params', 'access_modifier', 'is_static', 'is_classmethod', 'is_property')
     """方法定义"""
     def __init__(self, name: str, parameters: List[Parameter], body: List[ASTNode],
                  return_type: str = None, is_constructor: bool = False,
                  generic_params: List[str] = None,
-                 access_modifier: str = 'public', is_static: bool = False):
+                 access_modifier: str = 'public', is_static: bool = False,
+                 is_classmethod: bool = False, is_property: bool = False):
         self.name = name
         self.parameters = parameters
         self.body = body
@@ -345,6 +381,8 @@ class MethodDefinition(ASTNode):
         self.generic_params = generic_params or []
         self.access_modifier = access_modifier
         self.is_static = is_static
+        self.is_classmethod = is_classmethod
+        self.is_property = is_property
     
     def __repr__(self):
         return f"MethodDefinition({self.name})"
@@ -372,6 +410,19 @@ class IndexedAssignment(ASTNode):
     
     def __repr__(self):
         return f"IndexedAssignment({self.target}[{self.index}] = {self.value})"
+
+
+class IndexedCompoundAssignment(ASTNode):
+    __slots__ = ('target', 'index', 'operator', 'value')
+    """索引复合赋值（甲[丁] 加上 值 → 甲[丁] += 值）"""
+    def __init__(self, target: str, index: ASTNode, operator: str, value: ASTNode):
+        self.target = target
+        self.index = index
+        self.operator = operator  # '加', '减', '乘', '除', '模', '幂'
+        self.value = value
+    
+    def __repr__(self):
+        return f"IndexedCompoundAssignment({self.target}[{self.index}] {self.operator}= {self.value})"
 
 
 class Assignment(ASTNode):
@@ -459,6 +510,26 @@ class ListLiteral(ASTNode):
         return f"[{', '.join(map(str, self.elements))}]"
 
 
+class TupleLiteral(ASTNode):
+    __slots__ = ('elements',)
+    """元组字面量"""
+    def __init__(self, elements: List[ASTNode]):
+        self.elements = elements
+    
+    def __repr__(self):
+        return f"({', '.join(map(str, self.elements))})"
+
+
+class SetLiteral(ASTNode):
+    __slots__ = ('elements',)
+    """集合字面量"""
+    def __init__(self, elements: List[ASTNode]):
+        self.elements = elements
+    
+    def __repr__(self):
+        return f"{{{', '.join(map(str, self.elements))}}}"
+
+
 class StringInterpolation(ASTNode):
     __slots__ = ('parts',)
     """字符串插值"""
@@ -470,16 +541,35 @@ class StringInterpolation(ASTNode):
 
 
 class ListComprehension(ASTNode):
-    __slots__ = ('expression', 'variable', 'iterable', 'condition')
+    __slots__ = ('expression', 'variable', 'iterable', 'condition', 'generators')
     """列表推导"""
-    def __init__(self, expression: ASTNode, variable: str, iterable: ASTNode, condition: ASTNode = None):
+    def __init__(self, expression: ASTNode, variable: str, iterable: ASTNode, condition: ASTNode = None, generators=None):
         self.expression = expression
         self.variable = variable
         self.iterable = iterable
         self.condition = condition
+        # generators: List of (variable_str, iterable_ast, condition_ast_or_None)
+        # None means single generator (backward compat)
+        self.generators = generators
     
     def __repr__(self):
         return f"ListComprehension([{self.expression} for {self.variable} in {self.iterable}])"
+
+
+class SetComprehension(ASTNode):
+    __slots__ = ('expression', 'variable', 'iterable', 'condition', 'generators')
+    """集合推导: {expr for var in iterable if condition}"""
+    def __init__(self, expression: ASTNode, variable: str, iterable: ASTNode, condition: ASTNode = None, generators=None):
+        self.expression = expression
+        self.variable = variable
+        self.iterable = iterable
+        self.condition = condition
+        # generators: List of (variable_str, iterable_ast, condition_ast_or_None)
+        # None means single generator (backward compat)
+        self.generators = generators
+    
+    def __repr__(self):
+        return f"SetComprehension({{{self.expression} for {self.variable} in {self.iterable}}})"
 
 
 class LambdaExpression(ASTNode):
@@ -539,26 +629,30 @@ class MatchPattern(ASTNode):
 
 
 class DictComprehension(ASTNode):
-    __slots__ = ('key_expr', 'value_expr', 'variable', 'iterable', 'condition')
+    __slots__ = ('key_expr', 'value_expr', 'variable', 'iterable', 'condition', 'generators')
     """字典推导"""
     def __init__(self, key_expr: ASTNode, value_expr: ASTNode, variable: str,
-                 iterable: ASTNode, condition: ASTNode = None):
+                 iterable: ASTNode, condition: ASTNode = None, generators=None):
         self.key_expr = key_expr
         self.value_expr = value_expr
         self.variable = variable
         self.iterable = iterable
         self.condition = condition
+        # generators: List of (variable_str, iterable_ast, condition_ast_or_None)
+        # None means single generator (backward compat)
+        self.generators = generators
     
     def __repr__(self):
         return f"DictComprehension({{{self.key_expr}: {self.value_expr} for {self.variable} in {self.iterable}}})"
 
 
 class DecoratorDefinition(ASTNode):
-    __slots__ = ('decorator_name', 'paragraph')
+    __slots__ = ('decorator_name', 'paragraph', 'args')
     """装饰器定义"""
-    def __init__(self, decorator_name: str, paragraph):
+    def __init__(self, decorator_name: str, paragraph, args=None):
         self.decorator_name = decorator_name
         self.paragraph = paragraph
+        self.args = args  # 可选的装饰器参数列表（如 @repeat(3) 中的 [3]）
     
     def __repr__(self):
         return f"DecoratorDefinition(@{self.decorator_name})"
@@ -1037,3 +1131,14 @@ class FFIPreprocessorDef(ASTNode):
     
     def __repr__(self):
         return f"FFIPreprocessorDef({self.name}={self.value})"
+
+
+class KeywordArg(ASTNode):
+    """关键字参数：name=value（用于函数/方法调用中的关键字参数）"""
+    __slots__ = ('name', 'value')
+    def __init__(self, name: str, value):
+        self.name = name
+        self.value = value
+    
+    def __repr__(self):
+        return f"KeywordArg({self.name}={self.value})"

@@ -66,7 +66,8 @@ class UnifiedCodeGenerator:
             '加': '+',
             '减': '-',
             '乘': '*',
-            '除': '/',
+            '除': '//',
+            '除以': '//',
             '模': '%',
             '幂': '**',
             '大于': '>',
@@ -418,9 +419,9 @@ class UnifiedCodeGenerator:
         # 复合赋值语句
         elif is_instance(stmt, 'CompoundAssignment'):
             op_map = {
-                '加': '+=', '减': '-=', '乘': '*=', '除': '/=',
+                '加': '+=', '减': '-=', '乘': '*=', '除': '//=',
                 '模': '%=', '幂': '**=',
-                '加上': '+=', '减去': '-=', '乘以': '*=', '除以': '/=',
+                '加上': '+=', '减去': '-=', '乘以': '*=', '除以': '//=',
             }
             target_code = self._sanitize_name(stmt.target) if isinstance(stmt.target, str) else self._generate_expr(stmt.target)
             op = op_map.get(stmt.operator, '+=')
@@ -1258,6 +1259,9 @@ class UnifiedCodeGenerator:
             for part in expr.parts:
                 if isinstance(part, str):
                     f_parts.append(part.replace('{', '{{').replace('}', '}}'))
+                elif isinstance(part, tuple):
+                    # 带格式说明符：(expr_node, format_spec)
+                    f_parts.append('{' + self._generate_expr(part[0]) + ':' + part[1] + '}')
                 else:
                     f_parts.append('{' + self._generate_expr(part) + '}')
             return 'f' + repr(''.join(f_parts))
