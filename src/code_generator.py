@@ -367,6 +367,8 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read() if __import__('os').path.isfile(path) else ''")
         self._add_line("        _duan_builtin._读文件 = lambda path: open(path, 'r', encoding='utf-8').read() if __import__('os').path.isfile(path) else ''")
         self._add_line("        _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content) or None")
+        self._add_line("        _duan_builtin.删除文件 = lambda path: __import__('os').remove(path) if __import__('os').path.isfile(path) else None")
+        self._add_line("        _duan_builtin.删除目录 = lambda path: __import__('os').rmdir(path)")
         self._add_line("        _duan_builtin.文件存在 = lambda path: __import__('os').path.isfile(path)")
         self._add_line("        _duan_builtin.目录存在 = lambda path: __import__('os').path.isdir(path)")
         self._add_line("        _duan_builtin.打印 = print")

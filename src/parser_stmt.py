@@ -1727,7 +1727,31 @@ class ParserStmtMixin:
                                                           '尝试', '抛出', '匹配', '返回', '属性', 
                                                           '构造', '类', '接口'))
                 if not is_stmt_keyword:
-                    value = self._parse_expr()
+                    # 先解析第一个表达式（不含逗号/管道）
+                    first = self._parse_logical_expr()
+                    
+                    # 后置三元表达式：值 如果 条件 否则 值
+                    if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '如果':
+                        self._consume(TokenType.KEYWORD, '如果')
+                        condition = self._parse_logical_expr()
+                        else_expr = None
+                        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '否则':
+                            self._consume(TokenType.KEYWORD, '否则')
+                            else_expr = self._parse_expr()
+                        value = ConditionalExpression(condition, first, else_expr)
+                    # 检查是否是多值返回（逗号分隔）
+                    elif self._current() and self._current().type == TokenType.COMMA:
+                        values = [first]
+                        while self._current() and self._current().type == TokenType.COMMA:
+                            self._consume(TokenType.COMMA)
+                            # 跳过 NEWLINE
+                            while self._current() and self._current().type in (TokenType.NEWLINE,):
+                                self._consume()
+                            values.append(self._parse_logical_expr())
+                        value = TupleLiteral(values)
+                    else:
+                        # 单值返回
+                        value = first
         
         # 句号（可选）
         if self._current() and self._current().type == TokenType.DOT:
