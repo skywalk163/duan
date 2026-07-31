@@ -1,8 +1,9 @@
 import paramiko
+from ssh_config import SSH_HOST, SSH_USER_TRAE, SSH_PASS_TRAE, SUDO_PASS
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('192.168.0.88', username='trae', password='trae123', timeout=30)
+client.connect(SSH_HOST, username=SSH_USER_TRAE, password=SSH_PASS_TRAE, timeout=30)
 
 MODEL_DIR = '/home/skywalk/Downloads/kaggle/working/output_v2/v1-20260731-092537/checkpoint-192-merged'
 OUTPUT_DIR = '/home/trae/duan_model_v2'
@@ -11,9 +12,9 @@ LLAMA_DIR = '/home/trae/llama.cpp'
 
 cmds = [
     # 1. 用 sudo -S 并传入密码来复制模型
-    f"echo 'trae123' | sudo -S rm -rf {OUTPUT_DIR}",
-    f"echo 'trae123' | sudo -S cp -r {MODEL_DIR} {OUTPUT_DIR}",
-    f"echo 'trae123' | sudo -S chmod -R 777 {OUTPUT_DIR}",
+    f"echo '{SUDO_PASS}' | sudo -S rm -rf {OUTPUT_DIR}",
+    f"echo '{SUDO_PASS}' | sudo -S cp -r {MODEL_DIR} {OUTPUT_DIR}",
+    f"echo '{SUDO_PASS}' | sudo -S chmod -R 777 {OUTPUT_DIR}",
 
     # 2. 确认文件可读
     f'ls -la {OUTPUT_DIR}/',

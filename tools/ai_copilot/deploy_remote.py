@@ -2,10 +2,14 @@
 """SSH 到 192.168.0.88 部署 ollama 模型"""
 import paramiko
 import time
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ssh_config import SSH_HOST, SSH_USER_DUMATE, SSH_PASS_DUMATE
 
-HOST = "192.168.0.88"
-USER = "dumate"
-PASS = "dumate"
+HOST = SSH_HOST
+USER = SSH_USER_DUMATE
+PASS = SSH_PASS_DUMATE
 MODEL_DIR = "/home/skywalk/Downloads/kaggle/working/duan/tools/ai_copilot/output/duan_translator_merged_3.5_2b"
 GGUF = "duan_translator_q4_k_m.gguf"
 MODEL_NAME = "duan-translator"

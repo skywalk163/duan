@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """SSH 到 192.168.0.88 检查 GGUF tensor 详情"""
 import paramiko
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+from ssh_config import SSH_HOST, SSH_USER_DUMATE, SSH_PASS_DUMATE2
 
-HOST = "192.168.0.88"
-USER = "dumate"
-PASS = "dumate123"
+HOST = SSH_HOST
+USER = SSH_USER_DUMATE
+PASS = SSH_PASS_DUMATE2
 GGUF = "/home/skywalk/Downloads/kaggle/working/duan/tools/ai_copilot/output/duan_translator_merged_3.5_2b/duan_translator_q4_k_m.gguf"
 
 def run(ssh, cmd, timeout=60):

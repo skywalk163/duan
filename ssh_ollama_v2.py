@@ -1,8 +1,9 @@
 import paramiko
+from ssh_config import SSH_HOST, SSH_USER_TRAE, SSH_PASS_TRAE
 
 client = paramiko.SSHClient()
 client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-client.connect('192.168.0.88', username='trae', password='trae123', timeout=30)
+client.connect(SSH_HOST, username=SSH_USER_TRAE, password=SSH_PASS_TRAE, timeout=30)
 
 MODEL_NAME = 'duan_v2'
 

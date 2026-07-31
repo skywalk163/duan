@@ -173,6 +173,9 @@ tools/ai_copilot/export_remaining.py
 tools/ai_copilot/diagnose_remaining.py
 !tools/ai_copilot/sft_dataset.jsonl
 
+# 敏感信息
+.env
+
 # Ollama 模型文件（GGUF/safetensors 大文件，不入库）
 ollama_model/*.gguf
 ollama_model/merged_0.5b/
