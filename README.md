@@ -284,6 +284,8 @@ python train_lora_7b.py --model-preset qwen3.5-2b --qlora
 详细文档：
 - [LoRA 微调指南（Qwen3-8B / Qwen3.5-2B）](tools/ai_copilot/README_LoRA7B.md)
 - [ERNIE 微调指南（0.3B）](tools/ai_copilot/README_SFT.md)
+- [Kaggle 双 T4 + Swift 训练指南](tools/ai_copilot/RUN_GUIDE.md#kaggle-双-t4--swift-训练指南) — 免费 GPU 训练，新手友好
+- [完整运行指南](tools/ai_copilot/RUN_GUIDE.md)
 
 ## 标准库
 

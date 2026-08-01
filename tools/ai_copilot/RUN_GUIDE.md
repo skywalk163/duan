@@ -565,3 +565,131 @@ Qwen3.5 模型架构较新，需要较新版本的 llama.cpp。请确保 `llama.
 ```bash
 cd llama.cpp && git pull && pip install -r requirements.txt
 ```
+
+## Kaggle 双 T4 + Swift 训练指南
+
+如果你没有本地 GPU，可以使用 **Kaggle 免费双 T4 GPU** 进行训练。相比本地 LoRA 脚本，使用 **ms-swift** 框架在双 T4 上训练效率更高（batch_size=4, max_length=4096 不爆显存）。
+
+> 详细博文：[Kaggle 双 T4 训练 Qwen2.5-0.5B 的正确打开方式](https://blog.csdn.net/skywalk8163/article/details/163384636)
+
+### 为什么用 Swift？
+
+| 对比项 | 本地 LoRA 脚本 | Kaggle + Swift |
+|--------|---------------|----------------|
+| 硬件 | 需自备 GPU | 免费双 T4 (15GB x2) |
+| 框架 | peft + transformers | ms-swift |
+| 分布式 | 单卡 | 双卡 (torchrun) |
+| max_length | 1024~2048 | 4096 |
+| batch_size | 1~2 | 4 |
+| 训练速度 | ~9 分钟 (RTX 3060) | ~15 分钟 (3 epochs) |
+
+### 完整流程
+
+#### 1. 在 Kaggle 上创建 Notebook
+
+访问 [Kaggle](https://www.kaggle.com/)，创建新 Notebook，选择 **双 T4 GPU** 加速器。
+
+#### 2. 安装依赖
+
+```bash
+!pip install ms-swift[llm] -U -q
+!pip install torchao -U -q
+```
+
+#### 3. 下载模型
+
+用 transformers 下载（比 swift 自动下载更快）：
+
+```python
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+model_name = "Qwen/Qwen2.5-0.5B-Instruct"
+save_dir = "./qwen2.5-0.5b-instruct"
+
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
+tokenizer.save_pretrained(save_dir)
+
+model = AutoModelForCausalLM.from_pretrained(model_name, trust_remote_code=True)
+model.save_pretrained(save_dir)
+
+print(f"下载完成，保存在 {save_dir}")
+```
+
+#### 4. 获取训练数据集
+
+```bash
+!git clone https://gitcode.com/skywalk163/duan/
+```
+
+数据集路径：`/kaggle/working/duan/tools/ai_copilot/sft_dataset.jsonl`
+
+#### 5. 开始训练
+
+使用 `torchrun` 启动双卡分布式训练：
+
+```bash
+!torchrun --nproc_per_node=2 \
+    -m swift.cli.sft \
+    --model "./qwen2.5-0.5b-instruct" \
+    --dataset /kaggle/working/duan/tools/ai_copilot/sft_dataset.jsonl \
+    --max_length 4096 \
+    --num_train_epochs 12 \
+    --per_device_train_batch_size 4 \
+    --learning_rate 5e-5 \
+    --output_dir ./output_v2 \
+    --logging_steps 5 \
+    --save_steps 500 \
+    --eval_steps 500 \
+    --split_dataset_ratio 0.1 \
+    --bf16 true
+```
+
+**关键参数说明：**
+
+| 参数 | 说明 | 调优建议 |
+|------|------|----------|
+| `--num_train_epochs` | 训练轮数 | 12 epochs 效果最佳，3 epochs 快速验证 |
+| `--per_device_train_batch_size` | 每卡 batch size | 双 T4 设为 4，爆显存则减为 2 |
+| `--max_length` | 最大序列长度 | 4096 覆盖长代码样本 |
+| `--learning_rate` | 学习率 | 5e-5 经验值 |
+| `--save_steps` | 保存间隔步数 | 500 步保存一次 checkpoint |
+
+**训练时间参考（双 T4）：**
+
+| epochs | 步数 | 耗时 | eval_token_acc |
+|--------|------|------|----------------|
+| 3 | 201 | ~15 分钟 | 93.91% |
+| 6 | 402 | ~30 分钟 | — |
+| 12 | 804 | ~47 分钟 | 95.20% |
+
+> 最终测试显示 **checkpoint-500**（12 epochs 中第 500 步）效果最好，18/18 测试全部通过。
+
+#### 6. 合并 LoRA 模型
+
+```bash
+!swift merge-lora \
+    --adapters /kaggle/working/output_v2/v7-20260801-042924/checkpoint-500
+```
+
+#### 7. 转换为 GGUF 并部署
+
+合并后的模型需转换为 GGUF 格式才能用 ollama 加载。建议在本地机器上转换（Kaggle 上编译 llama.cpp 耗时较长）：
+
+```bash
+# 本地执行（需安装 llama.cpp）
+python convert_hf_to_gguf.py merged_model/ --outfile duan_translator.gguf --outtype f16
+ollama create duan-translator -f Modelfile
+ollama run duan-translator "def add(a, b): return a + b"
+```
+
+> 完整部署流程见上方「迁移到另一台机器」章节。
+
+### 训练成果
+
+最终训练得到的 v7 模型（checkpoint-500）已上线 Ollama：
+
+```bash
+ollama pull airoot/duan-translator
+```
+
+模型主页：[https://ollama.com/airoot/duan-translator](https://ollama.com/airoot/duan-translator)
