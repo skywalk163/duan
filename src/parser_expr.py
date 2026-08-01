@@ -1649,6 +1649,14 @@ class ParserExprMixin:
                     self._consume()
                 if self._match(TokenType.RBRACE):
                     break
+                # 支持 **dict 展开（如 {"k": 1, **other}）
+                if self._current() and self._current().type == TokenType.STAR:
+                    self._consume(TokenType.STAR)
+                    if self._current() and self._current().type == TokenType.STAR:
+                        self._consume(TokenType.STAR)
+                        spread = self._parse_comparison()
+                        entries.append((None, spread))
+                        continue
                 key = self._parse_comparison()
                 self._consume(TokenType.COLON)
                 val = self._parse_comparison()
