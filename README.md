@@ -220,6 +220,13 @@ duan compile hello.duan --backend llvm-typed -o hello.exe
 
 段言提供完整的 AI 辅助工具链，即使只有小模型（7B 以下），也能帮你写出正确的段言代码。
 
+> **模型已上线**：训练好的段言翻译器模型已发布到 Ollama 官网，可直接拉取使用：
+> ```bash
+> ollama pull airoot/duan-translator
+> ```
+> 模型主页：[https://ollama.com/airoot/duan-translator](https://ollama.com/airoot/duan-translator)
+> 详细使用说明见 [段言翻译器使用指南](段言翻译器使用指南.md)
+
 ### 核心思路
 
 ```

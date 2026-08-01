@@ -2,6 +2,12 @@
 
 本指南说明如何在本地使用小模型 LoRA 微调，让模型学会将 Python 代码翻译为段言 v3.2 代码。
 
+> **不想自己训练？** 训练好的模型已上线 Ollama，可直接拉取使用：
+> ```bash
+> ollama pull airoot/duan-translator
+> ```
+> 模型主页：[https://ollama.com/airoot/duan-translator](https://ollama.com/airoot/duan-translator)
+
 ## 快速总结
 
 - **支持模型**：

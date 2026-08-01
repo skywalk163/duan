@@ -1,4 +1,4 @@
-FROM skywalk163/duan-translator-0.5b:latest
+FROM airoot/duan-translator:latest
 
 TEMPLATE """{{ if .System }}<|im_start|>system
 {{ .System }}<|im_end|>

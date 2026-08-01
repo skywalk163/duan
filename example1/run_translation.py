@@ -10,7 +10,7 @@ import time
 import urllib.request
 import urllib.error
 
-MODEL = "skywalk163/duan-translator-0.5b"
+MODEL = "airoot/duan-translator"
 API_URL = "http://localhost:11434/api/generate"
 OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
 
