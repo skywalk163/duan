@@ -12,7 +12,7 @@ import ast_nodes as ast_nodes_module
 
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
-from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral
+from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock
 
 
 # =============================================================================
@@ -725,6 +725,8 @@ class PythonCodeGenerator:
             # 表达式语句（如 obj[key].append(v) 或 obj.method()）
             expr_str = self._generate_expr(stmt)
             self._add_line(expr_str)
+        elif isinstance(stmt, EmbedBlock):
+            self._generate_embed_block(stmt)
         else:
             raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
@@ -2242,6 +2244,50 @@ class PythonCodeGenerator:
         self._add_line(f"# C预处理器宏: {name} = {stmt.value}")
         self._add_line(f"_duan_ffi.定义宏('{name}', {repr(stmt.value)})")
         self._add_line("")
+
+    def _generate_embed_block(self, stmt: EmbedBlock):
+        """生成嵌入块代码
+        
+        Python 嵌入块：直接输出原始 Python 代码，共享段言变量作用域。
+        C 嵌入块：通过 ctypes 编译执行。
+        其他语言：以注释形式保留，提示不支持。
+        """
+        import textwrap
+        
+        lang = stmt.language.strip()
+        code = textwrap.dedent(stmt.code).strip()
+        
+        if lang.lower() in ('python', 'py'):
+            # Python 嵌入块：直接输出原始代码，保持缩进
+            self._add_line(f"# --- 嵌入 Python ---")
+            for line in code.split('\n'):
+                self._add_line(line)
+            self._add_line(f"# --- 结束嵌入 ---")
+        elif lang.lower() in ('c',):
+            # C 嵌入块：通过 ctypes/cffi 编译执行
+            self._add_line(f"# --- 嵌入 C（通过 ctypes 执行）---")
+            self._add_line("import ctypes")
+            self._add_line("import tempfile")
+            self._add_line("import os")
+            self._add_line("_duan_c_code = '''")
+            for line in code.split('\n'):
+                self._add_line(line)
+            self._add_line("'''")
+            # 编译并加载
+            self._add_line("_duan_c_src = tempfile.NamedTemporaryFile(suffix='.c', delete=False, mode='w')")
+            self._add_line("_duan_c_src.write(_duan_c_code)")
+            self._add_line("_duan_c_src.close()")
+            self._add_line("_duan_c_lib_path = _duan_c_src.name.replace('.c', '.so')")
+            self._add_line("import subprocess")
+            self._add_line("subprocess.run(['cc', '-shared', '-fPIC', '-o', _duan_c_lib_path, _duan_c_src.name], check=True)")
+            self._add_line("_duan_c_lib = ctypes.CDLL(_duan_c_lib_path)")
+            self._add_line(f"# --- 结束嵌入 C ---")
+        else:
+            # 不支持的语言：以注释保留
+            self._add_line(f"# --- 嵌入 {lang}（暂不支持直接执行）---")
+            for line in code.split('\n'):
+                self._add_line(f"# {line}")
+            self._add_line(f"# --- 结束嵌入 ---")
 
 
 # =============================================================================

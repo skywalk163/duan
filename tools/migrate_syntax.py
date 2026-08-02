@@ -6,6 +6,7 @@
 1. 定义 x 等于 y  ->  设 x 为 y
 2. 段落 名 接收 参数  ->  段落 名(参数)
 3. 对象之属性  ->  对象的属性（成员访问符统一）
+4. 段落/段 关键词  ->  函数（选词优化，段落 仍向后兼容但推荐用 函数）
 
 用法:
     python tools/migrate_syntax.py <文件或目录>
@@ -99,6 +100,35 @@ def migrate_member_access(content: str) -> tuple:
     return new_content, changes
 
 
+def migrate_paragraph_keyword(content: str) -> tuple:
+    """迁移段落关键词：段落 -> 函数
+    
+    将"段落"关键词替换为"函数"，但保留以下不变：
+    - 字符串内容中的"段落"
+    - 注释中的"段落"
+    - 修饰符前缀的"段落"（如"严格 段落" → "严格 函数"）
+    
+    注意："段"作为单字别名不迁移，因为它太容易和变量名冲突。
+    """
+    changes = []
+    
+    # 匹配行首（可选缩进 + 可选修饰符 + ）的 段落 关键词
+    # 修饰符：严格/松散/异步
+    pattern = re.compile(
+        r'^(\s*(?:(?:严格|松散|异步)\s+)?)段落(\s+)',
+        re.MULTILINE
+    )
+    
+    def replacer(m):
+        prefix = m.group(1)
+        suffix = m.group(2)
+        changes.append(f'  关键词: "{prefix}段落{suffix}" -> "{prefix}函数{suffix}"')
+        return f'{prefix}函数{suffix}'
+    
+    new_content = pattern.sub(replacer, content)
+    return new_content, changes
+
+
 def migrate_file(filepath: str, dry_run: bool = False) -> list:
     """迁移单个文件"""
     try:
@@ -120,6 +150,10 @@ def migrate_file(filepath: str, dry_run: bool = False) -> list:
     
     # 3. 成员访问符迁移
     content, changes = migrate_member_access(content)
+    all_changes.extend(changes)
+    
+    # 4. 段落关键词迁移（段落 -> 函数）
+    content, changes = migrate_paragraph_keyword(content)
     all_changes.extend(changes)
     
     if all_changes and not dry_run:

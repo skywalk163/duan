@@ -144,7 +144,7 @@ class Executor:
         - 返回语句、导入/导出语句
         """
         # 复杂代码关键词
-        complex_keywords = ['段落', '类', '接口', '如果', '当', '遍历',
+        complex_keywords = ['函数', '段落', '类', '接口', '如果', '当', '遍历',
                           '返回', '导入', '导出', '设']
         for kw in complex_keywords:
             if kw in code:
@@ -173,10 +173,10 @@ class Executor:
             print(value)
             return value
 
-        # 处理段落定义: 段落 平方(数值): 返回 数值 * 数值。结束。
+        # 处理段落定义: 函数/段落 平方(数值): 返回 数值 * 数值。结束。
         # 简化处理：只支持单行定义
-        # 新语法：段落 名(参数): 返回 表达式。
-        seg_match = re.match(r'段落\s+(\S+)\s*\(([^)]*)\)\s*:\s*返回\s+(.+)', code)
+        # 新语法：函数/段落 名(参数): 返回 表达式。
+        seg_match = re.match(r'(?:函数|段落)\s+(\S+)\s*\(([^)]*)\)\s*:\s*返回\s+(.+)', code)
         if seg_match:
             name = seg_match.group(1)
             params = [p.strip() for p in seg_match.group(2).split(',') if p.strip()]
@@ -189,8 +189,8 @@ class Executor:
                 return self._eval_expr(body, local_env)
             self.env.set_function(name, segment_func)
             return name
-        # 旧语法兼容：段落 平方 接收 数值: 返回 数值 * 数值。
-        seg_match_old = re.match(r'段落\s+(\S+)\s+接收\s+(\S+)\s*:\s*返回\s+(.+)', code)
+        # 旧语法兼容：函数/段落 平方 接收 数值: 返回 数值 * 数值。
+        seg_match_old = re.match(r'(?:函数|段落)\s+(\S+)\s+接收\s+(\S+)\s*:\s*返回\s+(.+)', code)
         if seg_match_old:
             name = seg_match_old.group(1)
             param = seg_match_old.group(2)

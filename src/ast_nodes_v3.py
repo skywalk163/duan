@@ -1143,3 +1143,23 @@ class KeywordArg(ASTNode):
     
     def __repr__(self):
         return f"KeywordArg({self.name}={self.value})"
+
+
+class EmbedBlock(ASTNode):
+    """嵌入块语句：嵌入 Python/C: ... 结束嵌入
+    
+    将外部语言代码作为"外语引用"嵌入段言代码中，
+    类似中文文本中嵌入数学公式或英文片段。
+    """
+    __slots__ = ('language', 'code', 'imports', 'exports')
+    def __init__(self, language: str = '', code: str = '',
+                 imports: list = None, exports: list = None,
+                 line: int = 0, col: int = 0):
+        super().__init__(line, col)
+        self.language = language       # "Python", "C" 等
+        self.code = code               # 原始嵌入代码
+        self.imports = imports or []   # 需要传入的段言变量名列表
+        self.exports = exports or []   # 需要传出的变量名列表
+    
+    def __repr__(self):
+        return f"EmbedBlock({self.language}, {len(self.code)} chars)"

@@ -13,7 +13,7 @@ class CommandHandler:
         'clear': ['清除', 'cls'],
         'reset': ['重置'],
         'vars': ['变量', 'var'],
-        'funcs': ['段落', 'func', 'functions'],
+        'funcs': ['函数', '段落', 'func', 'functions'],
         'classes': ['类', 'class'],
         'history': ['历史'],
         'load': ['加载'],

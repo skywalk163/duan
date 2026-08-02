@@ -702,14 +702,14 @@ class ParserExprMixin:
             expr = Identifier("super()")
             return self._parse_postfix(expr)
 
-        # 段落调用：段落段名(参数)
-        if tok.type == TokenType.KEYWORD and tok.value == '段落':
+        # 段落调用：函数/段落 段名(参数)
+        if tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
             self._consume()
             name_parts = []
             while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 name_parts.append(self._consume().value)
             if not name_parts:
-                return self._error("段落调用后应跟段名", tok.line, tok.col)
+                return self._error("函数/段落调用后应跟段名", tok.line, tok.col)
             name = ''.join(name_parts)
             if self._current() and self._current().type == TokenType.LPAREN:
                 self._consume(TokenType.LPAREN)
@@ -774,7 +774,7 @@ class ParserExprMixin:
                 _fn_stop2 = frozenset({
                     '为','等于','接收','返回','令','循环','断言','输出',
                     '如果','否则','那么','若','则','当','遍历','设','定义',
-                    '类','构造','段落','尝试','捕获','抛出','最终','导入',
+                    '类','构造','函数','段落','尝试','捕获','抛出','最终','导入',
                     '导出','从','真','假','空','且','或','非','与','等待',
                     '匹配','情况','的','之','对','步','至','到','在','于','中的',
                 })
@@ -960,7 +960,7 @@ class ParserExprMixin:
                 _fn_stop = frozenset({
                     '为','等于','接收','返回','令','循环','断言','输出',
                     '如果','否则','那么','若','则','当','遍历','设','定义',
-                    '类','构造','段落','尝试','捕获','抛出','最终','导入',
+                    '类','构造','函数','段落','尝试','捕获','抛出','最终','导入',
                     '导出','从','真','假','空','且','或','非','与','等待',
                     '匹配','情况','的','之','对','步','至','到','在','于','中的',
                 })
@@ -1984,7 +1984,7 @@ class ParserExprMixin:
                     _kwarg_stop_kws = frozenset({
                         '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
                         '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
-                        '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+                        '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
                         '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
                         '匹配', '情况', '的', '之', '对', '步', '至', '到',
                     })
@@ -2157,7 +2157,7 @@ class ParserExprMixin:
                             _kwarg_stop_kws = frozenset({
                                 '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
                                 '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
-                                '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+                                '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
                                 '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
                                 '匹配', '情况', '的', '之', '对', '步', '至', '到',
                             })

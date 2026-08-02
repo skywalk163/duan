@@ -68,6 +68,9 @@ class TokenType(Enum):
     DEDENT = auto()      # 缩进减少
     NEWLINE = auto()     # 换行
     
+    # 嵌入块
+    EMBED_BLOCK = auto()  # 嵌入的外语代码块（Python/C等）
+
     # 特殊
     EOF = auto()         # 文件结束
 

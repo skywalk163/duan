@@ -98,6 +98,10 @@ class ParserStmtMixin:
         if tok is None:
             return None
         
+        # 嵌入块：嵌入 Python/C: ... 结束嵌入
+        if tok.type == TokenType.EMBED_BLOCK:
+            return self._parse_embed_block()
+
         # 导入语句：导入
         if tok.type == TokenType.KEYWORD and tok.value == '导入':
             return self._parse_import_stmt()
@@ -212,8 +216,8 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '异步':
             # 查看下一个 token 判断是异步段落还是异步作用域还是异步遍历
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '段落':
-                # 异步段落：异步 段落 段名 ...
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落'):
+                # 异步段落：异步 函数/段落 段名 ...
                 return self._parse_async_paragraph()
             elif next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '作用域':
                 # 异步作用域：异步作用域 ...
@@ -229,14 +233,14 @@ class ParserStmtMixin:
         # 严格段落：严格 段落 段名 ...
         if tok.type == TokenType.KEYWORD and tok.value == '严格':
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '段落':
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落'):
                 return self._parse_strict_paragraph()
             # 否则作为普通标识符处理（严格可能作为变量名）
         
         # 松散段落：松散 段落 段名 ...（显式声明为松散模式）
         if tok.type == TokenType.KEYWORD and tok.value == '松散':
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '段落':
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落'):
                 self._consume(TokenType.KEYWORD, '松散')
                 para = self._parse_paragraph_v2()
                 if '松散' not in para.modifiers:
@@ -248,9 +252,9 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '等待':
             return self._parse_expr_stmt()
         
-        # 段落定义：段落/段 段名 接收 参数
+        # 段落定义：函数/段落/段 段名 接收 参数
         # 注意：段落调用（段落段名(参数)）由表达式解析器处理
-        if tok.type == TokenType.KEYWORD and tok.value in ('段落', '段'):
+        if tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落', '段'):
             # 检查后面是否是段名后跟括号
             next_tok = self._peek(1)
             second_tok = self._peek(2)
@@ -339,9 +343,9 @@ class ParserStmtMixin:
                 name = self._consume().value
                 if self._match(TokenType.RBOOK):
                     self._consume(TokenType.RBOOK)
-                    # 检查后面是否是 段 或 段落（段落定义关键字）
-                    if self._match(TokenType.KEYWORD, '段') or self._match(TokenType.KEYWORD, '段落'):
-                        self._consume()  # 消耗 段/段落
+                    # 检查后面是否是 段、函数 或 段落（段落定义关键字）
+                    if self._match(TokenType.KEYWORD, '段') or self._match(TokenType.KEYWORD, '函数') or self._match(TokenType.KEYWORD, '段落'):
+                        self._consume()  # 消耗 段/函数/段落
                         return self._parse_paragraph_v2(name=name)
             # 回退并作为表达式语句处理
             self.pos = saved_pos
@@ -361,6 +365,28 @@ class ParserStmtMixin:
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
         return expr
+    
+    def _parse_embed_block(self) -> ASTNode:
+        """解析嵌入块语句
+        
+        语法：嵌入 Python: ... 结束嵌入
+             嵌入 C: ... 结束嵌入
+        
+        lexer 已将整个嵌入块识别为单个 EMBED_BLOCK token，
+        token.value 为 (language, code) 元组。
+        """
+        tok = self._consume(TokenType.EMBED_BLOCK)
+        language, code = tok.value
+        # 消耗可能的句号
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+        return EmbedBlock(
+            language=language,
+            code=code,
+            line=tok.line,
+            col=tok.col
+        )
+
     
     def _parse_self_assignment(self) -> ASTNode:
         """解析self赋值语句或属性赋值语句
@@ -630,7 +656,7 @@ class ParserStmtMixin:
         _func_stop_keywords = frozenset({
             '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
             '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
-            '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+            '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
             '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
             '匹配', '的', '之', '对', '步', '至', '到',
         })
@@ -719,7 +745,7 @@ class ParserStmtMixin:
         _stop_keywords = frozenset({
             '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
             '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
-            '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+            '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
             '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
             '匹配', '情况', '的', '之', '对', '步', '至', '到', '在', '于', '中的',
         })
@@ -1643,7 +1669,7 @@ class ParserStmtMixin:
         _foreach_stop_keywords = frozenset({
             '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
             '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
-            '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+            '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
             '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
             '匹配', '情况', '的', '之', '对', '步', '至', '到', '在', '于', '中的',
         })
@@ -1802,7 +1828,7 @@ class ParserStmtMixin:
                 # 检查是否是语句关键字
                 is_stmt_keyword = False
                 if tok.type == TokenType.KEYWORD:
-                    if tok.value == '段落':
+                    if tok.value in ('函数', '段落'):
                         # 段落调用（段落段名(参数)）应该作为表达式处理
                         next_tok = self._peek(1)
                         if next_tok and next_tok.type == TokenType.LPAREN:
@@ -1860,6 +1886,8 @@ class ParserStmtMixin:
           捕获 异常类型 异常变量：
           捕获 (异常类型1, 异常类型2)：
           捕获 (异常类型1, 异常类型2) 异常变量：
+          捕获 异常类型1, 异常类型2：         （无括号多类型）
+          捕获 异常类型1, 异常类型2 异常变量：（无括号多类型 + 变量）
         """
         catch_type = None
         catch_var = None
@@ -1891,32 +1919,49 @@ class ParserStmtMixin:
             # 先读取第一个标识符/关键字
             first = self._consume().value
             
-            # 检查下一个 token
-            next_tok = self._current()
-            if next_tok and next_tok.type == TokenType.COLON:
-                # 只有一个标识符/关键字，后面是冒号
-                # 启发式判断：以大写字母开头视为类型名，否则视为变量名
-                if first and first[0].isupper():
-                    catch_type = first
-                else:
-                    catch_var = first
-            elif next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                # 跳过 '为' 关键字
-                if next_tok.value == '为':
-                    self._consume()  # 消费 '为'
-                    catch_type = first
-                    var_tok = self._current()
-                    if var_tok and var_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                        catch_var = self._consume().value
+            # 检查是否有逗号分隔的多类型（无括号）
+            if self._match(TokenType.COMMA):
+                types = [first]
+                while self._match(TokenType.COMMA):
+                    self._consume(TokenType.COMMA)
+                    type_tok = self._current()
+                    if type_tok and type_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        types.append(self._consume().value)
                     else:
-                        catch_var = first
-                else:
-                    # 有类型和变量名
-                    catch_type = first
+                        break
+                catch_type = ', '.join(types)
+                
+                # 检查是否有变量名
+                var_tok = self._current()
+                if var_tok and var_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD) and var_tok.value != '：':
                     catch_var = self._consume().value
             else:
-                # 只有一个标识符，视为变量名
-                catch_var = first
+                # 单类型或变量
+                next_tok = self._current()
+                if next_tok and next_tok.type == TokenType.COLON:
+                    # 只有一个标识符/关键字，后面是冒号
+                    # 启发式判断：以大写字母开头视为类型名，否则视为变量名
+                    if first and first[0].isupper():
+                        catch_type = first
+                    else:
+                        catch_var = first
+                elif next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    # 跳过 '为' 关键字
+                    if next_tok.value == '为':
+                        self._consume()  # 消费 '为'
+                        catch_type = first
+                        var_tok = self._current()
+                        if var_tok and var_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            catch_var = self._consume().value
+                        else:
+                            catch_var = first
+                    else:
+                        # 有类型和变量名
+                        catch_type = first
+                        catch_var = self._consume().value
+                else:
+                    # 只有一个标识符，视为变量名
+                    catch_var = first
         
         # 冒号（可能是中文冒号或英文冒号）
         if self._match(TokenType.COLON):
@@ -2086,16 +2131,18 @@ class ParserStmtMixin:
         return False
     
     def _parse_paragraph_v2(self, name: str = None) -> Paragraph:
-        """解析段落定义：段落/段 段名 接收 参数1, 参数2："""
+        """解析段落定义：函数/段落/段 段名 接收 参数1, 参数2："""
         if name is None:
-            # 消耗 段落 或 段 关键字
-            if self._match(TokenType.KEYWORD, '段落'):
+            # 消耗 函数、段落 或 段 关键字
+            if self._match(TokenType.KEYWORD, '函数'):
+                self._consume(TokenType.KEYWORD, '函数')
+            elif self._match(TokenType.KEYWORD, '段落'):
                 self._consume(TokenType.KEYWORD, '段落')
             elif self._match(TokenType.KEYWORD, '段'):
                 self._consume(TokenType.KEYWORD, '段')
             else:
                 tok = self._current()
-                self._error(f"期望'段落'或'段'关键字，但得到 {tok.type if tok else '输入结束'}",
+                self._error(f"期望'函数'（或兼容写法'段落'/'段'），但得到 {tok.type if tok else '输入结束'}",
                                  tok.line if tok else 0, tok.col if tok else 0)
         
             name_tok = self._current()
@@ -2198,7 +2245,7 @@ class ParserStmtMixin:
             # 已废弃，推荐使用括号式：段落 名(参数1, 参数2)：
             import warnings
             warnings.warn(
-                f"语法「段落 名 接收 参数」已废弃，请改用「段落 名(参数)」。在未来的版本中将移除「接收」关键字。",
+                f"语法「段落 名 接收 参数」已废弃，请改用「函数 名(参数)」或「段落 名(参数)」。在未来的版本中将移除「接收」关键字。",
                 DeprecationWarning, stacklevel=2
             )
             self._consume(TokenType.KEYWORD, '接收')
@@ -2515,7 +2562,7 @@ class ParserStmtMixin:
                 self._consume(TokenType.DOT)
                 continue
 
-            if stop_on_paragraph and depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '段落':
+            if stop_on_paragraph and depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
                 # 检查后面是否是段名后跟括号（段落调用）
                 next_tok = self._peek(1)
                 second_tok = self._peek(2)
@@ -2985,7 +3032,7 @@ class ParserStmtMixin:
                     methods.append(method)
 
                 # 方法定义（支持公有、私有、保护和静态）
-                elif tok.type == TokenType.KEYWORD and tok.value == '段落':
+                elif tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
                     method = self._parse_method_definition(is_constructor=False)
                     method.access_modifier = access_modifier
                     method.is_static = is_static
@@ -3071,10 +3118,10 @@ class ParserStmtMixin:
         else:
             # 段落
             tok = self._current()
-            if tok and tok.type == TokenType.KEYWORD and tok.value == '段落':
+            if tok and tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
                 self._consume(TokenType.KEYWORD)
             else:
-                self._error(f"期望'段落'，但得到'{tok.value if tok else '输入结束'}'", 
+                self._error(f"期望'函数'（或兼容写法'段落'），但得到'{tok.value if tok else '输入结束'}'", 
                                 tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None)
             
             # 方法名可能是IDENTIFIER或KEYWORD（如"加""减""乘"）
@@ -3344,8 +3391,8 @@ class ParserStmtMixin:
                     self._consume(TokenType.DEDENT)  # 消耗这个 DEDENT
                     break
 
-                # 方法签名：段落 方法名 接收 参数名 返回 类型
-                if tok.type == TokenType.KEYWORD and tok.value == '段落': 
+                # 方法签名：函数/段落 方法名 接收 参数名 返回 类型
+                if tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
                     sig = self._parse_method_signature()
                     methods.append(sig)
 
@@ -3369,7 +3416,15 @@ class ParserStmtMixin:
         段落 方法名 返回 类型。
         段落 方法名。
         """
-        self._consume(TokenType.KEYWORD, '段落')
+        # 消耗 函数 或 段落 关键字
+        if self._match(TokenType.KEYWORD, '函数'):
+            self._consume(TokenType.KEYWORD, '函数')
+        elif self._match(TokenType.KEYWORD, '段落'):
+            self._consume(TokenType.KEYWORD, '段落')
+        else:
+            tok = self._current()
+            self._error(f"期望'函数'（或兼容写法'段落'），但得到'{tok.value if tok else '输入结束'}'",
+                        tok.line if tok else 0, tok.col if tok else 0)
 
         # 方法名
         name_tok = self._current()
@@ -3558,7 +3613,7 @@ class ParserStmtMixin:
         name_parts = []
         while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
             # 遇到"标注"、"段落"、"构造"、"《"或"("时停止收集名称
-            if self._current().type == TokenType.KEYWORD and self._current().value in ('标注', '段落', '构造'):
+            if self._current().type == TokenType.KEYWORD and self._current().value in ('标注', '函数', '段落', '构造'):
                 break
             if self._current().type == TokenType.LBOOK:
                 break
@@ -3586,7 +3641,7 @@ class ParserStmtMixin:
                 _kwarg_stop_kws = frozenset({
                     '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
                     '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
-                    '类', '构造', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+                    '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
                     '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
                     '匹配', '情况', '的', '之', '对', '步', '至', '到',
                 })
@@ -3623,12 +3678,12 @@ class ParserStmtMixin:
             paragraph = None
             if self._match(TokenType.LBOOK):
                 paragraph = self._parse_paragraph()
-            elif self._match(TokenType.KEYWORD, '段落'):
+            elif self._match(TokenType.KEYWORD, '函数') or self._match(TokenType.KEYWORD, '段落'):
                 paragraph = self._parse_paragraph_v2()
             elif self._match(TokenType.KEYWORD, '构造'):
-                paragraph = self._parse_method_definition(is_constructor=True)  
+                paragraph = self._parse_method_definition(is_constructor=True)
             else:
-                self._error("装饰器后必须跟段落定义或构造定义")
+                self._error("装饰器后必须跟函数定义或构造定义")
             return DecoratorDefinition(decorator_name, paragraph)
 
         # 标注（可选关键字）— 仅自定义装饰器
@@ -3643,14 +3698,14 @@ class ParserStmtMixin:
         if self._match(TokenType.LBOOK):
             # 《段名》段形式
             paragraph = self._parse_paragraph()
-        elif self._match(TokenType.KEYWORD, '段落'):
-            # 段落 段名 参数形式
+        elif self._match(TokenType.KEYWORD, '函数') or self._match(TokenType.KEYWORD, '段落'):
+            # 函数/段落 段名 参数形式
             paragraph = self._parse_paragraph_v2()
         elif self._match(TokenType.KEYWORD, '构造'):
             # 构造定义
             paragraph = self._parse_method_definition(is_constructor=True)
         else:
-            self._error("装饰器后必须跟段落定义（'《段名》段' 或 '段落 段名'）")
+            self._error("装饰器后必须跟函数定义（'《段名》段' 或 '函数 段名'）")
 
         return DecoratorDefinition(decorator_name, paragraph, decorator_args)
 
@@ -3780,16 +3835,17 @@ class ParserStmtMixin:
     # =========================================================================
 
     def _parse_ffi_decl(self, from_at_c: bool = False) -> ASTNode:
-        """解析外部声明：外部 段落/结构体/回调/枚举/联合体/变长参数 ...
+        """解析外部声明：外部 函数/段落/结构体/回调/枚举/联合体/变长参数 ...
         也支持 @C 语法标记。
         
         语法：
-        外部 段落 函数名 接收 参数... 返回 类型 在 库别名
+        外部 函数 函数名 接收 参数... 返回 类型 在 库别名
+        外部 段落 函数名 接收 参数... 返回 类型 在 库别名（兼容写法）
         外部 结构体 名称 { 字段: 类型, ... }
         外部 回调 名称 接收 参数... 返回 类型
         外部 枚举 名称 { 成员 = 值, ... }
         外部 联合体 名称 { 字段: 类型, ... }
-        外部 变长参数 段落 函数名 接收 参数... 返回 类型 在 库别名
+        外部 变长参数 函数/段落 函数名 接收 参数... 返回 类型 在 库别名
         """
         # 外部（仅非@C模式需要）
         if not from_at_c:
@@ -3797,7 +3853,7 @@ class ParserStmtMixin:
         
         tok = self._current()
         if tok is None:
-            self._error("期望'段落'、'结构体'、'回调'、'枚举'、'联合体'或'变长参数'")
+            self._error("期望'函数'（或兼容写法'段落'）、'结构体'、'回调'、'枚举'、'联合体'或'变长参数'")
         
         if tok.type == TokenType.KEYWORD and tok.value == '变长参数':
             return self._parse_ffi_varargs_decl()
@@ -3815,14 +3871,14 @@ class ParserStmtMixin:
             return self._parse_ffi_debug_config()
         elif tok.type == TokenType.KEYWORD and tok.value == '宏':
             return self._parse_ffi_preprocessor_def()
-        elif tok.type == TokenType.KEYWORD and tok.value == '段落':
+        elif tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
             return self._parse_ffi_function_decl()
         elif tok.type == TokenType.KEYWORD and tok.value == '结构体':
             return self._parse_ffi_struct_def()
         elif tok.type == TokenType.KEYWORD and tok.value == '回调':
             return self._parse_ffi_callback_def()
         else:
-            self._error(f"期望'段落'、'结构体'、'回调'、'枚举'、'联合体'或'变长参数'，但得到'{tok.value}'")
+            self._error(f"期望'函数'（或兼容写法'段落'）、'结构体'、'回调'、'枚举'、'联合体'或'变长参数'，但得到'{tok.value}'")
 
     def _parse_ffi_load_library(self) -> FFILoadLibrary:
         """解析加载库语句：加载库 "libxxx.so" 为 别名"""
@@ -3856,9 +3912,12 @@ class ParserStmtMixin:
         return FFILoadLibrary(library_path, alias)
 
     def _parse_ffi_function_decl(self) -> FFIFunctionDecl:
-        """解析外部函数声明：外部 段落 函数名 接收 参数... 返回 类型 在 库别名"""
-        # 段落
-        self._consume(TokenType.KEYWORD, '段落')
+        """解析外部函数声明：外部 函数/段落 函数名 接收 参数... 返回 类型 在 库别名"""
+        # 函数 或 段落
+        if self._match(TokenType.KEYWORD, '函数'):
+            self._consume(TokenType.KEYWORD, '函数')
+        else:
+            self._consume(TokenType.KEYWORD, '段落')
         
         # 函数名
         name_tok = self._current()
@@ -4173,15 +4232,17 @@ class ParserStmtMixin:
         return FFIUnionDef(name, fields)
 
     def _parse_ffi_varargs_decl(self) -> FFIVarArgsDecl:
-        """解析变长参数声明：外部 变长参数 段落 函数名 接收 参数... 返回 类型 在 库别名"""
+        """解析变长参数声明：外部 变长参数 函数/段落 函数名 接收 参数... 返回 类型 在 库别名"""
         # 变长参数
         self._consume(TokenType.KEYWORD, '变长参数')
         
-        # 段落
-        if self._match(TokenType.KEYWORD, '段落'):
+        # 函数 或 段落
+        if self._match(TokenType.KEYWORD, '函数'):
+            self._consume(TokenType.KEYWORD, '函数')
+        elif self._match(TokenType.KEYWORD, '段落'):
             self._consume(TokenType.KEYWORD, '段落')
         else:
-            self._error("期望'段落'关键字")
+            self._error("期望'函数'（或兼容写法'段落'）关键字")
         
         # 函数名
         name_tok = self._current()

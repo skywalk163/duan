@@ -417,6 +417,16 @@ class Lexer:
             # 以及以数字开头的函数名（如"四舍五入"）的解析
             # 所有汉字统一由 _tokenize_identifier_or_keyword → _tokenize_chinese_sequence 处理
             
+            # 处理嵌入块：嵌入 Python: ... 结束嵌入
+            # 需在标识符/关键字分词之前检测，避免嵌入代码被段言分词器破坏
+            if _is_han_fast(source[i]) and source[i:i+2] == '嵌入':
+                token, consumed = self._tokenize_embed_block(source, i, line, col)
+                if token:
+                    tokens.append(token)
+                    col += consumed
+                    i += consumed
+                    continue
+
             # 处理中文数字（注释：不在此处处理，而是在标识符处理中判断）
             # 因为 "甲加三" 中的 "三" 需要根据上下文判断
             
@@ -803,6 +813,93 @@ class Lexer:
         value = ''.join(chars)
         return Token(TokenType.FSTRING, value, line, start_col), j - i + 1
     
+    def _tokenize_embed_block(self, source: str, i: int, line: int, col: int) -> Tuple[Optional[Token], int]:
+        """处理嵌入块：嵌入 Python: ... 结束嵌入
+        
+        语法格式：
+            嵌入 Python:
+                <原始代码>
+            结束嵌入
+            或
+            嵌入 C:
+                <原始代码>
+            结束嵌入
+        
+        将整个嵌入块作为一个 EMBED_BLOCK token 返回，
+        token.value 为 (language, code) 元组。
+        如果不是嵌入块（如"嵌入"作为普通标识符），返回 (None, 0)。
+        """
+        n = len(source)
+        start_col = col
+        j = i + 2  # 跳过 "嵌入"
+        col += 2
+        
+        # 跳过空格
+        while j < n and source[j] in ' \t':
+            j += 1
+            col += 1
+        
+        # 读取语言名称（ASCII 字母，直到冒号或换行）
+        lang_chars = []
+        while j < n and source[j] not in ':\n' and source[j] != '：':
+            lang_chars.append(source[j])
+            j += 1
+            col += 1
+        
+        language = ''.join(lang_chars).strip()
+        
+        # 必须有冒号才视为嵌入块
+        if j >= n or source[j] not in ':：':
+            return None, 0
+        j += 1  # 跳过冒号
+        col += 1
+        
+        # 检查语言名称是否有效
+        if not language:
+            return None, 0
+        
+        # 跳过冒号后的同一行剩余内容（到换行）
+        while j < n and source[j] != '\n':
+            j += 1
+        if j < n:
+            j += 1  # 跳过换行
+        
+        # 收集嵌入代码，直到遇到 "结束嵌入" 行
+        code_lines = []
+        end_marker = '结束嵌入'
+        while j < n:
+            # 检查当前行是否为 "结束嵌入"
+            # 跳过行首空白
+            line_start = j
+            k = j
+            while k < n and source[k] in ' \t':
+                k += 1
+            # 检查是否匹配 "结束嵌入"
+            if source[k:k+len(end_marker)] == end_marker:
+                # 确认后面是换行或EOF
+                after = k + len(end_marker)
+                if after >= n or source[after] == '\n' or source[after] in ' \t。':
+                    # 计算消耗的字符数
+                    consumed = after - i if after < n else n - i
+                    # 如果后面是句号，也消耗掉
+                    if after < n and source[after] == '。':
+                        consumed = after + 1 - i
+                    code = '\n'.join(code_lines)
+                    return Token(TokenType.EMBED_BLOCK, (language, code), line, start_col), consumed
+            
+            # 收集这一行
+            line_end = j
+            while line_end < n and source[line_end] != '\n':
+                line_end += 1
+            code_lines.append(source[line_start:line_end] if line_end < n else source[line_start:])
+            j = line_end + 1 if line_end < n else n
+        
+        # 到达 EOF 仍未找到 "结束嵌入"
+        raise LexerError(
+            f"嵌入块未闭合：缺少「结束嵌入」标记",
+            line, start_col
+        )
+
     def _tokenize_number(self, source: str, i: int, line: int, col: int) -> Tuple[Token, int]:
         """处理数字"""
         start = i
@@ -1365,8 +1462,8 @@ class Lexer:
                 i = k + 1
                 continue
 
-            # 查找 "段落 段名 参数 参数名" 格式
-            if source[i:i+2] == '段落':
+            # 查找 "函数/段落 段名 参数 参数名" 格式
+            if source[i:i+2] == '函数' or source[i:i+2] == '段落':
                 j = i + 2
                 # 跳过空白
                 while j < n and _is_space_tab(source[j]):

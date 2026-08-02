@@ -45,8 +45,8 @@ class DocParser:
                     self.current_doc.append(comment)
                 continue
 
-            # 处理段落定义
-            if stripped.startswith('段落'):
+            # 处理段落定义（支持 '函数' 和 '段落' 两种关键字）
+            if stripped.startswith('函数') or stripped.startswith('段落'):
                 self._parse_paragraph(stripped, i + 1)
                 continue
 
@@ -63,9 +63,9 @@ class DocParser:
 
     def _parse_paragraph(self, line: str, line_num: int):
         """解析段落定义"""
-        # 格式：段落 名称 接收 参数：
-        # 或：段落 名称：
-        match = re.match(r'段落\s+(\S+)(?:\s+接收\s+(.+?))?(?:：|:)', line)
+        # 格式：函数/段落 名称 接收 参数：
+        # 或：函数/段落 名称：
+        match = re.match(r'(?:函数|段落)\s+(\S+)(?:\s+接收\s+(.+?))?(?:：|:)', line)
         if match:
             name = match.group(1)
             params = match.group(2).strip() if match.group(2) else ''

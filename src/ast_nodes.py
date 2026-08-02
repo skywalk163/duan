@@ -348,6 +348,15 @@ class ExpressionStatement(ASTNode):
     expression: ASTNode = None
 
 
+@dataclass(slots=True)
+class EmbedBlock(ASTNode):
+    """嵌入块语句：嵌入 Python/C: ... 结束嵌入"""
+    language: str = ""       # "Python", "C" 等
+    code: str = ""           # 原始嵌入代码
+    imports: list = None     # 嵌入块中需要传入的段言变量名列表
+    exports: list = None     # 嵌入块中需要传出的变量名列表
+
+
 # =============================================================================
 # 段落定义节点
 # =============================================================================

@@ -156,3 +156,30 @@ class DuanParserCore:
         if value is not None and tok.value != value:
             return False
         return True
+    
+    # =========================================================================
+    # 段落/函数 关键字兼容辅助方法
+    # '函数' 是首选关键字，'段落' 和 '段' 是向后兼容别名
+    # =========================================================================
+    
+    PARAGRAPH_KEYWORDS = frozenset({'函数', '段落', '段'})
+    
+    def _is_paragraph_kw(self, tok: Optional[Token]) -> bool:
+        """检查 token 是否是段落/函数定义关键字（函数/段落/段）"""
+        return tok is not None and tok.type == TokenType.KEYWORD and tok.value in self.PARAGRAPH_KEYWORDS
+    
+    def _match_paragraph_kw(self) -> bool:
+        """检查当前 token 是否是段落/函数定义关键字（函数/段落/段）"""
+        return self._is_paragraph_kw(self._current())
+    
+    def _consume_paragraph_kw(self) -> Token:
+        """消耗段落/函数定义关键字（函数/段落/段），返回该 token"""
+        tok = self._current()
+        if tok is not None and tok.type == TokenType.KEYWORD and tok.value in self.PARAGRAPH_KEYWORDS:
+            self.pos += 1
+            return tok
+        raise ParseError(
+            f"期望'函数'（或兼容写法'段落'/'段'），但得到 {tok.type if tok else '输入结束'}"
+            f"（附近: '{tok.value if tok else ''}'）",
+            tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None
+        )

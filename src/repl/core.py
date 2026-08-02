@@ -68,7 +68,7 @@ class DuanREPL:
 
     def _is_multiline_start(self, line: str) -> bool:
         """判断是否是多行开始"""
-        starters = ['段落', '类', '接口', '如果', '当', '遍历', '尝试']
+        starters = ['函数', '段落', '类', '接口', '如果', '当', '遍历', '尝试']
         for s in starters:
             if line.startswith(s) and (line.endswith(':') or line.endswith('：')):
                 return True

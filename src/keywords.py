@@ -27,8 +27,9 @@ KEYWORDS_LOOP = {
 }
 
 # 函数定义
+# '函数' 是首选关键字，'段落' 和 '段' 是向后兼容别名
 KEYWORDS_FUNCTION = {
-    '段落', '段', '接收', '返回',
+    '函数', '段落', '段', '接收', '返回',
 }
 
 # 类型系统修饰符
@@ -72,6 +73,11 @@ KEYWORDS_CONTEXT = {
     '使用', '标注',
 }
 
+# 嵌入块（Embed Block）
+KEYWORDS_EMBED = {
+    '嵌入', '结束嵌入',
+}
+
 # C FFI 外部函数接口（新增）
 KEYWORDS_FFI = {
     '外部', '加载库', '结构体', '回调',
@@ -98,6 +104,7 @@ KEYWORDS_DOUBLE = (
     KEYWORDS_ASYNC |
     KEYWORDS_MATCH |
     KEYWORDS_CONTEXT |
+    KEYWORDS_EMBED |
     KEYWORDS_DECORATOR |
     KEYWORDS_FFI
 )
