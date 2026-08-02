@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
 
-VERSION = '段言编译器 v1.9.0'
+VERSION = '段言编译器 v1.10.3'
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -964,6 +964,15 @@ def main():
     publish_p = subparsers.add_parser('publish', help='发布段件（生成段件库条目并显示 PR 指引）')
     publish_p.add_argument('-p', '--project', default='.', help='项目目录')
 
+    # ── repl ──
+    repl_p = subparsers.add_parser('repl', help='启动段言交互式解释器 (REPL)')
+    repl_p.add_argument('--enhanced', action='store_true', help='使用增强模式（prompt_toolkit，需安装）')
+
+    # ── tutorial ──
+    tutorial_p = subparsers.add_parser('tutorial', help='30 分钟入门段言交互式教程')
+    tutorial_p.add_argument('--step', action='store_true', help='逐步运行（每节暂停）')
+    tutorial_p.add_argument('--repl', action='store_true', help='交互式练习模式')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1009,6 +1018,18 @@ def main():
     elif args.command == 'publish':
         cmd_publish(args)
         sys.exit(0)
+    elif args.command == 'repl':
+        from src.repl.core import DuanREPL
+        repl = DuanREPL(enhanced=args.enhanced)
+        repl.run()
+    elif args.command == 'tutorial':
+        from cli.tutorial import main as tutorial_main
+        sys.argv = ['duan tutorial']
+        if args.step:
+            sys.argv.append('--step')
+        if args.repl:
+            sys.argv.append('--repl')
+        tutorial_main()
 
 
 if __name__ == '__main__':

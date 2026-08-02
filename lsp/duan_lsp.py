@@ -395,12 +395,18 @@ class DuanLanguageServer:
             'textDocumentSync': 1,  # Full sync
             'completionProvider': {
                 'resolveProvider': True,
-                'triggerCharacters': [' ', '换', '设', '定', '打']
+                'triggerCharacters': [' ', '设', '定', '打', '定', '导', '类', '接', '返', '当', '遍', '如']
             },
             'hoverProvider': True,
             'definitionProvider': True,
             'referencesProvider': True,
             'documentSymbolProvider': True,
+            'documentFormattingProvider': True,
+            'documentRangeFormattingProvider': True,
+            'renameProvider': True,
+            'codeActionProvider': {
+                'codeActionKinds': ['quickfix', 'refactor']
+            },
             'diagnosticProvider': {
                 'interFileDependencies': False,
                 'workspaceDiagnostics': False
@@ -414,11 +420,16 @@ class DuanLanguageServer:
             'textDocument/didOpen': self._handle_did_open,
             'textDocument/didChange': self._handle_did_change,
             'textDocument/didClose': self._handle_did_close,
+            'textDocument/didSave': self._handle_did_save,
             'textDocument/completion': self._handle_completion,
             'textDocument/hover': self._handle_hover,
             'textDocument/definition': self._handle_definition,
             'textDocument/references': self._handle_references,
             'textDocument/documentSymbol': self._handle_document_symbol,
+            'textDocument/formatting': self._handle_formatting,
+            'textDocument/rangeFormatting': self._handle_range_formatting,
+            'textDocument/rename': self._handle_rename,
+            'textDocument/codeAction': self._handle_code_action,
         }
         
         handler = handlers.get(method)
@@ -445,6 +456,17 @@ class DuanLanguageServer:
         text_doc = params.get('textDocument', {})
         uri = text_doc.get('uri')
         self.doc_manager.close_document(uri)
+        return None
+
+    def _handle_did_save(self, params: Dict):
+        """处理文档保存"""
+        text_doc = params.get('textDocument', {})
+        uri = text_doc.get('uri')
+        # 重新分析文档并发布诊断
+        if uri in self.doc_manager.documents:
+            doc = self.doc_manager.documents[uri]
+            self.doc_manager._analyze_document(doc)
+            self._publish_diagnostics(uri)
         return None
 
     def _handle_completion(self, params: Dict) -> Dict:
@@ -474,14 +496,41 @@ class DuanLanguageServer:
         # 关键字补全
         for kw in sorted(ALL_KEYWORDS):
             if not prefix or kw.startswith(prefix):
-                completions.append({
+                # 关键字文档
+                kw_docs = {
+                    '定义': '定义变量：定义 变量名 等于 值。',
+                    '设': '设变量为值：设 变量名 为 值。',
+                    '如果': '条件语句：如果 条件 那么：...结束。',
+                    '若': '条件语句（简写）：若 条件 则：...结束。',
+                    '那么': '条件语句 then 分支',
+                    '否则': '条件语句 else 分支',
+                    '否则若': '条件语句 elif 分支',
+                    '遍历': '遍历循环：遍历 变量 于 列表：...结束。',
+                    '当': '条件循环：当 条件：...结束。',
+                    '返回': '返回语句：返回 表达式。',
+                    '跳出': '跳出循环：跳出。',
+                    '跳过': '跳过本次迭代：跳过。',
+                    '段落': '段落（函数）定义：段落 段名 接收 参数：...结束。',
+                    '类': '类定义：类 类名：...结束。',
+                    '接口': '接口定义：接口 接口名：...结束。',
+                    '尝试': '异常处理：尝试：...捕获 异常：...结束。',
+                    '抛出': '抛出异常：抛出 异常对象。',
+                    '导入': '导入模块：导入 模块名。',
+                    '匹配': '模式匹配：匹配 表达式：情况 模式：...结束。',
+                    '异步': '异步函数定义：异步 段落 段名...',
+                    '等待': '等待异步操作：等待 异步调用。',
+                }
+                item = {
                     'label': kw,
                     'kind': 14,  # Keyword
                     'detail': '关键字',
                     'sortText': f'1_{kw}',
                     'filterText': kw,
                     'insertText': kw[len(prefix):] if prefix and kw.startswith(prefix) else kw
-                })
+                }
+                if kw in kw_docs:
+                    item['documentation'] = {'kind': 'markdown', 'value': kw_docs[kw]}
+                completions.append(item)
         
         # 动词元数补全
         for verb, arity in sorted(VERB_ARITY.items()):
@@ -687,6 +736,210 @@ class DuanLanguageServer:
 
         return references
 
+    def _handle_formatting(self, params: Dict) -> List[Dict]:
+        """处理文档格式化请求"""
+        uri = params.get('textDocument', {}).get('uri', '')
+        doc = self.doc_manager.get_document(uri)
+        if not doc:
+            return []
+
+        options = params.get('options', {})
+        tab_size = options.get('tabSize', 4)
+        insert_spaces = options.get('insertSpaces', True)
+
+        edits = self._format_document(doc.text, tab_size, insert_spaces)
+        return edits
+
+    def _handle_range_formatting(self, params: Dict) -> List[Dict]:
+        """处理范围格式化请求"""
+        uri = params.get('textDocument', {}).get('uri', '')
+        doc = self.doc_manager.get_document(uri)
+        if not doc:
+            return []
+
+        range_info = params.get('range', {})
+        options = params.get('options', {})
+        tab_size = options.get('tabSize', 4)
+        insert_spaces = options.get('insertSpaces', True)
+
+        # 提取范围内的文本
+        start_line = range_info.get('start', {}).get('line', 0)
+        end_line = range_info.get('end', {}).get('line', 0)
+        lines = doc.text.split('\n')
+        range_text = '\n'.join(lines[start_line:end_line + 1])
+
+        edits = self._format_document(
+            doc.text, tab_size, insert_spaces,
+            start_line=start_line, end_line=end_line
+        )
+        return edits
+
+    def _format_document(self, text: str, tab_size: int, insert_spaces: bool,
+                         start_line: int = None, end_line: int = None) -> List[Dict]:
+        """格式化文档内容"""
+        indent = ' ' * tab_size if insert_spaces else '\t'
+        lines = text.split('\n')
+        total_lines = len(lines)
+
+        if start_line is None:
+            start_line = 0
+        if end_line is None:
+            end_line = total_lines - 1
+
+        # 计算缩进级别
+        formatted_lines = list(lines)
+        indent_level = 0
+
+        for i in range(start_line, end_line + 1):
+            line = lines[i].strip()
+
+            if not line:
+                continue
+
+            # 减少缩进：结束、否则、否则若、捕获、最终
+            decrease_keywords = ['结束', '否则', '否则若', '捕获', '最终']
+            for kw in decrease_keywords:
+                if line.startswith(kw):
+                    indent_level = max(0, indent_level - 1)
+                    break
+
+            # 应用缩进
+            formatted_lines[i] = indent * indent_level + line
+
+            # 增加缩进：如果...那么、遍历...、当...、段落...、类...、尝试...、匹配...
+            if any(line.endswith(kw) for kw in ['：', ':']):
+                if any(line.startswith(kw) for kw in
+                       ['如果', '若', '遍历', '当', '段落', '类', '接口', '尝试', '匹配', '否则', '否则若', '捕获']):
+                    indent_level += 1
+                elif any(kw in line for kw in ['接收', '构造']):
+                    indent_level += 1
+
+        new_text = '\n'.join(formatted_lines)
+
+        if new_text == text:
+            return []
+
+        return [{
+            'range': {
+                'start': {'line': start_line, 'character': 0},
+                'end': {'line': end_line, 'character': len(lines[end_line])}
+            },
+            'newText': '\n'.join(formatted_lines[start_line:end_line + 1])
+        }]
+
+    def _handle_rename(self, params: Dict) -> Optional[Dict]:
+        """处理重命名请求"""
+        uri = params.get('textDocument', {}).get('uri', '')
+        doc = self.doc_manager.get_document(uri)
+        if not doc:
+            return None
+
+        position = params.get('position', {})
+        new_name = params.get('newName', '')
+        line = position.get('line', 0)
+        character = position.get('character', 0)
+
+        # 获取当前光标处的词
+        line_text = doc.get_line(line)
+        start = character
+        end = character
+        while start > 0:
+            ch = line_text[start - 1]
+            if ch.isalnum() or '\u4e00' <= ch <= '\u9fff':
+                start -= 1
+            else:
+                break
+        while end < len(line_text):
+            ch = line_text[end]
+            if ch.isalnum() or '\u4e00' <= ch <= '\u9fff':
+                end += 1
+            else:
+                break
+        old_name = line_text[start:end]
+
+        if not old_name or not new_name:
+            return None
+
+        # 查找所有引用
+        changes = {}
+        for doc_uri, doc_obj in self.doc_manager.documents.items():
+            doc_edits = []
+            for i, doc_line in enumerate(doc_obj.lines):
+                pos = 0
+                while True:
+                    idx = doc_line.find(old_name, pos)
+                    if idx == -1:
+                        break
+                    # 检查是否是完整词（前后不是中文字符或字母数字）
+                    before_ok = idx == 0 or not (
+                        doc_line[idx - 1].isalnum() or '\u4e00' <= doc_line[idx - 1] <= '\u9fff'
+                    )
+                    after_ok = idx + len(old_name) >= len(doc_line) or not (
+                        doc_line[idx + len(old_name)].isalnum() or
+                        '\u4e00' <= doc_line[idx + len(old_name)] <= '\u9fff'
+                    )
+                    if before_ok and after_ok:
+                        doc_edits.append({
+                            'range': {
+                                'start': {'line': i, 'character': idx},
+                                'end': {'line': i, 'character': idx + len(old_name)}
+                            },
+                            'newText': new_name
+                        })
+                    pos = idx + len(old_name)
+
+            if doc_edits:
+                changes[doc_uri] = doc_edits
+
+        if not changes:
+            return None
+
+        return {'changes': changes}
+
+    def _handle_code_action(self, params: Dict) -> List[Dict]:
+        """处理代码操作请求（快速修复）"""
+        uri = params.get('textDocument', {}).get('uri', '')
+        doc = self.doc_manager.get_document(uri)
+        if not doc:
+            return []
+
+        context = params.get('context', {})
+        diagnostics = context.get('diagnostics', [])
+        code_actions = []
+
+        for diag in diagnostics:
+            msg = diag.get('message', '')
+            d_range = diag.get('range', {})
+
+            # 语法错误快速修复建议
+            if '意外的标记' in msg:
+                code_actions.append({
+                    'title': '查看段言语法文档',
+                    'kind': 'quickfix',
+                    'diagnostics': [diag],
+                    'command': {
+                        'title': '打开语法文档',
+                        'command': 'vscode.open',
+                        'arguments': ['https://github.com/duan-lang/duan/blob/main/docs/syntax.md']
+                    }
+                })
+            elif '名称未定义' in msg or '未定义' in msg:
+                code_actions.append({
+                    'title': '添加变量定义',
+                    'kind': 'quickfix',
+                    'diagnostics': [diag],
+                    'edit': {
+                        'changes': {
+                            uri: [{
+                                'range': d_range,
+                                'newText': f'定义 {msg.split("'")[1] if "'" in msg else "变量"} 等于 空。\n'
+                            }]
+                        }
+                    }
+                })
+
+        return code_actions
+
     def _handle_did_open(self, params: Dict):
         """处理文档打开"""
         text_doc = params.get('textDocument', {})
@@ -741,13 +994,17 @@ class DuanLanguageServer:
             if hasattr(e, 'line') and hasattr(e, 'col'):
                 line = max(0, e.line - 1)
                 col = max(0, e.col - 1)
+                # 尝试获取错误 token 的长度，用于精确高亮
+                end_col = col + 1
+                if hasattr(e, 'token_value') and e.token_value:
+                    end_col = col + len(str(e.token_value))
                 diagnostics.append({
                     'severity': 1,
                     'range': {
                         'start': {'line': line, 'character': col},
-                        'end': {'line': line, 'character': col + 1}
+                        'end': {'line': line, 'character': end_col}
                     },
-                    'message': str(e),
+                    'message': str(e.message) if hasattr(e, 'message') else str(e),
                     'source': '段言'
                 })
             else:
@@ -771,13 +1028,15 @@ class DuanLanguageServer:
             inferencer.infer(ast)
 
             for err in getattr(inferencer, 'errors', []):
+                err_line = getattr(err, 'line', 0)
+                err_col = getattr(err, 'col', 0)
                 diagnostics.append({
                     'severity': 1,
                     'range': {
-                        'start': {'line': 0, 'character': 0},
-                        'end': {'line': 0, 'character': 1}
+                        'start': {'line': max(0, err_line - 1), 'character': max(0, err_col - 1)},
+                        'end': {'line': max(0, err_line - 1), 'character': max(0, err_col)}
                     },
-                    'message': err,
+                    'message': str(err),
                     'source': '段言类型'
                 })
 
@@ -786,14 +1045,15 @@ class DuanLanguageServer:
                 check_results = checker.check(ast, inferencer)
                 for r in check_results:
                     severity = 1 if r.is_error() else 2
-                    line = max(0, getattr(r, 'line', 0) - 1)
+                    r_line = max(0, getattr(r, 'line', 0) - 1)
+                    r_col = max(0, getattr(r, 'col', 0))
                     diagnostics.append({
                         'severity': severity,
                         'range': {
-                            'start': {'line': line, 'character': 0},
-                            'end': {'line': line, 'character': 1}
+                            'start': {'line': r_line, 'character': r_col},
+                            'end': {'line': r_line, 'character': max(r_col, 1)}
                         },
-                        'message': r.message,
+                        'message': getattr(r, 'message', str(r)),
                         'source': '段言类型'
                     })
         except Exception:
