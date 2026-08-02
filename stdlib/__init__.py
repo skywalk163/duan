@@ -1,20 +1,29 @@
 """
 段言标准库
 
-提供内置函数和模块支持
+三层架构：
+  1. 原生标准库（.duan）：纯段言语法编写，体现语言特色
+  2. 核心运行时（builtins.py）：Python 实现的内置函数，无需 import
+  3. FFI 直通层（.py + .duan）：透传 Python/第三方库，方法名不翻译
+
+高级/领域模块已移至 contrib/ 目录，按需显式导入。
 
 使用方式（段言代码）：
     内置函数直接可用：打印("你好"), 随机整数(1, 100)
-    模块导入：从《JSON》导入《解析JSON》，《序列化JSON》。
+    模块导入：从 JSON 导入 解析JSON, 生成JSON。
+    contrib：从 contrib.HTTP客户端 导入 获取。
 """
 
 from .builtins import *
 
-# 核心运行时模块
+# ============================================================
+# 核心运行时模块（无外部依赖的纯 Python 封装）
+# ============================================================
+
 try:
     from .日期时间 import *
 except ImportError:
-    pass  # 依赖不可用时优雅降级
+    pass
 
 try:
     from .JSON import *
@@ -31,49 +40,72 @@ try:
 except ImportError:
     pass
 
-# FFI 直通层模块
 try:
-    from .日志系统增强 import *
+    from .数学 import *
 except ImportError:
     pass
 
 try:
-    from .进制转换 import *
+    from .字符串处理 import *
 except ImportError:
     pass
 
 try:
-    from .迭代工具 import *
+    from .字符串工具 import *
 except ImportError:
     pass
 
 try:
-    from .终端颜色 import *
+    from .字符串常量 import *
 except ImportError:
     pass
 
 try:
-    from .系统接口 import *
+    from .集合 import *
 except ImportError:
     pass
 
 try:
-    from .配置 import *
+    from .集合工具 import *
 except ImportError:
     pass
 
 try:
-    from .表格 import *
+    from .集合操作 import *
 except ImportError:
     pass
 
 try:
-    from .随机数据 import *
+    from .数据结构 import *
 except ImportError:
     pass
 
 try:
-    from .对象池缓存 import *
+    from .装饰器 import *
+except ImportError:
+    pass
+
+try:
+    from .断言工具 import *
+except ImportError:
+    pass
+
+# ============================================================
+# FFI 直通层模块（透传 Python 标准库/第三方库）
+# ============================================================
+
+try:
+    from .文件系统 import *
+except ImportError:
+    pass
+
+try:
+    from .文件匹配 import *
+except ImportError:
+    pass
+
+try:
+    from .临时文件 import *
 except ImportError:
     pass
 
@@ -83,7 +115,37 @@ except ImportError:
     pass
 
 try:
-    from .临时文件 import *
+    from .编码 import *
+except ImportError:
+    pass
+
+try:
+    from .编码解码 import *
+except ImportError:
+    pass
+
+try:
+    from .加密 import *
+except ImportError:
+    pass
+
+try:
+    from .时间管理 import *
+except ImportError:
+    pass
+
+try:
+    from .日志系统增强 import *
+except ImportError:
+    pass
+
+try:
+    from .对象池缓存 import *
+except ImportError:
+    pass
+
+try:
+    from .系统接口 import *
 except ImportError:
     pass
 
@@ -98,61 +160,14 @@ except ImportError:
     pass
 
 try:
-    from .美化输出 import *
-except ImportError:
-    pass
-
-try:
-    from .复制 import *
-except ImportError:
-    pass
-
-try:
-    from .文件系统 import *
-except ImportError:
-    pass
-
-try:
-    from .对象序列化 import *
-except ImportError:
-    pass
-
-try:
-    from .枚举 import *
-except ImportError:
-    pass
-
-try:
-    from .文本差异 import *
-except ImportError:
-    pass
-
-try:
-    from .压缩 import *
-except ImportError:
-    pass
-
-try:
-    from .字符串常量 import *
-except ImportError:
-    pass
-
-try:
-    from .函数工具 import *
-except ImportError:
-    pass
-
-try:
-    from .集合工具 import *
-except ImportError:
-    pass
-
-try:
     from .FFI import *
 except ImportError:
     pass
 
-# P9 特色标准库模块
+# ============================================================
+# 特色标准库（段言语言特色，纯中文 API）
+# ============================================================
+
 try:
     from .中文文本 import *
 except ImportError:

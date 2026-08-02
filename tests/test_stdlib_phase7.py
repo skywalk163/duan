@@ -58,25 +58,25 @@ class Test正则表达式(unittest.TestCase):
 class Test模板引擎(unittest.TestCase):
     
     def test_变量替换(self):
-        from stdlib.模板引擎 import 简单模板
+        from contrib.模板引擎 import 简单模板
         模板 = 简单模板('Hello, {{name}}!')
         self.assertEqual(模板.渲染({'name': 'World'}), 'Hello, World!')
     
     def test_条件渲染(self):
-        from stdlib.模板引擎 import 模板引擎
+        from contrib.模板引擎 import 模板引擎
         模板 = 模板引擎()
         内容 = '{% if name %}Hello, {{name}}!{% endif %}'
         self.assertEqual(模板.渲染(内容, name='World'), 'Hello, World!')
         self.assertEqual(模板.渲染(内容), '')
     
     def test_循环渲染(self):
-        from stdlib.模板引擎 import 模板引擎
+        from contrib.模板引擎 import 模板引擎
         模板 = 模板引擎()
         内容 = '{% for item in items %}{{item}}{% endfor %}'
         self.assertEqual(模板.渲染(内容, items=['a', 'b', 'c']), 'abc')
     
     def test_HTML转义(self):
-        from stdlib.模板引擎 import HTML转义
+        from contrib.模板引擎 import HTML转义
         self.assertEqual(HTML转义('<script>alert("xss")</script>'), '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;')
 
 

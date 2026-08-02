@@ -8,6 +8,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'stdlib'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'contrib'))
 
 
 class Test装饰器(unittest.TestCase):

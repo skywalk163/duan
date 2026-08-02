@@ -2,7 +2,8 @@
 第十一阶段测试用例 - 安全与权限
 """
 import sys
-sys.path.insert(0, 'c:/traework/duan/stdlib')
+sys.path.insert(0, 'c:/dumatework/duan/stdlib')
+sys.path.insert(0, 'c:/dumatework/duan/contrib')
 
 import unittest
 import time
@@ -174,10 +175,10 @@ class 测试访问控制(unittest.TestCase):
 
 
 class 测试加密协议(unittest.TestCase):
-    """测试加密协议模块"""
+    """测试加密模块（原加密协议已合并到加密）"""
     
     def test_对称加密解密(self):
-        from 加密协议 import 对称加密
+        from stdlib.加密 import 对称加密
         加密器 = 对称加密('my_secret_key')
         明文 = 'Hello, World!'
         密文 = 加密器.加密(明文)
@@ -185,19 +186,19 @@ class 测试加密协议(unittest.TestCase):
         self.assertEqual(解密结果, 明文)
     
     def test_哈希工具(self):
-        from 加密协议 import 哈希工具
+        from stdlib.加密 import 哈希工具
         self.assertEqual(len(哈希工具.MD5('test')), 32)
         self.assertEqual(len(哈希工具.SHA256('test')), 64)
         self.assertEqual(len(哈希工具.SHA512('test')), 128)
     
     def test_HMAC签名(self):
-        from 加密协议 import 哈希工具
+        from stdlib.加密 import 哈希工具
         签名 = 哈希工具.HMAC签名('key', 'message', 'sha256')
         self.assertTrue(哈希工具.验证HMAC('key', 'message', 签名, 'sha256'))
         self.assertFalse(哈希工具.验证HMAC('wrong_key', 'message', 签名, 'sha256'))
     
     def test_非对称加密(self):
-        from 加密协议 import 非对称加密
+        from stdlib.加密 import 非对称加密
         密钥对 = 非对称加密.生成密钥对()
         明文 = 'Secret message'
         密文 = 非对称加密.加密(明文, 密钥对.公钥)
@@ -205,7 +206,7 @@ class 测试加密协议(unittest.TestCase):
         self.assertEqual(解密结果, 明文)
     
     def test_便捷函数(self):
-        from 加密协议 import 加密, 解密, 哈希
+        from stdlib.加密 import 加密, 解密, 哈希
         密文 = 加密('hello', 'key')
         self.assertEqual(解密(密文, 'key'), 'hello')
         self.assertEqual(len(哈希('test')), 64)
