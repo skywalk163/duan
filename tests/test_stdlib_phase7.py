@@ -83,24 +83,24 @@ class Test模板引擎(unittest.TestCase):
 class TestJSON解析器(unittest.TestCase):
     
     def test_解析JSON(self):
-        from stdlib.JSON解析器 import 解析JSON
+        from stdlib.JSON import 解析JSON
         数据 = 解析JSON('{"name": "test", "value": 123}')
         self.assertEqual(数据['name'], 'test')
         self.assertEqual(数据['value'], 123)
     
     def test_生成JSON(self):
-        from stdlib.JSON解析器 import 生成JSON
+        from stdlib.JSON import 生成JSON
         数据 = {'name': 'test', 'value': 123}
         结果 = 生成JSON(数据)
         self.assertIn('"name": "test"', 结果)
     
     def test_JSON提取值(self):
-        from stdlib.JSON解析器 import JSON提取值
+        from stdlib.JSON import JSON提取值
         JSON字符串 = '{"a": {"b": {"c": 123}}}'
         self.assertEqual(JSON提取值(JSON字符串, 'a.b.c'), 123)
     
     def test_JSON转CSV(self):
-        from stdlib.JSON解析器 import JSON转CSV
+        from stdlib.JSON import JSON转CSV
         JSON字符串 = '[{"name": "Alice", "age": 25}, {"name": "Bob", "age": 30}]'
         CSV结果 = JSON转CSV(JSON字符串)
         self.assertIn('name,age', CSV结果)

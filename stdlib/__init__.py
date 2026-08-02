@@ -10,7 +10,7 @@
 
 from .builtins import *
 
-# 新模块导入
+# 核心运行时模块
 try:
     from .日期时间 import *
 except ImportError:
@@ -27,13 +27,13 @@ except ImportError:
     pass
 
 try:
-    from .正则 import *
+    from .正则表达式 import *
 except ImportError:
     pass
 
-# 新增标准库模块
+# FFI 直通层模块
 try:
-    from .日志 import *
+    from .日志系统增强 import *
 except ImportError:
     pass
 
@@ -48,17 +48,12 @@ except ImportError:
     pass
 
 try:
-    from .命令行参数 import *
-except ImportError:
-    pass
-
-try:
     from .终端颜色 import *
 except ImportError:
     pass
 
 try:
-    from .系统信息 import *
+    from .系统接口 import *
 except ImportError:
     pass
 
@@ -78,22 +73,17 @@ except ImportError:
     pass
 
 try:
-    from .缓存 import *
+    from .对象池缓存 import *
 except ImportError:
     pass
 
 try:
-    from .CSV import *
+    from .CSV读写器 import *
 except ImportError:
     pass
 
 try:
     from .临时文件 import *
-except ImportError:
-    pass
-
-try:
-    from .系统接口 import *
 except ImportError:
     pass
 
@@ -118,7 +108,7 @@ except ImportError:
     pass
 
 try:
-    from .文件匹配 import *
+    from .文件系统 import *
 except ImportError:
     pass
 
@@ -143,11 +133,6 @@ except ImportError:
     pass
 
 try:
-    from .高级文件 import *
-except ImportError:
-    pass
-
-try:
     from .字符串常量 import *
 except ImportError:
     pass
@@ -164,5 +149,21 @@ except ImportError:
 
 try:
     from .FFI import *
+except ImportError:
+    pass
+
+# P9 特色标准库模块
+try:
+    from .中文文本 import *
+except ImportError:
+    pass
+
+try:
+    from .历法 import *
+except ImportError:
+    pass
+
+try:
+    from .排版 import *
 except ImportError:
     pass
