@@ -31,21 +31,21 @@ def assert_result(interp, var_name, expected):
 
 def test_basic():
     print("=== 基础语法 ===")
-    interp = run_interpreter("定义 a 等于 42。")
+    interp = run_interpreter("设 a 为 42。")
     assert_result(interp, 'a', 42)
     print("✓ 变量定义")
     
-    interp = run_interpreter('定义 b 等于 "你好"。')
+    interp = run_interpreter('设 b 为 "你好"。')
     assert_result(interp, 'b', '你好')
     print("✓ 字符串")
     
-    interp = run_interpreter("定义 c 等于 真。")
+    interp = run_interpreter("设 c 为 真。")
     assert_result(interp, 'c', True)
     print("✓ 布尔值")
 
 def test_arithmetic():
     print("\n=== 算术运算 ===")
-    interp = run_interpreter("定义 a 等于 10 加 5。定义 b 等于 10 减 5。定义 c 等于 10 乘 5。")
+    interp = run_interpreter("设 a 为 10 加 5。设 b 为 10 减 5。设 c 为 10 乘 5。")
     assert_result(interp, 'a', 15)
     assert_result(interp, 'b', 5)
     assert_result(interp, 'c', 50)
@@ -53,7 +53,7 @@ def test_arithmetic():
 
 def test_simple_if():
     print("\n=== 简单条件 ===")
-    interp = run_interpreter("定义 x 等于 10。如果 x 大于 5 那么: x 等于 x 加 1。结束。")
+    interp = run_interpreter("设 x 为 10。如果 x 大于 5 那么: x 等于 x 加 1。结束。")
     assert_result(interp, 'x', 11)
     print("✓ 简单条件语句")
 
@@ -64,7 +64,7 @@ def test_functions():
     返回 x 加 y。
 结束。
 
-定义 r 等于 《加》(3, 5)。
+设 r 为 《加》(3, 5)。
 """
     interp = run_interpreter(code)
     assert_result(interp, 'r', 8)
@@ -74,7 +74,7 @@ def test_classes():
     print("\n=== 类测试 ===")
     code = """
 《人》类:
-    定义 姓名 等于 ""。
+    设 姓名 为 ""。
     
     《初始化》方法(n):
         姓名 等于 n。
@@ -85,7 +85,7 @@ def test_classes():
     结束。
 结束。
 
-定义 p 等于 新 人("张三")。
+设 p 为 新 人("张三")。
 """
     interp = run_interpreter(code)
     person = get_result(interp, 'p')
@@ -94,13 +94,13 @@ def test_classes():
 
 def test_lists():
     print("\n=== 列表测试 ===")
-    interp = run_interpreter("定义 lst 等于 [1, 2, 3]。定义 len 等于 listLen(lst)。")
+    interp = run_interpreter("设 lst 为 [1, 2, 3]。设 len 为 listLen(lst)。")
     assert_result(interp, 'len', 3)
     print("✓ 列表操作")
 
 def test_stdlib():
     print("\n=== 标准库 ===")
-    interp = run_interpreter("定义 a 等于 abs(-42)。定义 s 等于 upper('hello')。")
+    interp = run_interpreter("设 a 为 abs(-42)。设 s 为 upper('hello')。")
     assert_result(interp, 'a', 42)
     assert_result(interp, 's', 'HELLO')
     print("✓ 标准库函数")
@@ -108,20 +108,20 @@ def test_stdlib():
 def test_edge_cases():
     print("\n=== 边界情况 ===")
     try:
-        run_interpreter("定义 x 等于 10 除 0。")
+        run_interpreter("设 x 为 10 除 0。")
         assert False
     except:
         print("✓ 除零错误")
     
     try:
-        run_interpreter("定义 x 等于 未定义。")
+        run_interpreter("设 x 为 未定义。")
         assert False
     except:
         print("✓ 未定义变量")
 
 def test_compiler():
     print("\n=== 编译器 ===")
-    code = "定义 x 等于 10 加 20。"
+    code = "设 x 为 10 加 20。"
     module = parse_source(code)
     codegen = LLVMCodeGen()
     llvm = codegen.generate(module)

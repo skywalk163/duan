@@ -23,6 +23,7 @@ from keywords import (
 OPERATOR_VERBS = frozenset({
     '加', '减', '乘', '除', '加上', '减去', '乘以', '除以', 
     '大于', '小于', '等于', '不等于', '大于等于', '小于等于',
+    '不小于', '不大于',
     '模', '幂'
 })
 
@@ -620,6 +621,10 @@ class Lexer:
         # 管道操作符 ->
         if ch == '-' and i + 1 < n and source[i+1] == '>':
             return Token(TokenType.ARROW, '->', line, col), 2
+        
+        # 海象运算符 := （不支持）
+        if ch == ':' and i + 1 < n and source[i+1] == '=':
+            return Token(TokenType.WALRUS, ':=', line, col), 2
         
         # 比较运算符（双字符）
         if ch == '=' and i + 1 < n and source[i+1] == '=':

@@ -19,7 +19,7 @@ print("\n[1/8] 词法分析器...")
 try:
     from lexer import Lexer
     lexer = Lexer()
-    tokens = lexer.tokenize('定义甲等于三。')
+    tokens = lexer.tokenize('设甲为三。')
     print(f"  OK - 生成 {len(tokens)} 个token")
 except Exception as e:
     print(f"  FAIL - {e}")
@@ -29,7 +29,7 @@ print("\n[2/8] 语法解析器...")
 try:
     from duan_parser_v3 import DuanParser
     parser = DuanParser()
-    module = parser.parse('定义甲等于123。')
+    module = parser.parse('设甲为123。')
     print(f"  OK - 解析 {len(module.statements)} 条语句")
 except Exception as e:
     print(f"  FAIL - {e}")
@@ -81,7 +81,7 @@ try:
     analyzer = SemanticAnalyzer()
     generator = PythonCodeGenerator()
     
-    code = '定义甲等于三加五。'
+    code = '设甲为三加五。'
     module = parser.parse(code)
     analyzer.analyze(module)
     python_code = generator.generate(module)

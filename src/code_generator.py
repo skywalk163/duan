@@ -64,6 +64,8 @@ class PythonCodeGenerator:
         # 类方法名追踪（用于方法内自动添加 self. 前缀调用其他方法）
         self._class_method_names: set = set()
         self._in_class_method: bool = False
+        # 用户自定义函数名追踪（避免内置函数映射覆盖用户定义）
+        self._user_defined_functions: set = set()
         # 当前方法参数名追踪（避免将参数名误判为类属性）
         self._current_method_params: set = set()
         
@@ -86,8 +88,20 @@ class PythonCodeGenerator:
             '反转': 'reverse',
             '排序': 'sort',
             '包含': '__contains__',
-            '获取': '__getitem__',
+            '获取': 'get',
             '设置': '__setitem__',
+            # 字符串方法
+            '转大写': 'upper',
+            '转小写': 'lower',
+            '替换': 'replace',
+            '截取': 'slice',
+            '开头': 'startswith',
+            '结尾': 'endswith',
+            '去除空白': 'strip',
+            '分割': 'split',
+            '连接': 'join',
+            '查找': 'find',
+            '计数': 'count',
         }
         
         # 模块名映射（中文到Python模块）
@@ -124,6 +138,8 @@ class PythonCodeGenerator:
             '不等于': '!=',
             '大于等于': '>=',
             '小于等于': '<=',
+            '不小于': '>=',   # P2-3：比较运算符短形式
+            '不大于': '<=',   # P2-3：比较运算符短形式
             '且': 'and',
             '与': 'and',
             '或': 'or',
@@ -139,8 +155,31 @@ class PythonCodeGenerator:
             '断言': '_duan_assert',
             '读取': 'input',
             '长': 'len',
+            '长度': 'len',
             '首': 'lambda x: x[0]',
             '末': 'lambda x: x[-1]',
+            
+            # 数学函数（P1-1：补全反向映射）
+            '求和': 'sum',
+            '求最大': 'max',
+            '求最小': 'min',
+            '最大值': 'max',
+            '最小值': 'min',
+            '绝对值': 'abs',
+            '四舍五入': 'round',
+            '次方': 'pow',
+            '范围': 'range',
+            '全部': 'all',
+            '任意': 'any',
+            '整数': 'int',
+            '浮点数': 'float',
+            '字符串': 'str',
+            '列表': 'list',
+            '字典': 'dict',
+            '集合': 'set',
+            '布尔': 'bool',
+            '类型': 'type',
+            '去重': 'lambda x: list(set(x))',
             
             # 文件I/O
             '读取文件': '_duan_builtin.读取文件',
@@ -315,6 +354,7 @@ class PythonCodeGenerator:
         """生成Python代码"""
         self.output_lines = []
         self.indent_level = 0  # 重置缩进级别，防止跨条目状态污染
+        self._user_defined_functions = set()  # 重置用户自定义函数追踪
         
         # 添加文件头
         self._add_line("# 由段言编译器生成")
@@ -891,6 +931,9 @@ class PythonCodeGenerator:
         # 函数定义
         def_prefix = "async def" if '异步' in (stmt.modifiers or []) else "def"
         self._add_line(f"{def_prefix} {name}({params_str}){return_type_annotation}:")
+        
+        # 记录用户自定义函数名，避免内置函数映射覆盖
+        self._user_defined_functions.add(stmt.name)
         
         old_in_function = self._in_function
         self._in_function = True
@@ -1483,8 +1526,8 @@ class PythonCodeGenerator:
         elif isinstance(expr, ParagraphCall):
             name = self._sanitize_name(expr.name)
             
-            # 检查是否是内置函数
-            if expr.name in self.builtin_map:
+            # 检查是否是内置函数（但不覆盖用户自定义的函数）
+            if expr.name in self.builtin_map and expr.name not in self._user_defined_functions:
                 py_name = self.builtin_map[expr.name]
             else:
                 py_name = name
@@ -1590,6 +1633,19 @@ class PythonCodeGenerator:
                 # 特殊处理：包含方法 -> item in obj
                 elif expr.member == '包含':
                     return f"{args_str} in {obj}"
+
+                # P5 核心改造：内置函数式优先
+                # 如果方法名在 builtin_map 中且映射到 _duan_builtin，转为函数式调用
+                # 这样 obj.方法(args) 自动转为 _duan_builtin.方法(obj, args)
+                # 外部库方法（不在 builtin_map 中）则原样透传 obj.method(args)
+                builtin_target = self.builtin_map.get(expr.member)
+                if builtin_target and builtin_target.startswith('_duan_builtin.'):
+                    # 内置函数：转为函数式调用
+                    func_name = builtin_target.split('.', 1)[1]
+                    if args_str:
+                        return f"{builtin_target}({obj}, {args_str})"
+                    else:
+                        return f"{builtin_target}({obj})"
 
                 return f"{obj}.{mapped_member}({args_str})"
             else:
@@ -1816,6 +1872,17 @@ class PythonCodeGenerator:
             else:
                 self._add_line(f"import {mapped_module}")
                 self._imported_symbols.add(module_name)
+        
+        # 处理多模块导入（extra_modules）
+        if hasattr(stmt, 'extra_modules') and stmt.extra_modules:
+            for extra_mod, extra_alias in stmt.extra_modules:
+                mapped_extra = self.module_name_map.get(extra_mod, extra_mod)
+                if extra_alias:
+                    self._add_line(f"import {mapped_extra} as {extra_alias}")
+                    self._imported_symbols.add(extra_alias)
+                else:
+                    self._add_line(f"import {mapped_extra}")
+                    self._imported_symbols.add(extra_mod)
     
     def _generate_import_statement(self, stmt):
         """生成 ast_nodes.py 的 ImportStatement"""

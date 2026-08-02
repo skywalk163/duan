@@ -29,7 +29,7 @@ class TestParser(unittest.TestCase):
     def test_variable_declaration(self):
         """测试变量声明"""
         parser = self.Parser()
-        code = '定义甲等于123。'
+        code = '设甲为123。'
         module = parser.parse(code)
         self.assertIsNotNone(module)
         self.assertGreater(len(module.statements), 0)
@@ -86,7 +86,7 @@ class TestParser(unittest.TestCase):
     def test_list_literal(self):
         """测试列表字面量"""
         parser = self.Parser()
-        code = '定义列表等于[1, 2, 3]。'
+        code = '设列表为[1, 2, 3]。'
         module = parser.parse(code)
         self.assertIsNotNone(module)
 

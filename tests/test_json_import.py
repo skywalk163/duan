@@ -11,7 +11,7 @@ from code_generator import PythonCodeGenerator
 source = """从《JSON》导入《解析JSON》，《序列化JSON》。
 
 段落 主():
-    定义 数据 等于 解析JSON("{\"name\": \"段言\"}")。
+    设 数据 为 解析JSON("{\"name\": \"段言\"}")。
     打印输出(序列化JSON(数据))。
 结束。
 """

@@ -141,7 +141,7 @@ class TestIRValidationInCodegen(unittest.TestCase):
 
     def test_if_else_ir_generation_passes_validation(self):
         """if-else 程序的 IR 生成应通过验证"""
-        source = '''定义 x 等于 10
+        source = '''设 x 为 10
 如果 x 大于 5：
   打印 "大于"
 否则：
@@ -153,9 +153,9 @@ class TestIRValidationInCodegen(unittest.TestCase):
 
     def test_while_loop_ir_generation_passes_validation(self):
         """while 循环程序的 IR 生成应通过验证"""
-        source = '''定义 i 等于 0
+        source = '''设 i 为 0
 当 i 小于 5：
-  定义 i 等于 i 加 1
+  设 i 为 i 加 1
 '''
         ir = compile_source_typed(source)
         self.assertIsInstance(ir, str)
@@ -166,7 +166,7 @@ class TestIRValidationInCodegen(unittest.TestCase):
         source = '''段落 加法 接收 a, b：
   返回 a 加 b
 
-定义 结果 等于 加法(3, 5)
+设 结果 为 加法(3, 5)
 '''
         ir = compile_source_typed(source)
         self.assertIsInstance(ir, str)

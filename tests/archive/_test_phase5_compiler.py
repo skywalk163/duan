@@ -51,7 +51,7 @@ def test_tokenize_number():
     print(f"   [{len(tokens)} tokens]")
 
 def test_tokenize_complex():
-    tokens = tokenize_source('定义甲等于一加五。')
+    tokens = tokenize_source('设甲为一加五。')
     assert len(tokens) > 0
     print(f"   [{len(tokens)} tokens]")
 
@@ -64,25 +64,25 @@ register('词法-复杂语句', test_tokenize_complex)
 # =============================================================================
 
 def test_var_number():
-    c = compile_and_check('定义甲等于三。', '甲', '数')
+    c = compile_and_check('设甲为三。', '甲', '数')
     assert '数' in str(c._inferencer.symbol_table.lookup('甲').data_type)
 register('变量-数字字面量', test_var_number)
 
 
 def test_var_arithmetic():
-    c = compile_and_check('定义和等于一加五。', '和', '数')
+    c = compile_and_check('设和为一加五。', '和', '数')
 register('变量-加法运算', test_var_arithmetic)
 
 
 def test_var_list():
-    c = compile_and_check('定义列表等于[一, 二, 三]。', '列表', '列表')
+    c = compile_and_check('设列表为[一, 二, 三]。', '列表', '列表')
     assert '列表' in str(c._inferencer.symbol_table.lookup('列表').data_type)
 register('变量-列表字面量', test_var_list)
 
 
 def test_var_multiple_declarations():
     c = DuanCompiler()
-    c.compile('定义甲等于三。定义乙等于五加一。定义丙等于甲加乙。')
+    c.compile('设甲为三。设乙为五加一。设丙为甲加乙。')
     assert len(c.errors) == 0, f"错误: {c.errors}"
     sym = c._inferencer.symbol_table.lookup('丙')
     assert sym is not None
@@ -102,7 +102,7 @@ register('段落-调用', test_paragraph_call)
 
 def test_paragraph_def_and_call():
     c = DuanCompiler()
-    c.compile('段落 倍(值)  定义结果等于值乘二。 返回结果。 结束。')
+    c.compile('段落 倍(值)  设结果为值乘二。 返回结果。 结束。')
     # 检查段落被注册
     sym = c._inferencer.symbol_table.lookup('倍')
     assert sym is not None, "'倍' 段落应已注册"
@@ -141,7 +141,7 @@ register('语句-当循环', test_while_stmt)
 def test_end_to_end_compile():
     """完整端到端：源码 → tokens → AST → 类型检查"""
     c = DuanCompiler()
-    result = c.compile('定义甲等于三。定义乙等于甲加一。')
+    result = c.compile('设甲为三。设乙为甲加一。')
 
     # 验证每个阶段都产生输出
     assert result['tokens'] is not None and len(result['tokens']) > 0, "应该有 tokens"
@@ -161,7 +161,7 @@ register('完整-端到端编译', test_end_to_end_compile)
 
 def test_parse_only():
     """parse_source 便捷函数"""
-    module = parse_source('定义甲等于三。')
+    module = parse_source('设甲为三。')
     assert module is not None
     assert len(module.statements) > 0
 register('便捷-只解析', test_parse_only)
@@ -169,7 +169,7 @@ register('便捷-只解析', test_parse_only)
 
 def test_compile_source_function():
     """compile_source 便捷函数"""
-    c = compile_source('定义甲等于三。')
+    c = compile_source('设甲为三。')
     assert not c.has_errors
 register('便捷-compile_source', test_compile_source_function)
 

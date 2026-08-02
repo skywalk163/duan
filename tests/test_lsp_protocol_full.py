@@ -201,7 +201,7 @@ test(
         "params": {
             "textDocument": {
                 "uri": "file:///test.duan",
-                "text": "段落 主():\n    定义 x 等于 42。\n    打印输出(x)。\n结束。"
+                "text": "段落 主():\n    设 x 为 42。\n    打印输出(x)。\n结束。"
             }
         }
     },

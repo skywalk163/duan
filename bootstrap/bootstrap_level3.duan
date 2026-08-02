@@ -75,7 +75,7 @@
 
 段落 词 接收 src, p, n, s：
   如果 p 小于 n：
-    定义 c 等于 字符串获取(src, p)
+    设 c 为 字符串获取(src, p)
     如果 c 等于 "："：
       如果 s 等于 ""：
         返回 建("EOF", "")
@@ -112,7 +112,7 @@
 
 段落 数字 接收 src, p, n, s：
   如果 p 小于 n：
-    定义 c 等于 字符串获取(src, p)
+    设 c 为 字符串获取(src, p)
     如果 c 大于等于 "0"：
       如果 c 小于等于 "9"：
         返回 数字(src, p 加 1, n, s 加 c)
@@ -120,17 +120,17 @@
 
 段落 字符串 接收 src, p, n, s：
   如果 p 小于 n：
-    定义 c 等于 字符串获取(src, p)
+    设 c 为 字符串获取(src, p)
     如果 c 等于 '"'：
-      定义 tok 等于 建("STR", s)
+      设 tok 为 建("STR", s)
       返回 列表创建(tok, p 加 1)
     返回 字符串(src, p 加 1, n, s 加 c)
-  定义 tok 等于 建("STR", s)
+  设 tok 为 建("STR", s)
   返回 列表创建(tok, p)
 
 段落 扫注释 接收 src, p, n：
   如果 p 小于 n：
-    定义 c 等于 字符串获取(src, p)
+    设 c 为 字符串获取(src, p)
     如果 c 等于 "\n"：
       返回 p 加 1
     返回 扫注释(src, p 加 1, n)
@@ -138,84 +138,84 @@
 
 段落 扫 接收 src, p, n, toks：
   当 p 小于 n：
-    定义 c 等于 字符串获取(src, p)
-    定义 已处理 等于 假
+    设 c 为 字符串获取(src, p)
+    设 已处理 为 假
     如果 c 等于 " "：
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 "\n"：
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 "#"：
-      定义 p 等于 扫注释(src, p 加 1, n)
-      定义 已处理 等于 真
+      设 p 为 扫注释(src, p 加 1, n)
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 "'"：
       如果 p 加 1 小于 n：
-        定义 nc 等于 字符串获取(src, p 加 1)
+        设 nc 为 字符串获取(src, p 加 1)
         如果 nc 等于 '"'：
           列表追加(toks, 建("STR", '"'))
-          定义 p 等于 p 加 3
-          定义 已处理 等于 真
+          设 p 为 p 加 3
+          设 已处理 为 真
       如果 已处理 等于 假：
-        定义 p 等于 p 加 1
-        定义 已处理 等于 真
+        设 p 为 p 加 1
+        设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 '"'：
       如果 p 加 1 小于 n：
-        定义 nc 等于 字符串获取(src, p 加 1)
+        设 nc 为 字符串获取(src, p 加 1)
         如果 nc 等于 "'"：
           列表追加(toks, 建("STR", "'"))
-          定义 p 等于 p 加 3
-          定义 已处理 等于 真
+          设 p 为 p 加 3
+          设 已处理 为 真
       如果 已处理 等于 假：
-        定义 结果 等于 字符串(src, p 加 1, n, "")
-        定义 tok 等于 列表获取(结果, 0)
-        定义 p 等于 列表获取(结果, 1)
+        设 结果 为 字符串(src, p 加 1, n, "")
+        设 tok 为 列表获取(结果, 0)
+        设 p 为 列表获取(结果, 1)
         列表追加(toks, tok)
-        定义 已处理 等于 真
+        设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 "："：
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 "。"：
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 "，"：
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 "("：
       列表追加(toks, 建("LPAREN", "("))
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 ")"：
       列表追加(toks, 建("RPAREN", ")"))
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 等于 ","：
       列表追加(toks, 建("COMMA", ","))
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 大于等于 "0"：
       如果 c 小于等于 "9"：
-        定义 tok 等于 数字(src, p, n, "")
+        设 tok 为 数字(src, p, n, "")
         列表追加(toks, tok)
-        定义 p 等于 p 加 字符串长度(列表获取(tok, 1))
-        定义 已处理 等于 真
+        设 p 为 p 加 字符串长度(列表获取(tok, 1))
+        设 已处理 为 真
     如果 已处理 等于 假 且 c 大于等于 "a"：
-      定义 tok 等于 词(src, p, n, "")
+      设 tok 为 词(src, p, n, "")
       列表追加(toks, tok)
-      定义 p 等于 p 加 字符串长度(列表获取(tok, 1))
-      定义 已处理 等于 真
+      设 p 为 p 加 字符串长度(列表获取(tok, 1))
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 大于等于 "A"：
-      定义 tok 等于 词(src, p, n, "")
+      设 tok 为 词(src, p, n, "")
       列表追加(toks, tok)
-      定义 p 等于 p 加 字符串长度(列表获取(tok, 1))
-      定义 已处理 等于 真
+      设 p 为 p 加 字符串长度(列表获取(tok, 1))
+      设 已处理 为 真
     如果 已处理 等于 假 且 c 大于等于 "一"：
-      定义 tok 等于 词(src, p, n, "")
+      设 tok 为 词(src, p, n, "")
       列表追加(toks, tok)
-      定义 p 等于 p 加 字符串长度(列表获取(tok, 1))
-      定义 已处理 等于 真
+      设 p 为 p 加 字符串长度(列表获取(tok, 1))
+      设 已处理 为 真
     如果 已处理 等于 假：
-      定义 p 等于 p 加 1
+      设 p 为 p 加 1
   返回 toks
 
 段落 词法 接收 src：
@@ -225,226 +225,226 @@
   返回 或表达式(toks, p)
 
 段落 或表达式 接收 toks, p：
-  定义 结果 等于 且表达式(toks, p)
-  定义 left 等于 列表获取(结果, 0)
-  定义 np 等于 列表获取(结果, 1)
-  定义 继续循环 等于 真
+  设 结果 为 且表达式(toks, p)
+  设 left 为 列表获取(结果, 0)
+  设 np 为 列表获取(结果, 1)
+  设 继续循环 为 真
   当 继续循环 且 np 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, np)
-    定义 tv 等于 列表获取(tok, 1)
+    设 tok 为 列表获取(toks, np)
+    设 tv 为 列表获取(tok, 1)
     如果 tv 不等于 "或"：
-      定义 继续循环 等于 假
+      设 继续循环 为 假
     否则：
-      定义 右结果 等于 且表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
-      定义 left 等于 left 加 " or " 加 right
+      设 右结果 为 且表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
+      设 left 为 left 加 " or " 加 right
   返回 列表创建(left, np)
 
 段落 且表达式 接收 toks, p：
-  定义 结果 等于 比较表达式(toks, p)
-  定义 left 等于 列表获取(结果, 0)
-  定义 np 等于 列表获取(结果, 1)
-  定义 继续循环 等于 真
+  设 结果 为 比较表达式(toks, p)
+  设 left 为 列表获取(结果, 0)
+  设 np 为 列表获取(结果, 1)
+  设 继续循环 为 真
   当 继续循环 且 np 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, np)
-    定义 tv 等于 列表获取(tok, 1)
+    设 tok 为 列表获取(toks, np)
+    设 tv 为 列表获取(tok, 1)
     如果 tv 不等于 "且"：
-      定义 继续循环 等于 假
+      设 继续循环 为 假
     否则：
-      定义 右结果 等于 比较表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
-      定义 left 等于 left 加 " and " 加 right
+      设 右结果 为 比较表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
+      设 left 为 left 加 " and " 加 right
   返回 列表创建(left, np)
 
 段落 比较表达式 接收 toks, p：
-  定义 结果 等于 加减表达式(toks, p)
-  定义 left 等于 列表获取(结果, 0)
-  定义 np 等于 列表获取(结果, 1)
+  设 结果 为 加减表达式(toks, p)
+  设 left 为 列表获取(结果, 0)
+  设 np 为 列表获取(结果, 1)
   如果 np 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, np)
-    定义 tv 等于 列表获取(tok, 1)
+    设 tok 为 列表获取(toks, np)
+    设 tv 为 列表获取(tok, 1)
     如果 tv 等于 "等于"：
-      定义 右结果 等于 加减表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
+      设 右结果 为 加减表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
       返回 列表创建(left 加 " == " 加 right, np)
     如果 tv 等于 "小于"：
-      定义 右结果 等于 加减表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
+      设 右结果 为 加减表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
       返回 列表创建(left 加 " < " 加 right, np)
     如果 tv 等于 "大于"：
-      定义 右结果 等于 加减表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
+      设 右结果 为 加减表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
       返回 列表创建(left 加 " > " 加 right, np)
     如果 tv 等于 "小于等于"：
-      定义 右结果 等于 加减表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
+      设 右结果 为 加减表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
       返回 列表创建(left 加 " <= " 加 right, np)
     如果 tv 等于 "大于等于"：
-      定义 右结果 等于 加减表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
+      设 右结果 为 加减表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
       返回 列表创建(left 加 " >= " 加 right, np)
     如果 tv 等于 "不等于"：
-      定义 右结果 等于 加减表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
+      设 右结果 为 加减表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
       返回 列表创建(left 加 " != " 加 right, np)
   返回 列表创建(left, np)
 
 段落 加减表达式 接收 toks, p：
-  定义 结果 等于 乘除表达式(toks, p)
-  定义 left 等于 列表获取(结果, 0)
-  定义 np 等于 列表获取(结果, 1)
-  定义 继续循环 等于 真
+  设 结果 为 乘除表达式(toks, p)
+  设 left 为 列表获取(结果, 0)
+  设 np 为 列表获取(结果, 1)
+  设 继续循环 为 真
   当 继续循环 且 np 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, np)
-    定义 tv 等于 列表获取(tok, 1)
+    设 tok 为 列表获取(toks, np)
+    设 tv 为 列表获取(tok, 1)
     如果 tv 等于 "加"：
-      定义 右结果 等于 乘除表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
-      定义 left 等于 left 加 " + " 加 right
+      设 右结果 为 乘除表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
+      设 left 为 left 加 " + " 加 right
     否则：
       如果 tv 等于 "减"：
-        定义 右结果 等于 乘除表达式(toks, np 加 1)
-        定义 right 等于 列表获取(右结果, 0)
-        定义 np 等于 列表获取(右结果, 1)
-        定义 left 等于 left 加 " - " 加 right
+        设 右结果 为 乘除表达式(toks, np 加 1)
+        设 right 为 列表获取(右结果, 0)
+        设 np 为 列表获取(右结果, 1)
+        设 left 为 left 加 " - " 加 right
       否则：
-        定义 继续循环 等于 假
+        设 继续循环 为 假
   返回 列表创建(left, np)
 
 段落 乘除表达式 接收 toks, p：
-  定义 结果 等于 一元表达式(toks, p)
-  定义 left 等于 列表获取(结果, 0)
-  定义 np 等于 列表获取(结果, 1)
-  定义 继续循环 等于 真
+  设 结果 为 一元表达式(toks, p)
+  设 left 为 列表获取(结果, 0)
+  设 np 为 列表获取(结果, 1)
+  设 继续循环 为 真
   当 继续循环 且 np 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, np)
-    定义 tv 等于 列表获取(tok, 1)
+    设 tok 为 列表获取(toks, np)
+    设 tv 为 列表获取(tok, 1)
     如果 tv 等于 "乘"：
-      定义 右结果 等于 一元表达式(toks, np 加 1)
-      定义 right 等于 列表获取(右结果, 0)
-      定义 np 等于 列表获取(右结果, 1)
-      定义 left 等于 left 加 " * " 加 right
+      设 右结果 为 一元表达式(toks, np 加 1)
+      设 right 为 列表获取(右结果, 0)
+      设 np 为 列表获取(右结果, 1)
+      设 left 为 left 加 " * " 加 right
     否则：
       如果 tv 等于 "除"：
-        定义 右结果 等于 一元表达式(toks, np 加 1)
-        定义 right 等于 列表获取(右结果, 0)
-        定义 np 等于 列表获取(右结果, 1)
-        定义 left 等于 left 加 " // " 加 right
+        设 右结果 为 一元表达式(toks, np 加 1)
+        设 right 为 列表获取(右结果, 0)
+        设 np 为 列表获取(右结果, 1)
+        设 left 为 left 加 " // " 加 right
       否则：
         如果 tv 等于 "取模"：
-          定义 右结果 等于 一元表达式(toks, np 加 1)
-          定义 right 等于 列表获取(右结果, 0)
-          定义 np 等于 列表获取(右结果, 1)
-          定义 left 等于 left 加 " % " 加 right
+          设 右结果 为 一元表达式(toks, np 加 1)
+          设 right 为 列表获取(右结果, 0)
+          设 np 为 列表获取(右结果, 1)
+          设 left 为 left 加 " % " 加 right
         否则：
-          定义 继续循环 等于 假
+          设 继续循环 为 假
   返回 列表创建(left, np)
 
 段落 一元表达式 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 0) 等于 "KW" 且 列表获取(tok, 1) 等于 "非"：
-      定义 结果 等于 一元表达式(toks, p 加 1)
-      定义 expr 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
+      设 结果 为 一元表达式(toks, p 加 1)
+      设 expr 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
       返回 列表创建("not " 加 expr, np)
     如果 列表获取(tok, 0) 等于 "LPAREN"：
-      定义 结果 等于 表达式(toks, p 加 1)
-      定义 expr 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
+      设 结果 为 表达式(toks, p 加 1)
+      设 expr 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
       如果 np 小于 列表长度(toks)：
-        定义 tok 等于 列表获取(toks, np)
+        设 tok 为 列表获取(toks, np)
         如果 列表获取(tok, 0) 等于 "RPAREN"：
           返回 列表创建(expr, np 加 1)
       返回 列表创建(expr, np)
     如果 列表获取(tok, 0) 等于 "NUM"：
       返回 列表创建(列表获取(tok, 1), p 加 1)
     如果 列表获取(tok, 0) 等于 "STR"：
-      定义 s 等于 列表获取(tok, 1)
-      定义 有单引号 等于 假
-      定义 i 等于 0
+      设 s 为 列表获取(tok, 1)
+      设 有单引号 为 假
+      设 i 为 0
       当 i 小于 字符串长度(s)：
         如果 字符串获取(s, i) 等于 "'"：
-          定义 有单引号 等于 真
-        定义 i 等于 i 加 1
+          设 有单引号 为 真
+        设 i 为 i 加 1
       如果 有单引号：
         返回 列表创建('"' 加 s 加 '"', p 加 1)
       返回 列表创建("'" 加 s 加 "'", p 加 1)
     如果 列表获取(tok, 0) 等于 "ID"：
-      定义 name 等于 列表获取(tok, 1)
-      定义 np 等于 p 加 1
+      设 name 为 列表获取(tok, 1)
+      设 np 为 p 加 1
       如果 np 小于 列表长度(toks)：
-        定义 tok 等于 列表获取(toks, np)
+        设 tok 为 列表获取(toks, np)
         如果 列表获取(tok, 0) 等于 "LPAREN"：
-          定义 参数结果 等于 解析参数列表(toks, np 加 1)
-          定义 args 等于 列表获取(参数结果, 0)
-          定义 np 等于 列表获取(参数结果, 1)
+          设 参数结果 为 解析参数列表(toks, np 加 1)
+          设 args 为 列表获取(参数结果, 0)
+          设 np 为 列表获取(参数结果, 1)
           返回 列表创建(name 加 "(" 加 args 加 ")", np)
       返回 列表创建(name, np)
   返回 列表创建("None", p)
 
 段落 解析参数列表 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 0) 等于 "RPAREN"：
       返回 列表创建("", p 加 1)
-    定义 结果 等于 表达式(toks, p)
-    定义 first 等于 列表获取(结果, 0)
-    定义 np 等于 列表获取(结果, 1)
-    定义 剩余结果 等于 解析更多参数(toks, np, first)
+    设 结果 为 表达式(toks, p)
+    设 first 为 列表获取(结果, 0)
+    设 np 为 列表获取(结果, 1)
+    设 剩余结果 为 解析更多参数(toks, np, first)
     返回 剩余结果
   返回 列表创建("", p)
 
 段落 解析更多参数 接收 toks, p, acc：
   当 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 0) 等于 "RPAREN"：
       返回 列表创建(acc, p 加 1)
     如果 列表获取(tok, 0) 等于 "COMMA"：
-      定义 结果 等于 表达式(toks, p 加 1)
-      定义 next_arg 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 acc 等于 acc 加 ", " 加 next_arg
-      定义 p 等于 np
+      设 结果 为 表达式(toks, p 加 1)
+      设 next_arg 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 acc 为 acc 加 ", " 加 next_arg
+      设 p 为 np
     否则：
-      定义 p 等于 p 加 1
+      设 p 为 p 加 1
   返回 列表创建(acc, p)
 
 段落 find_ret 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 1) 等于 "返回"：
-      定义 结果 等于 表达式(toks, p 加 1)
-      定义 expr 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
+      设 结果 为 表达式(toks, p 加 1)
+      设 expr 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
       返回 列表创建("return " 加 expr, np)
   返回 列表创建("pass", p)
 
 段落 find_end 接收 toks, p：
   当 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 0) 等于 "KW"：
       如果 列表获取(tok, 1) 等于 "结束"：
         返回 p 加 1
       如果 是函数关键字(列表获取(tok, 1))：
         返回 p
-    定义 p 等于 p 加 1
+    设 p 为 p 加 1
   返回 p
 
 段落 find_next 接收 toks, p：
   当 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 0) 等于 "KW"：
-      定义 tv 等于 列表获取(tok, 1)
+      设 tv 为 列表获取(tok, 1)
       如果 是函数关键字(tv)：
         返回 p
       如果 tv 等于 "结束"：
@@ -455,399 +455,399 @@
         返回 p
       如果 tv 等于 "返回"：
         返回 p
-    定义 p 等于 p 加 1
+    设 p 为 p 加 1
   返回 p
 
 段落 comp_set 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 1) 等于 "设"：
-      定义 np 等于 p 加 1
+      设 np 为 p 加 1
       如果 np 小于 列表长度(toks)：
-        定义 tok 等于 列表获取(toks, np)
-        定义 var 等于 列表获取(tok, 1)
-        定义 np 等于 np 加 1
+        设 tok 为 列表获取(toks, np)
+        设 var 为 列表获取(tok, 1)
+        设 np 为 np 加 1
         如果 np 小于 列表长度(toks)：
-          定义 tok 等于 列表获取(toks, np)
+          设 tok 为 列表获取(toks, np)
           如果 列表获取(tok, 1) 等于 "为"：
-            定义 np 等于 np 加 1
-            定义 结果 等于 表达式(toks, np)
-            定义 expr 等于 列表获取(结果, 0)
-            定义 np 等于 列表获取(结果, 1)
+            设 np 为 np 加 1
+            设 结果 为 表达式(toks, np)
+            设 expr 为 列表获取(结果, 0)
+            设 np 为 列表获取(结果, 1)
             返回 列表创建(var 加 " = " 加 expr, np)
   返回 列表创建("", p)
 
 段落 find_matching_end 接收 toks, p, level：
   当 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 0) 等于 "KW"：
-      定义 tv 等于 列表获取(tok, 1)
+      设 tv 为 列表获取(tok, 1)
       如果 tv 等于 "如果"：
-        定义 level 等于 level 加 1
+        设 level 为 level 加 1
       如果 tv 等于 "当"：
-        定义 level 等于 level 加 1
+        设 level 为 level 加 1
       如果 tv 等于 "遍历"：
-        定义 level 等于 level 加 1
+        设 level 为 level 加 1
       如果 tv 等于 "类"：
-        定义 level 等于 level 加 1
+        设 level 为 level 加 1
       如果 tv 等于 "段落"：
-        定义 level 等于 level 加 1
+        设 level 为 level 加 1
       如果 tv 等于 "段"：
-        定义 level 等于 level 加 1
+        设 level 为 level 加 1
       如果 tv 等于 "否则"：
         如果 level 等于 1：
           返回 p
       如果 tv 等于 "结束"：
         如果 level 等于 1：
           返回 p 加 1
-        定义 level 等于 level 减 1
-    定义 p 等于 p 加 1
+        设 level 为 level 减 1
+    设 p 为 p 加 1
   返回 p
 
 段落 compile_block 接收 toks, p, end_p, indent, out：
   当 p 小于 end_p：
     如果 p 小于 列表长度(toks)：
-      定义 tok 等于 列表获取(toks, p)
-      定义 tv 等于 列表获取(tok, 1)
-      定义 已处理 等于 假
+      设 tok 为 列表获取(toks, p)
+      设 tv 为 列表获取(tok, 1)
+      设 已处理 为 假
       如果 tv 等于 "设"：
-        定义 结果 等于 comp_set(toks, p)
-        定义 stmt 等于 列表获取(结果, 0)
-        定义 np 等于 列表获取(结果, 1)
-        定义 out 等于 out 加 indent 加 stmt 加 "\n"
-        定义 p 等于 np
-        定义 已处理 等于 真
+        设 结果 为 comp_set(toks, p)
+        设 stmt 为 列表获取(结果, 0)
+        设 np 为 列表获取(结果, 1)
+        设 out 为 out 加 indent 加 stmt 加 "\n"
+        设 p 为 np
+        设 已处理 为 真
       如果 已处理 等于 假 且 tv 等于 "如果"：
-        定义 结果 等于 comp_if(toks, p)
-        定义 stmt 等于 列表获取(结果, 0)
-        定义 np 等于 列表获取(结果, 1)
-        定义 out 等于 out 加 add_indent(stmt, indent)
-        定义 p 等于 np
-        定义 已处理 等于 真
+        设 结果 为 comp_if(toks, p)
+        设 stmt 为 列表获取(结果, 0)
+        设 np 为 列表获取(结果, 1)
+        设 out 为 out 加 add_indent(stmt, indent)
+        设 p 为 np
+        设 已处理 为 真
       如果 已处理 等于 假 且 tv 等于 "当"：
-        定义 结果 等于 comp_while(toks, p)
-        定义 stmt 等于 列表获取(结果, 0)
-        定义 np 等于 列表获取(结果, 1)
-        定义 out 等于 out 加 add_indent(stmt, indent)
-        定义 p 等于 np
-        定义 已处理 等于 真
+        设 结果 为 comp_while(toks, p)
+        设 stmt 为 列表获取(结果, 0)
+        设 np 为 列表获取(结果, 1)
+        设 out 为 out 加 add_indent(stmt, indent)
+        设 p 为 np
+        设 已处理 为 真
       如果 已处理 等于 假 且 tv 等于 "遍历"：
-        定义 结果 等于 comp_for(toks, p)
-        定义 stmt 等于 列表获取(结果, 0)
-        定义 np 等于 列表获取(结果, 1)
-        定义 out 等于 out 加 add_indent(stmt, indent)
-        定义 p 等于 np
-        定义 已处理 等于 真
+        设 结果 为 comp_for(toks, p)
+        设 stmt 为 列表获取(结果, 0)
+        设 np 为 列表获取(结果, 1)
+        设 out 为 out 加 add_indent(stmt, indent)
+        设 p 为 np
+        设 已处理 为 真
       如果 已处理 等于 假 且 tv 等于 "返回"：
-        定义 结果 等于 find_ret(toks, p)
-        定义 stmt 等于 列表获取(结果, 0)
-        定义 np 等于 列表获取(结果, 1)
-        定义 out 等于 out 加 indent 加 stmt 加 "\n"
-        定义 p 等于 np
-        定义 已处理 等于 真
+        设 结果 为 find_ret(toks, p)
+        设 stmt 为 列表获取(结果, 0)
+        设 np 为 列表获取(结果, 1)
+        设 out 为 out 加 indent 加 stmt 加 "\n"
+        设 p 为 np
+        设 已处理 为 真
       如果 已处理 等于 假 且 列表获取(tok, 0) 等于 "ID"：
-        定义 np 等于 p 加 1
+        设 np 为 p 加 1
         如果 np 小于 列表长度(toks)：
-          定义 ntok 等于 列表获取(toks, np)
+          设 ntok 为 列表获取(toks, np)
           如果 列表获取(ntok, 0) 等于 "LPAREN"：
-            定义 结果 等于 表达式(toks, p)
-            定义 stmt 等于 列表获取(结果, 0)
-            定义 np 等于 列表获取(结果, 1)
-            定义 out 等于 out 加 indent 加 stmt 加 "\n"
-            定义 p 等于 np
-            定义 已处理 等于 真
+            设 结果 为 表达式(toks, p)
+            设 stmt 为 列表获取(结果, 0)
+            设 np 为 列表获取(结果, 1)
+            设 out 为 out 加 indent 加 stmt 加 "\n"
+            设 p 为 np
+            设 已处理 为 真
       如果 已处理 等于 假 且 tv 等于 "结束"：
         返回 out
       如果 已处理 等于 假：
-        定义 p 等于 p 加 1
+        设 p 为 p 加 1
   返回 out
 
 段落 add_indent 接收 text, indent：
-  定义 有尾换行 等于 假
+  设 有尾换行 为 假
   如果 字符串长度(text) 大于 0：
-    定义 末字符 等于 字符串获取(text, 字符串长度(text) 减 1)
+    设 末字符 为 字符串获取(text, 字符串长度(text) 减 1)
     如果 末字符 等于 "\n"：
-      定义 有尾换行 等于 真
+      设 有尾换行 为 真
   如果 有尾换行：
-    定义 text 等于 截取(text, 0, 字符串长度(text) 减 1)
-  定义 结果 等于 indent 加 加缩进行(text, indent, "", 0)
+    设 text 为 截取(text, 0, 字符串长度(text) 减 1)
+  设 结果 为 indent 加 加缩进行(text, indent, "", 0)
   如果 有尾换行：
     返回 结果 加 "\n"
   返回 结果
 
 段落 加缩进行 接收 text, indent, acc, i：
   当 i 小于 字符串长度(text)：
-    定义 c 等于 字符串获取(text, i)
+    设 c 为 字符串获取(text, i)
     如果 c 等于 "\n"：
-      定义 acc 等于 acc 加 "\n" 加 indent
+      设 acc 为 acc 加 "\n" 加 indent
     否则：
-      定义 acc 等于 acc 加 c
-    定义 i 等于 i 加 1
+      设 acc 为 acc 加 c
+    设 i 为 i 加 1
   返回 acc
 
 段落 comp_if 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 1) 等于 "如果"：
-      定义 np 等于 p 加 1
-      定义 结果 等于 表达式(toks, np)
-      定义 cond 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 end_p 等于 find_matching_end(toks, np, 1)
-      定义 body 等于 compile_block(toks, np, end_p 减 1, "    ", "")
+      设 np 为 p 加 1
+      设 结果 为 表达式(toks, np)
+      设 cond 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 end_p 为 find_matching_end(toks, np, 1)
+      设 body 为 compile_block(toks, np, end_p 减 1, "    ", "")
       如果 body 等于 ""：
-        定义 body 等于 "    pass\n"
-      定义 code 等于 "if " 加 cond 加 ":\n" 加 body
+        设 body 为 "    pass\n"
+      设 code 为 "if " 加 cond 加 ":\n" 加 body
       # 检查是否有否则块
       如果 end_p 小于 列表长度(toks)：
-        定义 next_tok 等于 列表获取(toks, end_p)
+        设 next_tok 为 列表获取(toks, end_p)
         如果 列表获取(next_tok, 1) 等于 "否则"：
-          定义 else_p 等于 end_p 加 1
-          定义 else_end 等于 find_matching_end(toks, else_p, 1)
-          定义 else_body 等于 compile_block(toks, else_p, else_end 减 1, "    ", "")
+          设 else_p 为 end_p 加 1
+          设 else_end 为 find_matching_end(toks, else_p, 1)
+          设 else_body 为 compile_block(toks, else_p, else_end 减 1, "    ", "")
           如果 else_body 等于 ""：
-            定义 else_body 等于 "    pass"
-          定义 code 等于 code 加 "\nelse:\n" 加 else_body
+            设 else_body 为 "    pass"
+          设 code 为 code 加 "\nelse:\n" 加 else_body
           返回 列表创建(code, else_end)
       返回 列表创建(code, end_p)
   返回 列表创建("", p)
 
 段落 comp_while 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 1) 等于 "当"：
-      定义 np 等于 p 加 1
-      定义 结果 等于 表达式(toks, np)
-      定义 cond 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 end_p 等于 find_matching_end(toks, np, 1)
-      定义 body 等于 compile_block(toks, np, end_p 减 1, "    ", "")
+      设 np 为 p 加 1
+      设 结果 为 表达式(toks, np)
+      设 cond 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 end_p 为 find_matching_end(toks, np, 1)
+      设 body 为 compile_block(toks, np, end_p 减 1, "    ", "")
       如果 body 等于 ""：
-        定义 body 等于 "    pass\n"
+        设 body 为 "    pass\n"
       返回 列表创建("while " 加 cond 加 ":\n" 加 body, end_p)
   返回 列表创建("", p)
 
 段落 comp_for 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 1) 等于 "遍历"：
-      定义 np 等于 p 加 1
+      设 np 为 p 加 1
       如果 np 小于 列表长度(toks)：
-        定义 var_tok 等于 列表获取(toks, np)
-        定义 var_name 等于 列表获取(var_tok, 1)
-        定义 np 等于 np 加 1
+        设 var_tok 为 列表获取(toks, np)
+        设 var_name 为 列表获取(var_tok, 1)
+        设 np 为 np 加 1
         如果 np 小于 列表长度(toks)：
-          定义 next_tok 等于 列表获取(toks, np)
+          设 next_tok 为 列表获取(toks, np)
           如果 列表获取(next_tok, 1) 等于 "在"：
-            定义 np 等于 np 加 1
-            定义 结果 等于 表达式(toks, np)
-            定义 iter_expr 等于 列表获取(结果, 0)
-            定义 np 等于 列表获取(结果, 1)
-            定义 end_p 等于 find_matching_end(toks, np, 1)
-            定义 body 等于 compile_block(toks, np, end_p 减 1, "    ", "")
+            设 np 为 np 加 1
+            设 结果 为 表达式(toks, np)
+            设 iter_expr 为 列表获取(结果, 0)
+            设 np 为 列表获取(结果, 1)
+            设 end_p 为 find_matching_end(toks, np, 1)
+            设 body 为 compile_block(toks, np, end_p 减 1, "    ", "")
             如果 body 等于 ""：
-              定义 body 等于 "    pass\n"
+              设 body 为 "    pass\n"
             返回 列表创建("for " 加 var_name 加 " in " 加 iter_expr 加 ":\n" 加 body, end_p)
   返回 列表创建("", p)
 
 段落 compile_stmts 接收 toks, p, out：
   当 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
-    定义 tv 等于 列表获取(tok, 1)
-    定义 已处理 等于 假
+    设 tok 为 列表获取(toks, p)
+    设 tv 为 列表获取(tok, 1)
+    设 已处理 为 假
     如果 tv 等于 "设"：
-      定义 结果 等于 comp_set(toks, p)
-      定义 stmt 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 out 等于 out 加 "    " 加 stmt 加 "\n"
-      定义 p 等于 np
-      定义 已处理 等于 真
+      设 结果 为 comp_set(toks, p)
+      设 stmt 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 out 为 out 加 "    " 加 stmt 加 "\n"
+      设 p 为 np
+      设 已处理 为 真
     如果 已处理 等于 假 且 tv 等于 "如果"：
-      定义 结果 等于 comp_if(toks, p)
-      定义 stmt 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 out 等于 out 加 add_indent(stmt, "    ")
-      定义 p 等于 np
-      定义 已处理 等于 真
+      设 结果 为 comp_if(toks, p)
+      设 stmt 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 out 为 out 加 add_indent(stmt, "    ")
+      设 p 为 np
+      设 已处理 为 真
     如果 已处理 等于 假 且 tv 等于 "当"：
-      定义 结果 等于 comp_while(toks, p)
-      定义 stmt 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 out 等于 out 加 add_indent(stmt, "    ")
-      定义 p 等于 np
-      定义 已处理 等于 真
+      设 结果 为 comp_while(toks, p)
+      设 stmt 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 out 为 out 加 add_indent(stmt, "    ")
+      设 p 为 np
+      设 已处理 为 真
     如果 已处理 等于 假 且 tv 等于 "遍历"：
-      定义 结果 等于 comp_for(toks, p)
-      定义 stmt 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 out 等于 out 加 add_indent(stmt, "    ")
-      定义 p 等于 np
-      定义 已处理 等于 真
+      设 结果 为 comp_for(toks, p)
+      设 stmt 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 out 为 out 加 add_indent(stmt, "    ")
+      设 p 为 np
+      设 已处理 为 真
     如果 已处理 等于 假 且 tv 等于 "返回"：
-      定义 结果 等于 find_ret(toks, p)
-      定义 stmt 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 out 等于 out 加 "    " 加 stmt 加 "\n"
-      定义 p 等于 np
-      定义 已处理 等于 真
+      设 结果 为 find_ret(toks, p)
+      设 stmt 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 out 为 out 加 "    " 加 stmt 加 "\n"
+      设 p 为 np
+      设 已处理 为 真
     如果 已处理 等于 假 且 列表获取(tok, 0) 等于 "ID"：
-      定义 np 等于 p 加 1
+      设 np 为 p 加 1
       如果 np 小于 列表长度(toks)：
-        定义 ntok 等于 列表获取(toks, np)
+        设 ntok 为 列表获取(toks, np)
         如果 列表获取(ntok, 0) 等于 "LPAREN"：
-          定义 结果 等于 表达式(toks, p)
-          定义 stmt 等于 列表获取(结果, 0)
-          定义 np 等于 列表获取(结果, 1)
-          定义 out 等于 out 加 "    " 加 stmt 加 "\n"
-          定义 p 等于 np
-          定义 已处理 等于 真
+          设 结果 为 表达式(toks, p)
+          设 stmt 为 列表获取(结果, 0)
+          设 np 为 列表获取(结果, 1)
+          设 out 为 out 加 "    " 加 stmt 加 "\n"
+          设 p 为 np
+          设 已处理 为 真
     如果 已处理 等于 假 且 tv 等于 "结束"：
       返回 列表创建(out, p 加 1)
     如果 已处理 等于 假 且 是函数关键字(tv)：
       返回 列表创建(out, p)
     如果 已处理 等于 假：
-      定义 p 等于 p 加 1
+      设 p 为 p 加 1
   返回 列表创建(out, p)
 
 段落 解析参数 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 1) 等于 "接收"：
       返回 收集参数(toks, p 加 1, "")
   返回 列表创建("", p)
 
 段落 收集参数 接收 toks, p, acc：
   当 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
-    定义 已处理 等于 假
+    设 tok 为 列表获取(toks, p)
+    设 已处理 为 假
     如果 列表获取(tok, 0) 等于 "ID"：
-      定义 v 等于 列表获取(tok, 1)
+      设 v 为 列表获取(tok, 1)
       如果 字符串长度(v) 大于 0：
-        定义 末字符 等于 字符串获取(v, 字符串长度(v) 减 1)
+        设 末字符 为 字符串获取(v, 字符串长度(v) 减 1)
         如果 末字符 等于 "："：
-          定义 v 等于 截取(v, 0, 字符串长度(v) 减 1)
+          设 v 为 截取(v, 0, 字符串长度(v) 减 1)
           如果 acc 等于 ""：
             返回 列表创建(v, p 加 1)
           返回 列表创建(acc 加 ", " 加 v, p 加 1)
       如果 acc 等于 ""：
-        定义 acc 等于 v
+        设 acc 为 v
       否则：
-        定义 acc 等于 acc 加 ", " 加 v
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+        设 acc 为 acc 加 ", " 加 v
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假 且 列表获取(tok, 0) 等于 "COMMA"：
-      定义 p 等于 p 加 1
-      定义 已处理 等于 真
+      设 p 为 p 加 1
+      设 已处理 为 真
     如果 已处理 等于 假：
       返回 列表创建(acc, p)
   返回 列表创建(acc, p)
 
 段落 compile_class 接收 toks, p：
   如果 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
+    设 tok 为 列表获取(toks, p)
     如果 列表获取(tok, 1) 等于 "类"：
-      定义 np 等于 p 加 1
-      定义 name 等于 ""
+      设 np 为 p 加 1
+      设 name 为 ""
       如果 np 小于 列表长度(toks)：
-        定义 name_tok 等于 列表获取(toks, np)
-        定义 name 等于 列表获取(name_tok, 1)
-        定义 np 等于 np 加 1
-      定义 end_p 等于 find_matching_end(toks, np, 1)
-      定义 body 等于 compile_class_body(toks, np, end_p 减 1, name)
+        设 name_tok 为 列表获取(toks, np)
+        设 name 为 列表获取(name_tok, 1)
+        设 np 为 np 加 1
+      设 end_p 为 find_matching_end(toks, np, 1)
+      设 body 为 compile_class_body(toks, np, end_p 减 1, name)
       返回 列表创建("class " 加 name 加 ":\n" 加 body, end_p)
   返回 列表创建("", p)
 
 段落 compile_class_body 接收 toks, p, end_p, class_name：
-  定义 out 等于 ""
+  设 out 为 ""
   当 p 小于 end_p 且 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
-    定义 tv 等于 列表获取(tok, 1)
+    设 tok 为 列表获取(toks, p)
+    设 tv 为 列表获取(tok, 1)
     如果 tv 等于 "属性"：
-      定义 np 等于 p 加 1
+      设 np 为 p 加 1
       如果 np 小于 列表长度(toks)：
-        定义 attr_tok 等于 列表获取(toks, np)
-        定义 attr_name 等于 列表获取(attr_tok, 1)
-        定义 p 等于 np 加 1
+        设 attr_tok 为 列表获取(toks, np)
+        设 attr_name 为 列表获取(attr_tok, 1)
+        设 p 为 np 加 1
         继续
     如果 是函数关键字(tv)：
-      定义 func结果 等于 compile_class_method(toks, p, class_name)
-      定义 method_code 等于 列表获取(func结果, 0)
-      定义 p 等于 列表获取(func结果, 1)
-      定义 out 等于 out 加 method_code
+      设 func结果 为 compile_class_method(toks, p, class_name)
+      设 method_code 为 列表获取(func结果, 0)
+      设 p 为 列表获取(func结果, 1)
+      设 out 为 out 加 method_code
       继续
     如果 tv 等于 "结束"：
       返回 out
-    定义 p 等于 p 加 1
+    设 p 为 p 加 1
   返回 out
 
 段落 compile_class_method 接收 toks, p, class_name：
-  定义 tok 等于 列表获取(toks, p)
-  定义 np 等于 p 加 1
-  定义 name 等于 ""
+  设 tok 为 列表获取(toks, p)
+  设 np 为 p 加 1
+  设 name 为 ""
   如果 np 小于 列表长度(toks)：
-    定义 name_tok 等于 列表获取(toks, np)
-    定义 name 等于 列表获取(name_tok, 1)
-    定义 np 等于 np 加 1
-  定义 参数结果 等于 解析参数(toks, np)
-  定义 params 等于 列表获取(参数结果, 0)
-  定义 np 等于 列表获取(参数结果, 1)
-  定义 self_param 等于 "self"
+    设 name_tok 为 列表获取(toks, np)
+    设 name 为 列表获取(name_tok, 1)
+    设 np 为 np 加 1
+  设 参数结果 为 解析参数(toks, np)
+  设 params 为 列表获取(参数结果, 0)
+  设 np 为 列表获取(参数结果, 1)
+  设 self_param 为 "self"
   如果 params 不等于 ""：
-    定义 self_param 等于 "self, " 加 params
-  定义 method_end 等于 find_matching_end(toks, np, 1)
-  定义 body 等于 compile_block(toks, np, method_end 减 1, "        ", "")
+    设 self_param 为 "self, " 加 params
+  设 method_end 为 find_matching_end(toks, np, 1)
+  设 body 为 compile_block(toks, np, method_end 减 1, "        ", "")
   如果 body 等于 ""：
-    定义 body 等于 "        pass"
-  定义 code 等于 "    def " 加 name 加 "(" 加 self_param 加 "):\n" 加 body 加 "\n"
+    设 body 为 "        pass"
+  设 code 为 "    def " 加 name 加 "(" 加 self_param 加 "):\n" 加 body 加 "\n"
   返回 列表创建(code, method_end)
 
 段落 compile_top 接收 toks, p, out：
   当 p 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, p)
-    定义 tv 等于 列表获取(tok, 1)
-    定义 已处理 等于 假
+    设 tok 为 列表获取(toks, p)
+    设 tv 为 列表获取(tok, 1)
+    设 已处理 为 假
     如果 tv 等于 "类"：
-      定义 结果 等于 compile_class(toks, p)
-      定义 class_code 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 out 等于 out 加 class_code 加 "\n"
-      定义 p 等于 np
-      定义 已处理 等于 真
+      设 结果 为 compile_class(toks, p)
+      设 class_code 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 out 为 out 加 class_code 加 "\n"
+      设 p 为 np
+      设 已处理 为 真
     如果 已处理 等于 假 且 是函数关键字(tv)：
-      定义 结果 等于 compile_single_func(toks, p)
-      定义 func_code 等于 列表获取(结果, 0)
-      定义 np 等于 列表获取(结果, 1)
-      定义 out 等于 out 加 func_code
-      定义 p 等于 np
-      定义 已处理 等于 真
+      设 结果 为 compile_single_func(toks, p)
+      设 func_code 为 列表获取(结果, 0)
+      设 np 为 列表获取(结果, 1)
+      设 out 为 out 加 func_code
+      设 p 为 np
+      设 已处理 为 真
     如果 已处理 等于 假：
-      定义 p 等于 p 加 1
+      设 p 为 p 加 1
   返回 out
 
 段落 compile_single_func 接收 toks, p：
-  定义 tok 等于 列表获取(toks, p)
-  定义 np 等于 p 加 1
-  定义 name 等于 ""
+  设 tok 为 列表获取(toks, p)
+  设 np 为 p 加 1
+  设 name 为 ""
   如果 np 小于 列表长度(toks)：
-    定义 tok 等于 列表获取(toks, np)
+    设 tok 为 列表获取(toks, np)
     如果 列表获取(tok, 0) 等于 "ID"：
-      定义 name 等于 列表获取(tok, 1)
-      定义 np 等于 np 加 1
-  定义 参数结果 等于 解析参数(toks, np)
-  定义 params 等于 列表获取(参数结果, 0)
-  定义 np 等于 列表获取(参数结果, 1)
-  定义 body结果 等于 compile_stmts(toks, np, "")
-  定义 body 等于 列表获取(body结果, 0)
-  定义 np 等于 列表获取(body结果, 1)
+      设 name 为 列表获取(tok, 1)
+      设 np 为 np 加 1
+  设 参数结果 为 解析参数(toks, np)
+  设 params 为 列表获取(参数结果, 0)
+  设 np 为 列表获取(参数结果, 1)
+  设 body结果 为 compile_stmts(toks, np, "")
+  设 body 为 列表获取(body结果, 0)
+  设 np 为 列表获取(body结果, 1)
   如果 body 等于 ""：
-    定义 body 等于 "    pass\n"
-  定义 code 等于 "def " 加 name 加 "(" 加 params 加 "):\n" 加 body 加 "\n"
+    设 body 为 "    pass\n"
+  设 code 为 "def " 加 name 加 "(" 加 params 加 "):\n" 加 body 加 "\n"
   返回 列表创建(code, np)
 
 段落 编译 接收 src：
-  定义 header 等于 "# Generated by Duan Level 3\n"
-  定义 toks 等于 词法(src)
-  定义 code 等于 compile_top(toks, 0, "")
+  设 header 为 "# Generated by Duan Level 3\n"
+  设 toks 为 词法(src)
+  设 code 为 compile_top(toks, 0, "")
   返回 header 加 code
 
 段落 测试：
@@ -855,19 +855,19 @@
   打印 ""
 
   打印 "--- 测试1: 基本函数 ---"
-  定义 src1 等于 "段落 foo 返回 42 结束"
+  设 src1 为 "段落 foo 返回 42 结束"
   打印 "源: " 加 src1
   打印 编译(src1)
   打印 ""
 
   打印 "--- 测试2: 带变量 ---"
-  定义 src2 等于 "段落 bar 设 x 为 10 返回 x 结束"
+  设 src2 为 "段落 bar 设 x 为 10 返回 x 结束"
   打印 "源: " 加 src2
   打印 编译(src2)
   打印 ""
 
   打印 "--- 测试3: 带if ---"
-  定义 src3 等于 "段落 baz 如果 真 返回 1 结束 返回 0 结束"
+  设 src3 为 "段落 baz 如果 真 返回 1 结束 返回 0 结束"
   打印 "源: " 加 src3
   打印 编译(src3)
   打印 ""

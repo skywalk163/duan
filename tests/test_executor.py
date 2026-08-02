@@ -62,7 +62,7 @@ class TestExecutor(unittest.TestCase):
     def test_paragraph_definition(self):
         """测试段落定义（单行形式）"""
         # 单行段落定义
-        self.executor.execute("段落 平方 接收 数值: 返回 数值 * 数值。")
+        self.executor.execute("段落 平方(数值): 返回 数值 * 数值。")
         result = self.executor.execute("平方(5)")
         self.assertEqual(result, 25)
 

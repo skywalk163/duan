@@ -44,21 +44,21 @@ class TestTypeCheckerConfig(unittest.TestCase):
 
     def test_file_directives_level(self):
         """文件级指令：类型检查级别"""
-        source = '# 类型检查级别: 表达式\n段落 测试 接收 a:整数:\n  返回 a'
+        source = '# 类型检查级别: 表达式\n段落 测试(a):整数:\n  返回 a'
         config = self.TypeCheckerConfig()
         config = config.apply_file_directives(source)
         self.assertEqual(config.check_level, self.TypeCheckLevel.EXPRESSION)
 
     def test_file_directives_mode(self):
         """文件级指令：类型模式"""
-        source = '# 类型模式: 严格\n段落 测试 接收 a:整数:\n  返回 a'
+        source = '# 类型模式: 严格\n段落 测试(a):整数:\n  返回 a'
         config = self.TypeCheckerConfig()
         config = config.apply_file_directives(source)
         self.assertEqual(config.default_segment_mode, self.SegmentTypeMode.STRICT)
 
     def test_file_directives_both(self):
         """文件级指令：两者都有"""
-        source = '# 类型检查级别: 变量\n# 类型模式: 严格\n段落 测试 接收 a:整数:\n  返回 a'
+        source = '# 类型检查级别: 变量\n# 类型模式: 严格\n段落 测试(a):整数:\n  返回 a'
         config = self.TypeCheckerConfig()
         config = config.apply_file_directives(source)
         self.assertEqual(config.check_level, self.TypeCheckLevel.VARIABLE)
@@ -116,7 +116,7 @@ class TestTypeCheckerIntegration(unittest.TestCase):
 
     def test_signature_level_ok(self):
         """签名级检查：有类型标注的段落通过"""
-        source = '# 类型检查级别: 签名\n段落 加法 接收 a:整数, b:整数 返回 整数:\n  返回 a 加 b'
+        source = '# 类型检查级别: 签名\n段落 加法(a):整数, b:整数 返回 整数:\n  返回 a 加 b'
         compiler = self.Compiler()
         compiler._config.type_check_level = self.TypeCheckLevel.SIGNATURE
         result = compiler.compile(source, optimize=False)
@@ -125,7 +125,7 @@ class TestTypeCheckerIntegration(unittest.TestCase):
 
     def test_signature_level_warning(self):
         """签名级检查：无类型标注产生警告"""
-        source = '# 类型检查级别: 签名\n段落 加法 接收 a, b:\n  返回 a 加 b'
+        source = '# 类型检查级别: 签名\n段落 加法(a, b):\n  返回 a 加 b'
         compiler = self.Compiler()
         compiler._config.type_check_level = self.TypeCheckLevel.SIGNATURE
         result = compiler.compile(source, optimize=False)
@@ -134,7 +134,7 @@ class TestTypeCheckerIntegration(unittest.TestCase):
 
     def test_signature_level_confirmed(self):
         """签名级检查：确认检查已执行"""
-        source = '# 类型检查级别: 无\n段落 无警告 接收 a, b:\n  返回 a 加 b'
+        source = '# 类型检查级别: 无\n段落 无警告(a, b):\n  返回 a 加 b'
         compiler = self.Compiler()
         compiler._config.type_check_level = self.TypeCheckLevel.NONE
         result = compiler.compile(source, optimize=False)
@@ -143,7 +143,7 @@ class TestTypeCheckerIntegration(unittest.TestCase):
 
     def test_no_check_level(self):
         """不检查级别：跳过类型检查"""
-        source = '段落 无检查 接收 a, b:\n  返回 a 加 b'
+        source = '段落 无检查(a, b):\n  返回 a 加 b'
         compiler = self.Compiler()
         compiler._config.type_check_level = self.TypeCheckLevel.NONE
         result = compiler.compile(source, optimize=False)
@@ -163,7 +163,7 @@ class TestStrictModifier(unittest.TestCase):
 
     def test_strict_segment_parses(self):
         """严格段落能正常解析"""
-        source = '严格 段落 测试 接收 a:整数:\n  返回 a'
+        source = '严格 段落 测试(a):整数:\n  返回 a'
         compiler = self.Compiler()
         compiler._config.type_check_level = self.TypeCheckLevel.EXPRESSION
         result = compiler.compile(source, optimize=False)
@@ -171,7 +171,7 @@ class TestStrictModifier(unittest.TestCase):
 
     def test_strict_segment_without_type_annotation(self):
         """严格段落缺少类型标注报错"""
-        source = '严格 段落 测试 接收 a:\n  返回 a'
+        source = '严格 段落 测试(a):\n  返回 a'
         compiler = self.Compiler()
         compiler._config.type_check_level = self.TypeCheckLevel.EXPRESSION
         result = compiler.compile(source, optimize=False)

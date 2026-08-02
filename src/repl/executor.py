@@ -173,18 +173,32 @@ class Executor:
             print(value)
             return value
 
-        # 处理段落定义: 段落 平方 接收 数值: 返回 数值 * 数值。结束。
+        # 处理段落定义: 段落 平方(数值): 返回 数值 * 数值。结束。
         # 简化处理：只支持单行定义
-        seg_match = re.match(r'段落\s+(\S+)\s+接收\s+(\S+)\s*:\s*返回\s+(.+)', code)
+        # 新语法：段落 名(参数): 返回 表达式。
+        seg_match = re.match(r'段落\s+(\S+)\s*\(([^)]*)\)\s*:\s*返回\s+(.+)', code)
         if seg_match:
             name = seg_match.group(1)
-            param = seg_match.group(2)
+            params = [p.strip() for p in seg_match.group(2).split(',') if p.strip()]
             body = seg_match.group(3)
             # 创建函数
             def segment_func(*args):
-                local_env = {param: args[0] if args else None}
+                local_env = {}
+                for i, p in enumerate(params):
+                    local_env[p] = args[i] if i < len(args) else None
                 return self._eval_expr(body, local_env)
             self.env.set_function(name, segment_func)
+            return name
+        # 旧语法兼容：段落 平方 接收 数值: 返回 数值 * 数值。
+        seg_match_old = re.match(r'段落\s+(\S+)\s+接收\s+(\S+)\s*:\s*返回\s+(.+)', code)
+        if seg_match_old:
+            name = seg_match_old.group(1)
+            param = seg_match_old.group(2)
+            body = seg_match_old.group(3)
+            def segment_func_old(*args):
+                local_env = {param: args[0] if args else None}
+                return self._eval_expr(body, local_env)
+            self.env.set_function(name, segment_func_old)
             return name
 
         # 其他表达式：直接求值

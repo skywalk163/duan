@@ -69,21 +69,21 @@ class TestSimplePrograms:
 
     def test_variable_declaration(self):
         """测试变量声明"""
-        source = '定义 x 等于 42'
+        source = '设 x 为 42'
         ns, _ = _compile_and_run(source)
         assert ns['x'] == 42
 
     def test_string_variable(self):
         """测试字符串变量"""
-        source = '定义 msg 等于 "hello"'
+        source = '设 msg 为 "hello"'
         ns, _ = _compile_and_run(source)
         assert ns['msg'] == 'hello'
 
     def test_arithmetic(self):
         """测试算术运算"""
-        source = '''定义 a 等于 3
-定义 b 等于 4
-定义 c 等于 a 加 b
+        source = '''设 a 为 3
+设 b 为 4
+设 c 为 a 加 b
 '''
         ns, _ = _compile_and_run(source)
         assert ns['c'] == 7
@@ -92,41 +92,41 @@ class TestSimplePrograms:
         """测试函数调用"""
         source = '''段落 加法 接收 x, y：
   返回 x 加 y
-定义 r 等于 加法(2, 3)
+设 r 为 加法(2, 3)
 '''
         ns, _ = _compile_and_run(source)
         assert ns['r'] == 5
 
     def test_if_statement(self):
         """测试条件语句"""
-        source = '''定义 x 等于 10
+        source = '''设 x 为 10
 如果 x 大于 5：
-  定义 y 等于 "大"
+  设 y 为 "大"
 否则：
-  定义 y 等于 "小"
+  设 y 为 "小"
 '''
         ns, _ = _compile_and_run(source)
         assert ns['y'] == '大'
 
     def test_while_loop(self):
         """测试循环"""
-        source = '''定义 i 等于 0
-定义 sum 等于 0
+        source = '''设 i 为 0
+设 sum 为 0
 当 i 小于 5：
-  定义 sum 等于 sum 加 i
-  定义 i 等于 i 加 1
+  设 sum 为 sum 加 i
+  设 i 为 i 加 1
 '''
         ns, _ = _compile_and_run(source)
         assert ns['sum'] == 10
 
     def test_list_operations(self):
         """测试列表操作"""
-        source = '''定义 lst 等于 列表创建()
+        source = '''设 lst 为 列表创建()
 列表追加(lst, 1)
 列表追加(lst, 2)
 列表追加(lst, 3)
-定义 len 等于 列表长度(lst)
-定义 first 等于 列表获取(lst, 0)
+设 len 为 列表长度(lst)
+设 first 为 列表获取(lst, 0)
 '''
         ns, _ = _compile_and_run(source)
         assert ns['len'] == 3
@@ -134,11 +134,11 @@ class TestSimplePrograms:
 
     def test_dict_operations(self):
         """测试字典操作"""
-        source = '''定义 d 等于 字典创建()
+        source = '''设 d 为 字典创建()
 字典设置(d, "a", 1)
 字典设置(d, "b", 2)
-定义 val 等于 字典获取(d, "a")
-定义 has 等于 字典包含键(d, "b")
+设 val 为 字典获取(d, "a")
+设 has 为 字典包含键(d, "b")
 '''
         ns, _ = _compile_and_run(source)
         assert ns['val'] == 1
@@ -166,13 +166,13 @@ class TestBootstrapLexer:
     def test_lexer_keywords(self):
         """测试关键字列表"""
         source = '''段落 创建关键字列表：
-  定义 列表 等于 列表创建()
+  设 列表 为 列表创建()
   列表追加(列表, "设")
   列表追加(列表, "为")
   返回 列表
 
-定义 kw 等于 创建关键字列表()
-定义 cnt 等于 列表长度(kw)
+设 kw 为 创建关键字列表()
+设 cnt 为 列表长度(kw)
 '''
         ns, _ = _compile_and_run(source)
         assert ns['cnt'] == 2
@@ -180,14 +180,14 @@ class TestBootstrapLexer:
     def test_lexer_token_structure(self):
         """测试令牌结构"""
         source = '''段落 创建令牌 接收 种别, 值：
-  定义 tok 等于 字典创建()
+  设 tok 为 字典创建()
   字典设置(tok, "种别", 种别)
   字典设置(tok, "值", 值)
   返回 tok
 
-定义 t 等于 创建令牌("数字", "42")
-定义 kind 等于 字典获取(t, "种别")
-定义 val 等于 字典获取(t, "值")
+设 t 为 创建令牌("数字", "42")
+设 kind 为 字典获取(t, "种别")
+设 val 为 字典获取(t, "值")
 '''
         ns, _ = _compile_and_run(source)
         assert ns['kind'] == '数字'
@@ -204,40 +204,40 @@ class TestBootstrapCodegen:
     def test_codegen_state_init(self):
         """测试代码生成器状态初始化"""
         source = '''段落 init_generator：
-  定义 state 等于 字典创建()
+  设 state 为 字典创建()
   字典设置(state, "lines", 列表创建())
   字典设置(state, "indent", 0)
   字典设置(state, "indent_str", "    ")
   返回 state
 
 段落 add_line 接收 state, line：
-  定义 lines 等于 字典获取(state, "lines")
-  定义 indent 等于 字典获取(state, "indent")
-  定义 indent_str 等于 字典获取(state, "indent_str")
-  定义 line_str 等于 转字符串(line)
-  定义 prefix 等于 ""
-  定义 i 等于 0
+  设 lines 为 字典获取(state, "lines")
+  设 indent 为 字典获取(state, "indent")
+  设 indent_str 为 字典获取(state, "indent_str")
+  设 line_str 为 转字符串(line)
+  设 prefix 为 ""
+  设 i 为 0
   当 i 小于 indent：
-    定义 prefix 等于 prefix 加 indent_str
-    定义 i 等于 i 加 1
+    设 prefix 为 prefix 加 indent_str
+    设 i 为 i 加 1
   列表追加(lines, prefix 加 line_str)
 
 段落 get_output 接收 state：
-  定义 lines 等于 字典获取(state, "lines")
-  定义 result 等于 ""
-  定义 i 等于 0
+  设 lines 为 字典获取(state, "lines")
+  设 result 为 ""
+  设 i 为 0
   当 i 小于 列表长度(lines)：
     如果 i 大于 0：
-      定义 result 等于 result 加 "\n"
-    定义 result 等于 result 加 列表获取(lines, i)
-    定义 i 等于 i 加 1
+      设 result 为 result 加 "\n"
+    设 result 为 result 加 列表获取(lines, i)
+    设 i 为 i 加 1
   返回 result
 
-定义 s 等于 init_generator()
+设 s 为 init_generator()
 add_line(s, "x = 1")
 add_line(s, "y = 2")
-定义 out 等于 get_output(s)
-定义 lines_count 等于 列表长度(字典获取(s, "lines"))
+设 out 为 get_output(s)
+设 lines_count 为 列表长度(字典获取(s, "lines"))
 '''
         ns, _ = _compile_and_run(source)
         assert ns['lines_count'] == 2
@@ -247,40 +247,40 @@ add_line(s, "y = 2")
     def test_codegen_indent(self):
         """测试代码生成器缩进"""
         source = '''段落 init_generator：
-  定义 state 等于 字典创建()
+  设 state 为 字典创建()
   字典设置(state, "lines", 列表创建())
   字典设置(state, "indent", 0)
   字典设置(state, "indent_str", "    ")
   返回 state
 
 段落 indent_push 接收 state：
-  定义 indent 等于 字典获取(state, "indent")
+  设 indent 为 字典获取(state, "indent")
   字典设置(state, "indent", indent 加 1)
 
 段落 indent_pop 接收 state：
-  定义 indent 等于 字典获取(state, "indent")
+  设 indent 为 字典获取(state, "indent")
   如果 indent 大于 0：
     字典设置(state, "indent", indent 减 1)
 
 段落 add_line 接收 state, line：
-  定义 lines 等于 字典获取(state, "lines")
-  定义 indent 等于 字典获取(state, "indent")
-  定义 indent_str 等于 字典获取(state, "indent_str")
-  定义 line_str 等于 转字符串(line)
-  定义 prefix 等于 ""
-  定义 i 等于 0
+  设 lines 为 字典获取(state, "lines")
+  设 indent 为 字典获取(state, "indent")
+  设 indent_str 为 字典获取(state, "indent_str")
+  设 line_str 为 转字符串(line)
+  设 prefix 为 ""
+  设 i 为 0
   当 i 小于 indent：
-    定义 prefix 等于 prefix 加 indent_str
-    定义 i 等于 i 加 1
+    设 prefix 为 prefix 加 indent_str
+    设 i 为 i 加 1
   列表追加(lines, prefix 加 line_str)
 
-定义 s 等于 init_generator()
+设 s 为 init_generator()
 add_line(s, "def f():")
 indent_push(s)
 add_line(s, "pass")
 indent_pop(s)
-定义 out 等于 列表获取(字典获取(s, "lines"), 1)
-定义 starts_with_spaces 等于 截取(out, 0, 4) 等于 "    "
+设 out 为 列表获取(字典获取(s, "lines"), 1)
+设 starts_with_spaces 为 截取(out, 0, 4) 等于 "    "
 '''
         ns, _ = _compile_and_run(source)
         assert ns['starts_with_spaces'] == True
@@ -296,9 +296,9 @@ indent_pop(s)
     返回 "_duan_builtin.列表长度"
   返回 name
 
-定义 m1 等于 map_builtin("打印")
-定义 m2 等于 map_builtin("列表创建")
-定义 m3 等于 map_builtin("自定义函数")
+设 m1 为 map_builtin("打印")
+设 m2 为 map_builtin("列表创建")
+设 m3 为 map_builtin("自定义函数")
 '''
         ns, _ = _compile_and_run(source)
         assert ns['m1'] == '_duan_builtin.打印'
@@ -338,13 +338,13 @@ class TestBootstrapParser:
     返回 真
   返回 假
 
-定义 t 等于 字典创建()
+设 t 为 字典创建()
 字典设置(t, "种别", "关键字")
 字典设置(t, "值", "设")
-定义 kind 等于 token_type(t)
-定义 val 等于 token_value(t)
-定义 is_set 等于 is_kw(t, "设")
-定义 is_ret 等于 is_kw(t, "返回")
+设 kind 为 token_type(t)
+设 val 为 token_value(t)
+设 is_set 为 is_kw(t, "设")
+设 is_ret 为 is_kw(t, "返回")
 '''
         ns, _ = _compile_and_run(source)
         assert ns['kind'] == '关键字'
@@ -363,20 +363,20 @@ class TestBootstrapIntegration:
     def test_simple_compile_pipeline(self):
         """测试简单编译流程模拟"""
         source = '''段落 简单编译 接收 src：
-  定义 lines 等于 列表创建()
+  设 lines 为 列表创建()
   列表追加(lines, "# Generated code")
   列表追加(lines, src)
-  定义 result 等于 ""
-  定义 i 等于 0
+  设 result 为 ""
+  设 i 为 0
   当 i 小于 列表长度(lines)：
     如果 i 大于 0：
-      定义 result 等于 result 加 "\n"
-    定义 result 等于 result 加 列表获取(lines, i)
-    定义 i 等于 i 加 1
+      设 result 为 result 加 "\n"
+    设 result 为 result 加 列表获取(lines, i)
+    设 i 为 i 加 1
   返回 result
 
-定义 code 等于 简单编译("x = 42")
-定义 has_header 等于 截取(code, 0, 16) 等于 "# Generated code"
+设 code 为 简单编译("x = 42")
+设 has_header 为 截取(code, 0, 16) 等于 "# Generated code"
 '''
         ns, _ = _compile_and_run(source)
         assert ns['has_header'] == True
@@ -384,15 +384,15 @@ class TestBootstrapIntegration:
     def test_ast_node_creation(self):
         """测试 AST 节点创建"""
         source = '''段落 make_var_decl 接收 name, value：
-  定义 node 等于 字典创建()
+  设 node 为 字典创建()
   字典设置(node, "类型", "变量声明")
   字典设置(node, "名称", name)
   字典设置(node, "值", value)
   返回 node
 
-定义 n 等于 make_var_decl("x", "42")
-定义 t 等于 字典获取(n, "类型")
-定义 name 等于 字典获取(n, "名称")
+设 n 为 make_var_decl("x", "42")
+设 t 为 字典获取(n, "类型")
+设 name 为 字典获取(n, "名称")
 '''
         ns, _ = _compile_and_run(source)
         assert ns['t'] == '变量声明'
@@ -477,7 +477,7 @@ class TestBootstrapSourceFiles:
         assert os.path.exists(path)
         with open(path, 'r', encoding='utf-8') as f:
             content = f.read()
-        assert '定义' in content
+        assert '设' in content
 
 
 if __name__ == '__main__':

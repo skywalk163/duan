@@ -61,6 +61,7 @@ class TokenType(Enum):
     # 管道操作符
     ARROW = auto()       # 箭头 ->
     PIPE = auto()        # 管道操作符（，或 ->）
+    WALRUS = auto()      # 海象运算符 := （不支持）
     
     # 结构
     INDENT = auto()      # 缩进增加

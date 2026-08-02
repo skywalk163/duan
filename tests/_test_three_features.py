@@ -692,13 +692,14 @@ class TestCompilerCore(unittest.TestCase):
     返回 甲 加 乙。
 结束。
 
-定义 结果 等于 加(三, 五)。
+设 结果 为 加(三, 五)。
 显示 结果。
 """
         # 验证源文件格式
         self.assertIn("段落", source)
         self.assertIn("结束", source)
-        self.assertIn("定义", source)
+        self.assertIn("设", source)
+        self.assertIn("为", source)
         # 模拟编译输出
         output = """
 # 段言编译输出
@@ -724,7 +725,7 @@ print(结果)
     结束。
 结束。
 
-定义 值 等于 获取值(真)。
+设 值 为 获取值(真)。
 显示 值!。
 """
         # 验证关键语法元素
@@ -739,7 +740,7 @@ print(结果)
 
 从 工具 导入 帮助。
 
-定义 结果 等于 数学.平方(四)。
+设 结果 为 数学.平方(四)。
 显示 结果。
 """
         self.assertIn("导入", source)

@@ -27,8 +27,8 @@ def generate_test_code(num_lines: int = 10000) -> str:
     """
     lines = []
     templates = [
-        "定义甲等于三。",
-        "定义乙等于五。",
+        "设甲为三。",
+        "设乙为五。",
         "打印 甲 加 乙。",
         "如果 甲 大于 乙：",
         "    打印 甲。",
@@ -40,8 +40,8 @@ def generate_test_code(num_lines: int = 10000) -> str:
         "    如果 数 小于等于 一：",
         "        返回 一。",
         "    返回 数 乘 计算阶乘 数减一。",
-        "定义列表等于[一, 二, 三, 四, 五]。",
-        "定义字典等于《键一》: 100, 《键二》: 200。",
+        "设列表为[一, 二, 三, 四, 五]。",
+        "设字典为《键一》: 100, 《键二》: 200。",
         "打印\"你好，世界！\"。",
         "设 结果 为 甲 加 乙 乘 三。",
     ]
@@ -85,14 +85,14 @@ class TestLexerPerformance(unittest.TestCase):
 
     def test_lexer_correctness_smoke(self):
         """性能测试前的正确性冒烟测试"""
-        test_code = "定义甲等于三。打印 甲 加 五。"
+        test_code = "设甲为三。打印 甲 加 五。"
         lexer = self.Lexer(test_code)
         tokens = lexer.tokenize()
 
         token_values = [t.value for t in tokens]
 
-        self.assertIn('定义', token_values)
-        self.assertIn('等于', token_values)
+        self.assertIn('设', token_values)
+        self.assertIn('为', token_values)
         self.assertIn(3, token_values)
         self.assertIn('打印', token_values)
         self.assertIn('加', token_values)

@@ -11,5 +11,5 @@
 # main: invoked from Python wrapper (run_compiler.py)
 # Takes a filepath and optionally an output path
 段落 main 接收 filepath：
-  定义 py_code 等于 compile_file(filepath)
+  设 py_code 为 compile_file(filepath)
   打印(py_code)

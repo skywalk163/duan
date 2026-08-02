@@ -30,7 +30,7 @@ class TestCompilerCache:
         _compile_cache.clear()
 
         source_file = tmp_path / "test_cache.duan"
-        source_file.write_text('定义 x 等于 123。', encoding='utf-8')
+        source_file.write_text('设 x 为 123。', encoding='utf-8')
         return str(source_file)
 
     def test_cache_hit_returns_same_result(self, temp_source_file):
@@ -83,14 +83,14 @@ class TestCompilerCache:
         # 修改文件内容
         time.sleep(0.1)  # 确保 mtime 有变化
         with open(temp_source_file, 'w', encoding='utf-8') as f:
-            f.write('定义 y 等于 456。')
+            f.write('设 y 为 456。')
 
         # 第二次编译（应该重新编译）
         result2 = compile_file(temp_source_file)
 
         # 验证返回的是不同对象（文件已修改）
         assert result1 is not result2
-        assert result2['source'] == '定义 y 等于 456。'
+        assert result2['source'] == '设 y 为 456。'
 
     def test_cache_uses_absolute_path(self, tmp_path):
         """测试缓存使用绝对路径作为 key"""

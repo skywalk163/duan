@@ -21,16 +21,16 @@ def test_basic_keywords():
     """测试基本关键字识别"""
     lexer = Lexer()
     
-    # 测试双字关键字（决策27：使用"等于"而非"为"）
-    tokens = lexer.tokenize("定义甲等于三。")
-    print("测试1: 定义甲等于三。")
+    # 测试赋值关键字"设"（旧"定义"已迁移为"设"）
+    tokens = lexer.tokenize("设甲为三。")
+    print("测试1: 设甲为三。")
     for tok in tokens:
         if tok.type != TokenType.EOF:
             print(f"  {tok}")
     
     assert tokens[0].type == TokenType.KEYWORD
-    assert tokens[0].value == "定义"
-    print("  [OK] '定义' 被正确识别为关键字")
+    assert tokens[0].value == "设"
+    print("  [OK] '设' 被正确识别为关键字")
     
     assert tokens[1].type == TokenType.IDENTIFIER
     assert tokens[1].value == "甲"
@@ -189,9 +189,9 @@ def test_complex_expression():
     """测试复杂表达式"""
     lexer = Lexer()
     
-    # 定义甲等于三加五。
-    tokens = lexer.tokenize("定义甲等于三加五。")
-    print("测试8: 定义甲等于三加五。")
+    # 设甲为三加五。
+    tokens = lexer.tokenize("设甲为三加五。")
+    print("测试8: 设甲为三加五。")
     for tok in tokens:
         if tok.type != TokenType.EOF and tok.type not in (TokenType.NEWLINE,):
             print(f"  {tok}")
@@ -199,8 +199,8 @@ def test_complex_expression():
     keywords = [t.value for t in tokens if t.type == TokenType.KEYWORD]
     print(f"  识别到的关键字: {keywords}")
     
-    assert "定义" in keywords
-    assert "等于" in keywords
+    assert "设" in keywords
+    assert "为" in keywords
     assert "加" in keywords
     print("  [OK] 复杂表达式被正确解析")
     

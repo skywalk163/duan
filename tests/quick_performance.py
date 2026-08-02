@@ -21,7 +21,7 @@ print("=" * 60)
 # 测试1：词法分析器
 print("\n[测试1] 词法分析器 - 简单变量")
 lexer = Lexer()
-code = '定义甲等于123。'
+code = '设甲为123。'
 
 start = time.time()
 for _ in range(1000):

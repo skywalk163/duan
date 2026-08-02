@@ -309,12 +309,13 @@ class Pipeline(ASTNode):
 
 
 class ImportStmt(ASTNode):
-    __slots__ = ('module_name', 'symbols', 'alias')
+    __slots__ = ('module_name', 'symbols', 'alias', 'extra_modules')
     """导入语句"""
-    def __init__(self, module_name: str, symbols: List[str] = None, alias: str = None):
+    def __init__(self, module_name: str, symbols: List[str] = None, alias: str = None, extra_modules: list = None):
         self.module_name = module_name
         self.symbols = symbols
         self.alias = alias
+        self.extra_modules = extra_modules or []  # 多模块导入时的额外模块 [(module_name, alias), ...]
     
     def __repr__(self):
         if self.symbols:

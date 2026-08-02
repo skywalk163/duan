@@ -34,6 +34,14 @@ class ParserExprMixin:
     
     def _parse_expr(self) -> ASTNode:
         """解析表达式（支持管道操作符、逻辑运算符和后置三元）"""
+        # 明确标注不支持的特性（P1-3）：海象运算符 :=
+        if self._match(TokenType.WALRUS):
+            tok = self._current()
+            self._error(
+                "段言不支持海象运算符 ':='。请使用「设」语句声明变量后再使用。",
+                tok.line, tok.col
+            )
+        
         left = self._parse_logical_expr()
         
         # 后置三元表达式：值 如果 条件 否则 值
@@ -65,6 +73,14 @@ class ParserExprMixin:
     
     def _parse_logical_expr(self) -> ASTNode:
         """解析逻辑表达式（且/与, 或）"""
+        # 明确标注不支持的特性（P1-3）：海象运算符 :=
+        if self._match(TokenType.WALRUS):
+            tok = self._current()
+            self._error(
+                "段言不支持海象运算符 ':='。请使用「设」语句声明变量后再使用。",
+                tok.line, tok.col
+            )
+        
         left = self._parse_comparison()
         
         while self._current() and not self._is_expr_terminator():
@@ -87,6 +103,12 @@ class ParserExprMixin:
         
         while self._current() and not self._is_expr_terminator():
             tok = self._current()
+            # 明确标注不支持的特性（P1-3）：海象运算符 :=
+            if tok.type == TokenType.WALRUS:
+                self._error(
+                    "段言不支持海象运算符 ':='。请使用「设」语句声明变量后再使用。",
+                    tok.line, tok.col
+                )
             # 遇到"那么"关键字，停止解析
             if tok.type == TokenType.KEYWORD and tok.value == '那么':
                 break
@@ -512,7 +534,8 @@ class ParserExprMixin:
                     # 无括号式：列 参数1 参数2 参数3
                     while self._current():
                         next_tok = self._current()
-                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET,
+                                             TokenType.NEWLINE, TokenType.DEDENT, TokenType.INDENT):
                             break
                         if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                             break
@@ -2075,8 +2098,19 @@ class ParserExprMixin:
                     is_dot_access = True
                 # 中文句号(。)是语句结束符，不进行成员访问
 
-            # 「的」或「之」作为属性访问运算符
-            if not is_dot_access and tok.type == TokenType.KEYWORD and tok.value in ('的', '之'):
+            # 「的」作为段言原生属性访问运算符
+            # 「.」用于 FFI/外部库调用（如 requests.get）
+            # 「之」已从成员访问中废弃，仅保留在推导式中作为循环引导符
+            if not is_dot_access and tok.type == TokenType.KEYWORD and tok.value == '的':
+                is_dot_access = True
+            elif not is_dot_access and tok.type == TokenType.KEYWORD and tok.value == '之':
+                # 检查是否在推导式上下文中（之 列表/之 集合 等）
+                # 如果不在推导式上下文，发出废弃警告
+                import warnings
+                warnings.warn(
+                    f"「之」作为成员访问符已废弃，请改用「的」。如：对象.属性 → 对象的属性",
+                    DeprecationWarning, stacklevel=2
+                )
                 is_dot_access = True
 
             if is_dot_access:

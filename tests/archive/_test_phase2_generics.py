@@ -44,7 +44,7 @@ def run(name, fn):
 # =====================================================================
 
 def test_generic_segment_simple_map():
-    """段落 映射<T> 接收 元素: T, 函数: T->T -> T   调用时自动推断 T=数"""
+    """段落 映射<T>(元素): T, 函数: T->T -> T   调用时自动推断 T=数"""
     # 定义：映射<T>(元素: T, 函数: T->T) -> T
     seg = SegmentDefinition(
         name='映射',
@@ -405,7 +405,7 @@ register('泛型类-方法调用参数类型检查', test_generic_class_method_c
 # =====================================================================
 
 def test_combo_generic_function_with_generic_class():
-    """段落 映射<T> 接收 列表: 列表[T], 函数: T->T -> 列表[T]"""
+    """段落 映射<T>(列表): 列表[T], 函数: T->T -> 列表[T]"""
     seg = SegmentDefinition(
         name='映射',
         parameters=[

@@ -40,7 +40,7 @@ class TestCompilerPipeline(unittest.TestCase):
     def test_variable_compile(self):
         """测试变量声明编译"""
         compiler = self.Compiler()
-        code = '定义 x 等于 123'
+        code = '设 x 为 123'
         try:
             result = compiler.compile(code)
             self.assertIsNotNone(result)

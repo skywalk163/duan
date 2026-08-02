@@ -74,6 +74,14 @@ class ParserStmtMixin:
                 self._consume(TokenType.DOT)
                 continue
 
+            # 跳过模块顶层的"结束"关键字（可选的块终止符）
+            if tok.type == TokenType.KEYWORD and tok.value == '结束':
+                self._consume(TokenType.KEYWORD, '结束')
+                continue
+            if tok.type == TokenType.IDENTIFIER and tok.value == '结束':
+                self._consume(TokenType.IDENTIFIER, '结束')
+                continue
+
             stmt = self._parse_statement()
             if stmt:
                 statements.append(stmt)
@@ -240,14 +248,17 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '等待':
             return self._parse_expr_stmt()
         
-        # 段落定义：段落 段名 接收 参数
+        # 段落定义：段落/段 段名 接收 参数
         # 注意：段落调用（段落段名(参数)）由表达式解析器处理
-        if tok.type == TokenType.KEYWORD and tok.value == '段落':
-            # 检查后面是否是段名后跟括号（段落调用）
+        if tok.type == TokenType.KEYWORD and tok.value in ('段落', '段'):
+            # 检查后面是否是段名后跟括号
             next_tok = self._peek(1)
             second_tok = self._peek(2)
             if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD) \
                     and second_tok and second_tok.type == TokenType.LPAREN:
+                # 向前扫描：找到匹配的 ) 后，如果紧跟 : 则是段落定义，否则是段落调用
+                if self._is_paragraph_definition():
+                    return self._parse_paragraph_v2()
                 # 这是段落调用，作为表达式语句处理
                 return self._parse_expr_stmt()
             # 否则作为段落定义处理
@@ -303,11 +314,45 @@ class ParserStmtMixin:
         if tok.type == TokenType.AT:
             return self._parse_decorator()
         
+        # 明确标注不支持的特性（P1-3）：async / await 关键字
+        if tok.type == TokenType.IDENTIFIER and tok.value == 'async':
+            self._error(
+                "段言不支持 'async' 关键字。请使用「异步」替代，例如：异步 段落 段名()。",
+                tok.line, tok.col
+            )
+        if tok.type == TokenType.IDENTIFIER and tok.value == 'await':
+            self._error(
+                "段言不支持 'await' 关键字。请使用「等待」替代，例如：等待 异步调用()。",
+                tok.line, tok.col
+            )
+        
         # 赋值语句：标识符 等于 值。
         if tok.type == TokenType.IDENTIFIER:
             return self._parse_assignment_stmt()
 
-        return None
+        # 书名号（《）作为段落定义或表达式语句
+        if tok.type == TokenType.LBOOK:
+            saved_pos = self.pos
+            self._consume(TokenType.LBOOK)
+            name_tok = self._current()
+            if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                name = self._consume().value
+                if self._match(TokenType.RBOOK):
+                    self._consume(TokenType.RBOOK)
+                    # 检查后面是否是 段 或 段落（段落定义关键字）
+                    if self._match(TokenType.KEYWORD, '段') or self._match(TokenType.KEYWORD, '段落'):
+                        self._consume()  # 消耗 段/段落
+                        return self._parse_paragraph_v2(name=name)
+            # 回退并作为表达式语句处理
+            self.pos = saved_pos
+            return self._parse_expr_stmt()
+
+        # 未知语法：报错而非静默失败
+        self._error(
+            f"无法识别的语法元素：'{tok.value}'（类型：{tok.type}）。"
+            f"请检查语句是否正确，或参考段言语法文档。",
+            tok.line, tok.col, tok.value
+        )
 
     def _parse_expr_stmt(self) -> ASTNode:
         """解析表达式语句（动词调用等）"""
@@ -840,57 +885,101 @@ class ParserStmtMixin:
         
         语法：
         1. 导入 模块名。
-        2. 导入《模块名》。
-        3. 导入 模块名 为 别名。
-        4. 导入《模块名》为 别名。
+        2. 导入 模块名 为 别名。
+        3. 导入 模块名一，模块名二。
+        4. 导入 模块名一 为 别名一，模块名二 为 别名二。
+        5. 导入《模块名》。
+        6. 导入《模块名》为 别名。
+        7. 导入 子模块名.符号 从 模块名（倒装形式）。
         """
         # 导入
         self._consume(TokenType.KEYWORD, '导入')
         
-        # 模块名（可以是标识符、关键字或书名号包裹）
-        module_name = None
-        if self._match(TokenType.LBOOK):
-            # 书名号语法：《模块名》
-            self._consume(TokenType.LBOOK)
-            name_tok = self._consume(TokenType.IDENTIFIER)
-            module_name = name_tok.value
-            self._consume(TokenType.RBOOK)
-        else:
-            # 简单语法：模块名（可以是标识符或关键字）
-            tok = self._current()
-            if tok.type == TokenType.IDENTIFIER:
-                module_name = self._consume(TokenType.IDENTIFIER).value
-            elif tok.type == TokenType.KEYWORD:
-                module_name = self._consume(TokenType.KEYWORD).value
-            else:
-                self._error(f"期望模块名，但得到 {tok.type} = '{tok.value}'（建议：使用「从 模块名 导入 名称。」语法）", tok.line, tok.col)
+        # 收集所有导入的模块（支持多模块）
+        module_entries = []  # [(module_name, alias), ...]
         
-        # 检查是否有别名：为
-        alias = None
-        if self._match(TokenType.KEYWORD, '为'):
-            self._consume(TokenType.KEYWORD, '为')
-            alias_tok = self._consume(TokenType.IDENTIFIER)
-            alias = alias_tok.value
+        while True:
+            # 模块名（可以是标识符、关键字或书名号包裹）
+            module_name = None
+            if self._match(TokenType.LBOOK):
+                # 书名号语法：《模块名》
+                self._consume(TokenType.LBOOK)
+                name_tok = self._consume(TokenType.IDENTIFIER)
+                module_name = name_tok.value
+                self._consume(TokenType.RBOOK)
+            else:
+                # 简单语法：模块名（支持点号分隔的路径，如 系统.路径）
+                tok = self._current()
+                if tok.type == TokenType.IDENTIFIER:
+                    module_name = self._consume(TokenType.IDENTIFIER).value
+                elif tok.type == TokenType.KEYWORD:
+                    module_name = self._consume(TokenType.KEYWORD).value
+                else:
+                    self._error(f"期望模块名，但得到 {tok.type} = '{tok.value}'（建议：使用「从 模块名 导入 名称。」语法）", tok.line, tok.col)
+                
+                # 支持点号分隔的模块路径：os.path → os.path
+                while self._current() and self._current().type == TokenType.DOT:
+                    dot = self._consume(TokenType.DOT)
+                    next_tok = self._current()
+                    if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        part = self._consume().value
+                        module_name += '.' + part
+                    else:
+                        # 遇到句号但后面不是标识符，回退
+                        self.pos -= 1
+                        break
+            
+            # 检查是否有别名：为
+            alias = None
+            if self._match(TokenType.KEYWORD, '为'):
+                self._consume(TokenType.KEYWORD, '为')
+                alias_tok = self._consume(TokenType.IDENTIFIER)
+                alias = alias_tok.value
+            
+            module_entries.append((module_name, alias))
+            
+            # 检查是否还有逗号分隔的更多模块
+            if self._current() and self._current().type == TokenType.COMMA:
+                self._consume(TokenType.COMMA)
+                continue
+            else:
+                break
         
         # 检查是否是 "导入 符号 从 模块" 语法（from import 的倒装形式）
         if self._match(TokenType.KEYWORD, '从'):
             self._consume(TokenType.KEYWORD, '从')
-            # 读取真正的模块名
+            # 读取真正的模块名（支持点号分隔路径）
+            real_module = ''
             real_module_tok = self._current()
-            if real_module_tok and real_module_tok.type == TokenType.IDENTIFIER:
-                real_module = self._consume(TokenType.IDENTIFIER).value
-            elif real_module_tok and real_module_tok.type == TokenType.KEYWORD:
-                real_module = self._consume(TokenType.KEYWORD).value
+            if real_module_tok and real_module_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                real_module = self._consume().value
+                # 支持点号分隔的模块路径
+                while self._current() and self._current().type == TokenType.DOT:
+                    self._consume(TokenType.DOT)
+                    next_tok = self._current()
+                    if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        real_module += '.' + self._consume().value
+                    else:
+                        self.pos -= 1
+                        break
             else:
-                real_module = module_name
+                real_module = module_entries[0][0] if module_entries else ''
             # module_name 实际上是导入的符号
-            return ImportStmt(real_module, symbols=[module_name], alias=alias)
+            symbols = [m[0] for m in module_entries]
+            return ImportStmt(real_module, symbols=symbols, alias=module_entries[0][1] if module_entries else None)
         
         # 句号（可选）
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
         
-        return ImportStmt(module_name, symbols=None, alias=alias)
+        # 多模块导入：返回第一个模块的导入语句
+        if len(module_entries) == 1:
+            return ImportStmt(module_entries[0][0], symbols=None, alias=module_entries[0][1])
+        else:
+            # 多模块导入：返回第一个模块，标记额外模块
+            extra_modules = [(m, a) for m, a in module_entries[1:]]
+            return ImportStmt(module_entries[0][0], symbols=None, alias=module_entries[0][1],
+                            extra_modules=extra_modules)
     
     def _parse_from_import_stmt(self) -> ImportStmt:
         """解析从...导入语句
@@ -903,7 +992,7 @@ class ParserStmtMixin:
         # 从
         self._consume(TokenType.KEYWORD, '从')
         
-        # 模块名（可以是标识符、关键字或书名号包裹）
+        # 模块名（支持点号分隔的路径，如 系统.路径）
         module_name = None
         if self._match(TokenType.LBOOK):
             # 书名号语法：《模块名》
@@ -920,6 +1009,18 @@ class ParserStmtMixin:
                 module_name = self._consume(TokenType.KEYWORD).value
             else:
                 self._error(f"期望模块名，但得到 {tok.type} = '{tok.value}'（建议：使用「从 模块名 导入 名称。」语法）", tok.line, tok.col)
+            
+            # 支持点号分隔的模块路径：os.path → os.path
+            while self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+                next_tok = self._current()
+                if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    part = self._consume().value
+                    module_name += '.' + part
+                else:
+                    # 遇到句号但后面不是标识符，回退
+                    self.pos -= 1
+                    break
         
         # 导入
         self._consume(TokenType.KEYWORD, '导入')
@@ -1294,48 +1395,15 @@ class ParserStmtMixin:
         return ExportStmt(symbols)
     
     def _parse_var_decl(self) -> VarDecl:
-        """解析变量声明"""
-        # 定义
-        self._consume(TokenType.KEYWORD, '定义')
+        """解析变量声明（已移除的语法：定义 x 等于 y）
 
-        # 标识符（允许 KEYWORD 作为变量名）
-        name_tok = self._current()
-        if name_tok is None:
-            self._error("期望标识符，但到达输入结束")
-
-        # 允许 KEYWORD 或 IDENTIFIER 作为变量名
-        if name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-            self._consume()
-            name = name_tok.value
-        else:
-            self._error(f"期望标识符，得到 {name_tok.type}", name_tok.line, name_tok.col, name_tok.value)
-
-        # 类型注解（可选）：定义 变量: 类型 等于 值
-        type_annotation = None
-        if self._current() and self._current().type == TokenType.COLON:
-            self._consume(TokenType.COLON)
-            type_tok = self._current()
-            if type_tok and type_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                type_annotation = self._consume().value
-
-        # 等于/为（支持两种赋值关键字）
-        if self._match(TokenType.KEYWORD, '等于'):
-            self._consume(TokenType.KEYWORD, '等于')
-        elif self._match(TokenType.KEYWORD, '为'):
-            self._consume(TokenType.KEYWORD, '为')
-        else:
-            tok = self._current()
-            self._error(f"期望'等于'或'为'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
-                             tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None)
-
-        # 表达式
-        value = self._parse_expr()
-
-        # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
-
-        return VarDecl(name, value, type_annotation=type_annotation)
+        此语法已从段言语法中移除。请使用「设 x 为 y」替代。
+        """
+        tok = self._current()
+        self._error(
+            f"语法「定义 x 等于 y」已移除，请改用「设 x 为 y」。如需定义类属性，请使用类定义语法。",
+            tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None
+        )
     
     def _parse_if_stmt(self) -> IfStmt:
         """解析条件语句（循环实现，支持任意深度嵌套）"""
@@ -1359,6 +1427,28 @@ class ParserStmtMixin:
         
         if self._current() and self._current().type == TokenType.DOT:
             self._consume(TokenType.DOT)
+        
+        # 单行体：如果 条件 那么 语句。  （无冒号，无换行）
+        if self._current() and self._current().type not in (TokenType.COLON, TokenType.LBRACE, TokenType.NEWLINE):
+            then_body = [self._parse_statement()]
+            # 处理 否则 / 否则如果 链
+            result = IfStmt(condition, then_body, None)
+            current = result
+            while self._current() and self._match(TokenType.KEYWORD, '否则'):
+                self._consume(TokenType.KEYWORD, '否则')
+                if self._match(TokenType.KEYWORD, '如果'):
+                    self._consume(TokenType.KEYWORD, '如果')
+                    elif_condition = self._parse_expr()
+                    if self._match(TokenType.KEYWORD, '那么'):
+                        self._consume(TokenType.KEYWORD, '那么')
+                    elif_body = [self._parse_statement()]
+                    current.else_body = IfStmt(elif_condition, elif_body, None)
+                    current = current.else_body
+                else:
+                    else_body = [self._parse_statement()]
+                    current.else_body = else_body
+                    break
+            return result
         
         # C风格花括号体：如果(cond){body} 否则{body} 否则如果(cond){body}
         if self._current() and self._current().type == TokenType.LBRACE:
@@ -1959,33 +2049,78 @@ class ParserStmtMixin:
             self._consume(TokenType.DOT)
         
         return ThrowStmt(value, from_expr)
-    def _parse_paragraph_v2(self) -> Paragraph:
-        """解析段落定义：段落 段名 接收 参数1, 参数2："""
-        self._consume(TokenType.KEYWORD, '段落')
+    def _is_paragraph_definition(self) -> bool:
+        """向前扫描，判断 段落 主(...) 是段落定义还是段落调用。
         
-        name_tok = self._current()
-        name_parts = []
-        if name_tok and name_tok.type == TokenType.IDENTIFIER:
-            name_parts.append(self._consume(TokenType.IDENTIFIER).value)
-        elif name_tok and name_tok.type == TokenType.CHINESE_NUM:
-            name_parts.append(str(self._consume(TokenType.CHINESE_NUM).value))
-        elif name_tok and name_tok.type == TokenType.KEYWORD:
-            name_parts.append(self._consume(TokenType.KEYWORD).value)
-        else:
-            self._error(f"期望标识符作为段名，但得到 {name_tok.type if name_tok else '输入结束'}", name_tok.line if name_tok else 0, name_tok.col if name_tok else 0, name_tok.value if name_tok else None)
+        段落定义：段落 主()： 或 段落 主(参数1, 参数2)：
+        段落调用：段落 主()  （无冒号）
         
-        while self._current():
-            next_tok = self._current()
-            if next_tok.type == TokenType.IDENTIFIER:
+        从当前token（段落/段关键字）开始，扫描到匹配的 ) 后检查是否有 :。
+        """
+        # 当前位置是 段落/段 关键字，后面是 段名(参数...)
+        # 从段名后的 ( 开始扫描，找到匹配的 )
+        pos = self.pos
+        # 跳过 段落/段 关键字
+        idx = pos
+        # 跳过段名
+        idx += 1
+        # 现在 idx 应该指向 (
+        if idx >= len(self.tokens):
+            return False
+        # 向前扫描，找匹配的 )
+        paren_depth = 0
+        while idx < len(self.tokens):
+            t = self.tokens[idx]
+            if t.type == TokenType.LPAREN:
+                paren_depth += 1
+            elif t.type == TokenType.RPAREN:
+                paren_depth -= 1
+                if paren_depth == 0:
+                    # 找到匹配的 )，检查下一个token是否是 :
+                    next_idx = idx + 1
+                    if next_idx < len(self.tokens):
+                        next_t = self.tokens[next_idx]
+                        return next_t.type == TokenType.COLON
+                    return False
+            idx += 1
+        return False
+    
+    def _parse_paragraph_v2(self, name: str = None) -> Paragraph:
+        """解析段落定义：段落/段 段名 接收 参数1, 参数2："""
+        if name is None:
+            # 消耗 段落 或 段 关键字
+            if self._match(TokenType.KEYWORD, '段落'):
+                self._consume(TokenType.KEYWORD, '段落')
+            elif self._match(TokenType.KEYWORD, '段'):
+                self._consume(TokenType.KEYWORD, '段')
+            else:
+                tok = self._current()
+                self._error(f"期望'段落'或'段'关键字，但得到 {tok.type if tok else '输入结束'}",
+                                 tok.line if tok else 0, tok.col if tok else 0)
+        
+            name_tok = self._current()
+            name_parts = []
+            if name_tok and name_tok.type == TokenType.IDENTIFIER:
                 name_parts.append(self._consume(TokenType.IDENTIFIER).value)
-            elif next_tok.type == TokenType.CHINESE_NUM:
+            elif name_tok and name_tok.type == TokenType.CHINESE_NUM:
                 name_parts.append(str(self._consume(TokenType.CHINESE_NUM).value))
-            elif next_tok.type == TokenType.KEYWORD and next_tok.value not in ('接收', '返回'):
+            elif name_tok and name_tok.type == TokenType.KEYWORD:
                 name_parts.append(self._consume(TokenType.KEYWORD).value)
             else:
-                break
-        
-        name = ''.join(name_parts)
+                self._error(f"期望标识符作为段名，但得到 {name_tok.type if name_tok else '输入结束'}", name_tok.line if name_tok else 0, name_tok.col if name_tok else 0, name_tok.value if name_tok else None)
+            
+            while self._current():
+                next_tok = self._current()
+                if next_tok.type == TokenType.IDENTIFIER:
+                    name_parts.append(self._consume(TokenType.IDENTIFIER).value)
+                elif next_tok.type == TokenType.CHINESE_NUM:
+                    name_parts.append(str(self._consume(TokenType.CHINESE_NUM).value))
+                elif next_tok.type == TokenType.KEYWORD and next_tok.value not in ('接收', '返回'):
+                    name_parts.append(self._consume(TokenType.KEYWORD).value)
+                else:
+                    break
+            
+            name = ''.join(name_parts)
         
         generic_params = []
         if self._current() and self._current().type == TokenType.LBRACKET:
@@ -2001,7 +2136,71 @@ class ParserStmtMixin:
                 self._consume(TokenType.RBRACKET)
         
         params = []
-        if self._match(TokenType.KEYWORD, '接收'):
+        # 支持括号式参数：段名(参数1, 参数2)： 或 《段名》段(参数1, 参数2)：
+        if self._match(TokenType.LPAREN):
+            self._consume(TokenType.LPAREN)
+            _stmt_keywords_paren = {'设', '定义', '当', '如果', '若', '遍历', '返回', '打印', '导入', '导出', '跳出', '跳过', '尝试', '抛出', '匹配'}
+            while self._current() and self._current().type != TokenType.RPAREN:
+                tok = self._current()
+                if tok.type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                    continue
+                if tok.type == TokenType.IDENTIFIER:
+                    param_name = self._consume(TokenType.IDENTIFIER).value
+                    param_type = None
+                    # 检查类型注解：参数名: 类型
+                    if self._current() and self._current().type == TokenType.COLON:
+                        next_tok = self._peek(1)
+                        if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            self._consume(TokenType.COLON)
+                            param_type = self._consume().value
+                    params.append({'name': param_name, 'type': param_type})
+                elif tok.type == TokenType.KEYWORD and tok.value not in _stmt_keywords_paren:
+                    param_name = self._consume(TokenType.KEYWORD).value
+                    param_type = None
+                    if self._current() and self._current().type == TokenType.COLON:
+                        next_tok = self._peek(1)
+                        if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            self._consume(TokenType.COLON)
+                            param_type = self._consume().value
+                    params.append({'name': param_name, 'type': param_type})
+                else:
+                    break
+            self._consume(TokenType.RPAREN)
+            # 支持括号外的参数类型标注：(a):整数, b:整数
+            param_idx = 0
+            _type_annotation_keywords = {'返回', '设', '定义', '当', '如果', '若', '遍历', '打印', '导入', '导出', '跳出', '跳过', '尝试', '抛出', '匹配', '异步', '等待'}
+            while (self._current() and self._current().type == TokenType.COLON
+                   and param_idx < len(params)):
+                next_tok = self._peek(1)
+                if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD, TokenType.CHINESE_NUM) \
+                        and not (next_tok.type == TokenType.KEYWORD and next_tok.value in _type_annotation_keywords):
+                    next_next = self._peek(2)
+                    if next_next and next_next.type == TokenType.NEWLINE:
+                        break  # 段落体冒号
+                    self._consume(TokenType.COLON)
+                    type_tok = self._current()
+                    if type_tok and type_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD, TokenType.CHINESE_NUM):
+                        params[param_idx]['type'] = self._consume().value
+                    param_idx += 1
+                    if self._current() and self._current().type == TokenType.COMMA:
+                        self._consume(TokenType.COMMA)
+                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                            if param_idx < len(params):
+                                param_idx += 1
+                            else:
+                                extra_name = self._consume().value
+                                params.append({'name': extra_name, 'type': None})
+                else:
+                    break
+        elif self._match(TokenType.KEYWORD, '接收'):
+            # 旧式参数语法：接收 参数1, 参数2
+            # 已废弃，推荐使用括号式：段落 名(参数1, 参数2)：
+            import warnings
+            warnings.warn(
+                f"语法「段落 名 接收 参数」已废弃，请改用「段落 名(参数)」。在未来的版本中将移除「接收」关键字。",
+                DeprecationWarning, stacklevel=2
+            )
             self._consume(TokenType.KEYWORD, '接收')
             
             _stmt_keywords = {'设', '定义', '当', '如果', '若', '遍历', '返回', '打印', '导入', '导出', '跳出', '跳过', '尝试', '抛出', '匹配'}
@@ -2310,6 +2509,12 @@ class ParserStmtMixin:
             # 类/接口定义（在body中遇到的，作为嵌套处理）- 仅在 depth==0 时停止
             if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('类', '接口'):
                 break
+
+            # 跳过孤立的句号（块结束后的可选终止符）
+            if tok.type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+                continue
+
             if stop_on_paragraph and depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '段落':
                 # 检查后面是否是段名后跟括号（段落调用）
                 next_tok = self._peek(1)
@@ -3121,6 +3326,10 @@ class ParserStmtMixin:
         # 接口体
         methods = []
         properties = []
+        
+        # 跳过 NEWLINE（冒号后可能有换行）
+        while self._current() and self._current().type == TokenType.NEWLINE:
+            self._consume(TokenType.NEWLINE)
         
         # 解析接口体（依赖 INDENT/DEDENT 结构）
         # 首先检查是否有 INDENT（表示有接口体）

@@ -46,37 +46,37 @@ class TestStdlibList(unittest.TestCase):
 
     def test_list_append(self):
         """测试列表追加"""
-        code = '定义 列表 为 [1, 2, 3]。\n列表追加(列表, 4)。\n打印 列表。'
+        code = '设 列表 为 [1, 2, 3]。\n列表追加(列表, 4)。\n打印 列表。'
         output = self._run_code(code)
         self.assertIn('4', output)
 
     def test_list_length(self):
         """测试列表长度"""
-        code = '定义 列表 为 [1, 2, 3, 4, 5]。\n打印 列表长度(列表)。'
+        code = '设 列表 为 [1, 2, 3, 4, 5]。\n打印 列表长度(列表)。'
         output = self._run_code(code)
         self.assertEqual(output, '5')
 
     def test_list_contains(self):
         """测试列表包含"""
-        code = '定义 列表 为 [1, 2, 3]。\n打印 列表包含(列表, 2)。'
+        code = '设 列表 为 [1, 2, 3]。\n打印 列表包含(列表, 2)。'
         output = self._run_code(code)
         self.assertIn('True', output)
 
     def test_list_sort(self):
         """测试列表排序"""
-        code = '定义 列表 为 [3, 1, 2]。\n列表排序(列表)。\n打印 列表。'
+        code = '设 列表 为 [3, 1, 2]。\n列表排序(列表)。\n打印 列表。'
         output = self._run_code(code)
         self.assertIn('[1, 2, 3]', output)
 
     def test_list_reverse(self):
         """测试列表反转"""
-        code = '定义 列表 为 [1, 2, 3]。\n列表反转(列表)。\n打印 列表。'
+        code = '设 列表 为 [1, 2, 3]。\n列表反转(列表)。\n打印 列表。'
         output = self._run_code(code)
         self.assertIn('[3, 2, 1]', output)
 
     def test_list_pop(self):
         """测试列表弹出"""
-        code = '定义 列表 为 [1, 2, 3]。\n定义 x 为 列表弹出(列表)。\n打印 x。'
+        code = '设 列表 为 [1, 2, 3]。\n设 x 为 列表弹出(列表)。\n打印 x。'
         output = self._run_code(code)
         self.assertEqual(output, '3')
 
@@ -111,31 +111,31 @@ class TestStdlibString(unittest.TestCase):
 
     def test_string_length(self):
         """测试字符串长度"""
-        code = '定义 s 为 "你好世界"。\n打印 字符串长度(s)。'
+        code = '设 s 为 "你好世界"。\n打印 字符串长度(s)。'
         output = self._run_code(code)
         self.assertEqual(output, '4')
 
     def test_string_substring(self):
         """测试字符串截取"""
-        code = '定义 s 为 "你好世界"。\n打印 截取(s, 0, 2)。'
+        code = '设 s 为 "你好世界"。\n打印 截取(s, 0, 2)。'
         output = self._run_code(code)
         self.assertEqual(output, '你好')
 
     def test_string_replace(self):
         """测试字符串替换"""
-        code = '定义 s 为 "你好世界"。\n打印 替换字符串(s, "世界", "段言")。'
+        code = '设 s 为 "你好世界"。\n打印 替换字符串(s, "世界", "段言")。'
         output = self._run_code(code)
         self.assertEqual(output, '你好段言')
 
     def test_string_split(self):
         """测试字符串分割"""
-        code = '定义 s 为 "a,b,c"。\n定义 parts 为 分割字符串(s, ",")。\n打印 列表长度(parts)。'
+        code = '设 s 为 "a,b,c"。\n设 parts 为 分割字符串(s, ",")。\n打印 列表长度(parts)。'
         output = self._run_code(code)
         self.assertEqual(output, '3')
 
     def test_string_strip(self):
         """测试去除空白"""
-        code = '定义 s 为 "  你好  "。\n打印 去除空白(s)。'
+        code = '设 s 为 "  你好  "。\n打印 去除空白(s)。'
         output = self._run_code(code)
         self.assertEqual(output, '你好')
 
@@ -176,19 +176,19 @@ class TestStdlibMath(unittest.TestCase):
 
     def test_sum(self):
         """测试求和"""
-        code = '定义 列表 为 [1, 2, 3, 4, 5]。\n打印 求和(列表)。'
+        code = '设 列表 为 [1, 2, 3, 4, 5]。\n打印 求和(列表)。'
         output = self._run_code(code)
         self.assertEqual(output, '15')
 
     def test_average(self):
         """测试平均数"""
-        code = '定义 列表 为 [1, 2, 3, 4]。\n打印 平均数(列表)。'
+        code = '设 列表 为 [1, 2, 3, 4]。\n打印 平均数(列表)。'
         output = self._run_code(code)
         self.assertEqual(float(output), 2.5)
 
     def test_random_int(self):
         """测试随机整数"""
-        code = '定义 x 为 随机整数(1, 10)。\n打印 x 大于等于 1 且 x 小于等于 10。'
+        code = '设 x 为 随机整数(1, 10)。\n打印 x 大于等于 1 且 x 小于等于 10。'
         output = self._run_code(code)
         self.assertIn('True', output)
 
@@ -234,7 +234,7 @@ class TestStdlibFile(unittest.TestCase):
         
         try:
             safe_path = tmp_path.replace('\\', '/')
-            code = f'写入文件("{safe_path}", "hello world")。\n定义 内容 为 读取文件("{safe_path}")。\n打印 内容。'
+            code = f'写入文件("{safe_path}", "hello world")。\n设 内容 为 读取文件("{safe_path}")。\n打印 内容。'
             output = self._run_code(code)
             self.assertEqual(output, 'hello world')
         finally:
@@ -291,19 +291,19 @@ class TestStdlibDict(unittest.TestCase):
 
     def test_dict_get(self):
         """测试字典获取"""
-        code = '定义 d 为 字典创建()。\n字典设置(d, "a", 1)。\n打印 字典获取(d, "a")。'
+        code = '设 d 为 字典创建()。\n字典设置(d, "a", 1)。\n打印 字典获取(d, "a")。'
         output = self._run_code(code)
         self.assertEqual(output, '1')
 
     def test_dict_keys(self):
         """测试字典键列表"""
-        code = '定义 d 为 字典创建()。\n字典设置(d, "a", 1)。\n字典设置(d, "b", 2)。\n打印 列表长度(字典键列表(d))。'
+        code = '设 d 为 字典创建()。\n字典设置(d, "a", 1)。\n字典设置(d, "b", 2)。\n打印 列表长度(字典键列表(d))。'
         output = self._run_code(code)
         self.assertEqual(output, '2')
 
     def test_dict_contains_key(self):
         """测试字典包含键"""
-        code = '定义 d 为 字典创建()。\n字典设置(d, "a", 1)。\n打印 字典包含键(d, "a")。'
+        code = '设 d 为 字典创建()。\n字典设置(d, "a", 1)。\n打印 字典包含键(d, "a")。'
         output = self._run_code(code)
         self.assertIn('True', output)
 

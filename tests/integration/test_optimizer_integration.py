@@ -47,7 +47,7 @@ class TestOptimizerIntegration(unittest.TestCase):
     def test_constant_folding_applied(self):
         # 测试常量折叠是否生效：常量表达式应该被折叠为字面量
         # 使用段言语法编写一个包含常量表达式的变量声明
-        code = '定义 x 等于 1 加 2 乘 3。'
+        code = '设 x 为 1 加 2 乘 3。'
 
         # 使用默认优化（optimize=True）
         result = self.compiler.compile(code, optimize=True)

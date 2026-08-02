@@ -15,12 +15,12 @@
 
 # compile_source: takes Duan source string, returns Python code string
 段落 compile_source 接收 source：
-  定义 tokens 等于 词法分析(source)
-  定义 ast 等于 parse(tokens)
-  定义 py_code 等于 generate(ast)
+  设 tokens 为 词法分析(source)
+  设 ast 为 parse(tokens)
+  设 py_code 为 generate(ast)
   返回 py_code
 
 # compile_file: reads a .duan file and compiles it to Python
 段落 compile_file 接收 filepath：
-  定义 content 等于 _读文件(filepath)
+  设 content 为 _读文件(filepath)
   返回 compile_source(content)

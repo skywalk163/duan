@@ -2,8 +2,8 @@
 可空类型安全（Null Safety）测试 —— 强制可空类型 unwrap 系统
 
 测试点：
-1. 可空类型声明：定义值等于空 → 推断为 NullType（空|空）
-2. unwrap 基本：定义值等于空! → 非可空
+1. 可空类型声明：设值为空 → 推断为 NullType（空|空）
+2. unwrap 基本：设值为空! → 非可空
 3. 变量声明可空后解包使用
 4. 段落参数非可空 → 调用时传可空值报错（必须 unwrap）
 5. 段落参数可空 → 正常传参
@@ -40,16 +40,16 @@ class TestNullSafetyBasic(unittest.TestCase):
     """基础可空类型测试"""
 
     def test_null_declaration(self):
-        """测试点 1：定义值等于空 → 推断为 NullType"""
-        c = compile_source('定义值等于空。')
+        """测试点 1：设值为空 → 推断为 NullType"""
+        c = compile_source('设值为空。')
         sym = c._inferencer.symbol_table.lookup('值')
         self.assertIsNotNone(sym, "'值' 变量应被定义")
         # 空字面量应被推断为 NullType
         self.assertIsInstance(sym.data_type, NullType)
 
     def test_unwrap_basic(self):
-        """测试点 2：定义值等于空! → 解包"""
-        c = compile_source('定义值等于空!。')
+        """测试点 2：设值为空! → 解包"""
+        c = compile_source('设值为空!。')
         sym = c._inferencer.symbol_table.lookup('值')
         self.assertIsNotNone(sym, "'值' 变量应被定义")
         # 对空值执行 ! 会被转为非可空（可能 UnknownType，表示运行时断言结果）
@@ -61,8 +61,8 @@ class TestNullSafetyBasic(unittest.TestCase):
         # 由于段言当前推断器将每个顶层语句的 VariableDeclaration 独立推断，
         # 我们通过简单赋值链来测试
         src = (
-            '定义值等于空。'
-            '定义值2等于值!。'
+            '设值为空。'
+            '设值2为值!。'
         )
         c = compile_source(src)
         sym = c._inferencer.symbol_table.lookup('值2')
@@ -79,7 +79,7 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
         src = (
             '段落展示内容接收内容:数：\n'
             '    打印内容。\n'
-            '定义值等于空。\n'
+            '设值为空。\n'
             '展示内容(值)。\n'
         )
         c = compile_source(src)
@@ -95,7 +95,7 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
         src = (
             '段落打印数接收数：\n'
             '    打印数。\n'
-            '定义值等于42。\n'
+            '设值为42。\n'
             '打印数(值!)。\n'
         )
         c = compile_source(src)
@@ -108,7 +108,7 @@ class TestNullSafetyFunctionCall(unittest.TestCase):
         src = (
             '段落打印值接收值：\n'
             '    打印值。\n'
-            '定义空值等于空。\n'
+            '设空值为空。\n'
             '打印值(空值)。\n'
         )
         c = compile_source(src)
@@ -123,8 +123,8 @@ class TestNullSafetyArithmetic(unittest.TestCase):
     def test_operation_without_unwrap(self):
         """测试点 6：参与运算的值是可空的但未 unwrap → 应报错"""
         src = (
-            '定义值等于空。'
-            '定义结果等于值加1。'
+            '设值为空。'
+            '设结果为值加1。'
         )
         c = compile_source(src)
         errors = [e for e in c.errors if '可空' in e or 'unwrap' in e or '解包' in e]
@@ -136,8 +136,8 @@ class TestNullSafetyArithmetic(unittest.TestCase):
     def test_operation_with_unwrap(self):
         """可空值先 unwrap 再运算 → 正常"""
         src = (
-            '定义值等于3。'
-            '定义结果等于值!加1。'
+            '设值为3。'
+            '设结果为值!加1。'
         )
         c = compile_source(src)
         errors = [e for e in c.errors if '可空' in e or 'unwrap' in e or '解包' in e]
@@ -150,7 +150,7 @@ class TestUnwrapExpressionAst(unittest.TestCase):
     def test_parsed_has_unwrap_expression(self):
         """确保解析后能产生 UnwrapExpression 节点"""
         c = DuanCompiler()
-        raw = c.parse_raw('定义值等于空!。')
+        raw = c.parse_raw('设值为空!。')
         # 从原始 AST 中查看存在 UnwrapExpression
         ast_nodes = []
 
@@ -192,7 +192,7 @@ class TestUnwrapExpressionAst(unittest.TestCase):
     def test_adapter_converts_unwrap(self):
         """确保 AstAdapter 将 UnwrapExpression 转换为正确类型"""
         c = DuanCompiler()
-        result = c.compile('定义值等于空!。')
+        result = c.compile('设值为空!。')
         # 适配后的 AST
         adapted = result['ast']
         # 检查顶层 VariableDeclaration 的 value 是 UnwrapExpression
@@ -231,7 +231,7 @@ class TestBackwardsCompatibility(unittest.TestCase):
     """测试点 9：确保对现有 Phase 1-5 代码不造成破坏"""
 
     def test_simple_arithmetic(self):
-        c = compile_source('定义甲等于3加5。')
+        c = compile_source('设甲为3加5。')
         self.assertEqual(len([e for e in c.errors if '可空' in e]), 0)
 
     def test_paragraph_call(self):
@@ -246,7 +246,7 @@ class TestBackwardsCompatibility(unittest.TestCase):
 
     def test_null_value_without_unwrap(self):
         """仅声明空值变量不会触发可空错误"""
-        c = compile_source('定义值等于空。')
+        c = compile_source('设值为空。')
         self.assertIsNotNone(c._inferencer)
 
 

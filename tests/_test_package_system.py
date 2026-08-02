@@ -143,11 +143,11 @@ class TestModuleDependencyResolver(unittest.TestCase):
     def test_circular_dependency_detection(self):
         from module_resolver import ModuleDependencyResolver, CircularDependencyError
         # A -> B -> A
-        (self.tmp / "甲.duan").write_text("导入 乙。\\n", encoding="utf-8")
-        (self.tmp / "乙.duan").write_text("导入 甲。\\n", encoding="utf-8")
+        (self.tmp / "甲.duan").write_text("导入 乙。\n", encoding="utf-8")
+        (self.tmp / "乙.duan").write_text("导入 甲。\n", encoding="utf-8")
         resolver = ModuleDependencyResolver([self.tmp])
         with self.assertRaises(CircularDependencyError):
-            resolver.resolve_all("甲", "导入 乙。\\n")
+            resolver.resolve_all("甲", "导入 乙。\n")
 
 
 class TestBackwardCompatibility(unittest.TestCase):
@@ -156,7 +156,7 @@ class TestBackwardCompatibility(unittest.TestCase):
     def test_compile_single_module_unchanged(self):
         from compiler import DuanCompiler
         c = DuanCompiler()
-        result = c.compile("定义 甲 等于 三。")
+        result = c.compile("设 甲 为 三。")
         self.assertIsNotNone(result)
         self.assertIn("ast", result)
         self.assertIn("tokens", result)
@@ -166,7 +166,7 @@ class TestBackwardCompatibility(unittest.TestCase):
         from compiler import DuanCompiler
         c = DuanCompiler()
         self.assertIsNone(c.project_root)
-        result = c.compile("段 主():\\n结束。\\n")
+        result = c.compile("段 主():\n结束。\n")
         self.assertIsNotNone(result)
 
 

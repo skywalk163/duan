@@ -31,7 +31,7 @@ class TestVariableDeclaration:
     
     def test_simple_variable(self, parser):
         """测试简单变量声明"""
-        module = parser.parse('定义甲等于3。')
+        module = parser.parse('设甲为3。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -40,7 +40,7 @@ class TestVariableDeclaration:
     
     def test_variable_with_expression(self, parser):
         """测试带表达式的变量声明"""
-        module = parser.parse('定义结果等于三加五。')
+        module = parser.parse('设结果为三加五。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -49,7 +49,7 @@ class TestVariableDeclaration:
     
     def test_multiple_variables(self, parser):
         """测试多变量声明"""
-        module = parser.parse('定义甲等于1。定义乙等于2。定义丙等于3。')
+        module = parser.parse('设甲为1。设乙为2。设丙为3。')
         
         assert len(module.statements) == 3
         for stmt in module.statements:
@@ -65,7 +65,7 @@ class TestExpressions:
     
     def test_arithmetic_expression(self, parser):
         """测试算术表达式"""
-        module = parser.parse('定义结果等于甲加乙。')
+        module = parser.parse('设结果为甲加乙。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -74,7 +74,7 @@ class TestExpressions:
     
     def test_nested_expression(self, parser):
         """测试嵌套表达式"""
-        module = parser.parse('定义结果等于甲加乙乘丙。')
+        module = parser.parse('设结果为甲加乙乘丙。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -173,7 +173,7 @@ class TestFunctionDefinition:
     def test_function_with_body(self, parser):
         """测试带函数体的函数定义"""
         code = '''段落 计算 接收 甲, 乙：
-  定义结果等于甲加乙。
+  设结果为甲加乙。
   返回结果。'''
         
         module = parser.parse(code)
@@ -215,13 +215,13 @@ class TestFunctionCall:
     
     def test_simple_call(self, parser):
         """测试简单函数调用"""
-        module = parser.parse('定义结果等于段落计算(甲，乙)。')
+        module = parser.parse('设结果为段落计算(甲，乙)。')
         
         assert len(module.statements) >= 1
     
     def test_call_in_expression(self, parser):
         """测试表达式中的函数调用"""
-        module = parser.parse('定义结果等于段落计算(甲，乙)。')
+        module = parser.parse('设结果为段落计算(甲，乙)。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]
@@ -241,7 +241,7 @@ class TestComplexPrograms:
   如果数小于等于1：返回1。
   返回数乘段落阶乘(数减1)。
 
-定义结果等于段落阶乘(5)。
+设结果为段落阶乘(5)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -254,7 +254,7 @@ class TestComplexPrograms:
   如果数小于等于2：返回1。
   返回段落斐波那契(数减1)加段落斐波那契(数减2)。
 
-定义结果等于段落斐波那契(10)。
+设结果为段落斐波那契(10)。
 打印结果。'''
         
         module = parser.parse(code)
@@ -273,7 +273,7 @@ class TestErrorHandling:
         """测试不完整语句"""
         # 不完整语句应该能优雅处理
         try:
-            module = parser.parse('定义甲等于')
+            module = parser.parse('设甲为')
             # 可能返回部分结果或抛出异常
         except Exception as e:
             # 应该是有意义的错误信息
@@ -298,7 +298,7 @@ class TestNoSpaceCode:
     
     def test_no_space_variable(self, parser):
         """测试无空格变量声明"""
-        module = parser.parse('定义甲等于三加五。')
+        module = parser.parse('设甲为三加五。')
         
         assert len(module.statements) == 1
         stmt = module.statements[0]

@@ -30,7 +30,7 @@ class TestLexer(unittest.TestCase):
 
     def test_simple_tokenize(self):
         """测试简单语句词法分析"""
-        lexer = self.Lexer('定义甲等于三。')
+        lexer = self.Lexer('设甲为三。')
         tokens = lexer.tokenize()
         self.assertGreater(len(tokens), 0)
         # 验证生成了预期的 token 类型
@@ -40,8 +40,8 @@ class TestLexer(unittest.TestCase):
         self.assertIn(self.TokenType.CHINESE_NUM, token_types)
         # 验证关键字值
         token_values = [t.value for t in tokens if t.type == self.TokenType.KEYWORD]
-        self.assertIn('定义', token_values)
-        self.assertIn('等于', token_values)
+        self.assertIn('设', token_values)
+        self.assertIn('为', token_values)
 
     def test_number_literal(self):
         """测试数字字面量"""
@@ -68,7 +68,7 @@ class TestLexer(unittest.TestCase):
 
     def test_list_literal(self):
         """测试列表字面量"""
-        lexer = self.Lexer('定义列表等于[1, 2, 3]。')
+        lexer = self.Lexer('设列表为[1, 2, 3]。')
         tokens = lexer.tokenize()
         token_types = [t.type for t in tokens]
         self.assertIn(self.TokenType.LBRACKET, token_types)
