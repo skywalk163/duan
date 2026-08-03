@@ -1,0 +1,7 @@
+# 段言 v4.0 L4 外语引用层（Python 生态直通）demo 依赖
+# 安装:  pip install -r examples/L4_python/requirements.txt
+numpy>=1.22
+pandas>=1.5
+matplotlib>=3.5
+requests>=2.28
+scikit-learn>=1.2
