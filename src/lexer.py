@@ -27,6 +27,16 @@ OPERATOR_VERBS = frozenset({
     '模', '幂'
 })
 
+# 标识符安全关键字：这些关键字常作为复合标识符的后缀（如"处理函数"、"输出格式"），
+# 在分词时不应触发拆分。即：当这些关键字出现在标识符中间或末尾时，应作为标识符的一部分。
+IDENTIFIER_SAFE_KEYWORDS = frozenset({
+    '函数', '段落',  # 函数相关
+    '输出', '返回',  # I/O 和返回
+    '接口', '结构体',  # 类型相关
+    '枚举', '联合体',  # FFI 类型
+    '回调',  # FFI 回调（如"回调函数"、"回调结构体"）
+})
+
 # 常见复合词保护列表（这些词包含运算符动词或中文数字，但应该作为整体识别）
 COMMON_COMPOUND_WORDS = frozenset({
     '追加', '加入', '减少', '乘法', '除法', '模式', '幂次',
@@ -50,6 +60,9 @@ COMMON_COMPOUND_WORDS = frozenset({
     '开启调试', '记录调用', '记录类型', '追踪内存',
     '注册回调', '注销回调', '获取回调', 'FFI调试', 'FFI禁用调试', 'FFI获取日志',
     '位域设置', '位域获取', '创建函数指针', '创建类型别名', '定义宏', '获取宏',
+    # 科学计算中"X函数"作为标识符（如"导函数"、"函数对象"）
+    '导函数', '目标函数', '梯度函数', '海森函数', '函数对象',
+    '伽马函数', '误差函数', '贝塔函数', '激活函数', '损失函数', '核函数',
 })
 
 # CJK 汉字范围
@@ -1123,6 +1136,13 @@ class Lexer:
             
             # 检查完整标识符是否是常见复合词（优先级高于中文数字拆分）
             if full_identifier in _common_compounds:
+                # 如果完整标识符同时也是关键字（如"创建回调"在VERB_ARITY中），作为关键字输出
+                kw_check, _ = _match_kw(source, pos)
+                if kw_check == full_identifier:
+                    _tokens_append(_Token(_TokenType.KEYWORD, full_identifier, line, current_col))
+                    consumed += len(full_identifier)
+                    current_col += len(full_identifier)
+                    continue
                 # 常见复合词，作为整体标识符，不拆分
                 _tokens_append(_Token(_TokenType.IDENTIFIER, full_identifier, line, current_col))
                 consumed += len(full_identifier)
@@ -1200,6 +1220,12 @@ class Lexer:
                         if not is_chinese_num:
                             skip_verb = True
                 
+                # 动词在词首且后面还有内容时跳过：动词作为复合标识符前缀时不应拆分
+                # 例如"输出格式"不应拆为 输出(关键字)+格式，而应作为整体标识符
+                # 注意：只对 VERB_ARITY 中的动词生效，不对"返回"等语句关键字生效
+                if length > 1 and keyword in VERB_ARITY and len(full_identifier) > length:
+                    skip_verb = True
+                
                 # 特殊处理："当"关键字只在后面跟着冒号或在标识符开头时才作为关键字
                 # 否则作为复合词的一部分（如"当前时间戳"中的"当"）
                 if length == 1 and keyword == '当':
@@ -1270,6 +1296,9 @@ class Lexer:
                         elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
                             # 单字 compound_safe 关键字：直接跳过
                             skip_kw = True
+                        elif sub_kw in IDENTIFIER_SAFE_KEYWORDS:
+                            # 标识符安全关键字（如"函数"、"输出"）：是复合标识符的一部分，跳过
+                            skip_kw = True
                         
                         if not skip_kw:
                             # 不是需要跳过的关键字，标记为内嵌关键字
@@ -1306,8 +1335,10 @@ class Lexer:
                                     # 例如：甲加乙 -> [甲] [加] [乙]
                                     pass
                                 else:
-                                    scan_pos += sub_len
-                                    continue
+                                    # 只跳过不在词尾的关键字；在词尾时作为关键字输出
+                                    if scan_pos + sub_len < len(full_identifier):
+                                        scan_pos += sub_len
+                                        continue
                             elif sub_len == 1 and sub_kw in OPERATOR_VERBS:
                                 # 单字运算符动词（不在 compound_safe 中）
                                 # 检查后面是否是括号（可能是函数名的一部分，如"阶乘"）
@@ -1332,6 +1363,10 @@ class Lexer:
                                 # 但常见比较运算符（大于、小于、等于）在表达式中很常见，应该优先识别为运算符
                                 # 策略：多字比较运算符总是作为关键字识别
                                 pass  # 不跳过，继续输出为关键字
+                            elif sub_len > 1 and sub_kw in IDENTIFIER_SAFE_KEYWORDS:
+                                # 标识符安全关键字（如"函数"、"输出"）：跳过，作为复合标识符的一部分
+                                scan_pos += sub_len
+                                continue
                             elif sub_len > 1:
                                 # 其他多字关键字（如接收、段落等），直接输出
                                 pass  # 不跳过，继续输出为关键字
@@ -1360,7 +1395,9 @@ class Lexer:
                                         if next_char != ':' and not next_char.isspace():
                                             skip_after_rematch = True
                                 elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
-                                    skip_after_rematch = True
+                                    # 只跳过不在词尾的关键字；在词尾时作为关键字输出
+                                    if sub_len < len(full_identifier):
+                                        skip_after_rematch = True
                                 elif sub_len == 1 and sub_kw in OPERATOR_VERBS:
                                     # 单字运算符动词：检查后面是否是括号（可能是函数名的一部分，如"阶乘"）
                                     next_pos = abs_pos + sub_len
@@ -1369,6 +1406,9 @@ class Lexer:
                                         if next_char == '(':
                                             # 后面跟着括号，作为复合词的一部分（如"阶乘"）
                                             skip_after_rematch = True
+                                elif sub_kw in IDENTIFIER_SAFE_KEYWORDS:
+                                    # 标识符安全关键字（如"函数"、"输出"）：跳过，作为复合标识符的一部分
+                                    skip_after_rematch = True
                                 if skip_after_rematch:
                                     scan_pos += sub_len
                                     continue

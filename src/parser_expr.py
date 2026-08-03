@@ -536,17 +536,17 @@ class ParserExprMixin:
                             self._consume(TokenType.STAR)
                             if self._current() and self._current().type == TokenType.STAR:
                                 self._consume(TokenType.STAR)
-                                arg = self._parse_comparison()
+                                arg = self._parse_logical_expr()
                                 if arg and isinstance(arg, Identifier):
                                     args.append(Identifier(f'**{arg.name}'))
                             else:
-                                arg = self._parse_comparison()
+                                arg = self._parse_logical_expr()
                                 if arg and isinstance(arg, Identifier):
                                     args.append(Identifier(f'*{arg.name}'))
                             if self._match(TokenType.COMMA):
                                 self._consume(TokenType.COMMA)
                             continue
-                        arg = self._parse_comparison()
+                        arg = self._parse_logical_expr()
                         if arg:
                             args.append(arg)
                         else:
@@ -562,8 +562,8 @@ class ParserExprMixin:
                             break
                         if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                             break
-                        # 收集完整表达式（支持嵌套函数调用和运算符）
-                        arg = self._parse_comparison()
+                        # 收集完整表达式（支持嵌套函数调用、比较和逻辑运算符）
+                        arg = self._parse_logical_expr()
                         if arg:
                             args.append(arg)
                         else:
@@ -579,7 +579,7 @@ class ParserExprMixin:
                         if self._current() and self._current().type == TokenType.COMMA:
                             self._consume(TokenType.COMMA)
                             continue
-                        arg = self._parse_comparison()
+                        arg = self._parse_logical_expr()
                         if arg:
                             args.append(arg)
                             collected += 1
