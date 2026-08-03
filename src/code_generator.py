@@ -2393,25 +2393,204 @@ class PythonCodeGenerator:
         self._add_line("")
 
     def _generate_embed_block(self, stmt: EmbedBlock):
-        """生成嵌入块代码
-        
-        Python 嵌入块：直接输出原始 Python 代码，共享段言变量作用域。
-        C 嵌入块：通过 ctypes 编译执行。
-        其他语言：以注释形式保留，提示不支持。
+        """生成嵌入块代码（v4.0 分层架构 L3/L4 统一入口）
+
+        支持的嵌入类型（自左向右按首词路由）：
+        - L4: 引 Python / Py            → 作用域隔离沙箱（E4），只暴露公共函数
+        - L3: 引 SQL [库标签]           → 原生参数化 sqlite3（E1），防注入
+        - L3: 引 模式/正则/Regex 名     → 命名捕获组成员访问类（E2）
+        - L3: 引 公式/数学/Math 名      → sympy 表达式封装（E3）
+        -     引 C                      → ctypes 编译（保留原实现）
+        -     其他                      → 注释保留（保留原实现）
         """
         import textwrap
-        
-        lang = stmt.language.strip()
+        import re as _duan_re
+
+        # 拆分首词（真正的语言/领域类型）和剩余标签（库名/正则名/公式名）
+        lang_raw = stmt.language.strip() or "Python"
+        lang_tokens = lang_raw.split()
+        lang_main = lang_tokens[0].lower() if lang_tokens else "python"
+        lang_label = "_".join(lang_tokens[1:]) if len(lang_tokens) > 1 else ""
         code = textwrap.dedent(stmt.code).strip()
-        
-        if lang.lower() in ('python', 'py'):
-            # Python 嵌入块：直接输出原始代码，保持缩进
-            self._add_line(f"# --- 嵌入 Python ---")
-            for line in code.split('\n'):
-                self._add_line(line)
-            self._add_line(f"# --- 结束嵌入 ---")
-        elif lang.lower() in ('c',):
-            # C 嵌入块：通过 ctypes/cffi 编译执行
+
+        # -------- L4: Python / Py 作用域隔离沙箱（E4）--------
+        if lang_main in ('python', 'py'):
+            self._add_line(f"# --- L4: 引 Python{(' ' + lang_label) if lang_label else ''}（作用域隔离沙箱）---")
+            self._add_line("import types as _duan_types_mod")
+            # 简化：使用 _DUAN_L4_NS 稳定命名空间，避免递增 id 不稳定
+            self._add_line("_DUAN_L4_NS = _duan_types_mod.ModuleType('duan_l4')")
+            self._add_line("_DUAN_L4_SRC = '''\n" + code + "\n'''")
+            self._add_line("exec(compile(_DUAN_L4_SRC, '<l4_python>', 'exec'), _DUAN_L4_NS.__dict__)")
+            # 只导出公共标识符：以 l3_ / l4_ 开头 或 不以 _ 开头的 callable / 基本数据
+            self._add_line("for _DUAN_L4_NAME, _DUAN_L4_OBJ in list(_DUAN_L4_NS.__dict__.items()):")
+            self._add_line("    if _DUAN_L4_NAME.startswith('__'):")
+            self._add_line("        continue")
+            self._add_line("    # 规则：l3_* / l4_* 强制导出；其他不以 _ 开头的函数/类/普通数据也导出")
+            self._add_line("    _ok = _DUAN_L4_NAME.startswith('l3_') or _DUAN_L4_NAME.startswith('l4_')")
+            self._add_line("    if (not _ok) and not _DUAN_L4_NAME.startswith('_'):")
+            self._add_line("        import builtins as _duan_bi")
+            self._add_line("        _ok = callable(_DUAN_L4_OBJ) or isinstance(_DUAN_L4_OBJ, (_duan_bi.int,_duan_bi.float,_duan_bi.str,_duan_bi.list,_duan_bi.dict,_duan_bi.tuple,_duan_bi.bool,_duan_bi.type(None)))")
+            self._add_line("    if _ok:")
+            self._add_line("        globals()[_DUAN_L4_NAME] = _DUAN_L4_OBJ")
+            self._add_line("del _DUAN_L4_SRC, _DUAN_L4_NAME, _DUAN_L4_OBJ, _ok")
+            self._add_line(f"# --- 结束 L4 引 Python{(' ' + lang_label) if lang_label else ''} ---")
+            return
+
+        # -------- L3: SQL 原生参数化封装（E1）--------
+        if lang_main == 'sql':
+            db_var = lang_label or "default"
+            self._add_line(f"# --- L3: 引 SQL {lang_label}（原生参数化 sqlite3，防注入）---")
+            self._add_line("import sqlite3 as _duan_sqlite3")
+            self._add_line(f"if '_DUAN_SQL_CONNS' not in globals(): _DUAN_SQL_CONNS = {{}}")
+            self._add_line(f"if '{db_var}' not in _DUAN_SQL_CONNS:")
+            self._add_line(f"    _DUAN_SQL_CONNS['{db_var}'] = _duan_sqlite3.connect(':memory:' if '{db_var}' == 'default' else '{db_var}.db')")
+            self._add_line(f"    _DUAN_SQL_CONNS['{db_var}'].row_factory = _duan_sqlite3.Row")
+            # 遍历 code（多行按 ; 分语句，允许 -- 注释）
+            statements = [s.strip() for s in code.split(';') if s.strip()]
+            for idx, raw_sql in enumerate(statements):
+                # 跳过纯注释
+                if all(line.lstrip().startswith('--') for line in raw_sql.split('\n') if line.strip()):
+                    continue
+                verb = raw_sql.lstrip().split(None, 1)[0].upper() if raw_sql.strip() else ''
+                sql_one_line = " ".join(line.strip() for line in raw_sql.split('\n') if line.strip() and not line.lstrip().startswith('--'))
+                sql_py_repr = repr(sql_one_line)
+                if verb in ('SELECT', 'PRAGMA', 'WITH', 'EXPLAIN', 'SHOW'):
+                    # 返回 list[dict] 的查询函数
+                    fn_name = f"l3_sql_{db_var or 'default'}_q{idx}" if statements else f"l3_sql_query_{db_var}"
+                    self._add_line(f"def {fn_name}(params=()):")
+                    self._add_line(f"    _c = _DUAN_SQL_CONNS['{db_var}'].cursor()")
+                    self._add_line(f"    _c.execute({sql_py_repr}, tuple(params))")
+                    self._add_line(f"    return [dict(_r) for _r in _c.fetchall()]")
+                else:
+                    # 返回影响行数的 DDL/DML 函数
+                    fn_name = f"l3_sql_{db_var or 'default'}_e{idx}" if statements else f"l3_sql_exec_{db_var}"
+                    self._add_line(f"def {fn_name}(params=()):")
+                    self._add_line(f"    _c = _DUAN_SQL_CONNS['{db_var}'].cursor()")
+                    self._add_line(f"    _c.execute({sql_py_repr}, tuple(params))")
+                    self._add_line(f"    _DUAN_SQL_CONNS['{db_var}'].commit()")
+                    self._add_line(f"    return _c.rowcount")
+            self._add_line(f"# --- 结束 L3 引 SQL {lang_label}（共 {len(statements)} 条语句）---")
+            return
+
+        # -------- L3: 模式 / 正则 / Regex 命名捕获组类（E2）--------
+        if lang_main in ('模式', '正则', 'regex', 'regexp', 'matcher'):
+            pattern_name = lang_label or "Matcher"
+            safe_name = _duan_re.sub(r'\W|^(?=\d)', '_', pattern_name) if pattern_name else "Matcher"
+            # 允许引块里写多行：第一行是正则，后续是注释/别名
+            lines = [ln for ln in code.split('\n') if ln.strip() and not ln.lstrip().startswith('#')]
+            regex_src = lines[0] if lines else r""
+            # 提取命名捕获组名
+            named = _duan_re.findall(r'\(\?P<([^>]+)>', regex_src)
+            group_fields = ",".join(named) if named else ""
+            self._add_line(f"# --- L3: 引 模式 {pattern_name}（正则命名捕获组 → 成员访问类）---")
+            self._add_line("import re as _duan_l3_re")
+            self._add_line(f"_DUAN_L3_RE_{safe_name.upper()} = _duan_l3_re.compile({regex_src!r})")
+            self._add_line(f"class L3Pattern_{safe_name}:")
+            self._add_line(f"    __slots__ = ('_m','hit',{','.join(repr(n) for n in named) if named else '()'})")
+            self._add_line(f"    def __init__(self, m):")
+            self._add_line(f"        self._m = m; self.hit = m is not None")
+            for n in named:
+                self._add_line(f"        self.{n} = m.group('{n}') if self.hit else None")
+            self._add_line(f"    def __bool__(self): return self.hit")
+            self._add_line(f"    def __repr__(self):")
+            self._add_line(f"        if not self.hit: return '{safe_name}<未命中>'")
+            if named:
+                parts = "+','+".join([f\"f'{n}={{self.{n}}}'\" for n in named])
+                self._add_line(f"        return '{safe_name}<' + {parts} + '>'")
+            else:
+                self._add_line(f"        return '{safe_name}<命中>'")
+            self._add_line(f"    @classmethod")
+            self._add_line(f"    def 匹配(cls, text): return cls(_DUAN_L3_RE_{safe_name.upper()}.fullmatch(text))")
+            self._add_line(f"    @classmethod")
+            self._add_line(f"    def 搜索(cls, text): return cls(_DUAN_L3_RE_{safe_name.upper()}.search(text))")
+            self._add_line(f"    @classmethod")
+            self._add_line(f"    def 查找全部(cls, text):")
+            self._add_line(f"        ms = _DUAN_L3_RE_{safe_name.upper()}.finditer(text)")
+            self._add_line(f"        return [cls(m) for m in ms]")
+            # 导出一个别名：中文模式名
+            self._add_line(f"{pattern_name if pattern_name and pattern_name.isidentifier() else safe_name} = L3Pattern_{safe_name}")
+            self._add_line(f"# --- 结束 L3 引 模式 {pattern_name}（命名组: {named or '∅'}）---")
+            return
+
+        # -------- L3: 公式 / 数学 / Math  sympy 封装（E3）--------
+        if lang_main in ('公式', '数学', 'math', 'formula'):
+            expr_name = lang_label or "Expr"
+            safe_name = _duan_re.sub(r'\W|^(?=\d)', '_', expr_name) if expr_name else "Expr"
+            self._add_line(f"# --- L3: 引 公式 {expr_name}（sympy 封装）---")
+            self._add_line("try:")
+            self._add_line("    import sympy as _duan_l3_sym")
+            self._add_line("except Exception as _DUAN_L3_SYM_ERR:")
+            self._add_line("    _duan_l3_sym = None")
+            # 解析公式行：支持 解...= / d/dx... / ∫(... →...) / 直接化简 / 矩阵乘法
+            for idx, raw_line in enumerate(code.split('\n')):
+                line = raw_line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                # 去掉末尾句号/感叹号
+                line_clean = line.rstrip('。！!？?；;')
+                # 形式 1: 解 2x^2+5x-3=0
+                m_solve = _duan_re.match(r'^解\s+(.+?)\s*=\s*(.+?)\s*$', line_clean)
+                if m_solve:
+                    lhs, rhs = m_solve.group(1), m_solve.group(2)
+                    fn_name = f"l3_math_solve_{safe_name}_{idx}"
+                    self._add_line(f"def {fn_name}(**kw):")
+                    self._add_line("    if not _duan_l3_sym: raise RuntimeError(f'sympy未装: {_DUAN_L3_SYM_ERR}')")
+                    self._add_line(f"    from sympy import Eq, solve, symbols, sympify")
+                    self._add_line(f"    _all_sym = list(set(sympify({lhs!r}).free_symbols) | set(sympify({rhs!r}).free_symbols))")
+                    self._add_line(f"    for _s in _all_sym: globals().setdefault(str(_s), _s)")
+                    self._add_line(f"    _sol = solve(Eq(sympify({lhs!r}), sympify({rhs!r})), dict=True)")
+                    self._add_line(f"    return _sol")
+                    continue
+                # 形式 2: d/dx (...)
+                m_diff = _duan_re.match(r'^d\s*/\s*d([a-zA-Z])\s*\((.+)\)$', line_clean)
+                if m_diff:
+                    vn, ex = m_diff.group(1), m_diff.group(2)
+                    fn_name = f"l3_math_diff_{safe_name}_{vn}_{idx}"
+                    self._add_line(f"def {fn_name}():")
+                    self._add_line("    if not _duan_l3_sym: raise RuntimeError(f'sympy未装: {_DUAN_L3_SYM_ERR}')")
+                    self._add_line(f"    from sympy import diff, sympify, symbols")
+                    self._add_line(f"    v = symbols({vn!r})")
+                    self._add_line(f"    return str(diff(sympify({ex!r}), v))")
+                    continue
+                # 形式 3: 积分 ∫(a→b) f dx  或  积分 f 从 a 到 b
+                m_int = _duan_re.match(r'^[∫积分]\s*(\()?\s*(.+?)\s*→\s*(.+?)\s*\)?\s*(.+)\s*d([a-zA-Z])$', line_clean)
+                m_int2 = _duan_re.match(r'^积分\s+(.+?)\s+从\s+(.+?)\s+到\s+(.+?)$', line_clean)
+                if m_int or m_int2:
+                    if m_int:
+                        a, b, f, vn = m_int.group(2), m_int.group(3), m_int.group(4), m_int.group(5)
+                    else:
+                        f, a, b = m_int2.group(1), m_int2.group(2), m_int2.group(3)
+                        vn = 'x'
+                    fn_name = f"l3_math_int_{safe_name}_{vn}_{idx}"
+                    self._add_line(f"def {fn_name}():")
+                    self._add_line("    if not _duan_l3_sym: raise RuntimeError(f'sympy未装: {_DUAN_L3_SYM_ERR}')")
+                    self._add_line(f"    from sympy import integrate, sympify, symbols")
+                    self._add_line(f"    v = symbols({vn!r}); f = sympify({f.strip()!r})")
+                    self._add_line(f"    r = integrate(f, (v, sympify({a!r}), sympify({b!r})))")
+                    self._add_line(f"    try: return float(r.evalf())")
+                    self._add_line(f"    except: return str(r)")
+                    continue
+                # 形式 4: 矩阵乘法 A * B
+                m_mat = _duan_re.match(r'^矩阵乘\s+(\[\[.*\]\])\s*\*\s*(\[\[.*\]\])$', line_clean)
+                if m_mat:
+                    fn_name = f"l3_math_mat_{safe_name}_{idx}"
+                    self._add_line(f"def {fn_name}():")
+                    self._add_line("    if not _duan_l3_sym: raise RuntimeError(f'sympy未装: {_DUAN_L3_SYM_ERR}')")
+                    self._add_line(f"    from sympy import Matrix")
+                    self._add_line(f"    R = Matrix({m_mat.group(1)}) * Matrix({m_mat.group(2)})")
+                    self._add_line(f"    return [list(row) for row in R.tolist()]")
+                    continue
+                # 默认：表达式化简
+                fn_name = f"l3_math_simp_{safe_name}_{idx}"
+                self._add_line(f"def {fn_name}():")
+                self._add_line("    if not _duan_l3_sym: raise RuntimeError(f'sympy未装: {_DUAN_L3_SYM_ERR}')")
+                self._add_line(f"    from sympy import simplify, sympify")
+                self._add_line(f"    return str(simplify(sympify({line_clean!r})))")
+            self._add_line(f"# --- 结束 L3 引 公式 {expr_name} ---")
+            return
+
+        # -------- 原实现：C 嵌入 --------
+        if lang_main in ('c',):
             self._add_line(f"# --- 嵌入 C（通过 ctypes 执行）---")
             self._add_line("import ctypes")
             self._add_line("import tempfile")
@@ -2420,7 +2599,6 @@ class PythonCodeGenerator:
             for line in code.split('\n'):
                 self._add_line(line)
             self._add_line("'''")
-            # 编译并加载
             self._add_line("_duan_c_src = tempfile.NamedTemporaryFile(suffix='.c', delete=False, mode='w')")
             self._add_line("_duan_c_src.write(_duan_c_code)")
             self._add_line("_duan_c_src.close()")
@@ -2429,12 +2607,21 @@ class PythonCodeGenerator:
             self._add_line("subprocess.run(['cc', '-shared', '-fPIC', '-o', _duan_c_lib_path, _duan_c_src.name], check=True)")
             self._add_line("_duan_c_lib = ctypes.CDLL(_duan_c_lib_path)")
             self._add_line(f"# --- 结束嵌入 C ---")
-        else:
-            # 不支持的语言：以注释保留
-            self._add_line(f"# --- 嵌入 {lang}（暂不支持直接执行）---")
-            for line in code.split('\n'):
-                self._add_line(f"# {line}")
-            self._add_line(f"# --- 结束嵌入 ---")
+            return
+
+        # -------- 不支持的语言：注释保留 --------
+        self._add_line(f"# --- 嵌入 {lang_raw}（暂不支持直接执行）---")
+        for line in code.split('\n'):
+            self._add_line(f"# {line}")
+        self._add_line(f"# --- 结束嵌入 ---")
+
+    # --- 辅助：生成递增 id（嵌入沙箱变量、SQL 函数名去重）---
+    def _fresh_id(self):
+        if not hasattr(self, '_duan_embed_id_counter'):
+            self._duan_embed_id_counter = 0
+        self._duan_embed_id_counter += 1
+        self._prev_fresh_id = self._duan_embed_id_counter
+        return self._duan_embed_id_counter
 
 
 # =============================================================================
