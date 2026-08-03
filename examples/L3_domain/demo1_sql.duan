@@ -1,0 +1,81 @@
+# 文体: 文言
+# L3 领域嵌入示例1：SQL（建表/插入/查询/聚合）
+# 注意：sqlite3 是 Python 标准库，无需额外安装
+
+引 Python:
+    import sqlite3
+    import os
+    _L3_SQL_CONN = {}  # 连接缓存
+
+    def _conn(db_path=":memory:"):
+        """获取连接（默认内存库）"""
+        if db_path not in _L3_SQL_CONN:
+            _L3_SQL_CONN[db_path] = sqlite3.connect(db_path)
+            _L3_SQL_CONN[db_path].row_factory = sqlite3.Row
+        return _L3_SQL_CONN[db_path]
+
+    def l3_sql_exec(db, sql, params=()):
+        """执行 DDL/DML，返回影响行数"""
+        c = _conn(db).cursor()
+        c.execute(sql, tuple(params))
+        _conn(db).commit()
+        return c.rowcount
+
+    def l3_sql_query(db, sql, params=()):
+        """查询，返回 list[dict]"""
+        c = _conn(db).cursor()
+        c.execute(sql, tuple(params))
+        rows = c.fetchall()
+        return [dict(r) for r in rows]
+
+    def l3_sql_close_and_remove(db):
+        """清理：如果是文件库则删除文件"""
+        if db in _L3_SQL_CONN:
+            _L3_SQL_CONN[db].close()
+            del _L3_SQL_CONN[db]
+        if db != ":memory:" and os.path.exists(db):
+            os.remove(db)
+            return True
+        return False
+结束引
+
+段 主():
+    设 DB = ":memory:"  # 内存库（程序结束自动消失）
+
+    打印 "→ 1. 建表: 学生成绩"
+    l3_sql_exec(DB, """
+        CREATE TABLE students (
+            id    INTEGER PRIMARY KEY AUTOINCREMENT,
+            name  TEXT    NOT NULL,
+            age   INTEGER,
+            score REAL
+        )
+    """)
+
+    打印 "→ 2. 批量插入 6 条数据"
+    设 学生列表 = [
+        ["张三", 22, 88.5],
+        ["李四", 25, 92.0],
+        ["王五", 31, 76.3],
+        ["赵六", 28, 85.1],
+        ["钱七", 23, 90.7],
+        ["孙八", 26, 79.4],
+    ]
+    遍 学生列表为 s:
+        l3_sql_exec(DB, "INSERT INTO students(name, age, score) VALUES (?,?,?)", s)
+
+    打印 "→ 3. 查询：分数 > 85 分的学生（参数化查询）"
+    设 好成绩 = l3_sql_query(DB, "SELECT name,age,score FROM students WHERE score>? ORDER BY score DESC", [85])
+    遍 好成绩为 行:
+        打印 "   ", 行
+
+    打印 "→ 4. 聚合：平均分 + 最高分 + 最低分"
+    设 统计 = l3_sql_query(DB, "SELECT AVG(score) avg, MAX(score) mx, MIN(score) mn, COUNT(*) n FROM students")
+    设 s0 = 统计[0]
+    打印 "   共 ", s0["n"], " 人, 平均分=", s0["avg"], " 最高=", s0["mx"], " 最低=", s0["mn"]
+
+    打印 "→ 5. 清理连接"
+    l3_sql_close_and_remove(DB)
+    打印 "完成。"
+
+主()
