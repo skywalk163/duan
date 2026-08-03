@@ -444,10 +444,18 @@ class Lexer:
             # 以及以数字开头的函数名（如"四舍五入"）的解析
             # 所有汉字统一由 _tokenize_identifier_or_keyword → _tokenize_chinese_sequence 处理
             
-            # 处理嵌入块：嵌入 Python: ... 结束嵌入
+            # 处理嵌入块 / L4外语引用块：
+            #   v3.3 兼容写法：嵌入 Python: ... 结束嵌入
+            #   v4.0 推荐写法：引 Python:   ... 结束引
             # 需在标识符/关键字分词之前检测，避免嵌入代码被段言分词器破坏
-            if _is_han_fast(source[i]) and source[i:i+2] == '嵌入':
-                token, consumed = self._tokenize_embed_block(source, i, line, col)
+            embed_prefix_len = 0
+            if _is_han_fast(source[i]):
+                if source[i:i+2] == '嵌入':
+                    embed_prefix_len = 2  # 旧写法：嵌入
+                elif source[i] == '引':
+                    embed_prefix_len = 1  # 新写法：引
+            if embed_prefix_len > 0:
+                token, consumed = self._tokenize_embed_block(source, i, line, col, embed_prefix_len)
                 if token:
                     tokens.append(token)
                     col += consumed
@@ -844,26 +852,23 @@ class Lexer:
         value = ''.join(chars)
         return Token(TokenType.FSTRING, value, line, start_col), j - i + 1
     
-    def _tokenize_embed_block(self, source: str, i: int, line: int, col: int) -> Tuple[Optional[Token], int]:
-        """处理嵌入块：嵌入 Python: ... 结束嵌入
-        
-        语法格式：
-            嵌入 Python:
-                <原始代码>
-            结束嵌入
-            或
-            嵌入 C:
-                <原始代码>
-            结束嵌入
-        
+    def _tokenize_embed_block(self, source: str, i: int, line: int, col: int, prefix_len: int = 2) -> Tuple[Optional[Token], int]:
+        """处理嵌入块 / L4 外语引用块
+
+        语法格式（两种写法等价，任意组合都兼容）：
+            嵌入 Python:   <原始代码>   结束嵌入   （v3.3 原写法，2字前缀）
+            引   Python:   <原始代码>   结束引     （v4.0 推荐，1字前缀）
+            引   Python:   <原始代码>   结束嵌入   （容错：混用也可以）
+            嵌入 Python:   <原始代码>   结束引     （容错：混用也可以）
+
         将整个嵌入块作为一个 EMBED_BLOCK token 返回，
         token.value 为 (language, code) 元组。
         如果不是嵌入块（如"嵌入"作为普通标识符），返回 (None, 0)。
         """
         n = len(source)
         start_col = col
-        j = i + 2  # 跳过 "嵌入"
-        col += 2
+        j = i + prefix_len  # 跳过前缀（嵌入=2字，引=1字）
+        col += prefix_len
         
         # 跳过空格
         while j < n and source[j] in ' \t':
@@ -895,20 +900,25 @@ class Lexer:
         if j < n:
             j += 1  # 跳过换行
         
-        # 收集嵌入代码，直到遇到 "结束嵌入" 行
+        # 收集嵌入代码，直到遇到 "结束嵌入" 或 "结束引"（两种都可，容错）
         code_lines = []
-        end_marker = '结束嵌入'
+        end_markers = ('结束嵌入', '结束引')
         while j < n:
-            # 检查当前行是否为 "结束嵌入"
+            # 检查当前行是否为结束标记
             # 跳过行首空白
             line_start = j
             k = j
             while k < n and source[k] in ' \t':
                 k += 1
-            # 检查是否匹配 "结束嵌入"
-            if source[k:k+len(end_marker)] == end_marker:
+            # 检查是否匹配任一结束标记
+            matched_end = None
+            for em in end_markers:
+                if source[k:k+len(em)] == em:
+                    matched_end = em
+                    break
+            if matched_end:
                 # 确认后面是换行或EOF
-                after = k + len(end_marker)
+                after = k + len(matched_end)
                 if after >= n or source[after] == '\n' or source[after] in ' \t。':
                     # 计算消耗的字符数
                     consumed = after - i if after < n else n - i
@@ -925,9 +935,9 @@ class Lexer:
             code_lines.append(source[line_start:line_end] if line_end < n else source[line_start:])
             j = line_end + 1 if line_end < n else n
         
-        # 到达 EOF 仍未找到 "结束嵌入"
+        # 到达 EOF 仍未找到结束标记
         raise LexerError(
-            f"嵌入块未闭合：缺少「结束嵌入」标记",
+            f"L4引用/嵌入块未闭合：缺少「结束嵌入」或「结束引」标记",
             line, start_col
         )
 
