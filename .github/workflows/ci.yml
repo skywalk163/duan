@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 4.0dev]
   pull_request:
-    branches: [main]
+    branches: [main, 4.0dev]
   workflow_dispatch:
 
 jobs:
@@ -23,27 +23,40 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      # ============ 基础 pytest + ANTLR 后端 + L3/L4 可选依赖 ============
+      - name: Install dependencies (基础 + ANTLR + L3/L4 可选依赖)
         run: |
           python -m pip install --upgrade pip
           python -m pip install pytest pytest-cov
+          # ANTLR 后端（双后端验证）
+          python -m pip install "antlr4-python3-runtime>=4.13.0"
+          # L3 原生 数学公式 依赖（sympy）
+          python -m pip install numpy sympy pandas
+          # L4 demo3 绘图 matplotlib，demo4 requests，demo5 sklearn
+          python -m pip install matplotlib requests scikit-learn || true
+          # 打印环境
+          python -c "import sys; print('Python', sys.version); \
+                     import numpy, sympy, pandas; \
+                     print('numpy:', numpy.__version__); \
+                     print('sympy:', sympy.__version__); \
+                     print('pandas:', pandas.__version__)"
 
-      # 运行单元测试
+      # ============ 1. 单元测试 ============
       - name: Unit Tests
         run: |
           pytest tests/unit/ -v --tb=short
 
-      # 运行集成测试
+      # ============ 2. 集成测试 ============
       - name: Integration Tests
         run: |
           pytest tests/integration/ -v --tb=short
 
-      # 运行端到端测试
+      # ============ 3. E2E 端到端测试 ============
       - name: End-to-End Tests
         run: |
           pytest tests/e2e/ -v --tb=short
 
-      # 运行 legacy 功能测试（向后兼容）
+      # ============ 4. legacy 功能测试（向后兼容）============
       - name: Legacy Feature Tests
         run: |
           python tests/_test_three_features.py
@@ -51,15 +64,70 @@ jobs:
           python tests/_test_null_safety.py
           python tests/_test_package_system.py
 
-      # 运行根目录测试文件（补充 CI 覆盖缺口）
-      - name: Root Directory Tests
+      # ============ 5. 全量 pytest（根目录 tests/ + contrib/F3 标准库单元测试）============
+      - name: 全量 pytest (tests/ + F3 标准库 42 条断言)
         run: |
-          pytest tests/test_parser.py tests/test_lexer.py tests/test_async.py tests/test_codegen.py tests/test_exception.py tests/test_executor.py tests/test_semantic.py tests/test_class_definition.py tests/test_duan_syntax.py tests/test_e2e.py tests/test_edge_cases.py tests/test_commands.py tests/test_file_io.py tests/test_interface.py tests/test_json_import.py tests/test_module_system.py tests/test_module_resolver.py tests/test_summary.py tests/test_ternary.py tests/test_advanced_semantic.py tests/test_duan_stdlib.py tests/test_duan_stdlib2.py tests/test_class_advanced.py tests/test_llvm_async.py tests/test_lsp_protocol.py tests/test_lsp_protocol_full.py tests/test_modern_features.py -v --tb=short --ignore=tests/archive 2>&1 || true
+          pytest tests/ contrib/test_F3_三个增强模块.py \
+                 --ignore=tests/archive \
+                 --ignore=tests/level9_project \
+                 --ignore=tests/performance_benchmark.py \
+                 -v --tb=short
 
-      # 统一测试运行器
+      # ============ 6. 统一测试运行器（quick）============
       - name: Unified Test Runner
         run: |
           python tests/run_tests.py --quick
+
+      # ============ 7. 8 个集成 demo smoke（E阶段 + L1 入门）============
+      - name: 8 个集成 demo smoke 测试
+        run: |
+          python - <<'PY'
+          import subprocess, sys, os, pathlib
+          ROOT = pathlib.Path(__file__).parent.resolve()
+          EXAMPLES = ROOT / "examples"
+          CMD = [sys.executable, "-m", "cli.duan"]
+          # 选 8 个代表性 & 依赖轻的 demo（L1入门 × 3 + 基础 × 3 + E阶段 L3 SQL & L4 沙箱 × 2）
+          demos = [
+              "L1_baihua/01_打印.duan",
+              "L1_baihua/02_计算.duan",
+              "L1_baihua/03_如果否则.duan",
+              "hello.duan",
+              "basic.duan",
+              "test_fib.duan",
+              "E阶段_L3L4原生语法/E1_L3_SQL原生.duan",
+              "E阶段_L3L4原生语法/E4_L4_沙箱隔离验证.duan",
+          ]
+          failures = []
+          for rel in demos:
+              p = EXAMPLES / rel
+              print(f"\n{'='*60}\n▶ Smoke: {rel} @ {p}\n{'='*60}")
+              try:
+                  r = subprocess.run(
+                      CMD + [str(p)],
+                      cwd=str(ROOT),
+                      capture_output=True, text=True,
+                      timeout=90,
+                      env={**os.environ, "PYTHONIOENCODING": "utf-8"},
+                  )
+                  print("--- stdout ---")
+                  print(r.stdout[-3000:])
+                  print("--- stderr ---")
+                  print(r.stderr[-3000:])
+                  print(f"exit_code = {r.returncode}")
+                  if r.returncode != 0:
+                      failures.append((rel, r.returncode, r.stderr[-400:]))
+              except subprocess.TimeoutExpired:
+                  print("TIMEOUT >90s")
+                  failures.append((rel, "TIMEOUT", ""))
+          print("\n" + "="*60)
+          print(f"Demo smoke: 通过 {len(demos)-len(failures)}/{len(demos)}")
+          if failures:
+              for name, rc, err in failures:
+                  print(f"  ✗ {name} (rc={rc}): {err!r}")
+              sys.exit(1)
+          else:
+              print("🎉 所有 demo smoke 一次通过")
+          PY
 
   lint:
     runs-on: ubuntu-latest
@@ -74,7 +142,7 @@ jobs:
           python -m pip install flake8
       - name: Lint check
         run: |
-          flake8 src/ cli/ --count --statistics --max-line-length=120 || true
+          flake8 src/ cli/ contrib --count --statistics --max-line-length=120 || true
 
   build:
     runs-on: ubuntu-latest

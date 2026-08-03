@@ -1352,11 +1352,212 @@ def debug_set_breakpoints(session_id):
     })
 
 
+# ==================== 20+ Demo 列表 & 自动运行 API ====================
+
+_EXAMPLES_ROOT = os.path.join(_project_dir, 'examples')
+
+
+def _scan_file_demos(root_dir: str, base_category: str = '示例库') -> list:
+    """递归扫描 examples/ 下所有 .duan 文件，生成 demo 列表（category: 子目录名）"""
+    results = []
+    if not os.path.isdir(root_dir):
+        return results
+    for dirpath, _, filenames in os.walk(root_dir):
+        for fn in sorted(filenames):
+            if not fn.endswith('.duan'):
+                continue
+            fpath = os.path.join(dirpath, fn)
+            try:
+                rel = os.path.relpath(fpath, root_dir)
+                rel_fwd = rel.replace(os.sep, '/')
+                # 第一级子目录作为 category（如果就是根目录则用 base_category）
+                if '/' in rel_fwd:
+                    category = rel_fwd.split('/', 1)[0]
+                else:
+                    category = base_category
+                with open(fpath, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                size = len(content)
+                # 生成稳定 id：去掉后缀 + 安全符号替换
+                raw_id = 'file__' + rel_fwd.replace('.duan', '').replace('/', '__').replace(' ', '_')
+                safe_id = ''.join(ch if ch.isalnum() or ch in ('_', '-') else '_' for ch in raw_id)
+                results.append({
+                    'id': safe_id,
+                    'source_type': 'file',
+                    'category': category,
+                    'title': fn.replace('.duan', ''),
+                    'path': rel_fwd,
+                    'description': f'文件 {rel_fwd}（{size} 字节）',
+                    'size': size,
+                    'lines': content.count('\n') + 1,
+                })
+            except Exception:
+                continue
+    return results
+
+
+def _collect_all_demos() -> list:
+    """合并内置 BUILTIN_EXAMPLES（7 大类 30+）+ examples/ 文件扫描，总 50+"""
+    demos = []
+    # 1) 内置示例（BUILTIN_EXAMPLES 7 大分类）
+    for cat in BUILTIN_EXAMPLES:
+        cat_name = cat.get('category', '内置')
+        for ex in cat.get('examples', []):
+            demos.append({
+                'id': 'builtin__' + ex.get('id', ''),
+                'source_type': 'builtin',
+                'category': '入门教程/' + cat_name,
+                'title': ex.get('title', ''),
+                'description': ex.get('description', ''),
+                'size': len(ex.get('code', '')),
+                'lines': ex.get('code', '').count('\n') + 1,
+            })
+    # 2) examples/ 文件库
+    demos.extend(_scan_file_demos(_EXAMPLES_ROOT, base_category='示例库/根'))
+    return demos
+
+
+def _get_demo_source(demo_id: str) -> str:
+    """根据 id 获取源码。优先 BUILTIN；否则按 file__<path> 去 examples/ 读文件"""
+    # 1) 内置示例
+    if demo_id.startswith('builtin__'):
+        inner = demo_id[len('builtin__'):]
+        for cat in BUILTIN_EXAMPLES:
+            for ex in cat.get('examples', []):
+                if ex.get('id') == inner:
+                    return ex.get('code', '')
+        raise FileNotFoundError(f'未找到内置示例: {inner}')
+    # 2) 文件示例
+    if demo_id.startswith('file__'):
+        tail = demo_id[len('file__'):]
+        rel = tail.replace('__', '/') + '.duan'
+        fpath = os.path.join(_EXAMPLES_ROOT, rel)
+        if not os.path.exists(fpath):
+            # 尝试另一种常见映射：下划线直接转 /（中文路径 __ 分隔可能有歧义，这里放宽）
+            alt_candidates = [
+                os.path.join(_EXAMPLES_ROOT, tail.replace('_', '/') + '.duan'),
+                os.path.join(_EXAMPLES_ROOT, tail + '.duan'),
+            ]
+            fpath = None
+            for cand in alt_candidates:
+                if os.path.exists(cand):
+                    fpath = cand
+                    break
+        if not fpath or not os.path.exists(fpath):
+            raise FileNotFoundError(f'未找到文件示例: {demo_id}')
+        with open(fpath, 'r', encoding='utf-8') as f:
+            return f.read()
+    raise ValueError(f'demo_id 格式不支持: {demo_id}')
+
+
+@app.route('/api/demos', methods=['GET'])
+@app.route('/api/demos/list', methods=['GET'])
+def list_demos():
+    """返回所有 demo 列表：count + categories(按类别分组) + demos(平铺) + categories_tree
+
+    Query 参数：
+      category=<str>  可选：仅返回该类别（模糊包含匹配）
+      limit=<int>     可选：最多返回 N 条
+    """
+    raw = _collect_all_demos()
+    # 可选过滤
+    q_cat = request.args.get('category', '').strip()
+    if q_cat:
+        raw = [d for d in raw if q_cat in d['category'] or q_cat in d['title']]
+    try:
+        limit = int(request.args.get('limit', '0'))
+        if limit > 0:
+            raw = raw[:limit]
+    except Exception:
+        pass
+    # 分类聚合
+    cats = {}
+    for d in raw:
+        cats.setdefault(d['category'], 0)
+        cats[d['category']] += 1
+    categories = [{'name': k, 'count': v} for k, v in cats.items()]
+    return jsonify({
+        'success': True,
+        'count': len(raw),
+        'categories_count': len(categories),
+        'categories': categories,
+        'demos': raw,
+    })
+
+
+@app.route('/api/demos/run', methods=['POST'])
+def run_demo():
+    """运行指定 demo：参数 { demo_id }  或 { path: 路径 } 或 { code: 源码 }
+    返回与 /api/execute 一致的 run_duan_code 结果，额外附带 demo_id / path。
+    """
+    data = request.get_json(silent=True) or {}
+    demo_id = data.get('demo_id', '') or request.args.get('demo_id', '')
+    path = data.get('path', '')
+    code = data.get('code', '') or ''
+
+    extra = {}
+    try:
+        if code:
+            extra['source'] = 'inline'
+        elif demo_id:
+            code = _get_demo_source(demo_id)
+            extra['demo_id'] = demo_id
+            extra['source'] = 'demo_id'
+        elif path:
+            # 允许直接传相对 examples/ 的路径
+            fpath = os.path.join(_EXAMPLES_ROOT, path)
+            if not os.path.exists(fpath):
+                return jsonify({'success': False, 'error': f'未找到路径: {path}'}), 404
+            with open(fpath, 'r', encoding='utf-8') as f:
+                code = f.read()
+            extra['source'] = 'path'
+            extra['path'] = path
+        else:
+            return jsonify({'success': False, 'error': '请提供 demo_id, path 或 code 三者其一'}), 400
+    except FileNotFoundError as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
+
+    if not code:
+        return jsonify({'success': False, 'error': 'demo 源码为空'}), 400
+
+    run_result = run_duan_code(code)
+    run_result.update(extra)
+    return jsonify(run_result)
+
+
+@app.route('/api/demos/<demo_id>', methods=['GET'])
+def get_demo(demo_id):
+    """获取单个 demo 详情（含源码）"""
+    try:
+        code = _get_demo_source(demo_id)
+    except FileNotFoundError as e:
+        return jsonify({'success': False, 'error': str(e)}), 404
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+    # 查找元信息
+    info = {
+        'id': demo_id,
+        'code': code,
+        'size': len(code),
+        'lines': code.count('\n') + 1,
+    }
+    for d in _collect_all_demos():
+        if d['id'] == demo_id:
+            for k in ('category', 'title', 'description', 'source_type', 'path'):
+                if k in d:
+                    info[k] = d[k]
+            break
+    info['success'] = True
+    return jsonify(info)
+
+
 if __name__ == '__main__':
     print(f"段言 Web Playground 启动中...")
     print(f"  静态文件目录: {app.static_folder}")
     print(f"  分享存储目录: {SHARED_DIR}")
     print(f"  访问地址: http://localhost:5000")
     print(f"  调试器: 已集成")
+    n_demos = len(_collect_all_demos())
+    print(f"  可用 Demo 数量: {n_demos}  (GET /api/demos)")
     print()
     app.run(debug=True, host='0.0.0.0', port=5000)
