@@ -1843,10 +1843,76 @@ class PythonCodeGenerator:
         return name
     
     def _generate_import_stmt(self, stmt: ImportStmt):
-        """生成导入语句"""
+        """生成导入语句
+        
+        支持三种语言前缀：
+        - None: 段言标准库（中文模块名映射到 stdlib 路径）
+        - 'python': Python 第三方库（直接 import 原名）
+        - 'c': C 语言库（通过 ctypes/FFI 加载）
+        """
         module_name = stmt.module_name
         
-        # 使用模块名映射转换中文模块名
+        # Python 第三方库导入：直接 import 原名
+        if getattr(stmt, 'language', None) == 'python':
+            if stmt.symbols:
+                symbols_str = ', '.join(stmt.symbols)
+                if stmt.alias:
+                    self._add_line(f"from {module_name} import {symbols_str} as {stmt.alias}")
+                    self._imported_symbols.add(stmt.alias)
+                else:
+                    self._add_line(f"from {module_name} import {symbols_str}")
+                    for symbol in stmt.symbols:
+                        self._imported_symbols.add(symbol)
+            else:
+                if stmt.alias:
+                    self._add_line(f"import {module_name} as {stmt.alias}")
+                    self._imported_symbols.add(stmt.alias)
+                else:
+                    self._add_line(f"import {module_name}")
+                    self._imported_symbols.add(module_name)
+            # 处理多模块导入
+            if hasattr(stmt, 'extra_modules') and stmt.extra_modules:
+                for extra_mod, extra_alias in stmt.extra_modules:
+                    if extra_alias:
+                        self._add_line(f"import {extra_mod} as {extra_alias}")
+                        self._imported_symbols.add(extra_alias)
+                    else:
+                        self._add_line(f"import {extra_mod}")
+                        self._imported_symbols.add(extra_mod)
+            return
+        
+        # C 语言库导入：通过 ctypes 加载共享库
+        if getattr(stmt, 'language', None) == 'c':
+            if stmt.symbols:
+                # from 模块导入符号 → 声明 ctypes 函数
+                symbols_str = ', '.join(stmt.symbols)
+                self._add_line(f"# 导入 C 库 {module_name} 的符号: {symbols_str}")
+                # 尝试通过 ctypes 加载
+                self._add_line(f"try:")
+                self._add_line(f"    _c_lib_{module_name} = ctypes.CDLL('{module_name}')")
+                self._add_line(f"except:")
+                self._add_line(f"    _c_lib_{module_name} = None")
+                for symbol in stmt.symbols:
+                    if stmt.alias:
+                        self._add_line(f"{stmt.alias}_{symbol} = getattr(_c_lib_{module_name}, '{symbol}', None) if _c_lib_{module_name} else None")
+                        self._imported_symbols.add(f"{stmt.alias}_{symbol}")
+                    else:
+                        self._add_line(f"_c_{module_name}_{symbol} = getattr(_c_lib_{module_name}, '{symbol}', None) if _c_lib_{module_name} else None")
+                        self._imported_symbols.add(symbol)
+            else:
+                self._add_line(f"# 导入 C 库: {module_name}")
+                self._add_line(f"try:")
+                self._add_line(f"    _c_lib_{module_name} = ctypes.CDLL('{module_name}')")
+                self._add_line(f"except:")
+                self._add_line(f"    _c_lib_{module_name} = None")
+                if stmt.alias:
+                    self._add_line(f"{stmt.alias} = _c_lib_{module_name}")
+                    self._imported_symbols.add(stmt.alias)
+                else:
+                    self._imported_symbols.add(module_name)
+            return
+        
+        # 段言标准库导入：使用模块名映射转换中文模块名
         mapped_module = self.module_name_map.get(module_name, module_name)
         
         if stmt.symbols:

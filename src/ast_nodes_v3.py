@@ -309,24 +309,29 @@ class Pipeline(ASTNode):
 
 
 class ImportStmt(ASTNode):
-    __slots__ = ('module_name', 'symbols', 'alias', 'extra_modules')
-    """导入语句"""
-    def __init__(self, module_name: str, symbols: List[str] = None, alias: str = None, extra_modules: list = None):
+    __slots__ = ('module_name', 'symbols', 'alias', 'extra_modules', 'language')
+    """导入语句
+    
+    language: None=段言标准库, 'python'=Python第三方库, 'c'=C语言库
+    """
+    def __init__(self, module_name: str, symbols: List[str] = None, alias: str = None, extra_modules: list = None, language: str = None):
         self.module_name = module_name
         self.symbols = symbols
         self.alias = alias
         self.extra_modules = extra_modules or []  # 多模块导入时的额外模块 [(module_name, alias), ...]
+        self.language = language  # None=段言, 'python'=Python, 'c'=C
     
     def __repr__(self):
+        lang_prefix = f"[{self.language}] " if self.language else ""
         if self.symbols:
             symbols_str = ', '.join(self.symbols)
             if self.alias:
-                return f"ImportStmt(from {self.module_name} import {symbols_str} as {self.alias})"
-            return f"ImportStmt(from {self.module_name} import {symbols_str})"
+                return f"ImportStmt({lang_prefix}from {self.module_name} import {symbols_str} as {self.alias})"
+            return f"ImportStmt({lang_prefix}from {self.module_name} import {symbols_str})"
         else:
             if self.alias:
-                return f"ImportStmt(import {self.module_name} as {self.alias})"
-            return f"ImportStmt(import {self.module_name})"
+                return f"ImportStmt({lang_prefix}import {self.module_name} as {self.alias})"
+            return f"ImportStmt({lang_prefix}import {self.module_name})"
 
 
 class ExportStmt(ASTNode):

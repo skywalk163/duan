@@ -345,11 +345,25 @@ class Lexer:
                     i += 1
                 continue
             
-            # 处理注释（// 开头）
+            # 处理注释（// 开头）或整除运算符（// 在表达式中间）
             if i + 1 < n and source[i:i+2] == '//':
-                while i < n and source[i] != '\n':
-                    i += 1
-                continue
+                # 判断是注释还是整除：检查前一个 token
+                # 如果前一个 token 是数字、标识符、) 或 ]，则 // 是整除运算符
+                if tokens and tokens[-1].type in (
+                    TokenType.NUMBER, TokenType.IDENTIFIER, TokenType.RPAREN, TokenType.RBRACKET,
+                    TokenType.STRING
+                ):
+                    # 整除运算符：发出两个 SLASH token
+                    tokens.append(Token(TokenType.SLASH, '/', line, col))
+                    tokens.append(Token(TokenType.SLASH, '/', line, col + 1))
+                    i += 2
+                    col += 2
+                    continue
+                else:
+                    # 注释
+                    while i < n and source[i] != '\n':
+                        i += 1
+                    continue
             
             # 处理以点号开头的浮点数（如 .5）
             if source[i] == '.' and i + 1 < n and _is_ascii_digit(source[i + 1]):

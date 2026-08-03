@@ -465,10 +465,10 @@ class ParserStmtMixin:
                 # 返回赋值节点（target 是属性访问表达式）
                 return Assignment(target_expr, value)
             else:
-                # 不是赋值，是方法调用等表达式语句
-                if self._current() and self._current().type == TokenType.DOT:
-                    self._consume(TokenType.DOT)
-                return target_expr
+                # 不是赋值——回退到己之前，用完整表达式解析器处理整个链式调用
+                # （如 己.history.append(内容) 需要被完整解析为 MemberAccess 链）
+                self.pos = saved_pos_before_ji
+                return self._parse_expr_stmt()
         
         # 先尝试解析一个表达式，看看是不是属性访问
         # 我们先尝试解析标识符，然后看看后面有没有点号
@@ -917,9 +917,35 @@ class ParserStmtMixin:
         5. 导入《模块名》。
         6. 导入《模块名》为 别名。
         7. 导入 子模块名.符号 从 模块名（倒装形式）。
+        8. 导入 Python: 模块名。（导入Python第三方库）
+        9. 导入 C: 模块名。（导入C语言库）
+        10. 导入 标准模块名。（导入段言标准库，"标准"前缀可选）
         """
         # 导入
         self._consume(TokenType.KEYWORD, '导入')
+        
+        # 检查语言前缀：Python: / C:
+        language = None
+        if self._current() and self._current().type == TokenType.IDENTIFIER:
+            lang_tok = self._current()
+            if lang_tok.value == 'Python':
+                # 检查后面是否是冒号
+                saved = self.pos
+                self._consume()
+                if self._current() and self._current().type == TokenType.COLON:
+                    self._consume(TokenType.COLON)
+                    language = 'python'
+                else:
+                    # 不是冒号，回退
+                    self.pos = saved
+            elif lang_tok.value == 'C':
+                saved = self.pos
+                self._consume()
+                if self._current() and self._current().type == TokenType.COLON:
+                    self._consume(TokenType.COLON)
+                    language = 'c'
+                else:
+                    self.pos = saved
         
         # 收集所有导入的模块（支持多模块）
         module_entries = []  # [(module_name, alias), ...]
@@ -992,7 +1018,7 @@ class ParserStmtMixin:
                 real_module = module_entries[0][0] if module_entries else ''
             # module_name 实际上是导入的符号
             symbols = [m[0] for m in module_entries]
-            return ImportStmt(real_module, symbols=symbols, alias=module_entries[0][1] if module_entries else None)
+            return ImportStmt(real_module, symbols=symbols, alias=module_entries[0][1] if module_entries else None, language=language)
         
         # 句号（可选）
         if self._current() and self._current().type == TokenType.DOT:
@@ -1000,12 +1026,12 @@ class ParserStmtMixin:
         
         # 多模块导入：返回第一个模块的导入语句
         if len(module_entries) == 1:
-            return ImportStmt(module_entries[0][0], symbols=None, alias=module_entries[0][1])
+            return ImportStmt(module_entries[0][0], symbols=None, alias=module_entries[0][1], language=language)
         else:
             # 多模块导入：返回第一个模块，标记额外模块
             extra_modules = [(m, a) for m, a in module_entries[1:]]
             return ImportStmt(module_entries[0][0], symbols=None, alias=module_entries[0][1],
-                            extra_modules=extra_modules)
+                            extra_modules=extra_modules, language=language)
     
     def _parse_from_import_stmt(self) -> ImportStmt:
         """解析从...导入语句

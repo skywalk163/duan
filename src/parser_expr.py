@@ -229,12 +229,24 @@ class ParserExprMixin:
                 left = BinaryOp(self.MUL_OP_MAP[op], left, right)
             elif tok.type == TokenType.STAR:
                 self._consume()
-                right = self._parse_power_expr()
-                left = BinaryOp('*', left, right)
+                # 检查是否是 ** （幂运算）
+                if self._current() and self._current().type == TokenType.STAR:
+                    self._consume()
+                    right = self._parse_power_expr()
+                    left = BinaryOp('**', left, right)
+                else:
+                    right = self._parse_power_expr()
+                    left = BinaryOp('*', left, right)
             elif tok.type == TokenType.SLASH:
                 self._consume()
-                right = self._parse_power_expr()
-                left = BinaryOp('/', left, right)
+                # 检查是否是 // （整除）
+                if self._current() and self._current().type == TokenType.SLASH:
+                    self._consume()
+                    right = self._parse_power_expr()
+                    left = BinaryOp('//', left, right)
+                else:
+                    right = self._parse_power_expr()
+                    left = BinaryOp('/', left, right)
             elif tok.type == TokenType.PERCENT:
                 self._consume()
                 right = self._parse_power_expr()
@@ -260,6 +272,17 @@ class ParserExprMixin:
                 op = self._consume().value
                 right = self._parse_power_expr()
                 left = BinaryOp(self.POWER_OP_MAP[op], left, right)
+            elif tok.type == TokenType.STAR:
+                # 检查 ** 幂运算符号
+                self._consume()
+                if self._current() and self._current().type == TokenType.STAR:
+                    self._consume()
+                    right = self._parse_power_expr()
+                    left = BinaryOp('**', left, right)
+                else:
+                    # 单个 * 不是幂运算，回退
+                    self.pos -= 1
+                    break
             else:
                 break
         
