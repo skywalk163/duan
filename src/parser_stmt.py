@@ -352,11 +352,24 @@ class ParserStmtMixin:
             return self._parse_expr_stmt()
 
         # 未知语法：报错而非静默失败
-        self._error(
-            f"无法识别的语法元素：'{tok.value}'（类型：{tok.type}）。"
-            f"请检查语句是否正确，或参考段言语法文档。",
-            tok.line, tok.col, tok.value
-        )
+        # 根据当前 token 类型给出更有针对性的提示
+        if tok.type == TokenType.KEYWORD:
+            self._error(
+                f"「{tok.value}」是保留关键字，不能直接作为语句开头。"
+                f"请检查语法是否正确，或参考段言语法文档。",
+                tok.line, tok.col, tok.value
+            )
+        elif tok.type == TokenType.EQUALS:
+            self._error(
+                f"赋值需要使用「设」关键字。如：设 甲 为 10。而不是 甲 = 10。",
+                tok.line, tok.col, tok.value
+            )
+        else:
+            self._error(
+                f"无法识别的语法元素：'{tok.value}'。"
+                f"请检查语句是否正确，或参考段言语法文档。",
+                tok.line, tok.col, tok.value
+            )
 
     def _parse_expr_stmt(self) -> ASTNode:
         """解析表达式语句（动词调用等）"""
@@ -427,6 +440,29 @@ class ParserStmtMixin:
             # 构建 target_expr = MemberAccess(Identifier("self"), attr_name)
             from ast_nodes_v3 import MemberAccess
             target_expr = MemberAccess(Identifier("self"), attr_name, False, [])
+            
+            # 深层链式访问：己.data.value 或 己.cache["key"]
+            # 继续解析后续的 .属性 和 [索引] 链
+            while self._current():
+                if self._current().type == TokenType.DOT:
+                    self._consume(TokenType.DOT)  # 消耗 .
+                    member_tok = self._current()
+                    if member_tok and member_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        member_name = member_tok.value
+                        self._consume()
+                        target_expr = MemberAccess(target_expr, member_name, False, [])
+                        continue
+                    else:
+                        break
+                elif self._current().type == TokenType.LBRACKET:
+                    self._consume(TokenType.LBRACKET)
+                    from ast_nodes_v3 import IndexAccess
+                    index = self._parse_expr()
+                    self._consume(TokenType.RBRACKET)
+                    target_expr = IndexAccess(target_expr, index)
+                    continue
+                else:
+                    break
             
             # 检查是否是赋值
             assign_op = None
