@@ -1,0 +1,28 @@
+# 文体: 文言
+# J3 - L4 MoonBit 嵌入：快速排序（moon build --target wasm + wasmtime 执行）
+
+引 MoonBit:
+    fn main {
+        println("Hello from MoonBit!")
+        let arr = [3, 1, 4, 1, 5, 9, 2, 6]
+        let sorted = quick_sort(arr)
+        println("Sorted: \{sorted}")
+    }
+
+    fn quick_sort(arr : Array[Int]) -> Array[Int] {
+        if arr.length() <= 1 {
+            return arr
+        }
+        let pivot = arr[0]
+        let left = arr[1:].iter().filter(fn(x) { x <= pivot }).collect()
+        let right = arr[1:].iter().filter(fn(x) { x > pivot }).collect()
+        return quick_sort(left) + [pivot] + quick_sort(right)
+    }
+
+段 运行():
+    打印("======= J3 L4 MoonBit 嵌入示例 =======")
+    打印("[MoonBit] 快速排序 3,1,4,1,5,9,2,6 → wasm 执行")
+    打印("注意: 需要安装 moon 工具链 + wasmtime")
+    打印("======= J3 结束 =======")
+
+运行()

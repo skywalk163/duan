@@ -116,10 +116,12 @@ class ModuleResolver:
         Args:
             search_paths: 模块搜索路径列表，None表示使用默认路径
         """
-        # 默认搜索路径：当前目录 + stdlib 目录
+        # 默认搜索路径：当前目录 + stdlib 目录 + contrib 目录
         if search_paths is None:
-            stdlib_path = os.path.join(os.path.dirname(__file__), '..', 'stdlib')
-            search_paths = ['.', stdlib_path]
+            base_dir = os.path.dirname(__file__)
+            stdlib_path = os.path.join(base_dir, '..', 'stdlib')
+            contrib_path = os.path.join(base_dir, '..', 'contrib')
+            search_paths = ['.', stdlib_path, contrib_path]
         self.search_paths = search_paths
         self.lexer = Lexer()
         self.parser = DuanParser()

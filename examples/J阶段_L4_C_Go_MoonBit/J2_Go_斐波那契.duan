@@ -1,0 +1,28 @@
+# 文体: 文言
+# J2 - L4 Go 嵌入：斐波那契 + 并发统计（go build -buildmode=c-shared）
+
+引 Go:
+    //export 斐波那契
+    func 斐波那契(n int) int {
+        if n <= 1 {
+            return n
+        }
+        return 斐波那契(n-1) + 斐波那契(n-2)
+    }
+
+    //export 求和
+    func 求和(arr []float64) float64 {
+        s := 0.0
+        for _, v := range arr {
+            s += v
+        }
+        return s
+    }
+
+段 运行():
+    打印("======= J2 L4 Go 嵌入示例 =======")
+    打印("[Go] 斐波那契(10) = " + 串(斐波那契(10)))
+    打印("[Go] 求和(1,2,3,4,5) = " + 串(求和(1,2,3,4,5)))
+    打印("======= J2 结束 =======")
+
+运行()

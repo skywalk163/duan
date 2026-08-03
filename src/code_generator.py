@@ -2589,24 +2589,157 @@ class PythonCodeGenerator:
             self._add_line(f"# --- 结束 L3 引 公式 {expr_name} ---")
             return
 
-        # -------- 原实现：C 嵌入 --------
+        # -------- L4: C 嵌入（gcc 编译 + ctypes 动态加载）--------
         if lang_main in ('c',):
-            self._add_line(f"# --- 嵌入 C（通过 ctypes 执行）---")
-            self._add_line("import ctypes")
-            self._add_line("import tempfile")
-            self._add_line("import os")
-            self._add_line("_duan_c_code = '''")
+            self._add_line(f"# --- L4: 引 C（gcc 编译 + ctypes 动态加载）---")
+            self._add_line("import ctypes as _duan_ctypes")
+            self._add_line("import tempfile as _duan_tmp")
+            self._add_line("import os as _duan_os")
+            self._add_line("import subprocess as _duan_sp")
+            self._add_line("import sys as _duan_sys")
+            self._add_line("import re as _duan_l4_re")
+            self._add_line("_DUAN_C_CODE = '''")
             for line in code.split('\n'):
                 self._add_line(line)
             self._add_line("'''")
-            self._add_line("_duan_c_src = tempfile.NamedTemporaryFile(suffix='.c', delete=False, mode='w')")
-            self._add_line("_duan_c_src.write(_duan_c_code)")
-            self._add_line("_duan_c_src.close()")
-            self._add_line("_duan_c_lib_path = _duan_c_src.name.replace('.c', '.so')")
-            self._add_line("import subprocess")
-            self._add_line("subprocess.run(['cc', '-shared', '-fPIC', '-o', _duan_c_lib_path, _duan_c_src.name], check=True)")
-            self._add_line("_duan_c_lib = ctypes.CDLL(_duan_c_lib_path)")
-            self._add_line(f"# --- 结束嵌入 C ---")
+            # 平台检测：.so vs .dll
+            self._add_line("_DUAN_C_EXT = '.dll' if _duan_sys.platform == 'win32' else '.so'")
+            # 编译器检测：gcc > cc > clang
+            self._add_line("_DUAN_C_CC = None")
+            self._add_line("for _DUAN_C_CAND in ['gcc', 'cc', 'clang']:")
+            self._add_line("    try:")
+            self._add_line("        _duan_sp.run([_DUAN_C_CAND, '--version'], capture_output=True, check=True)")
+            self._add_line("        _DUAN_C_CC = _DUAN_C_CAND; break")
+            self._add_line("    except Exception: pass")
+            # 写临时 C 文件
+            self._add_line("_DUAN_C_SRC = _duan_tmp.NamedTemporaryFile(suffix='.c', delete=False, mode='w', encoding='utf-8')")
+            self._add_line("_DUAN_C_SRC.write('#include <stdlib.h>\\n#include <string.h>\\n#include <math.h>\\n')")
+            self._add_line("_DUAN_C_SRC.write(_DUAN_C_CODE)")
+            self._add_line("_DUAN_C_SRC.close()")
+            self._add_line("_DUAN_C_LIB = _DUAN_C_SRC.name.replace('.c', _DUAN_C_EXT)")
+            # 编译
+            self._add_line("if _DUAN_C_CC:")
+            self._add_line("    _duan_sp.run([_DUAN_C_CC, '-shared', '-fPIC', '-O2', '-o', _DUAN_C_LIB, _DUAN_C_SRC.name, '-lm'], check=True)")
+            # 加载动态库
+            self._add_line("_DUAN_C_DLL = _duan_ctypes.CDLL(_DUAN_C_LIB) if _DUAN_C_CC else None")
+            # 自动解析 C 函数签名，生成 Python 可调用封装
+            self._add_line("_DUAN_C_FUNCS = _duan_l4_re.findall(r'(?:int|float|double|void|long|char\\s*\\*)\\s+(\\w+)\\s*\\(', _DUAN_C_CODE)")
+            self._add_line("for _DUAN_C_FN in _DUAN_C_FUNCS:")
+            self._add_line("    if _DUAN_C_DLL:")
+            self._add_line("        try:")
+            # 尝试推断返回类型和参数类型
+            self._add_line("            _DUAN_C_FN_OBJ = getattr(_DUAN_C_DLL, _DUAN_C_FN)")
+            self._add_line("            _DUAN_C_FN_OBJ.restype = _duan_ctypes.c_double")
+            self._add_line("            globals()[_DUAN_C_FN] = _DUAN_C_FN_OBJ")
+            self._add_line("        except Exception:")
+            self._add_line("            globals()[_DUAN_C_FN] = lambda *a, _fn=_DUAN_C_FN: f'[C:{_fn} 未加载]'")
+            self._add_line("    else:")
+            self._add_line("        globals()[_DUAN_C_FN] = lambda *a, _fn=_DUAN_C_FN: f'[C:{_fn} 编译器未找到]'")
+            self._add_line("del _DUAN_C_CODE, _DUAN_C_FN, _DUAN_C_FUNCS")
+            self._add_line(f"# --- 结束 L4 引 C ---")
+            return
+
+        # -------- L4: Go 嵌入（go build -buildmode=c-shared）--------
+        if lang_main in ('go', 'golang'):
+            self._add_line(f"# --- L4: 引 Go（go build -buildmode=c-shared + ctypes 加载）---")
+            self._add_line("import ctypes as _duan_ctypes")
+            self._add_line("import tempfile as _duan_tmp")
+            self._add_line("import os as _duan_os")
+            self._add_line("import subprocess as _duan_sp")
+            self._add_line("import sys as _duan_sys")
+            self._add_line("import re as _duan_l4_re")
+            self._add_line("_DUAN_GO_CODE = '''")
+            for line in code.split('\n'):
+                self._add_line(line)
+            self._add_line("'''")
+            # 检测 Go 编译器
+            self._add_line("_DUAN_GO_OK = False")
+            self._add_line("try:")
+            self._add_line("    _duan_sp.run(['go', 'version'], capture_output=True, check=True)")
+            self._add_line("    _DUAN_GO_OK = True")
+            self._add_line("except Exception: pass")
+            # 写 Go 源文件
+            self._add_line("if _DUAN_GO_OK:")
+            self._add_line("    _DUAN_GO_EXT = '.dll' if _duan_sys.platform == 'win32' else '.so'")
+            self._add_line("    _DUAN_GO_DIR = _duan_tmp.mkdtemp(prefix='duan_go_')")
+            self._add_line("    _DUAN_GO_SRC = _duan_os.path.join(_DUAN_GO_DIR, 'main.go')")
+            # 包装 Go 代码为 c-shared 导出库
+            self._add_line("    _DUAN_GO_WRAPPED = 'package main\\n\\nimport \"C\"\\n\\n' + _DUAN_GO_CODE")
+            self._add_line("    with open(_DUAN_GO_SRC, 'w', encoding='utf-8') as _f: _f.write(_DUAN_GO_WRAPPED)")
+            # 初始化 go.mod
+            self._add_line("    _duan_sp.run(['go', 'mod', 'init', 'duan_l4_go'], cwd=_DUAN_GO_DIR, capture_output=True)")
+            # 编译为 c-shared 库
+            self._add_line("    _DUAN_GO_LIB = _duan_os.path.join(_DUAN_GO_DIR, 'duan_go' + _DUAN_GO_EXT)")
+            self._add_line("    try:")
+            self._add_line("        _duan_sp.run(['go', 'build', '-buildmode=c-shared', '-o', _DUAN_GO_LIB, _DUAN_GO_SRC], cwd=_DUAN_GO_DIR, check=True)")
+            self._add_line("        _DUAN_GO_DLL = _duan_ctypes.CDLL(_DUAN_GO_LIB)")
+            # 自动解析 //export GoFuncName 导出函数
+            self._add_line("        _DUAN_GO_EXPORTS = _duan_l4_re.findall(r'//export\\s+(\\w+)', _DUAN_GO_CODE)")
+            self._add_line("        for _DUAN_GO_FN in _DUAN_GO_EXPORTS:")
+            self._add_line("            try:")
+            self._add_line("                _DUAN_GO_FN_OBJ = getattr(_DUAN_GO_DLL, _DUAN_GO_FN)")
+            self._add_line("                _DUAN_GO_FN_OBJ.restype = _duan_ctypes.c_double")
+            self._add_line("                globals()[_DUAN_GO_FN] = _DUAN_GO_FN_OBJ")
+            self._add_line("            except Exception:")
+            self._add_line("                globals()[_DUAN_GO_FN] = lambda *a, _fn=_DUAN_GO_FN: f'[Go:{_fn} 未加载]'")
+            self._add_line("    except Exception as _DUAN_GO_ERR:")
+            self._add_line("        print(f'[L4 Go] 编译失败: {_DUAN_GO_ERR}')")
+            self._add_line("else:")
+            self._add_line("    print('[L4 Go] Go 编译器未安装, 跳过')")
+            self._add_line("del _DUAN_GO_CODE")
+            self._add_line(f"# --- 结束 L4 引 Go ---")
+            return
+
+        # -------- L4: MoonBit 嵌入（moon build --target wasm）--------
+        if lang_main in ('moonbit', 'mbt', 'moon'):
+            self._add_line(f"# --- L4: 引 MoonBit（moon build --target wasm + wasmtime 执行）---")
+            self._add_line("import tempfile as _duan_tmp")
+            self._add_line("import os as _duan_os")
+            self._add_line("import subprocess as _duan_sp")
+            self._add_line("import sys as _duan_sys")
+            self._add_line("import json as _duan_json")
+            self._add_line("_DUAN_MBT_CODE = '''")
+            for line in code.split('\n'):
+                self._add_line(line)
+            self._add_line("'''")
+            # 检测 MoonBit 工具链
+            self._add_line("_DUAN_MBT_OK = False")
+            self._add_line("try:")
+            self._add_line("    _duan_sp.run(['moon', 'version'], capture_output=True, check=True)")
+            self._add_line("    _DUAN_MBT_OK = True")
+            self._add_line("except Exception: pass")
+            # 创建 MoonBit 项目并编译
+            self._add_line("if _DUAN_MBT_OK:")
+            self._add_line("    _DUAN_MBT_DIR = _duan_tmp.mkdtemp(prefix='duan_mbt_')")
+            self._add_line("    _DUAN_MBT_SRC = _duan_os.path.join(_DUAN_MBT_DIR, 'main.mbt')")
+            self._add_line("    with open(_DUAN_MBT_SRC, 'w', encoding='utf-8') as _f: _f.write(_DUAN_MBT_CODE)")
+            # 生成 moon.pkg.json
+            self._add_line("    _DUAN_MBT_PKG = _duan_os.path.join(_DUAN_MBT_DIR, 'moon.pkg.json')")
+            self._add_line("    with open(_DUAN_MBT_PKG, 'w') as _f: _duan_json.dump({}, _f)")
+            # 编译为 wasm
+            self._add_line("    try:")
+            self._add_line("        _duan_sp.run(['moon', 'build', '--target', 'wasm'], cwd=_DUAN_MBT_DIR, check=True, capture_output=True)")
+            # 尝试用 wasmtime 执行
+            self._add_line("        _DUAN_MBT_WASM = _duan_os.path.join(_DUAN_MBT_DIR, 'target', 'wasm', 'release', 'build', 'main.wasm')")
+            self._add_line("        if not _duan_os.path.exists(_DUAN_MBT_WASM):")
+            # 尝试其他路径
+            self._add_line("            _DUAN_MBT_WASM = _duan_os.path.join(_DUAN_MBT_DIR, 'target', 'wasm', 'debug', 'build', 'main.wasm')")
+            self._add_line("        if _duan_os.path.exists(_DUAN_MBT_WASM):")
+            self._add_line("            try:")
+            self._add_line("                _DUAN_MBT_OUT = _duan_sp.run(['wasmtime', _DUAN_MBT_WASM], capture_output=True, text=True, timeout=30)")
+            self._add_line("                print(f'[MoonBit wasm] {_DUAN_MBT_OUT.stdout.strip()}')")
+            self._add_line("                if _DUAN_MBT_OUT.stderr: print(f'[MoonBit wasm stderr] {_DUAN_MBT_OUT.stderr.strip()}')")
+            self._add_line("            except Exception as _DUAN_MBT_WASM_ERR:")
+            self._add_line("                print(f'[MoonBit] wasm 编译成功但 wasmtime 执行失败: {_DUAN_MBT_WASM_ERR}')")
+            self._add_line("                print(f'[MoonBit] wasm 文件位于: {_DUAN_MBT_WASM}')")
+            self._add_line("        else:")
+            self._add_line("            print(f'[MoonBit] 编译完成但未找到 wasm 文件')")
+            self._add_line("    except Exception as _DUAN_MBT_ERR:")
+            self._add_line("        print(f'[L4 MoonBit] 编译失败: {_DUAN_MBT_ERR}')")
+            self._add_line("else:")
+            self._add_line("    print('[L4 MoonBit] MoonBit 工具链未安装, 跳过')")
+            self._add_line("del _DUAN_MBT_CODE")
+            self._add_line(f"# --- 结束 L4 引 MoonBit ---")
             return
 
         # -------- 不支持的语言：注释保留 --------
