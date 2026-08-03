@@ -201,11 +201,12 @@ class RSA:
         """初始化RSA"""
         try:
             from cryptography.hazmat.primitives.asymmetric import rsa, padding
-            from cryptography.hazmat.primitives import hashes
+            from cryptography.hazmat.primitives import hashes, serialization
             from cryptography.hazmat.backends import default_backend
             self._rsa = rsa
             self._padding = padding
             self._hashes = hashes
+            self._serialization = serialization
             self._backend = default_backend()
             self._use_crypto = True
         except ImportError:
@@ -242,14 +243,14 @@ class RSA:
                 backend=self._backend
             )
             私钥PEM = 私钥对象.private_bytes(
-                encoding=self._hashes.Encoding.PEM,
-                format=self._hashes.PrivateFormat.PKCS8,
-                encryption_algorithm=self._hashes.NoEncryption()
+                encoding=self._serialization.Encoding.PEM,
+                format=self._serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=self._serialization.NoEncryption()
             )
             公钥对象 = 私钥对象.public_key()
             公钥PEM = 公钥对象.public_bytes(
-                encoding=self._hashes.Encoding.PEM,
-                format=self._hashes.PublicFormat.SubjectPublicKeyInfo
+                encoding=self._serialization.Encoding.PEM,
+                format=self._serialization.PublicFormat.SubjectPublicKeyInfo
             )
         else:
             私钥对象 = self._RSA.generate(密钥长度)

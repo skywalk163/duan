@@ -1104,8 +1104,20 @@ class PythonCodeGenerator:
         """生成类定义"""
         class_name = self._sanitize_name(stmt.name)
 
+        # 检查是否有抽象方法
+        has_abstract = False
+        if hasattr(stmt, 'methods') and stmt.methods:
+            for method in stmt.methods:
+                if getattr(method, 'is_abstract', False):
+                    has_abstract = True
+                    break
+
         # 类定义行（包含父类和实现的接口）
         all_bases = list(stmt.base_classes) + list(getattr(stmt, 'interfaces', []) or [])
+        if has_abstract:
+            self._needs_abc = True
+            if 'ABC' not in all_bases:
+                all_bases.insert(0, 'ABC')
         if all_bases:
             bases = ', '.join(self._sanitize_name(b) for b in all_bases)
             self._add_line(f"class {class_name}({bases}):")
@@ -1360,14 +1372,17 @@ class PythonCodeGenerator:
         method_name = method.name
 
         # 构造函数特殊处理
-        if method.is_constructor or method_name == '构造':
+        is_ctor = getattr(method, 'is_constructor', False) or method_name == '构造'
+        if is_ctor:
             method_name = '__init__'
 
         # 静态方法不需要 self 参数
         is_static = getattr(method, 'is_static', False)
         is_classmethod = getattr(method, 'is_classmethod', False)
-        if is_static:
-            params = []
+        is_abstract = getattr(method, 'is_abstract', False)
+        if is_static or is_abstract:
+            # 抽象方法可以有 self 也可以没有，但测试用例中的抽象方法通常无参数
+            params = [] if is_static else ['self']
         else:
             params = ['self']
 
@@ -1378,23 +1393,41 @@ class PythonCodeGenerator:
 
         # 收集参数名（用于排除 self. 前缀）
         self._current_method_params = set()
-        if hasattr(method, 'parameters') and method.parameters:
-            for param in method.parameters:
-                param_name = self._sanitize_name(param.name)
-                self._current_method_params.add(param.name)
-                if param.default_value:
-                    default = self._generate_expr(param.default_value)
-                    params.append(f"{param_name}={default}")
+        # 兼容 MethodDefinition(.parameters) 和 Paragraph(.params)
+        method_params = getattr(method, 'parameters', None)
+        if method_params is None:
+            method_params = getattr(method, 'params', None)
+        if method_params:
+            for param in method_params:
+                # Paragraph 的 params 是 List[Dict[str,str]]，MethodDefinition 的是 List[Parameter]
+                if isinstance(param, dict):
+                    param_name = self._sanitize_name(param.get('name', ''))
+                    self._current_method_params.add(param.get('name', ''))
+                    if param.get('default'):
+                        params.append(f"{param_name}={param['default']}")
+                    else:
+                        params.append(param_name)
                 else:
-                    params.append(param_name)
+                    param_name = self._sanitize_name(param.name)
+                    self._current_method_params.add(param.name)
+                    if getattr(param, 'default_value', None):
+                        default = self._generate_expr(param.default_value)
+                        params.append(f"{param_name}={default}")
+                    else:
+                        params.append(param_name)
 
         params_str = ', '.join(params)
 
         # 方法定义（必须包含括号）
+        if is_abstract:
+            self._needs_abc = True
+            self._add_line("@abstractmethod")
         if is_static:
             self._add_line(f"@staticmethod")
         if is_classmethod:
             self._add_line(f"@classmethod")
+        if getattr(method, 'is_property', False):
+            self._add_line("@property")
         self._add_line(f"def {method_name}({params_str}):")
 
         old_in_function = self._in_function

@@ -94,7 +94,8 @@ class WhileStmt(ASTNode):
 
 
 class Paragraph(ASTNode):
-    __slots__ = ('name', 'params', 'return_type', 'body', 'generic_params', 'modifiers')
+    __slots__ = ('name', 'params', 'return_type', 'body', 'generic_params', 'modifiers',
+                 'access_modifier', 'is_static', 'is_classmethod', 'is_property', 'is_abstract')
     """段落定义"""
     def __init__(self, name: str, params: List[Dict[str, str]], return_type: Optional[str], body: List[ASTNode],
                  generic_params: List[str] = None, modifiers: List[str] = None):
@@ -104,6 +105,11 @@ class Paragraph(ASTNode):
         self.body = body
         self.generic_params = generic_params or []
         self.modifiers = modifiers or []
+        self.access_modifier = 'public'
+        self.is_static = False
+        self.is_classmethod = False
+        self.is_property = False
+        self.is_abstract = False
     
     def __repr__(self):
         return f"Paragraph({self.name})"
@@ -372,13 +378,14 @@ class AttributeDeclaration(ASTNode):
 
 
 class MethodDefinition(ASTNode):
-    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor', 'generic_params', 'access_modifier', 'is_static', 'is_classmethod', 'is_property')
+    __slots__ = ('name', 'parameters', 'body', 'return_type', 'is_constructor', 'generic_params', 'access_modifier', 'is_static', 'is_classmethod', 'is_property', 'is_abstract')
     """方法定义"""
     def __init__(self, name: str, parameters: List[Parameter], body: List[ASTNode],
                  return_type: str = None, is_constructor: bool = False,
                  generic_params: List[str] = None,
                  access_modifier: str = 'public', is_static: bool = False,
-                 is_classmethod: bool = False, is_property: bool = False):
+                 is_classmethod: bool = False, is_property: bool = False,
+                 is_abstract: bool = False):
         self.name = name
         self.parameters = parameters
         self.body = body
@@ -389,6 +396,7 @@ class MethodDefinition(ASTNode):
         self.is_static = is_static
         self.is_classmethod = is_classmethod
         self.is_property = is_property
+        self.is_abstract = is_abstract
     
     def __repr__(self):
         return f"MethodDefinition({self.name})"

@@ -190,7 +190,7 @@ class 简单缓存:
         """获取缓存值"""
         if 键 in self._缓存:
             值, 时间戳 = self._缓存[键]
-            if self._过期时间 is None or time.time() - 时间戳 < self._过期时间:
+            if self._过期时间 is None or time.monotonic() - 时间戳 < self._过期时间:
                 return 值
             else:
                 del self._缓存[键]
@@ -198,7 +198,7 @@ class 简单缓存:
     
     def 设置(self, 键: Any, 值: Any):
         """设置缓存值"""
-        self._缓存[键] = (值, time.time())
+        self._缓存[键] = (值, time.monotonic())
     
     def 删除(self, 键: Any) -> bool:
         """删除缓存项"""
@@ -223,7 +223,7 @@ class 简单缓存:
     
     def 清理过期(self):
         """清理过期项"""
-        当前时间 = time.time()
+        当前时间 = time.monotonic()
         过期键 = []
         for 键, (_, 时间戳) in self._缓存.items():
             if self._过期时间 and 当前时间 - 时间戳 > self._过期时间:

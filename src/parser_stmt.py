@@ -3105,6 +3105,34 @@ class ParserStmtMixin:
                     method.access_modifier = 'private'
                     methods.append(method)
 
+                # 结束标记（方法定义结束后的"结束。"）
+                elif tok.type == TokenType.IDENTIFIER and tok.value == '结束':
+                    self._consume(TokenType.IDENTIFIER, '结束')
+                    # 可选句号
+                    if self._current() and self._current().type == TokenType.PERIOD:
+                        self._consume(TokenType.PERIOD)
+                    continue
+
+                # 装饰器：@静态方法、@类方法、@特性、@抽象 等
+                elif tok.type == TokenType.AT:
+                    decorator = self._parse_decorator()
+                    if decorator is not None:
+                        # 内置装饰器返回 DecoratorDefinition（含被装饰的段落）
+                        from ast_nodes_v3 import DecoratorDefinition
+                        if isinstance(decorator, DecoratorDefinition):
+                            method = decorator.paragraph
+                            if method is not None:
+                                method.access_modifier = access_modifier
+                                if decorator.decorator_name == '静态方法':
+                                    method.is_static = True
+                                elif decorator.decorator_name == '类方法':
+                                    method.is_classmethod = True
+                                elif decorator.decorator_name == '特性':
+                                    method.is_property = True
+                                elif decorator.decorator_name == '抽象':
+                                    method.is_abstract = True
+                                methods.append(method)
+
                 # 其他情况（不应该发生）
                 else:
                     break
@@ -3737,6 +3765,14 @@ class ParserStmtMixin:
 
         # 内置装饰器处理（@静态方法、@类方法、@特性、@抽象）
         if decorator_name in ('静态方法', '类方法', '特性', '抽象'):
+            # 跳过装饰器名与被装饰定义之间的 NEWLINE
+            while self._match(TokenType.NEWLINE):
+                self._consume(TokenType.NEWLINE)
+            # 跳过可选的"标注"关键字（@抽象 标注 段落 ...）
+            if self._match(TokenType.KEYWORD, '标注'):
+                self._consume(TokenType.KEYWORD, '标注')
+                while self._match(TokenType.NEWLINE):
+                    self._consume(TokenType.NEWLINE)
             paragraph = None
             if self._match(TokenType.LBOOK):
                 paragraph = self._parse_paragraph()

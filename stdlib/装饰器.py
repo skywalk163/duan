@@ -38,7 +38,7 @@ def 缓存(最大缓存数: int = 128, 过期秒数: int = None, 忽略关键字
             else:
                 键 = _生成缓存键(参数 + (frozenset(关键字参数.items()),))
             
-            现在 = time.time()
+            现在 = time.monotonic()
             
             if 键 in 缓存字典:
                 数据 = 缓存字典[键]
@@ -252,7 +252,7 @@ def 限流(最大调用次数: int = 100, 时间窗口秒数: int = 60):
     def 装饰器(函数: Callable) -> Callable:
         @functools.wraps(函数)
         def 包装器(*参数, **关键字参数):
-            现在 = time.time()
+            现在 = time.monotonic()
             调用记录[:] = [t for t in 调用记录 if (现在 - t) < 时间窗口秒数]
             
             if len(调用记录) >= 最大调用次数:

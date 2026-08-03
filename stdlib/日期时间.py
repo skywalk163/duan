@@ -402,3 +402,155 @@ def 解析相对时间(相对时间: str) -> 日期时间:
             return 日期时间(当前.年() + 年数, 当前.月(), 当前.日())
     
     return 当前
+
+
+# =============================================================================
+# 测试兼容 API（phase2 测试期望的函数名，兼容 Python datetime 和段言日期时间）
+# =============================================================================
+
+def 当前日期() -> _datetime:
+    """返回当前日期（不含时间部分）"""
+    return _datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def 当前时间戳() -> float:
+    """返回当前 Unix 时间戳（秒）"""
+    return time.time()
+
+
+def 当前时间戳毫秒() -> int:
+    """返回当前 Unix 时间戳（毫秒）"""
+    return int(time.time() * 1000)
+
+
+def 时间戳转字符串(时间戳: float, 格式: str = '%Y-%m-%d %H:%M:%S') -> str:
+    """时间戳转字符串"""
+    return _datetime.fromtimestamp(时间戳).strftime(格式)
+
+
+def 日期时间转字符串(dt, 格式: str = '%Y-%m-%d %H:%M:%S') -> str:
+    """日期时间转字符串（兼容 Python datetime 和段言日期时间）"""
+    if isinstance(dt, 日期时间):
+        return dt.格式化(格式)
+    return dt.strftime(格式)
+
+
+def 字符串转日期时间(字符串: str, 格式: str = '%Y-%m-%d %H:%M:%S') -> _datetime:
+    """字符串转日期时间"""
+    return _datetime.strptime(字符串, 格式)
+
+
+def 字符串转日期(字符串: str, 格式: str = '%Y-%m-%d') -> _datetime:
+    """字符串转日期"""
+    return _datetime.strptime(字符串, 格式)
+
+
+def 字符串转时间(字符串: str, 格式: str = '%H:%M:%S') -> _datetime:
+    """字符串转时间"""
+    return _datetime.strptime(字符串, 格式)
+
+
+def _get_dt_field(dt, py_attr: str, duan_method: str):
+    """从 Python datetime 或段言日期时间获取字段"""
+    if isinstance(dt, 日期时间):
+        return getattr(dt, duan_method)()
+    return getattr(dt, py_attr)
+
+
+def 获取年份(dt) -> int:
+    """获取年份"""
+    return _get_dt_field(dt, 'year', '年')
+
+
+def 获取月份(dt) -> int:
+    """获取月份"""
+    return _get_dt_field(dt, 'month', '月')
+
+
+def 获取日(dt) -> int:
+    """获取日"""
+    return _get_dt_field(dt, 'day', '日')
+
+
+def 获取星期几名称(dt) -> str:
+    """获取星期几名称"""
+    星期列表 = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
+    if isinstance(dt, 日期时间):
+        return dt.周几()
+    return 星期列表[dt.weekday()]
+
+
+def 是否闰年(年) -> bool:
+    """是否闰年"""
+    if isinstance(年, (日期时间, _datetime)):
+        年 = 年.year if not isinstance(年, 日期时间) else 年.年()
+    return (年 % 4 == 0 and 年 % 100 != 0) or (年 % 400 == 0)
+
+
+def 添加天数(dt, 天数: int):
+    """添加天数（兼容 Python datetime 和段言日期时间）"""
+    if isinstance(dt, 日期时间):
+        return 加天数(dt, 天数)
+    return dt + _timedelta(days=天数)
+
+
+def 时间差天数(dt1, dt2) -> int:
+    """计算两个日期的天数差"""
+    if isinstance(dt1, 日期时间):
+        d1 = dt1._日期时间
+    else:
+        d1 = dt1
+    if isinstance(dt2, 日期时间):
+        d2 = dt2._日期时间
+    else:
+        d2 = dt2
+    return abs((d2 - d1).days)
+
+
+def 日期比较(dt1, dt2) -> int:
+    """日期比较（返回 -1/0/1）"""
+    if isinstance(dt1, 日期时间):
+        d1 = dt1._日期时间
+    else:
+        d1 = dt1
+    if isinstance(dt2, 日期时间):
+        d2 = dt2._日期时间
+    else:
+        d2 = dt2
+    if d1 < d2:
+        return -1
+    elif d1 > d2:
+        return 1
+    return 0
+
+
+def 获取相对时间描述(dt) -> str:
+    """获取相对时间描述"""
+    if isinstance(dt, 日期时间):
+        d = dt._日期时间
+    else:
+        d = dt
+    当前 = _datetime.now()
+    差值 = 当前 - d
+    总秒数 = 差值.total_seconds()
+
+    if 总秒数 < 0:
+        总秒数 = -总秒数
+        前缀 = ''
+    else:
+        前缀 = '前'
+
+    if 总秒数 < 60:
+        return f'{int(总秒数)}秒{前缀}'
+    elif 总秒数 < 3600:
+        return f'{int(总秒数 / 60)}分钟{前缀}'
+    elif 总秒数 < 86400:
+        return f'{int(总秒数 / 3600)}小时{前缀}'
+    elif 总秒数 < 604800:
+        return f'{int(总秒数 / 86400)}天{前缀}'
+    elif 总秒数 < 2592000:
+        return f'{int(总秒数 / 604800)}周{前缀}'
+    elif 总秒数 < 31536000:
+        return f'{int(总秒数 / 2592000)}个月{前缀}'
+    else:
+        return f'{int(总秒数 / 31536000)}年{前缀}'
