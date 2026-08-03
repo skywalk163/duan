@@ -1913,7 +1913,11 @@ class PythonCodeGenerator:
             return
         
         # 段言标准库导入：使用模块名映射转换中文模块名
-        mapped_module = self.module_name_map.get(module_name, module_name)
+        # 1. 先查 duanpub 加载器（支持 "标准文件系统" / "文件系统" 等导入名）
+        mapped_module = self._resolve_duanpub_import(module_name)
+        # 2. 如果 duanpub 没有命中，回退到内置模块名映射
+        if mapped_module is None:
+            mapped_module = self.module_name_map.get(module_name, module_name)
         
         if stmt.symbols:
             # 从...导入：from 数学 import 平方根, 幂
@@ -1972,6 +1976,50 @@ class PythonCodeGenerator:
             # import module
             self._add_line(f"import {mapped_module}")
             self._imported_symbols.add(module_name)
+    
+    def _resolve_duanpub_import(self, module_name: str):
+        """
+        通过 duanpub 加载器解析导入名，返回 Python 模块名。
+        
+        解析顺序：
+        1. duanpub P0 包 → get_stdlib_bridge() 返回 Python 模块名
+        2. duanpub P1 包 → 返回 "stdlib.duanpub.<包名>"（桥接模块路径）
+        3. 未命中 → 返回 None（回退到 module_name_map）
+        """
+        try:
+            import sys
+            import os
+            # 确保 stdlib 目录在 path 中
+            stdlib_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'stdlib')
+            if stdlib_dir not in sys.path:
+                sys.path.insert(0, stdlib_dir)
+            from duanpub import resolve_import, get_stdlib_bridge
+            
+            pkg_info = resolve_import(module_name)
+            if pkg_info is None:
+                return None
+            
+            priority = pkg_info.get('priority', 'P2')
+            
+            # P0: 已有 stdlib 实现，桥接到 Python 模块
+            if priority == 'P0':
+                # 去掉"标准"前缀后查找桥接
+                real_name = module_name[2:] if module_name.startswith('标准') else module_name
+                bridge = get_stdlib_bridge(real_name)
+                if bridge:
+                    return bridge
+                # 没有桥接映射时，用真实包名作为 Python 模块名
+                return real_name
+            
+            # P1: 有 Python 桥接模块
+            if priority == 'P1':
+                # 去掉"标准"前缀后得到真实包名
+                real_name = module_name[2:] if module_name.startswith('标准') else module_name
+                return 'stdlib.duanpub.' + real_name
+        except Exception:
+            pass
+        return None
+
     
     def _is_chinese(self, text: str) -> bool:
         """判断字符串是否包含中文"""
