@@ -1,0 +1,42 @@
+# 文体: 文言
+# 示例2: 用 pandas 读/写 CSV
+
+引 Python:
+    import pandas as pd
+    import os
+    def l4_create_sample_csv(path):
+        """创建示例 CSV，返回行数"""
+        df = pd.DataFrame({
+            '姓名': ['张三', '李四', '王五', '赵六', '钱七'],
+            '年龄': [22, 25, 31, 28, 35],
+            '分数': [88.5, 92.0, 76.3, 85.1, 90.7]
+        })
+        df.to_csv(path, index=False, encoding='utf-8-sig')
+        return len(df)
+
+    def l4_pandas_head(path, n=5):
+        """读取 CSV 前 n 行，返回 list[dict]"""
+        df = pd.read_csv(path, encoding='utf-8-sig')
+        return df.head(n).to_dict(orient='records')
+
+    def l4_remove_if_exists(path):
+        if os.path.exists(path):
+            os.remove(path)
+            return True
+        return False
+结束引
+
+段 主():
+    设 测试路径 = "tmp_students.csv"
+    设 行数 = l4_create_sample_csv(测试路径)
+    打印 "已创建测试 CSV，共 ", 行数, " 行"
+
+    设 前几行 = l4_pandas_head(测试路径, 3)
+    打印 "读取前 3 行:"
+    遍 前几行为 行:
+        打印 "  ", 行
+
+    设 已删 = l4_remove_if_exists(测试路径)
+    打印 "清理临时文件 ", 测试路径, ": ", 已删
+
+主()

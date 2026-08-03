@@ -1,0 +1,18 @@
+# 文体: 文言
+# 示例1: 用 numpy 计算均值
+
+引 Python:
+    import numpy as np
+    def l4_numpy_mean(arr):
+        """计算数组的均值（返回 float）"""
+        nparr = np.array(arr, dtype=float)
+        return float(np.mean(nparr))
+结束引
+
+段 主():
+    设 数据 = [12, 25, 30, 43, 52, 67, 78, 89]
+    打印 "原始数据:", 数据
+    设 结果 = l4_numpy_mean(数据)
+    打印 "numpy 计算的均值:", 结果
+
+主()
