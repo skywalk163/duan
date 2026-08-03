@@ -70,8 +70,8 @@ class ParserStmtMixin:
                 continue
 
             # 跳过孤立的句号（结构定义结束后的可选终止符）
-            if tok.type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if tok.type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
                 continue
 
             # 跳过模块顶层的"结束"关键字（可选的块终止符）
@@ -160,22 +160,22 @@ class ParserStmtMixin:
         # 跳出语句：跳出
         if tok.type == TokenType.KEYWORD and tok.value == '跳出':
             self._consume(TokenType.KEYWORD, '跳出')
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return BreakStmt()
         
         # 跳过语句：跳过
         if tok.type == TokenType.KEYWORD and tok.value == '跳过':
             self._consume(TokenType.KEYWORD, '跳过')
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return ContinueStmt()
         
         # 空语句：pass（Python兼容）
         if tok.type == TokenType.IDENTIFIER and tok.value == 'pass':
             self._consume(TokenType.IDENTIFIER)
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return PassStmt()
         
         # 类型检查开关：开启类型检查 / 关闭类型检查
@@ -189,8 +189,8 @@ class ParserStmtMixin:
                     line, col = tok.line, tok.col
                     self._consume(TokenType.KEYWORD)  # 开启/关闭
                     self._consume()  # 类型检查（IDENTIFIER）
-                    if self._current() and self._current().type == TokenType.DOT:
-                        self._consume(TokenType.DOT)
+                    if self._current() and self._current().type == TokenType.PERIOD:
+                        self._consume(TokenType.PERIOD)
                     return TypeCheckToggleStmt(enable, line, col)
                 else:
                     next_next = self._peek(2)
@@ -200,8 +200,8 @@ class ParserStmtMixin:
                         self._consume(TokenType.KEYWORD)  # 开启/关闭
                         self._consume(TokenType.KEYWORD)  # 类型
                         self._consume()  # 检查（可能是 IDENTIFIER）
-                        if self._current() and self._current().type == TokenType.DOT:
-                            self._consume(TokenType.DOT)
+                        if self._current() and self._current().type == TokenType.PERIOD:
+                            self._consume(TokenType.PERIOD)
                         return TypeCheckToggleStmt(enable, line, col)
         
         # 异常捕获：尝试
@@ -375,8 +375,8 @@ class ParserStmtMixin:
         """解析表达式语句（动词调用等）"""
         expr = self._parse_expr()
         # 消耗句号
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         return expr
     
     def _parse_embed_block(self) -> ASTNode:
@@ -391,8 +391,8 @@ class ParserStmtMixin:
         tok = self._consume(TokenType.EMBED_BLOCK)
         language, code = tok.value
         # 消耗可能的句号
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         return EmbedBlock(
             language=language,
             code=code,
@@ -488,8 +488,8 @@ class ParserStmtMixin:
                 value = self._parse_expr()
                 
                 # 句号（可选）
-                if self._current() and self._current().type == TokenType.DOT:
-                    self._consume(TokenType.DOT)
+                if self._current() and self._current().type == TokenType.PERIOD:
+                    self._consume(TokenType.PERIOD)
                 
                 if assign_op in ('+=', '-=', '*=', '/=', '%=', '**='):
                     # 复合赋值：target op= value → target = target op value
@@ -532,8 +532,8 @@ class ParserStmtMixin:
                 value = self._parse_expr()
                 
                 # 句号（可选）
-                if self._current() and self._current().type == TokenType.DOT:
-                    self._consume(TokenType.DOT)
+                if self._current() and self._current().type == TokenType.PERIOD:
+                    self._consume(TokenType.PERIOD)
                 
                 # 返回赋值节点（target 是属性访问表达式）
                 return Assignment(target_expr, value)
@@ -578,8 +578,8 @@ class ParserStmtMixin:
         value = self._parse_expr()
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         # 创建赋值节点（self.attr_name = value）
         return SelfAssignment(attr_name, value)
@@ -615,8 +615,8 @@ class ParserStmtMixin:
                 operator = compound_ops[op_text]
                 self._consume(TokenType.KEYWORD, op_text)
                 value = self._parse_expr()
-                if self._current() and self._current().type == TokenType.DOT:
-                    self._consume(TokenType.DOT)
+                if self._current() and self._current().type == TokenType.PERIOD:
+                    self._consume(TokenType.PERIOD)
                 return IndexedCompoundAssignment(name, index, operator, value)
             
             # 检查等于/为/=
@@ -630,8 +630,8 @@ class ParserStmtMixin:
             
             value = self._parse_expr()
             
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             
             return IndexedAssignment(name, index, value)
         
@@ -645,8 +645,8 @@ class ParserStmtMixin:
             value = self._parse_expr()
             
             # 句号（可选）
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             
             return CompoundAssignment(name, operator, value)
         
@@ -663,8 +663,8 @@ class ParserStmtMixin:
         value = self._parse_expr()
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return VarDecl(name, value)
     
@@ -821,8 +821,8 @@ class ParserStmtMixin:
         value = self._parse_expr()
 
         # 句号（可选，用于独立语句）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
 
         return VarDecl(name, value, type_annotation=type_annotation)
 
@@ -1057,8 +1057,8 @@ class ParserStmtMixin:
             return ImportStmt(real_module, symbols=symbols, alias=module_entries[0][1] if module_entries else None, language=language)
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         # 多模块导入：返回第一个模块的导入语句
         if len(module_entries) == 1:
@@ -1140,15 +1140,15 @@ class ParserStmtMixin:
                 continue
             
             # 检查是否结束（句号）
-            if self._current() and self._current().type == TokenType.DOT:
+            if self._current() and self._current().type == TokenType.PERIOD:
                 break
             
             # 如果不是标识符/关键字或句号，结束
             break
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         # 别名（可选）：从 模块 导入 符号 为 别名
         alias = None
@@ -1157,8 +1157,8 @@ class ParserStmtMixin:
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 alias = self._consume().value
             # 句号（可选）
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         
         return ImportStmt(module_name, symbols=symbols, alias=alias)
     
@@ -1190,8 +1190,8 @@ class ParserStmtMixin:
             # 值
             value = self._parse_expr()
             # 句号（可选）
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return DestructuringAssignment(variables, value, style='tuple')
         
         # 检查是否为列表解构赋值：设 [首, 余] 为 列表
@@ -1217,8 +1217,8 @@ class ParserStmtMixin:
             # 值
             value = self._parse_expr()
             # 句号（可选）
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return DestructuringAssignment(variables, value, style='list')
         
         # 普通变量声明：变量名（支持标识符和关键字）
@@ -1264,8 +1264,8 @@ class ParserStmtMixin:
                 # 构建元组字面量作为值
                 from ast_nodes_v3 import TupleLiteral
                 value = TupleLiteral(values)
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return DestructuringAssignment(variables, value, style='tuple')
         
         # 支持属性赋值：设 obj.attr 为 value 或 设 己.attr 为 value
@@ -1310,8 +1310,8 @@ class ParserStmtMixin:
                     self._error(f"期望'为'或'等于'，但得到 {tok.type if tok else '输入结束'}",
                                tok.line if tok else 0, tok.col if tok else 0)
                 value = self._parse_expr()
-                if self._current() and self._current().type == TokenType.DOT:
-                    self._consume(TokenType.DOT)
+                if self._current() and self._current().type == TokenType.PERIOD:
+                    self._consume(TokenType.PERIOD)
                 return IndexedAssignment(target=target_expr, index=None, value=value)
             
             # 期望"为"或"等于"
@@ -1326,8 +1326,8 @@ class ParserStmtMixin:
                 self._error(f"期望'为'或'等于'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
                            tok.line if tok else 0, tok.col if tok else 0)
             value = self._parse_expr()
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             # 生成属性赋值：name.attr = value
             return VarDecl(full_name, value, type_annotation=None)
 
@@ -1355,8 +1355,8 @@ class ParserStmtMixin:
                 self._error(f"期望'为'或'等于'，但得到 {tok.type if tok else '输入结束'} = '{tok.value if tok else ''}'",
                            tok.line if tok else 0, tok.col if tok else 0)
             value = self._parse_expr()
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return IndexedAssignment(target=target_expr, index=None, value=value)
         
         # 类型注解（可选）：设 变量: 类型 为 值
@@ -1416,8 +1416,8 @@ class ParserStmtMixin:
                 tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None)
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return VarDecl(name, value, type_annotation=type_annotation)
     
@@ -1435,8 +1435,8 @@ class ParserStmtMixin:
         # 检查是否是"全部"
         if self._match(TokenType.IDENTIFIER, '全部'):
             self._consume(TokenType.IDENTIFIER, '全部')
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return ExportStmt(['*'])  # 特殊标记：导出全部
         
         # 符号列表（可以是书名号包裹或简单标识符/关键字）
@@ -1468,7 +1468,7 @@ class ParserStmtMixin:
                 continue
             
             # 检查是否结束（句号）
-            if self._current() and self._current().type == TokenType.DOT:
+            if self._current() and self._current().type == TokenType.PERIOD:
                 break
             
             # 如果不是标识符/关键字或句号，结束
@@ -1477,8 +1477,8 @@ class ParserStmtMixin:
                 break
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return ExportStmt(symbols)
     
@@ -1513,8 +1513,8 @@ class ParserStmtMixin:
         elif self._match(TokenType.KEYWORD, '那么'):
             self._consume(TokenType.KEYWORD, '那么')
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         # 单行体：如果 条件 那么 语句。  （无冒号，无换行）
         if self._current() and self._current().type not in (TokenType.COLON, TokenType.LBRACE, TokenType.NEWLINE):
@@ -1550,8 +1550,8 @@ class ParserStmtMixin:
                     # 否则如果(cond){body}
                     self._consume(TokenType.KEYWORD, '如果')
                     elif_condition = self._parse_expr()
-                    if self._current() and self._current().type == TokenType.DOT:
-                        self._consume(TokenType.DOT)
+                    if self._current() and self._current().type == TokenType.PERIOD:
+                        self._consume(TokenType.PERIOD)
                     if self._current() and self._current().type == TokenType.LBRACE:
                         elif_body = self._parse_brace_body()
                     else:
@@ -1616,16 +1616,16 @@ class ParserStmtMixin:
                 pass
             else:
                 self._consume(TokenType.KEYWORD, '结束')
-                if self._current() and self._current().type == TokenType.DOT:
-                    self._consume(TokenType.DOT)
+                if self._current() and self._current().type == TokenType.PERIOD:
+                    self._consume(TokenType.PERIOD)
         elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
             next_tok = self._peek(1)
             if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '否则':
                 pass
             else:
                 self._consume(TokenType.IDENTIFIER)
-                if self._current() and self._current().type == TokenType.DOT:
-                    self._consume(TokenType.DOT)
+                if self._current() and self._current().type == TokenType.PERIOD:
+                    self._consume(TokenType.PERIOD)
         
         # 创建根节点
         result = IfStmt(condition, then_body, None)
@@ -1796,7 +1796,7 @@ class ParserStmtMixin:
         
         # 处理隐式范围表达式：遍历 i 于 0self.hash_count（无 至/到 关键字）
         # 当可迭代对象解析后，下一个 token 不是 : 或 { 时，尝试解析为范围表达式
-        if self._current() and self._current().type not in (TokenType.COLON, TokenType.LBRACE, TokenType.NEWLINE, TokenType.DOT):
+        if self._current() and self._current().type not in (TokenType.COLON, TokenType.LBRACE, TokenType.NEWLINE, TokenType.PERIOD):
             # 尝试解析剩余部分作为范围结束表达式
             saved_pos = self.pos
             try:
@@ -1867,12 +1867,12 @@ class ParserStmtMixin:
         # "结束"可能被词法分析器识别为 IDENTIFIER（非关键字），两种情况都要处理
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
             self._consume(TokenType.KEYWORD, '结束')
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
             self._consume(TokenType.IDENTIFIER)
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         
         return WhileStmt(condition, body)
     
@@ -1886,7 +1886,7 @@ class ParserStmtMixin:
         # 检查是否有表达式：如果下一个token不是句号、不是DEDENT、不是NEWLINE、不是语句关键字，则解析表达式
         if self._current():
             tok = self._current()
-            if tok.type != TokenType.DOT and tok.type != TokenType.DEDENT and tok.type != TokenType.NEWLINE:
+            if tok.type != TokenType.PERIOD and tok.type != TokenType.DEDENT and tok.type != TokenType.NEWLINE:
                 # 检查是否是语句关键字
                 is_stmt_keyword = False
                 if tok.type == TokenType.KEYWORD:
@@ -1932,8 +1932,8 @@ class ParserStmtMixin:
                         value = first
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return ReturnStmt(value)
     
@@ -2114,12 +2114,12 @@ class ParserStmtMixin:
         # 消耗"结束"关键字（可选）
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
             self._consume(TokenType.KEYWORD, '结束')
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
             self._consume(TokenType.IDENTIFIER)
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         
         return TryStmt(try_body, catch_clauses=catch_clauses, 
                        catch_type=catch_type, catch_var=catch_var, 
@@ -2135,11 +2135,11 @@ class ParserStmtMixin:
         
         # 检查是否是裸抛出（重新抛出当前异常）
         tok = self._current()
-        if tok and tok.type in (TokenType.NEWLINE, TokenType.DEDENT, TokenType.DOT, TokenType.EOF):
+        if tok and tok.type in (TokenType.NEWLINE, TokenType.DEDENT, TokenType.PERIOD, TokenType.EOF):
             # 裸抛出：抛出（重新抛出当前异常）
             # 句号（可选）
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
             return ThrowStmt(None)
         
         # 异常值
@@ -2152,8 +2152,8 @@ class ParserStmtMixin:
             from_expr = self._parse_expr()
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return ThrowStmt(value, from_expr)
     def _is_paragraph_definition(self) -> bool:
@@ -2440,8 +2440,8 @@ class ParserStmtMixin:
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         self._consume(TokenType.COLON)
 
@@ -2464,8 +2464,8 @@ class ParserStmtMixin:
         elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
             self._consume(TokenType.IDENTIFIER)
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return Paragraph(name, params, return_type, body, generic_params=generic_params)
     
@@ -2525,13 +2525,13 @@ class ParserStmtMixin:
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
             self._consume(TokenType.KEYWORD, '结束')
             # 消耗句号（可选）
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
             self._consume(TokenType.IDENTIFIER, '结束')
             # 消耗句号（可选）
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         
         return AsyncScope(tasks=body, result_vars=result_vars)
     
@@ -2620,8 +2620,8 @@ class ParserStmtMixin:
                 break
 
             # 跳过孤立的句号（块结束后的可选终止符）
-            if tok.type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if tok.type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
                 continue
 
             if stop_on_paragraph and depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
@@ -2734,8 +2734,8 @@ class ParserStmtMixin:
         # 冒号
         if self._current() and self._current().type == TokenType.COLON:
             self._consume(TokenType.COLON)
-        elif self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        elif self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         # 方法体
         body = []
@@ -2792,8 +2792,8 @@ class ParserStmtMixin:
         # 冒号
         if self._current() and self._current().type == TokenType.COLON:
             self._consume(TokenType.COLON)
-        elif self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        elif self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         # 类体
         attributes = []
@@ -2848,8 +2848,8 @@ class ParserStmtMixin:
             default_value = self._parse_expr()
         
         # 句号
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return AttributeDeclaration(name=attr_name, default_value=default_value)
 
@@ -2896,8 +2896,8 @@ class ParserStmtMixin:
         # 冒号
         if self._current() and self._current().type == TokenType.COLON:
             self._consume(TokenType.COLON)
-        elif self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        elif self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         # 方法体
         body = []
@@ -2951,7 +2951,7 @@ class ParserStmtMixin:
                 if self._current().type == TokenType.KEYWORD and self._current().value in ('继承', '实现'):
                     break
                 # 检查是否遇到句号或冒号
-                if self._current().type in (TokenType.DOT, TokenType.COLON):    
+                if self._current().type in (TokenType.PERIOD, TokenType.COLON):    
                     break
                 name_parts.append(self._consume().value)
         else:
@@ -2993,7 +2993,7 @@ class ParserStmtMixin:
                 # 收集多 token 名称（如"可打印"被拆为"可"+"打印"）
                 parts = []
                 while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                    if self._current().type in (TokenType.COLON, TokenType.DOT):
+                    if self._current().type in (TokenType.COLON, TokenType.PERIOD):
                         break
                     parts.append(self._consume().value)
                 if parts:
@@ -3004,8 +3004,8 @@ class ParserStmtMixin:
                     break
 
         # 句号或冒号
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         elif self._current() and self._current().type == TokenType.COLON:       
             self._consume(TokenType.COLON)
         else:
@@ -3130,7 +3130,7 @@ class ParserStmtMixin:
         attr_name_parts = []
         while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
             # 遇到分隔符时停止
-            if self._current().type == TokenType.DOT:
+            if self._current().type == TokenType.PERIOD:
                 break
             if self._current().type == TokenType.NEWLINE:
                 break
@@ -3151,8 +3151,8 @@ class ParserStmtMixin:
             default_value = self._parse_expr()
 
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
 
         return AttributeDeclaration(name=attr_name, default_value=default_value)
 
@@ -3334,8 +3334,8 @@ class ParserStmtMixin:
 
         # 句号或冒号
         tok_colon = self._current()
-        if tok_colon and tok_colon.type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if tok_colon and tok_colon.type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         elif tok_colon and tok_colon.type == TokenType.COLON:
             self._consume(TokenType.COLON)
         else:
@@ -3400,7 +3400,7 @@ class ParserStmtMixin:
             # 检查是否遇到"继承"关键字或冒号/句号
             if self._current().type == TokenType.KEYWORD and self._current().value == '继承':
                 break
-            if self._current().type in (TokenType.COLON, TokenType.DOT):        
+            if self._current().type in (TokenType.COLON, TokenType.PERIOD):        
                 break
             name_parts.append(self._consume().value)
         name = ''.join(name_parts)
@@ -3416,7 +3416,7 @@ class ParserStmtMixin:
                 parts = []
                 while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                     # 遇到逗号、冒号、句号时停止
-                    if self._current().type in (TokenType.COLON, TokenType.DOT):
+                    if self._current().type in (TokenType.COLON, TokenType.PERIOD):
                         break
                     parts.append(self._consume().value)
                 if parts:
@@ -3429,8 +3429,8 @@ class ParserStmtMixin:
         # 冒号或句号
         if self._match(TokenType.COLON):
             self._consume(TokenType.COLON)
-        elif self._match(TokenType.DOT):
-            self._consume(TokenType.DOT)
+        elif self._match(TokenType.PERIOD):
+            self._consume(TokenType.PERIOD)
 
         # 接口体
         methods = []
@@ -3527,8 +3527,8 @@ class ParserStmtMixin:
                 return_type = self._consume().value
 
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
 
         return MethodSignature(name, params, return_type)
 
@@ -3555,8 +3555,8 @@ class ParserStmtMixin:
             self._consume(TokenType.COLON)
 
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
 
         # 解析各个情况
         cases = []
@@ -3612,13 +3612,13 @@ class ParserStmtMixin:
             saved_pos = self.pos
             mod_tok = self._consume()
             mod_name = mod_tok.value
-            if self._current() and self._current().type == TokenType.DOT:
-                self._consume(TokenType.DOT)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
                 if self._current() and self._current().type == TokenType.STAR:
                     self._consume(TokenType.STAR)
                     # 消耗句号（可选）
-                    if self._current() and self._current().type == TokenType.DOT:
-                        self._consume(TokenType.DOT)
+                    if self._current() and self._current().type == TokenType.PERIOD:
+                        self._consume(TokenType.PERIOD)
                     return ImportStmt(mod_name, symbols=['*'], alias=None)
 
             # 不是通配符导入，回退
@@ -3652,8 +3652,8 @@ class ParserStmtMixin:
             self._consume(TokenType.COLON)
 
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
 
         # 体
         body = self._parse_body()
@@ -3790,8 +3790,8 @@ class ParserStmtMixin:
             self._consume(TokenType.COLON)
 
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
 
         # 分支体
         body = []
@@ -3968,8 +3968,8 @@ class ParserStmtMixin:
             self._error(f"期望库别名，但得到 {alias_tok.type if alias_tok else '输入结束'}")
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFILoadLibrary(library_path, alias)
 
@@ -4012,7 +4012,7 @@ class ParserStmtMixin:
                 ptok = self._current()
                 if ptok.type == TokenType.KEYWORD and ptok.value in ('返回', '在'):
                     break
-                if ptok.type == TokenType.DOT:
+                if ptok.type == TokenType.PERIOD:
                     break
                 
                 if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
@@ -4021,7 +4021,7 @@ class ParserStmtMixin:
                     while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                         if self._current().value in ('返回', '在', '为'):
                             break
-                        if self._match(TokenType.COMMA) or self._current().type == TokenType.DOT:
+                        if self._match(TokenType.COMMA) or self._current().type == TokenType.PERIOD:
                             break
                         param_parts.append(self._current().value)
                         self._consume()
@@ -4066,8 +4066,8 @@ class ParserStmtMixin:
                 self._error(f"期望库别名，但得到 {alias_tok.type if alias_tok else '输入结束'}")
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIFunctionDecl(name, params, return_type, library_alias, c_name)
 
@@ -4117,8 +4117,8 @@ class ParserStmtMixin:
             self._consume(TokenType.RBRACE)
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIStructDef(name, fields)
 
@@ -4143,7 +4143,7 @@ class ParserStmtMixin:
                 ptok = self._current()
                 if ptok.type == TokenType.KEYWORD and ptok.value == '返回':
                     break
-                if ptok.type == TokenType.DOT:
+                if ptok.type == TokenType.PERIOD:
                     break
                 
                 if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
@@ -4184,8 +4184,8 @@ class ParserStmtMixin:
                 return_type = self._consume().value
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFICallbackDef(name, params, return_type)
 
@@ -4239,8 +4239,8 @@ class ParserStmtMixin:
             self._consume(TokenType.RBRACE)
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIEnumDef(name, values)
 
@@ -4288,8 +4288,8 @@ class ParserStmtMixin:
             self._consume(TokenType.RBRACE)
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIUnionDef(name, fields)
 
@@ -4332,7 +4332,7 @@ class ParserStmtMixin:
                 ptok = self._current()
                 if ptok.type == TokenType.KEYWORD and ptok.value in ('返回', '在'):
                     break
-                if ptok.type == TokenType.DOT:
+                if ptok.type == TokenType.PERIOD:
                     break
                 
                 if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
@@ -4383,8 +4383,8 @@ class ParserStmtMixin:
                 self._error(f"期望库别名，但得到 {alias_tok.type if alias_tok else '输入结束'}")
         
         # 句号（可选）
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIVarArgsDecl(name, params, return_type, library_alias, c_name)
 
@@ -4403,8 +4403,8 @@ class ParserStmtMixin:
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 base_type = self._consume().value
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFITypedefDef(name, base_type)
 
@@ -4448,8 +4448,8 @@ class ParserStmtMixin:
         if self._match(TokenType.RBRACE):
             self._consume(TokenType.RBRACE)
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIBitfieldDef(name, base_type, fields)
 
@@ -4469,7 +4469,7 @@ class ParserStmtMixin:
                 ptok = self._current()
                 if ptok.type == TokenType.KEYWORD and ptok.value == '返回':
                     break
-                if ptok.type == TokenType.DOT:
+                if ptok.type == TokenType.PERIOD:
                     break
                 if ptok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                     param_parts = []
@@ -4504,8 +4504,8 @@ class ParserStmtMixin:
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIFuncPtrDef(name, params, return_type)
 
@@ -4542,8 +4542,8 @@ class ParserStmtMixin:
             if self._match(TokenType.RBRACE):
                 self._consume(TokenType.RBRACE)
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIDebugConfig(enabled, log_calls, log_types, trace_memory)
 
@@ -4567,7 +4567,7 @@ class ParserStmtMixin:
                 elif self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                     value = self._consume().value
         
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return FFIPreprocessorDef(name, value)

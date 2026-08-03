@@ -666,6 +666,10 @@ class Lexer:
         if ch == '》':
             return Token(TokenType.RBOOK, '》', line, col), 1
         
+        # 中文句号（直接映射到 PERIOD，不经过 SYMBOL_MAP 的 DOT 映射）
+        if ch == '。':
+            return Token(TokenType.PERIOD, ch, line, col), 1
+        
         # 中文符号映射
         if ch in SYMBOL_MAP:
             mapped = SYMBOL_MAP[ch]

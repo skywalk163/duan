@@ -29,7 +29,8 @@ class TokenType(Enum):
     OPERATOR = auto()    # 运算符（加、减、乘、除等）
     
     # 符号
-    DOT = auto()         # 句号 。
+    DOT = auto()         # 英文点号 .（成员访问符）
+    PERIOD = auto()      # 中文句号 。（语句结束符）
     COMMA = auto()       # 逗号 ，（管道操作符）
     SEMICOLON = auto()   # 分号 ；
     COLON = auto()       # 冒号 ：

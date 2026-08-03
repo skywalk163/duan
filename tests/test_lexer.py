@@ -178,7 +178,7 @@ def test_symbols():
     assert len(commas) == 2, "应该有2个逗号"
     print("  [OK] 逗号被正确识别")
     
-    dots = [t for t in tokens if t.type == TokenType.DOT]
+    dots = [t for t in tokens if t.type == TokenType.PERIOD]
     assert len(dots) == 1, "应该有1个句号"
     print("  [OK] 句号被正确识别")
     

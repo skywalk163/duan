@@ -28,7 +28,7 @@ class ParserExprMixin:
         tok = self._current()
         if tok is None:
             return True
-        if tok.type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT, TokenType.DOT):
+        if tok.type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT, TokenType.DOT, TokenType.PERIOD):
             return True
         return False
     
@@ -495,7 +495,7 @@ class ParserExprMixin:
                     # 无括号参数
                     while self._current():
                         next_tok = self._current()
-                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                        if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                             break
                         if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                             break
@@ -557,7 +557,7 @@ class ParserExprMixin:
                     # 无括号式：列 参数1 参数2 参数3
                     while self._current():
                         next_tok = self._current()
-                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET,
+                        if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET,
                                              TokenType.NEWLINE, TokenType.DEDENT, TokenType.INDENT):
                             break
                         if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
@@ -595,7 +595,7 @@ class ParserExprMixin:
                 else:
                     # 无括号式：列表追加 成绩 分数
                     for _ in range(arity):
-                        if self._current() and self._current().type not in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN):
+                        if self._current() and self._current().type not in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN):
                             arg = self._parse_comparison()
                             if arg:
                                 args.append(arg)
@@ -616,7 +616,7 @@ class ParserExprMixin:
             if not next_tok or next_tok.type == TokenType.LPAREN:
                 pass  # 下面的正常分支处理括号
             elif (next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE) or \
-                 next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN,
+                 next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN,
                                     TokenType.RBRACKET, TokenType.COLON, TokenType.EOF):
                 if next_tok.type != TokenType.LPAREN:
                     # 当作变量名处理，如 "如果操作等于加那么..." 中的 "加"
@@ -649,7 +649,7 @@ class ParserExprMixin:
                     # 可变参数
                     while self._current():
                         next_tok = self._current()
-                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                        if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                             break
                         if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                             break
@@ -661,7 +661,7 @@ class ParserExprMixin:
                 else:
                     # 固定参数
                     for _ in range(arity):
-                        if self._current() and self._current().type not in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN):
+                        if self._current() and self._current().type not in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN):
                             arg = self._parse_comparison()
                             if arg:
                                 args.append(arg)

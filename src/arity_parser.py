@@ -221,7 +221,7 @@ class ArityParser:
     
     def _is_blocking_token(self, token: Token) -> bool:
         """判断是否为阻断符"""
-        if token.type == TokenType.DOT:
+        if token.type == TokenType.DOT or token.type == TokenType.PERIOD:
             return True
         if token.type == TokenType.COMMA:
             return True
