@@ -755,6 +755,9 @@ class Lexer:
                     elif next_ch == '0':
                         chars.append('\0')
                     else:
+                        # 未识别的转义序列，保留反斜杠和后续字符
+                        # 如 \d → \d（而非丢弃反斜杠只剩 d）
+                        chars.append('\\')
                         chars.append(next_ch)
                     j += 2
                 else:

@@ -1,5 +1,5 @@
 /* =============================================================================
-   段言 (Duan) Web Playground - 样式 v3.2
+   段言 (Duan) Web Playground - 样式 v4.0
    ============================================================================= */
 
 :root {
@@ -1079,6 +1079,84 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
+}
+
+/* =============================================================================
+   L1/L2 文体模式
+   ============================================================================= */
+
+/* L1 白话模式：温暖、宽松、适合教学 */
+[data-style="L1"] .editor {
+    --l1-font: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, 'Microsoft YaHei', monospace;
+}
+
+[data-style="L1"] .navbar {
+    border-bottom: 2px solid var(--accent-orange);
+}
+
+[data-style="L1"] .logo-accent {
+    color: var(--accent-orange);
+}
+
+[data-style="L1"] .editor-tab.active {
+    border-bottom-color: var(--accent-orange);
+}
+
+[data-style="L1"] .tab.active {
+    color: var(--accent-orange);
+}
+
+[data-style="L1"] .file-tree-item.active {
+    border-left-color: var(--accent-orange);
+}
+
+[data-style="L1"] .example-item.active {
+    border-left-color: var(--accent-orange);
+}
+
+[data-style="L1"] .btn-run {
+    background: #d29922;
+    border-color: #d29922;
+}
+
+[data-style="L1"] .btn-run:hover {
+    background: #e0a830;
+    border-color: #e0a830;
+}
+
+/* L2 文言模式：精准、紧凑、适合商业 */
+[data-style="L2"] .navbar {
+    border-bottom: 2px solid var(--accent-purple);
+}
+
+[data-style="L2"] .logo-accent {
+    color: var(--accent-purple);
+}
+
+[data-style="L2"] .editor-tab.active {
+    border-bottom-color: var(--accent-purple);
+}
+
+[data-style="L2"] .tab.active {
+    color: var(--accent-purple);
+}
+
+[data-style="L2"] .file-tree-item.active {
+    border-left-color: var(--accent-purple);
+}
+
+[data-style="L2"] .example-item.active {
+    border-left-color: var(--accent-purple);
+}
+
+[data-style="L2"] .btn-run {
+    background: #8250df;
+    border-color: #8250df;
+}
+
+[data-style="L2"] .btn-run:hover {
+    background: #9368e8;
+    border-color: #9368e8;
 }
 
 /* =============================================================================

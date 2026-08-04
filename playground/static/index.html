@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>段言 (Duan) Playground - v3.2</title>
+    <title>段言 (Duan) Playground - v4.0</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>段</text></svg>">
 </head>
@@ -11,7 +11,7 @@
     <header class="navbar">
         <div class="nav-left">
             <span class="logo">段<span class="logo-accent">言</span></span>
-            <span class="logo-sub">Playground v3.2</span>
+            <span class="logo-sub">Playground v4.0</span>
         </div>
         <div class="nav-center">
             <button class="btn btn-examples" onclick="toggleSidebar()" title="示例库">
@@ -34,6 +34,9 @@
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2 10h12v2H2zM8 2v12H6V2h2z"/></svg>
             </button>
             <div class="toolbar-divider"></div>
+            <button class="btn btn-icon" id="styleBtn" onclick="toggleStyle()" title="切换文体：L1白话 / L2文言">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2h2l3 12H6L5 11H3l-1 3H0L3 2zm3.3 7L5 5.5 3.7 9h2.6zM11 2l2 5h-4l2-5zm2 6l-2 6h2l1-3h2l1 3h2l-2-6h-4z"/></svg>
+            </button>
             <button class="btn btn-icon" onclick="toggleTheme()" title="切换主题" id="themeBtn">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 12A5 5 0 118 3a5 5 0 010 10z"/></svg>
             </button>
@@ -166,7 +169,7 @@
             <div class="grammar-modal-header">
                 <div class="grammar-modal-title">
                     <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1.5A1.5 1.5 0 00.5 3v10A1.5 1.5 0 002 14.5h12a1.5 1.5 0 001.5-1.5V3A1.5 1.5 0 0014 1.5H2zM2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
-                    段言语法速查 v3.2
+                    段言语法速查 v4.0
                 </div>
                 <button class="btn btn-close" onclick="closeGrammarModal()" title="关闭">✕</button>
             </div>

@@ -73,7 +73,7 @@ l3_sql_exec(DB, "INSERT INTO t VALUES (?,?)", [1, "张三"])
 l3_sql_exec(DB, "INSERT INTO t VALUES (?,?)", [2, "李四"])
 设 结果 = l3_sql_query(DB, "SELECT * FROM t ORDER BY id")
 打印("行数:", 长度(结果))
-遍 结果为 行:
+遍历 行 于 结果:
     打印(行["id"], 行["name"])
 '''
         output = _run_duan(code)
@@ -168,7 +168,7 @@ class TestL3_Regex_E2E(unittest.TestCase):
         return re.fullmatch(pattern, text) is not None
 结束引
 
-设 邮箱正则 = r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+"
+设 邮箱正则 = "[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+"
 打印(l3_re_match(邮箱正则, "test@duan-lang.org"))
 打印(l3_re_match(邮箱正则, "bad-email@"))
 打印(l3_re_match(邮箱正则, "user@example.com"))
@@ -187,10 +187,10 @@ class TestL3_Regex_E2E(unittest.TestCase):
 结束引
 
 设 文本 = "客服: 13812345678, 备用: 15987654321, 座机: 010-12345678"
-设 手机正则 = r"1[3-9]\\d{9}"
+设 手机正则 = "1[3-9]\\d{9}"
 设 号码 = l3_re_findall(手机正则, 文本)
 打印(长度(号码))
-遍 号码为 n:
+遍历 n 于 号码:
     打印(n)
 '''
         output = _run_duan(code)
@@ -208,7 +208,7 @@ class TestL3_Regex_E2E(unittest.TestCase):
         return m.groupdict() if m else {}
 结束引
 
-设 日期正则 = r"(?P<年>\\d{4})-(?P<月>\\d{2})-(?P<日>\\d{2})"
+设 日期正则 = "(?P<年>\\d{4})-(?P<月>\\d{2})-(?P<日>\\d{2})"
 设 d = l3_re_named_groups(日期正则, "2026-08-04")
 打印(d["年"])
 打印(d["月"])
@@ -229,7 +229,7 @@ class TestL3_Regex_E2E(unittest.TestCase):
 结束引
 
 设 文本 = "日期: 2026-08-04, 截止: 2026-12-31"
-设 新文本 = l3_re_sub(r"(\\d{4})-(\\d{2})-(\\d{2})", r"\\1/\\2/\\3", 文本)
+设 新文本 = l3_re_sub("(\\d{4})-(\\d{2})-(\\d{2})", "\\1/\\2/\\3", 文本)
 打印(新文本)
 '''
         output = _run_duan(code)
@@ -308,7 +308,7 @@ class TestL3_Math_E2E(unittest.TestCase):
 设 B = [[7, 8], [9, 10], [11, 12]]
 设 C = l3_math_matrix_mult(A, B)
 打印(长度(C))
-遍 C为 c:
+遍历 c 于 C:
     打印(长度(c))
 '''
         output = _run_duan(code)

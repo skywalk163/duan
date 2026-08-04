@@ -1,5 +1,5 @@
 /**
- * 段言 (Duan) Web Playground - 前端逻辑 v3.2
+ * 段言 (Duan) Web Playground - 前端逻辑 v4.0
  */
 
 let editor = null;
@@ -8,12 +8,14 @@ let isSidebarOpen = false;
 let currentFontSize = 14;
 let autoSaveTimer = null;
 let currentProjectName = '';
+let currentStyle = 'L2'; // 默认 L2 文言模式
 
 const API_BASE = '';
 const STORAGE_KEY = 'duan_playground_code';
 const PROJECT_KEY = 'duan_playground_project';
 const THEME_KEY = 'duan_playground_theme';
 const FONT_KEY = 'duan_playground_font';
+const STYLE_KEY = 'duan_playground_style';
 
 loadExamples();
 
@@ -29,6 +31,10 @@ applyTheme(savedTheme);
 const savedFont = parseInt(localStorage.getItem(FONT_KEY)) || 14;
 currentFontSize = savedFont;
 
+const savedStyle = localStorage.getItem(STYLE_KEY) || 'L2';
+currentStyle = savedStyle;
+applyStyle(currentStyle);
+
 require.config({
     paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' }
 });
@@ -41,22 +47,36 @@ require(['vs/editor/editor.main'], function () {
         tokenPostfix: '.duan',
 
         keywords: [
+            // v4.0 L0 核心关键字（单字主形式）
             '设', '为', '等于',
-            '如果', '那么', '否则', '否则如果',
-            '遍历', '于', '当', '跳出', '跳过',
-            '段落', '接收', '返回',
-            '类', '继承', '属性', '构造', '己', '父', '新建',
-            '接口', '实现',
-            '导入', '导出', '从',
+            '若', '则', '否', '或若',
+            '遍', '于', '当', '断', '跃',
+            '段', '返',
+            '类', '承', '性', '构', '己', '父', '新',
+            '约', '现',
+            '引', '出', '自',
             '且', '或', '非',
             '真', '假', '空',
+            '印', '写',
+            '试', '捕', '掷',
+            '匹', '例',
+            '异', '等',
+            '常',
+            '护', '私', '公', '静',
+            '是',
+            // v3.3 兼容别名（双字形式）
+            '如果', '那么', '否则', '否则如果',
+            '遍历', '段落', '接收', '返回',
+            '继承', '属性', '构造', '新建',
+            '接口', '实现',
+            '导入', '导出', '从',
             '打印', '输出',
             '尝试', '捕获', '抛出',
             '匹配', '情况',
             '异步', '等待',
             '常量',
             '保护', '私有', '公共', '静态',
-            '是'
+            '跳出', '跳过'
         ],
 
         typeKeywords: [
@@ -64,6 +84,11 @@ require(['vs/editor/editor.main'], function () {
         ],
 
         operators: [
+            // v4.0 符号运算符（主形式）
+            '+', '-', '*', '/', '%', '**', '//',
+            '>', '<', '>=', '<=', '==', '!=',
+            '+=', '-=', '*=', '/=',
+            // v3.3 中文运算符（别名）
             '加', '减', '乘', '除', '模', '幂',
             '大于', '小于', '等于', '不等于', '大于等于', '小于等于',
             '加上', '减去', '乘以', '除以'
@@ -182,31 +207,39 @@ setTimeout(function() {
 }, 5000);
 
 function getDefaultCode() {
-    return `# 欢迎使用段言 v3.2 Playground！
+    return `# 欢迎使用段言 v4.0 Playground！
 # 试试运行这段代码 👇
 # 快捷键：Ctrl+Enter 运行
+# 文体切换：点击工具栏「文」按钮切换 L1白话 / L2文言
 
-打印("你好，段言！")
+印("你好，段言 v4.0！")
 
 设 甲 为 10
 设 乙 为 20
 
-打印("甲 = ")
-打印(甲)
-打印("乙 = ")
-打印(乙)
+印("甲 = ")
+印(甲)
+印("乙 = ")
+印(乙)
 
-如果 甲 大于 乙：
-  打印("甲更大")
+若 甲 > 乙：
+  印("甲更大")
 否则：
-  打印("乙更大")
+  印("乙更大")
 
-# 定义段落
-段落 平方 接收 数值：
-  返回 数值 乘 数值
+# v4.0 函数定义（单字关键字）
+段 平方(x)：
+  返回 x * x
 
-打印("5 的平方 = ")
-打印(平方(5))
+印("5 的平方 = ")
+印(平方(5))
+
+# v4.0 循环
+设 总和 为 0
+遍 i 于 列(1, 2, 3, 4, 5)：
+  设 总和 为 总和 + i
+印("1-5 总和 = ")
+印(总和)
 `;
 }
 
@@ -633,7 +666,7 @@ function loadStdlib() {
 function renderGrammar(categories) {
     const panel = document.getElementById('grammarModalBody');
 
-    let html = '<div class="grammar-intro"><p>快速入门段言 v3.2 语法，适合新手查阅。点击「示例」可加载对应代码体验。</p></div>';
+    let html = '<div class="grammar-intro"><p>快速入门段言 v4.0 分层语法。L0 核心字（30个）稳定不变，L1 白话子集（19字）适合教学，L2 文言全集（30字）适合商业项目。点击「示例」可加载对应代码体验。</p></div>';
 
     categories.forEach(function(cat) {
         html += '<div class="grammar-category">';
@@ -828,6 +861,26 @@ function toggleTheme() {
     try {
         localStorage.setItem(THEME_KEY, next);
     } catch (e) {}
+}
+
+function toggleStyle() {
+    const next = currentStyle === 'L2' ? 'L1' : 'L2';
+    currentStyle = next;
+    applyStyle(next);
+    try {
+        localStorage.setItem(STYLE_KEY, next);
+    } catch (e) {}
+    const label = next === 'L1' ? '白话' : '文言';
+    showToast('已切换到 L' + (next === 'L1' ? '1' : '2') + ' ' + label + '模式', 'info');
+}
+
+function applyStyle(style) {
+    document.body.dataset.style = style;
+    const btn = document.getElementById('styleBtn');
+    if (btn) {
+        btn.title = style === 'L1' ? '当前：L1 白话模式（19字子集）' : '当前：L2 文言模式（30字全集）';
+        btn.style.color = style === 'L1' ? 'var(--accent-orange)' : 'var(--accent-purple)';
+    }
 }
 
 // ==================== 多文件项目管理 ====================
