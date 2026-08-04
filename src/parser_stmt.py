@@ -13,7 +13,7 @@
 
 from typing import List, Any, Optional
 from tokens import Token, TokenType
-from keywords import VERB_ARITY, KEYWORDS_DOUBLE, KEYWORDS_SPECIAL, BUILTIN_TYPES
+from keywords import VERB_ARITY, STDLIB_VERB_ARITY, ALL_VERB_ARITY, KEYWORDS_DOUBLE, KEYWORDS_SPECIAL, BUILTIN_TYPES
 from ast_nodes_v3 import *
 from parser_core import ParseError
 
@@ -304,6 +304,10 @@ class ParserStmtMixin:
 
         # 动词调用作为独立语句
         if tok.type == TokenType.KEYWORD and tok.value in VERB_ARITY:
+            return self._parse_expr_stmt()
+        
+        # stdlib 函数调用作为独立语句（不再是 KEYWORD，走 IDENTIFIER 路径）
+        if tok.type == TokenType.IDENTIFIER and tok.value in STDLIB_VERB_ARITY:
             return self._parse_expr_stmt()
         
         # self赋值语句：己属性名 为 值

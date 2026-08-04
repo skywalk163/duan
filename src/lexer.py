@@ -16,7 +16,7 @@ from enum import Enum
 from tokens import Token, TokenType
 from keywords import (
     ALL_KEYWORDS, KEYWORDS_DOUBLE, KEYWORDS_LOGIC, KEYWORDS_SPECIAL,
-    VERB_ARITY, BUILTIN_TYPES, SYMBOL_MAP, BLOCKING_SYMBOLS
+    VERB_ARITY, STDLIB_VERB_ARITY, ALL_VERB_ARITY, BUILTIN_TYPES, SYMBOL_MAP, BLOCKING_SYMBOLS
 )
 
 # 运算符动词集合（用于分词时识别运算符）
@@ -1189,6 +1189,15 @@ class Lexer:
                     current_col += len(prefix_matched)
                     continue
             
+            # 检查完整标识符是否是 stdlib 函数名（在 STDLIB_VERB_ARITY 中但不在 VERB_ARITY 中）
+            # 如果是，直接作为 IDENTIFIER 输出，不拆分（防止"字典设置"被拆为 字典+设+置）
+            # 注意：VERB_ARITY 中的核心动词仍需作为 KEYWORD 处理
+            if full_identifier in STDLIB_VERB_ARITY and full_identifier not in VERB_ARITY:
+                _tokens_append(_Token(_TokenType.IDENTIFIER, full_identifier, line, current_col))
+                consumed += len(full_identifier)
+                current_col += len(full_identifier)
+                continue
+            
             # 第一层：尝试最长匹配关键字
             keyword, length = _match_kw(source, pos)
             
@@ -1491,7 +1500,7 @@ class Lexer:
                         # 检查后跟"方法("：收集括号内的参数名，并注册方法名
                         if source[next_start:next_start+2] == '方法' and next_start+2 < n and source[next_start+2] == '(':
                             # 注册方法名（如"添加成绩"、"打印信息"）
-                            if name not in ALL_KEYWORDS and name not in VERB_ARITY:
+                            if name not in ALL_KEYWORDS and name not in ALL_VERB_ARITY:
                                 definitions.add(name)
                             # 收集括号内的参数
                             p = next_start + 3  # 跳过 方法(
@@ -1515,7 +1524,7 @@ class Lexer:
                                 else:
                                     # 非汉字的参数（如ASCII字符'x'），向前移动一位避免死循环
                                     p += 1
-                        elif name not in ALL_KEYWORDS and name not in VERB_ARITY:
+                        elif name not in ALL_KEYWORDS and name not in ALL_VERB_ARITY:
                             definitions.add(name)
                 i = k + 1
                 continue
@@ -1557,7 +1566,7 @@ class Lexer:
                         if k > j:
                             param_name = source[j:k]
                             # 排除关键字和动词
-                            if param_name not in ALL_KEYWORDS and param_name not in VERB_ARITY:
+                            if param_name not in ALL_KEYWORDS and param_name not in ALL_VERB_ARITY:
                                 definitions.add(param_name)
                         j = k
                         # 跳过空白

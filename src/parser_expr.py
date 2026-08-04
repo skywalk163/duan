@@ -14,7 +14,7 @@
 
 from typing import List, Any, Optional, Union
 from tokens import Token, TokenType
-from keywords import VERB_ARITY, KEYWORDS_DOUBLE, KEYWORDS_SPECIAL
+from keywords import VERB_ARITY, STDLIB_VERB_ARITY, ALL_VERB_ARITY, KEYWORDS_DOUBLE, KEYWORDS_SPECIAL
 from ast_nodes_v3 import *
 from ast_nodes import UnwrapExpression
 from parser_core import ParseError
@@ -643,7 +643,7 @@ class ParserExprMixin:
                 # 无括号：动词 参数1 参数2（如"幂 二 十"）
                 # 使用元数驱动参数收集
                 self._consume()
-                arity = VERB_ARITY.get(name, 2)
+                arity = ALL_VERB_ARITY.get(name, 2)
                 args = []
                 if arity == -1:
                     # 可变参数
@@ -1038,43 +1038,112 @@ class ParserExprMixin:
                 expr = Identifier(name)
             else:
                 # 检查是否是段落调用（标识符后跟参数）
+                # 如果是已知的 stdlib 动词，使用其 arity 限制参数收集
+                stdlib_arity = STDLIB_VERB_ARITY.get(name)
                 args = []
-                while self._current():
-                    next_tok = self._current()
-                    # 停止条件：句号、逗号、右括号
-                    if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
-                        break
-                    # 遇到运算符动词停止
-                    if next_tok.type == TokenType.KEYWORD and next_tok.value in self.OPERATOR_VERBS:
-                        break
-                    # 遇到IDENTIFIER类型的运算符（如"减去"）停止
-                    if next_tok.type == TokenType.IDENTIFIER and                        (next_tok.value in self.ADD_OP_MAP or next_tok.value in self.MUL_OP_MAP):
-                        break
-                    # 遇到"不"（not in的前缀）停止
-                    if next_tok.type == TokenType.IDENTIFIER and next_tok.value == '不':
-                        break
-                    # 遇到其他关键字（除运算符动词外）停止
-                    if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
-                        break
-                    
-                    # 收集单个参数（只收集primary，不包含运算）
-                    if next_tok.type == TokenType.NUMBER:
-                        args.append(NumberLiteral(self._consume().value))
-                    elif next_tok.type == TokenType.CHINESE_NUM:
-                        args.append(NumberLiteral(self._consume().value))
-                    elif next_tok.type == TokenType.STRING:
-                        args.append(StringLiteral(self._consume().value))
-                    elif next_tok.type == TokenType.IDENTIFIER:
-                        # 收集标识符作为独立参数（不嵌套）
-                        args.append(Identifier(self._consume().value))
+
+                # 括号语法：函数(参数1, 参数2)
+                if self._current() and self._current().type == TokenType.LPAREN:
+                    self._consume(TokenType.LPAREN)
+                    while self._current() and self._current().type != TokenType.RPAREN:
+                        if self._current().type == TokenType.COMMA:
+                            self._consume(TokenType.COMMA)
+                            continue
+                        arg = self._parse_comparison()
+                        if arg:
+                            args.append(arg)
+                        else:
+                            break
+                    if self._current() and self._current().type == TokenType.RPAREN:
+                        self._consume(TokenType.RPAREN)
+                    expr = ParagraphCall(name, args) if args else ParagraphCall(name, [])
+                    return self._parse_postfix(expr)
+
+                # 无括号语法：使用 arity 限制参数收集
+                if stdlib_arity is not None:
+                    if stdlib_arity == 0:
+                        # 无参数函数
+                        expr = ParagraphCall(name, [])
+                    elif stdlib_arity == -1:
+                        # 可变参数：收集到阻断符为止
+                        while self._current():
+                            next_tok = self._current()
+                            if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                                break
+                            if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                                break
+                            if next_tok.type == TokenType.KEYWORD and next_tok.value in self.OPERATOR_VERBS:
+                                break
+                            if next_tok.type == TokenType.IDENTIFIER and (next_tok.value in self.ADD_OP_MAP or next_tok.value in self.MUL_OP_MAP):
+                                break
+                            if next_tok.type == TokenType.IDENTIFIER and next_tok.value == '\u4e0d':
+                                break
+                            if next_tok.type == TokenType.NUMBER:
+                                args.append(NumberLiteral(self._consume().value))
+                            elif next_tok.type == TokenType.CHINESE_NUM:
+                                args.append(NumberLiteral(self._consume().value))
+                            elif next_tok.type == TokenType.STRING:
+                                args.append(StringLiteral(self._consume().value))
+                            elif next_tok.type == TokenType.IDENTIFIER:
+                                args.append(Identifier(self._consume().value))
+                            else:
+                                break
+                        expr = ParagraphCall(name, args)
                     else:
-                        break
-                
-                # 如果有参数，作为段落调用
-                if args:
-                    expr = ParagraphCall(name, args)
+                        # 固定参数：收集指定数量
+                        for _ in range(stdlib_arity):
+                            if not self._current():
+                                break
+                            next_tok = self._current()
+                            if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                                break
+                            if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                                break
+                            if next_tok.type == TokenType.KEYWORD and next_tok.value in self.OPERATOR_VERBS:
+                                break
+                            if next_tok.type == TokenType.IDENTIFIER and (next_tok.value in self.ADD_OP_MAP or next_tok.value in self.MUL_OP_MAP):
+                                break
+                            if next_tok.type == TokenType.IDENTIFIER and next_tok.value == '\u4e0d':
+                                break
+                            if next_tok.type == TokenType.NUMBER:
+                                args.append(NumberLiteral(self._consume().value))
+                            elif next_tok.type == TokenType.CHINESE_NUM:
+                                args.append(NumberLiteral(self._consume().value))
+                            elif next_tok.type == TokenType.STRING:
+                                args.append(StringLiteral(self._consume().value))
+                            elif next_tok.type == TokenType.IDENTIFIER:
+                                args.append(Identifier(self._consume().value))
+                            else:
+                                break
+                        expr = ParagraphCall(name, args)
                 else:
-                    expr = Identifier(name)
+                    # 普通标识符：保持原有的贪婪收集行为
+                    while self._current():
+                        next_tok = self._current()
+                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            break
+                        if next_tok.type == TokenType.KEYWORD and next_tok.value in self.OPERATOR_VERBS:
+                            break
+                        if next_tok.type == TokenType.IDENTIFIER and                            (next_tok.value in self.ADD_OP_MAP or next_tok.value in self.MUL_OP_MAP):
+                            break
+                        if next_tok.type == TokenType.IDENTIFIER and next_tok.value == '不':
+                            break
+                        if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                            break
+                        if next_tok.type == TokenType.NUMBER:
+                            args.append(NumberLiteral(self._consume().value))
+                        elif next_tok.type == TokenType.CHINESE_NUM:
+                            args.append(NumberLiteral(self._consume().value))
+                        elif next_tok.type == TokenType.STRING:
+                            args.append(StringLiteral(self._consume().value))
+                        elif next_tok.type == TokenType.IDENTIFIER:
+                            args.append(Identifier(self._consume().value))
+                        else:
+                            break
+                    if args:
+                        expr = ParagraphCall(name, args)
+                    else:
+                        expr = Identifier(name)
             
             return self._parse_postfix(expr)
         
