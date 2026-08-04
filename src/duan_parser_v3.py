@@ -19,7 +19,7 @@ from parser_expr import ParserExprMixin
 from ast_nodes_v3 import (
     ASTNode, Module, VarDecl, IfStmt, ForeachStmt, WhileStmt, 
     ReturnStmt, BreakStmt, ContinueStmt, BinaryOp, UnaryOp, NumberLiteral,
-    StringLiteral, Identifier, ParagraphCall, Paragraph, Pipeline,
+    StringLiteral, Identifier, ParagraphCall, FunctionCallExpr, Paragraph, Pipeline,
     ImportStmt, ExportStmt, ClassInstantiation, SelfAssignment,
     CompoundAssignment, IndexedCompoundAssignment, MemberAccess, IndexAccess, ClassDefinition,
     AttributeDeclaration, MethodDefinition, Parameter, TryStmt,
@@ -50,7 +50,7 @@ __all__ = [
     # AST 节点类型
     'ASTNode', 'Module', 'VarDecl', 'IfStmt', 'ForeachStmt', 'WhileStmt',
     'ReturnStmt', 'BreakStmt', 'ContinueStmt', 'BinaryOp', 'UnaryOp', 'NumberLiteral',
-    'StringLiteral', 'Identifier', 'ParagraphCall', 'Paragraph', 'Pipeline',
+    'StringLiteral', 'Identifier', 'ParagraphCall', 'FunctionCallExpr', 'Paragraph', 'Pipeline',
     'ImportStmt', 'ExportStmt', 'ClassInstantiation', 'SelfAssignment',
     'CompoundAssignment', 'MemberAccess', 'IndexAccess', 'ClassDefinition',
     'AttributeDeclaration', 'MethodDefinition', 'Parameter', 'TryStmt',

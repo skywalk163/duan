@@ -831,7 +831,7 @@ class ParserExprMixin:
                 while self._current():
                     nt = self._current()
                     # 停止条件
-                    if nt.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                    if nt.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                         break
                     # 遇到动词运算符停止（如加、减、大于等）
                     if nt.type == TokenType.KEYWORD and nt.value in self.OPERATOR_VERBS:
@@ -876,7 +876,7 @@ class ParserExprMixin:
                 while self._current():
                     nt = self._current()
                     # 停止条件
-                    if nt.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                    if nt.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                         break
                     # 遇到动词运算符停止
                     if nt.type == TokenType.KEYWORD and nt.value in self.OPERATOR_VERBS:
@@ -1068,7 +1068,7 @@ class ParserExprMixin:
                         # 可变参数：收集到阻断符为止
                         while self._current():
                             next_tok = self._current()
-                            if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                                 break
                             if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                                 break
@@ -1095,7 +1095,7 @@ class ParserExprMixin:
                             if not self._current():
                                 break
                             next_tok = self._current()
-                            if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                                 break
                             if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                                 break
@@ -1120,7 +1120,7 @@ class ParserExprMixin:
                     # 普通标识符：保持原有的贪婪收集行为
                     while self._current():
                         next_tok = self._current()
-                        if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                        if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                             break
                         if next_tok.type == TokenType.KEYWORD and next_tok.value in self.OPERATOR_VERBS:
                             break
@@ -1156,7 +1156,7 @@ class ParserExprMixin:
             args = []
             while self._current():
                 next_tok = self._current()
-                if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                     break
                 if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                     break
@@ -1236,7 +1236,7 @@ class ParserExprMixin:
                 while self._current():
                     next_tok = self._current()
                     # 停止条件：句号、逗号、右括号
-                    if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                    if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                         break
                     # 遇到运算符动词停止
                     if next_tok.type == TokenType.KEYWORD and next_tok.value in self.OPERATOR_VERBS:
@@ -1275,7 +1275,7 @@ class ParserExprMixin:
             args = []
             while self._current():
                 next_tok = self._current()
-                if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                     break
                 if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
                     break
@@ -1526,8 +1526,8 @@ class ParserExprMixin:
         body = self._parse_comparison()
         
         # 可选的句号
-        if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
         
         return LambdaExpression(params, body)
 
@@ -2059,7 +2059,41 @@ class ParserExprMixin:
                 elif isinstance(expr, str):
                     func_name = expr
                 else:
-                    return self._error(f"不支持在复杂表达式后进行括号调用: {type(expr).__name__}（可将'()'改为'。'或去掉括号）")
+                    # 链式调用：expr()  → FunctionCallExpr(expr, args)
+                    # 支持 func()()、obj.method()()、func()().method() 等
+                    args = []
+                    while not self._match(TokenType.RPAREN):
+                        if self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                            self._consume()
+                            continue
+                        if self._current() and self._current().type == TokenType.STAR:
+                            self._consume(TokenType.STAR)
+                            if self._current() and self._current().type == TokenType.STAR:
+                                self._consume(TokenType.STAR)
+                                arg = self._parse_comparison()
+                                if arg is not None and isinstance(arg, Identifier):
+                                    args.append(Identifier(f'**{arg.name}'))
+                            else:
+                                arg = self._parse_comparison()
+                                if arg is not None and isinstance(arg, Identifier):
+                                    args.append(Identifier(f'*{arg.name}'))
+                            if self._match(TokenType.COMMA):
+                                self._consume(TokenType.COMMA)
+                            continue
+                        arg = self._parse_comparison()
+                        if arg is not None:
+                            args.append(arg)
+                        else:
+                            break
+                        if self._match(TokenType.COMMA):
+                            self._consume(TokenType.COMMA)
+                        while self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                            self._consume()
+                    if self._current() and self._current().type == TokenType.RPAREN:
+                        self._consume(TokenType.RPAREN)
+                    from ast_nodes_v3 import FunctionCallExpr
+                    expr = FunctionCallExpr(expr, args)
+                    continue
 
                 # 收集参数（直到右括号）- 使用比较表达式而非完整表达式
                 # 以避免逗号被当作管道操作符处理
@@ -2185,10 +2219,8 @@ class ParserExprMixin:
             # "obj.属性" / "obj.方法()" 或 "obj的属性" / "obj的方法()"
             is_dot_access = False
             if tok.type == TokenType.DOT:
-                # 检查是否是英文点号（成员访问）还是中文句号（语句结束）        
-                if tok.value == '.':
-                    is_dot_access = True
-                # 中文句号(。)是语句结束符，不进行成员访问
+                # DOT 已在 lexer 层拆分：DOT 始终是英文点号（成员访问），PERIOD 是中文句号（语句结束）
+                is_dot_access = True
 
             # 「的」作为段言原生属性访问运算符
             # 「.」用于 FFI/外部库调用（如 requests.get）
@@ -2289,7 +2321,7 @@ class ParserExprMixin:
                         while self._current():
                             next_tok = self._current()
                             # 阻断符：句号、逗号、右括号、右中括号、关键字      
-                            if next_tok.type in (TokenType.DOT, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
+                            if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET):
                                 break
                             if next_tok.type == TokenType.KEYWORD and (next_tok.value in KEYWORDS_DOUBLE or next_tok.value in VERB_ARITY):
                                 break

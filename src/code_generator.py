@@ -11,7 +11,7 @@ import ast_nodes as ast_nodes_module
 
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
-from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock
+from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock, FunctionCallExpr
 
 
 # =============================================================================
@@ -1580,6 +1580,18 @@ class PythonCodeGenerator:
             args_str = ', '.join(args)
             
             return f"{py_name}({args_str})"
+        
+        elif isinstance(expr, FunctionCallExpr):
+            # 链式函数调用：expr()  → callee(args)
+            callee = self._generate_expr(expr.callee)
+            args = []
+            for arg in expr.args:
+                if isinstance(arg, KeywordArg):
+                    args.append(f"{arg.name}={self._generate_expr(arg.value)}")
+                else:
+                    args.append(self._generate_expr(arg))
+            args_str = ', '.join(args)
+            return f"{callee}({args_str})"
         
         elif isinstance(expr, Pipeline):
             # 管道操作：从左到右依次调用

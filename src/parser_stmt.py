@@ -615,29 +615,31 @@ class ParserStmtMixin:
         name = name_tok.value
         
         # 检查属性赋值：obj.attr 等于/为/= 值（v3.4 新增）
+        # 支持链式：obj.a.b.c = value
         if self._current() and self._current().type == TokenType.DOT:
-            self._consume(TokenType.DOT)
-            # 读取属性名
-            attr_tok = self._current()
-            if attr_tok and attr_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                attr_name = self._consume().value
-                # 构建赋值目标：MemberAccess(Identifier(name), attr_name)
-                target = MemberAccess(Identifier(name), attr_name)
-                
-                # 检查等于/为/=
-                if self._match(TokenType.KEYWORD, '等于') or self._match(TokenType.KEYWORD, '为') or self._match(TokenType.EQUALS):
-                    self._consume()
-                    value = self._parse_expr()
-                    # 句号（可选）
-                    if self._current() and self._current().type == TokenType.PERIOD:
-                        self._consume(TokenType.PERIOD)
-                    return Assignment(target, value)
-                
-                # 可能是链式属性访问（如 obj.a.b = value），回退到表达式
-                self.pos = saved_pos
-                return self._parse_expr_stmt()
+            # 构建链式成员访问目标
+            target = Identifier(name)
+            while self._current() and self._current().type == TokenType.DOT:
+                self._consume(TokenType.DOT)
+                attr_tok = self._current()
+                if attr_tok and attr_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    attr_name = self._consume().value
+                    target = MemberAccess(target, attr_name)
+                else:
+                    # 属性名不是有效的标识符/关键字，回退
+                    self.pos = saved_pos
+                    return self._parse_expr_stmt()
             
-            # 属性名不是有效的标识符/关键字，回退
+            # 检查等于/为/=
+            if self._match(TokenType.KEYWORD, '等于') or self._match(TokenType.KEYWORD, '为') or self._match(TokenType.EQUALS):
+                self._consume()
+                value = self._parse_expr()
+                # 句号（可选）
+                if self._current() and self._current().type == TokenType.PERIOD:
+                    self._consume(TokenType.PERIOD)
+                return Assignment(target, value)
+            
+            # 不是赋值，可能是表达式语句（如 obj.a.b()）
             self.pos = saved_pos
             return self._parse_expr_stmt()
         

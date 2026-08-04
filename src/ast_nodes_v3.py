@@ -194,6 +194,17 @@ class ParagraphCall(ASTNode):
         return f"《{self.name}》({', '.join(map(str, self.args))})"
 
 
+class FunctionCallExpr(ASTNode):
+    """表达式上的函数调用，用于 func()() 或 obj.method()() 等链式调用"""
+    __slots__ = ('callee', 'args')
+    def __init__(self, callee: ASTNode, args: List[ASTNode]):
+        self.callee = callee
+        self.args = args
+    
+    def __repr__(self):
+        return f"Call({self.callee})({', '.join(map(str, self.args))})"
+
+
 class SliceExpr(ASTNode):
     __slots__ = ('start', 'stop', 'step')
     """切片表达式: start:stop:step"""
