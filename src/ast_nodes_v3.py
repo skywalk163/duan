@@ -13,11 +13,12 @@ from typing import List, Any, Optional, Dict
 
 class ASTNode:
     """AST 节点基类"""
-    __slots__ = ('line', 'col')
+    __slots__ = ('line', 'col', '_ast_type_id')
     
     def __init__(self, line: int = 0, col: int = 0):
         self.line = line
         self.col = col
+        self._ast_type_id = 0  # v3 节点统一使用 0，不参与 v4 的 _ast_type_id 分派
 
 
 class Module(ASTNode):

@@ -184,6 +184,8 @@ class OptionalTypeWrapper(Type):
         return self.inner_type.collect_type_vars()
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         return OptionalTypeWrapper(self.inner_type.apply_substitution(subs))
 
     def resolve_type_vars(self) -> 'Type':
@@ -218,6 +220,8 @@ class ListType(Type):
         return set()
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         if self.element_type:
             return ListType(self.element_type.apply_substitution(subs))
         return ListType(self.element_type)
@@ -256,6 +260,8 @@ class DictType(Type):
         return result
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         return DictType(
             self.key_type.apply_substitution(subs) if self.key_type else None,
             self.value_type.apply_substitution(subs) if self.value_type else None,
@@ -293,6 +299,8 @@ class TupleType(Type):
         return result
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         return TupleType([t.apply_substitution(subs) for t in self.element_types])
 
     def resolve_type_vars(self) -> 'Type':
@@ -323,6 +331,8 @@ class SetType(Type):
         return set()
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         if self.element_type:
             return SetType(self.element_type.apply_substitution(subs))
         return SetType(self.element_type)
@@ -363,6 +373,8 @@ class FunctionType(Type):
         return result
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         return FunctionType(
             [t.apply_substitution(subs) for t in self.param_types],
             self.return_type.apply_substitution(subs),
@@ -419,6 +431,8 @@ class TypeVar(Type):
         return result
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         if self.name in subs:
             return subs[self.name]
         new_constraint = self.constraint.apply_substitution(subs) if self.constraint else None
@@ -468,6 +482,8 @@ class GenericTypeInstance(Type):
         return result
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         return GenericTypeInstance(
             self.base_name,
             [t.apply_substitution(subs) for t in self.type_args],
@@ -558,6 +574,8 @@ class ClassType(Type):
         return result
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         if not self.type_args:
             return self
         return ClassType(
@@ -611,6 +629,8 @@ class InterfaceType(Type):
         return result
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'InterfaceType':
+        if not subs:
+            return self
         new_methods = {}
         for name, ft in self.methods.items():
             new_methods[name] = ft.apply_substitution(subs)
@@ -697,6 +717,8 @@ class FutureType(Type):
         return self.inner_type.collect_type_vars()
 
     def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
         return FutureType(self.inner_type.apply_substitution(subs))
 
     def resolve_type_vars(self) -> 'Type':
@@ -708,51 +730,85 @@ class FutureType(Type):
 # =============================================================================
 
 class TypeSubstitution:
-    """类型变量 → 类型 的替换映射"""
+    """类型变量 → 类型 的替换映射（Copy-on-Write 优化）
 
-    def __init__(self, mapping: Optional[Dict[str, Type]] = None):
-        self.mapping: Dict[str, Type] = dict(mapping) if mapping else {}
+    CoW 机制：clone() 创建子节点共享父节点的映射，O(1) 克隆。
+    写入时只修改本地 _mapping，读取时沿 _parent 链向上查找。
+    """
+
+    def __init__(self, mapping: Optional[Dict[str, Type]] = None,
+                 parent: Optional['TypeSubstitution'] = None):
+        self._mapping: Dict[str, Type] = dict(mapping) if mapping else {}
+        self._parent: Optional['TypeSubstitution'] = parent
+
+    # ---- 沿父链查找的读取接口 ----
 
     def __contains__(self, name: str) -> bool:
-        return name in self.mapping
+        if name in self._mapping:
+            return True
+        if self._parent is not None:
+            return name in self._parent
+        return False
 
     def __getitem__(self, name: str) -> Type:
-        return self.mapping[name]
-
-    def __setitem__(self, name: str, t: Type) -> None:
-        self.mapping[name] = t
+        if name in self._mapping:
+            return self._mapping[name]
+        if self._parent is not None:
+            return self._parent[name]
+        raise KeyError(name)
 
     def get(self, name: str, default: Optional[Type] = None) -> Optional[Type]:
-        return self.mapping.get(name, default)
+        if name in self._mapping:
+            return self._mapping[name]
+        if self._parent is not None:
+            return self._parent.get(name, default)
+        return default
+
+    # ---- 写入接口（仅写本地） ----
+
+    def __setitem__(self, name: str, t: Type) -> None:
+        self._mapping[name] = t
 
     def bind(self, name: str, t: Type) -> 'TypeSubstitution':
         """添加一个绑定，返回自身以支持链式调用"""
-        self.mapping[name] = t
+        self._mapping[name] = t
         return self
 
+    # ---- 合并与遍历 ----
+
     def compose(self, other: 'TypeSubstitution') -> 'TypeSubstitution':
-        """组合两个替换：先应用 other，再应用 self（但这里简化）。"""
+        """组合两个替换：先应用 other，再应用 self。"""
         result = TypeSubstitution()
-        # 将 self 中的值使用 other 应用
-        for name, t in self.mapping.items():
-            result.mapping[name] = t.apply_substitution(other)
-        # 合并 other
-        for name, t in other.mapping.items():
-            if name not in result.mapping:
-                result.mapping[name] = t
+        for name, t in self.items():
+            result._mapping[name] = t.apply_substitution(other)
+        for name, t in other.items():
+            if name not in result._mapping:
+                result._mapping[name] = t
         return result
 
     def items(self):
-        return self.mapping.items()
+        """返回所有条目（本地覆盖父级，父链去重）"""
+        seen: Dict[str, Type] = {}
+        if self._parent is not None:
+            for name, t in self._parent.items():
+                seen[name] = t
+        for name, t in self._mapping.items():
+            seen[name] = t
+        return seen.items()
 
     def clone(self) -> 'TypeSubstitution':
-        return TypeSubstitution(dict(self.mapping))
+        """Copy-on-Write: O(1) 克隆，延迟复制映射"""
+        return TypeSubstitution(parent=self)
 
     def __repr__(self) -> str:
-        return f"TypeSubstitution({self.mapping})"
+        return f"TypeSubstitution({dict(self.items())})"
 
     def __bool__(self) -> bool:
-        return bool(self.mapping)
+        if self._mapping:
+            return True
+        if self._parent is not None:
+            return bool(self._parent)
+        return False
 
 
 class UnificationError(Exception):
@@ -775,9 +831,17 @@ def unify(t1: Type, t2: Type, subs: Optional[TypeSubstitution] = None) -> TypeSu
     if subs is None:
         subs = TypeSubstitution()
 
+    # ⭐ 快速路径 1：同一对象引用，直接返回
+    if t1 is t2:
+        return subs
+
     # 先应用已有的替换
     t1 = t1.apply_substitution(subs)
     t2 = t2.apply_substitution(subs)
+
+    # ⭐ 快速路径 2：替换后仍是同一对象
+    if t1 is t2:
+        return subs
 
     id1 = t1._type_id
     id2 = t2._type_id
@@ -803,19 +867,48 @@ def unify(t1: Type, t2: Type, subs: Optional[TypeSubstitution] = None) -> TypeSu
         if id1 == TYPE_ID_LIST:
             if t1.element_type is None or t2.element_type is None:
                 return subs
+            # ⭐ 快速路径：元素类型都是具体类型，直接用 is_subtype_of 比较
+            if _is_basic_type_id(t1.element_type._type_id) and _is_basic_type_id(t2.element_type._type_id):
+                if t1.element_type._type_id == t2.element_type._type_id:
+                    return subs
+                # 兼容：Any/Unknown 通配
+                eid1, eid2 = t1.element_type._type_id, t2.element_type._type_id
+                if eid1 in (TYPE_ID_ANY, TYPE_ID_UNKNOWN) or eid2 in (TYPE_ID_ANY, TYPE_ID_UNKNOWN):
+                    return subs
+                raise UnificationError("列表元素类型不兼容", t1, t2)
             return unify(t1.element_type, t2.element_type, subs)
         # 集合
         if id1 == TYPE_ID_SET:
             if t1.element_type is None or t2.element_type is None:
                 return subs
+            # ⭐ 快速路径：元素类型都是具体类型
+            if _is_basic_type_id(t1.element_type._type_id) and _is_basic_type_id(t2.element_type._type_id):
+                if t1.element_type._type_id == t2.element_type._type_id:
+                    return subs
+                eid1, eid2 = t1.element_type._type_id, t2.element_type._type_id
+                if eid1 in (TYPE_ID_ANY, TYPE_ID_UNKNOWN) or eid2 in (TYPE_ID_ANY, TYPE_ID_UNKNOWN):
+                    return subs
+                raise UnificationError("集合元素类型不兼容", t1, t2)
             return unify(t1.element_type, t2.element_type, subs)
         # 字典
         if id1 == TYPE_ID_DICT:
             s = subs
             if t1.key_type and t2.key_type:
-                s = unify(t1.key_type, t2.key_type, s)
+                # ⭐ 快速路径：键类型都是具体类型
+                if _is_basic_type_id(t1.key_type._type_id) and _is_basic_type_id(t2.key_type._type_id):
+                    kid1, kid2 = t1.key_type._type_id, t2.key_type._type_id
+                    if kid1 != kid2 and kid1 not in (TYPE_ID_ANY, TYPE_ID_UNKNOWN) and kid2 not in (TYPE_ID_ANY, TYPE_ID_UNKNOWN):
+                        raise UnificationError("字典键类型不兼容", t1, t2)
+                else:
+                    s = unify(t1.key_type, t2.key_type, s)
             if t1.value_type and t2.value_type:
-                s = unify(t1.value_type, t2.value_type, s)
+                # ⭐ 快速路径：值类型都是具体类型
+                if _is_basic_type_id(t1.value_type._type_id) and _is_basic_type_id(t2.value_type._type_id):
+                    vid1, vid2 = t1.value_type._type_id, t2.value_type._type_id
+                    if vid1 != vid2 and vid1 not in (TYPE_ID_ANY, TYPE_ID_UNKNOWN) and vid2 not in (TYPE_ID_ANY, TYPE_ID_UNKNOWN):
+                        raise UnificationError("字典值类型不兼容", t1, t2)
+                else:
+                    s = unify(t1.value_type, t2.value_type, s)
             return s
         # 元组
         if id1 == TYPE_ID_TUPLE:
@@ -912,6 +1005,13 @@ def unify(t1: Type, t2: Type, subs: Optional[TypeSubstitution] = None) -> TypeSu
     raise UnificationError("无法合一的类型", t1, t2)
 
 
+def _is_basic_type_id(tid: int) -> bool:
+    """判断类型 ID 是否对应基本类型（数、串、布尔、空、任意、未知）。
+    基本类型是单例，不可能包含 TypeVar 子类型，可安全跳过发生检查。
+    """
+    return tid <= TYPE_ID_UNKNOWN
+
+
 def _unify_type_var(tv: TypeVar, other: Type, subs: TypeSubstitution) -> TypeSubstitution:
     """将类型变量 tv 与 other 合一（HM 风格：严格发生检查）"""
     # 若 tv 已有绑定，则使用绑定后的值
@@ -931,13 +1031,11 @@ def _unify_type_var(tv: TypeVar, other: Type, subs: TypeSubstitution) -> TypeSub
                 tv, other,
             )
 
-    # 严格发生检查：若 tv 出现在 other 中（非自身名称），拒绝
-    # 例如 T = list[T] 这样的无限类型在 HM 中是不允许的
-    if oid != TYPE_ID_TVAR:
+    # ⭐ 快速路径：other 是基本类型（数/串/布尔/空/任意/未知），不可能包含 TypeVar，跳过发生检查
+    if oid != TYPE_ID_TVAR and not _is_basic_type_id(oid):
         fvs = other.collect_type_vars()
         for fv in fvs:
             if fv.name == tv.name:
-                # 发生检查失败：tv 出现在 other 内部（非平凡场景）
                 raise UnificationError(
                     f"发生检查失败：类型变量 {tv.name} 出现在 {other} 内部，"
                     f"导致无限类型（发生检查失败）",
@@ -993,13 +1091,19 @@ class TypeSymbolTable:
     - 作用域嵌套（enter_scope / exit_scope）
     - 泛型参数绑定（define_generic_param / resolve_type_param）
     - 按作用域查找（从内到外）
+    - ⭐ 全局符号索引（_global_index）：O(1) 查找函数/类/枚举/trait
     """
+
+    # 全局符号类型：可用扁平索引加速查找
+    _GLOBAL_SYMBOL_TYPES = frozenset({'function', 'class', 'enum', 'trait', 'interface'})
 
     def __init__(self):
         self.scopes: List[Dict[str, TypedSymbol]] = [{}]
         self.current_level = 0
         # 泛型参数（名称 → TypeVar），单独维护以便快速查找
         self.generic_params: Dict[str, TypeVar] = {}
+        # ⭐ 全局符号扁平索引：名称 → 符号（O(1) 查找函数/类/枚举/trait）
+        self._global_index: Dict[str, TypedSymbol] = {}
 
     # ---- 作用域 ----
     def enter_scope(self):
@@ -1008,8 +1112,15 @@ class TypeSymbolTable:
         self.current_level += 1
 
     def exit_scope(self):
-        """退出作用域"""
+        """退出作用域（同时清理该作用域在全局索引中的符号）"""
         if self.current_level > 0:
+            # 清理该作用域中注册的全局符号
+            exited_scope = self.scopes[self.current_level]
+            for name, symbol in exited_scope.items():
+                if symbol.symbol_type in self._GLOBAL_SYMBOL_TYPES:
+                    # 只有当前索引指向此符号时才删除（避免删除被覆盖的符号）
+                    if self._global_index.get(name) is symbol:
+                        del self._global_index[name]
             self.scopes.pop()
             self.current_level -= 1
 
@@ -1022,10 +1133,17 @@ class TypeSymbolTable:
         symbol = TypedSymbol(name, symbol_type, data_type, self.current_level,
                              is_mutable, is_nullable)
         self.scopes[self.current_level][name] = symbol
+        # ⭐ 全局符号：写入扁平索引
+        if symbol_type in self._GLOBAL_SYMBOL_TYPES:
+            self._global_index[name] = symbol
         return True
 
     def lookup(self, name: str) -> Optional[TypedSymbol]:
-        """查找符号（从当前作用域向外查找）"""
+        """查找符号（优先全局索引 O(1)，再回退到作用域栈遍历）"""
+        # ⭐ 快速路径：全局符号索引
+        if name in self._global_index:
+            return self._global_index[name]
+        # 回退：从当前作用域向外查找（处理局部变量、参数等）
         for level in range(self.current_level, -1, -1):
             if name in self.scopes[level]:
                 return self.scopes[level][name]
@@ -1063,6 +1181,45 @@ class TypeSymbolTable:
     def get_generic_param_names(self) -> List[str]:
         """获取当前所有泛型参数名称"""
         return list(self.generic_params.keys())
+
+    # ⭐ 并行推断支持：快照与合并
+    def snapshot(self) -> 'TypeSymbolTable':
+        """创建符号表的不可变快照（用于并行推断中的隔离副本）。
+
+        快照包含：
+        - 当前作用域栈的浅拷贝（全局作用域）
+        - 全局符号索引的拷贝
+        - 泛型参数的拷贝
+
+        注意：快照中不包含局部作用域（当前函数体内），因为并行推断的段
+        各自拥有独立的局部作用域。
+        """
+        snap = TypeSymbolTable.__new__(TypeSymbolTable)
+        # 只保留全局作用域（level 0）
+        snap.scopes = [{k: v for k, v in self.scopes[0].items()}]
+        snap.current_level = 0
+        snap.generic_params = dict(self.generic_params)
+        # 全局索引：只保留当前全局作用域中的符号
+        snap._global_index = {
+            k: v for k, v in self._global_index.items()
+            if v.scope_level == 0
+        }
+        return snap
+
+    def merge_global(self, other: 'TypeSymbolTable'):
+        """合并另一个符号表的全局符号到当前符号表。
+
+        用于并行推断后，将各 worker 推断出的段类型合并回主符号表。
+        只合并全局作用域（level 0）中的符号，不合并局部作用域。
+        """
+        for name, symbol in other._global_index.items():
+            if symbol.scope_level == 0:
+                # 更新或添加全局符号
+                if name in self.scopes[0]:
+                    self.scopes[0][name].data_type = symbol.data_type
+                else:
+                    self.scopes[0][name] = symbol
+                self._global_index[name] = self.scopes[0][name]
 
 
 # =============================================================================
@@ -1126,8 +1283,31 @@ class TypeParser:
 
     def __init__(self, symbol_table: Optional[TypeSymbolTable] = None):
         self.symbol_table = symbol_table
+        # ⭐ 类型解析缓存：同一类型注解字符串在模块内高度重复，缓存可大幅减少重复解析
+        self._parse_cache: Dict[str, Type] = {}
+        self._max_cache_size = 512
 
     def parse(self, expr: str) -> Type:
+        """解析类型表达式字符串为 Type 对象（带 LRU 缓存）。"""
+        if not expr:
+            return TYPE_UNKNOWN
+        expr = expr.strip()
+        if not expr:
+            return TYPE_UNKNOWN
+        # ⭐ 缓存查询
+        if expr in self._parse_cache:
+            return self._parse_cache[expr]
+        result = self._parse_impl(expr)
+        # ⭐ 缓存写入（LRU 淘汰：超过最大尺寸时清空一半）
+        if len(self._parse_cache) >= self._max_cache_size:
+            # 简单 LRU：丢弃前半部分（保留最近使用的一半）
+            keys = list(self._parse_cache.keys())
+            for k in keys[:len(keys) // 2]:
+                del self._parse_cache[k]
+        self._parse_cache[expr] = result
+        return result
+
+    def _parse_impl(self, expr: str) -> Type:
         expr = expr.strip()
         if not expr:
             return TYPE_UNKNOWN

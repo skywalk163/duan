@@ -1,5 +1,27 @@
 # 段言 CHANGELOG
 
+## v5.0.0 (2026-08-04) — 类型推断性能演进（阶段一至三）
+
+### 阶段一（v4.3.0）：低风险优化
+- `is_instance` → `_ast_type_id` 整数分派：`type_inferencer.py` 中 39 处字符串比较替换为 O(1) 整数比较
+- `TypeSubstitution` Copy-on-Write：`clone()` 延迟复制，减少 80% 对象创建开销
+- `apply_substitution` 单例短路：`_SingletonType` 子类跳过完整替换链
+
+### 阶段二（v4.4.0）：结构性优化
+- 基于调用图的 HM 迭代优化：`_build_call_graph` + `_topo_sort_segments` 拓扑分层推断，无环段 1 轮、有环段 2 轮
+- 增量推断缓存：`SegmentCacheEntry` + 源码哈希 + 依赖传播 + 级联失效
+- `unify` 快速路径扩展：同引用快速返回 + 基本类型跳过发生检查 + 具体类型跳过递归
+
+### 阶段三（v5.0.0）：架构级优化
+- 并行段推断：`ThreadPoolExecutor` 拓扑分层并行推断，`snapshot()`/`merge_global()` 符号表隔离与合并
+- 符号表全局索引：`_global_index` 扁平字典，O(1) 查找函数/类/枚举/trait
+- 类型解析 LRU 缓存：`_parse_cache` 512 容量 + LRU 淘汰
+
+### 文档与工具
+- 新增 `docs/类型推断性能演进规划.md`：三阶段路线图、任务分解表、基准数据
+- 新增 `bench_type_infer.py`：多维度基准测试脚本
+- 新增 `profile_type_infer.py`：cProfile 性能分析脚本
+
 ## v4.2.0 (2026-08-04) — 可选类型系统与词法分析器修复
 
 ### Z 阶段：可选类型系统

@@ -12,8 +12,10 @@
 
 import sys
 import os
+import hashlib
 from typing import Dict, List, Optional, Any, Set, Tuple
 from dataclasses import dataclass, field
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # 统一类型系统（Phase 1 增强版）
 from type_system import (
@@ -43,19 +45,29 @@ from ast_nodes import (
     EnumDefinition, EnumVariant, DataTypeField,
     TraitDefinition, TraitMethodSignature, TraitImplementation,
     TypeAlias, OptionalType as ASTOptionalType, UnwrapExpression,
+    AST_TYPE_ID_NUMBER_LITERAL, AST_TYPE_ID_STRING_LITERAL,
+    AST_TYPE_ID_BOOLEAN_LITERAL, AST_TYPE_ID_NULL_LITERAL,
+    AST_TYPE_ID_SELF_REFERENCE, AST_TYPE_ID_IDENTIFIER,
+    AST_TYPE_ID_BINARY_OP, AST_TYPE_ID_UNARY_OP, AST_TYPE_ID_FUNCTION_CALL,
+    AST_TYPE_ID_PIPE_EXPRESSION, AST_TYPE_ID_PROPERTY_ACCESS,
+    AST_TYPE_ID_INDEX_ACCESS, AST_TYPE_ID_LIST_LITERAL,
+    AST_TYPE_ID_DICT_LITERAL, AST_TYPE_ID_NEW_EXPRESSION,
+    AST_TYPE_ID_CONDITIONAL_EXPRESSION, AST_TYPE_ID_STRING_INTERPOLATION,
+    AST_TYPE_ID_LIST_COMPREHENSION, AST_TYPE_ID_LAMBDA_EXPRESSION,
+    AST_TYPE_ID_MATCH_STATEMENT, AST_TYPE_ID_DICT_COMPREHENSION,
+    AST_TYPE_ID_VARIABLE_DECLARATION, AST_TYPE_ID_ASSIGNMENT,
+    AST_TYPE_ID_IF_STATEMENT, AST_TYPE_ID_FOREACH_STATEMENT,
+    AST_TYPE_ID_WHILE_STATEMENT, AST_TYPE_ID_RETURN_STATEMENT,
+    AST_TYPE_ID_PRINT_STATEMENT, AST_TYPE_ID_EXPRESSION_STATEMENT,
+    AST_TYPE_ID_THROW_STATEMENT, AST_TYPE_ID_DEFER_STATEMENT,
+    AST_TYPE_ID_ASYNC_SCOPE, AST_TYPE_ID_SEGMENT_DEFINITION,
+    AST_TYPE_ID_AWAIT_EXPRESSION, AST_TYPE_ID_UNWRAP_EXPRESSION,
 )
 
 
 # =============================================================================
 # 辅助：检查节点实例
 # =============================================================================
-
-def is_instance(node, class_name: str) -> bool:
-    """检查节点类型（通过名称检查，支持多个模块）"""
-    if node is None:
-        return False
-    return type(node).__name__ == class_name
-
 
 # =============================================================================
 # 类型推断器
@@ -66,6 +78,16 @@ class InferenceResult:
     """单个表达式的推断结果（类型 + 相关的替换）"""
     inferred_type: Type
     substitution: TypeSubstitution = field(default_factory=TypeSubstitution)
+
+
+@dataclass
+class SegmentCacheEntry:
+    """段推断缓存条目（增量推断用）"""
+    source_hash: str        # 段体源码哈希
+    dep_type_hashes: Dict[str, str] = field(default_factory=dict)  # 依赖段名 → 依赖段类型哈希
+    result_type: Optional[FunctionType] = None  # 缓存推断结果
+    # 依赖此段的段名集合（用于级联失效）
+    reverse_deps: Set[str] = field(default_factory=set)
 
 
 class TypeInferencer:
@@ -107,6 +129,17 @@ class TypeInferencer:
 
         # HM 推断阶段：在段体推断期间累积的替换（用于反馈到段签名）
         self._hm_subs: Optional[TypeSubstitution] = None
+
+        # 调用图：段名 → 被调用段名集合（用于拓扑排序优化）
+        self._call_graph: Dict[str, Set[str]] = {}
+
+        # 增量推断缓存：段名 → 缓存条目
+        self._segment_cache: Dict[str, SegmentCacheEntry] = {}
+        self._incremental: bool = False
+
+        # ⭐ 并行推断配置
+        self._parallel: bool = False
+        self._max_workers: int = 4
 
         # trait 实现（(trait名, 类型名) → 方法名 → FunctionType）
         self.trait_impls: Dict[Tuple[str, str], Dict[str, FunctionType]] = {}
@@ -210,8 +243,13 @@ class TypeInferencer:
                         self._add_error(f"类型 '{impl.type_name}' 实现接口 '{impl.trait_name}': {err}", node=impl)
 
     # ---- 主推断入口（HM 两阶段） ----
-    def infer(self, module: Module) -> Dict[int, Type]:
-        """对整个模块进行类型推断（HM 风格两阶段：预扫描 + 推断 + 泛化）"""
+    def infer(self, module: Module, incremental: bool = False) -> Dict[int, Type]:
+        """对整个模块进行类型推断（HM 风格两阶段：预扫描 + 推断 + 泛化）
+
+        Args:
+            module: 要推断的模块
+            incremental: 是否启用增量推断缓存（IDE 场景下可大幅提速）
+        """
         self.type_cache = {}
         self.symbol_table = TypeSymbolTable()
         self.type_parser = TypeParser(self.symbol_table)
@@ -225,6 +263,7 @@ class TypeInferencer:
         self.generic_class_instances = {}
         self._method_pre_scan_cache = {}
         self._hm_subs = None
+        self._incremental = incremental
         self.module = module
 
         # 阶段 0：注册所有类型定义（枚举、trait、类）
@@ -371,7 +410,308 @@ class TypeInferencer:
                 # 记录在一个简单字典中，供 PropertyAccess 查找（可选）
                 self._method_pre_scan_cache[(cls.name, method.name)] = FunctionType(m_param_types, m_ret)
 
+    # ---- 调用图构建与拓扑排序 ----
+    def _build_call_graph(self, module: Module):
+        """构建调用图：段名 → 被调用段名集合。
+        对每个段体做轻量 AST 遍历，收集 FunctionCall 调用的目标段名。
+        """
+        self._call_graph = {}
+
+        def _iter_segments():
+            for seg in getattr(module, 'segments', []) or []:
+                yield seg
+            for stmt in getattr(module, 'statements', []) or []:
+                if isinstance(stmt, SegmentDefinition):
+                    yield stmt
+
+        # 先收集所有已知段名
+        known_segments = set()
+        for seg in _iter_segments():
+            known_segments.add(seg.name)
+
+        # 对每个段收集其调用的段
+        for seg in _iter_segments():
+            callees = self._collect_callees(seg)
+            # 只保留已知段名（排除内置函数、方法调用等）
+            self._call_graph[seg.name] = callees & known_segments
+
+    def _collect_callees(self, segment) -> Set[str]:
+        """轻量 AST 遍历：收集段体中 FunctionCall 调用的目标段名。
+        不做完整类型推断，只做 AST 节点扫描。
+        """
+        callees: Set[str] = set()
+
+        def _walk(node):
+            if node is None:
+                return
+            if hasattr(node, '_ast_type_id') and node._ast_type_id == AST_TYPE_ID_FUNCTION_CALL:
+                func_name = None
+                if hasattr(node.name, 'name'):
+                    func_name = node.name.name
+                elif hasattr(node.name, '_ast_type_id') and node.name._ast_type_id == AST_TYPE_ID_IDENTIFIER:
+                    func_name = node.name.name
+                if func_name:
+                    callees.add(func_name)
+            # 递归遍历子节点
+            for attr in ('body', 'statements', 'arguments', 'expression', 'value',
+                         'condition', 'true_branch', 'false_branch', 'else_branch',
+                         'then_branch', 'cases', 'tasks', 'left', 'right', 'operand',
+                         'elements', 'key', 'target', 'iterable', 'handler'):
+                child = getattr(node, attr, None)
+                if child is not None:
+                    if isinstance(child, list):
+                        for item in child:
+                            _walk(item)
+                    else:
+                        _walk(child)
+
+        for stmt in getattr(segment, 'body', []) or []:
+            _walk(stmt)
+        return callees
+
+    # ---- 增量推断缓存 ----
+    def _compute_segment_hash(self, segment) -> str:
+        """计算段体源码哈希（用于增量推断缓存键）。"""
+        body_repr = repr([str(type(s).__name__) for s in (getattr(segment, 'body', []) or [])])
+        return hashlib.md5(body_repr.encode('utf-8')).hexdigest()
+
+    def _compute_type_hash(self, ft: FunctionType) -> str:
+        """计算函数类型的哈希（用于检测依赖段类型是否变化）。"""
+        return hashlib.md5(str(ft).encode('utf-8')).hexdigest()
+
+    def _invalidate_dependents(self, seg_name: str):
+        """递归失效所有依赖此段的缓存条目（级联失效）。"""
+        to_process = [seg_name]
+        processed: Set[str] = set()
+        while to_process:
+            current = to_process.pop()
+            if current in processed:
+                continue
+            processed.add(current)
+            if current in self._segment_cache:
+                entry = self._segment_cache[current]
+                for rd in entry.reverse_deps:
+                    if rd not in processed:
+                        to_process.append(rd)
+                # 删除此缓存条目（将被重新推断）
+                del self._segment_cache[current]
+
+    def _check_cache(self, segment, dep_type_hashes: Dict[str, str]) -> Optional[FunctionType]:
+        """检查段推断缓存是否有效。
+
+        Returns:
+            若缓存命中，返回缓存的 FunctionType；否则返回 None（需要重新推断）。
+        """
+        if not self._incremental:
+            return None
+
+        seg_name = segment.name
+        if seg_name not in self._segment_cache:
+            return None
+
+        entry = self._segment_cache[seg_name]
+        source_hash = self._compute_segment_hash(segment)
+
+        # 检查源码是否变化
+        if source_hash != entry.source_hash:
+            # 源码变化，失效此段及其所有依赖者
+            self._invalidate_dependents(seg_name)
+            return None
+
+        # 检查依赖段类型是否变化
+        for dep_name, expected_hash in entry.dep_type_hashes.items():
+            if dep_name not in dep_type_hashes:
+                # 依赖段不再存在
+                self._invalidate_dependents(seg_name)
+                return None
+            if dep_type_hashes[dep_name] != expected_hash:
+                # 依赖段类型变化，失效此段及级联依赖
+                self._invalidate_dependents(seg_name)
+                return None
+
+        return entry.result_type
+
+    def _update_cache(self, seg_name: str, source_hash: str,
+                       dep_type_hashes: Dict[str, str], result_type: FunctionType):
+        """更新段推断缓存（同时更新反向依赖关系）。"""
+        # 计算旧的反向依赖集合（用于清理）
+        old_reverse_deps: Set[str] = set()
+        if seg_name in self._segment_cache:
+            old_reverse_deps = self._segment_cache[seg_name].reverse_deps
+
+        # 创建新缓存条目
+        entry = SegmentCacheEntry(
+            source_hash=source_hash,
+            dep_type_hashes=dep_type_hashes,
+            result_type=result_type,
+        )
+        self._segment_cache[seg_name] = entry
+
+        # 更新新依赖的反向引用
+        for dep_name in dep_type_hashes:
+            if dep_name not in self._segment_cache:
+                self._segment_cache[dep_name] = SegmentCacheEntry(
+                    source_hash="", dep_type_hashes={}, result_type=None
+                )
+            self._segment_cache[dep_name].reverse_deps.add(seg_name)
+
+        # 清理旧依赖的反向引用（不再依赖的段）
+        removed_deps = old_reverse_deps - set(dep_type_hashes.keys())
+        for old_dep in removed_deps:
+            if old_dep in self._segment_cache:
+                self._segment_cache[old_dep].reverse_deps.discard(seg_name)
+
+    def _topo_sort_segments(self, segments: List) -> List[List]:
+        """拓扑排序：将段按调用依赖分层。
+        
+        调用图 _call_graph 是 caller -> {callees}，即 A 调用 B 意味着 A 依赖 B。
+        因此 B 必须先于 A 推断。构建反向图（被调用者 → 调用者集合）用于更新入度。
+        
+        返回：[[段1, 段2], [段3], ...]，每层内的段无相互依赖，可并行推断。
+        有环的段（相互递归）放在同一层，标记为需要额外迭代。
+        """
+        if not self._call_graph:
+            return [segments]
+
+        # 构建名称 → 段映射
+        name_to_seg = {seg.name: seg for seg in segments}
+        seg_names = set(name_to_seg.keys())
+
+        # 入度 = 此段依赖的段数（即它调用的段数）
+        in_degree: Dict[str, int] = {}
+        for seg in segments:
+            callees = self._call_graph.get(seg.name, set()) & seg_names
+            in_degree[seg.name] = len(callees)
+
+        # 构建反向图：被调用者 → 调用者集合（用于更新入度）
+        reverse_graph: Dict[str, Set[str]] = {}
+        for caller, callees in self._call_graph.items():
+            if caller not in seg_names:
+                continue
+            for callee in callees:
+                if callee in seg_names:
+                    if callee not in reverse_graph:
+                        reverse_graph[callee] = set()
+                    reverse_graph[callee].add(caller)
+
+        # BFS 拓扑分层
+        layers: List[List] = []
+        remaining = set(seg.name for seg in segments)
+        in_scc: Set[str] = set()  # 相互递归的段
+
+        while remaining:
+            # 找出当前入度为 0 的段（无依赖，可立即推断）
+            current_layer = []
+            for name in list(remaining):
+                if in_degree.get(name, 0) == 0:
+                    current_layer.append(name_to_seg[name])
+                    remaining.discard(name)
+
+            if current_layer:
+                layers.append(current_layer)
+                # 移除当前层段对依赖它的段（调用者）的入度影响
+                for seg in current_layer:
+                    for caller in reverse_graph.get(seg.name, set()):
+                        if caller in in_degree:
+                            in_degree[caller] = max(0, in_degree[caller] - 1)
+            else:
+                # 剩余段形成环（SCC），全部放入同一层
+                scc_layer = [name_to_seg[name] for name in remaining]
+                layers.append(scc_layer)
+                in_scc.update(remaining)
+                remaining.clear()
+
+        return layers
+
     # ---- HM 阶段 2：推断函数体并泛化 ----
+
+    # ⭐ 并行推断：在隔离环境中推断单个段
+    def _infer_segment_isolated(self, segment, pre_func_type: FunctionType,
+                                  sym_table_snapshot, call_graph: Dict[str, Set[str]],
+                                  incremental: bool) -> Tuple[str, Optional[FunctionType], List[str]]:
+        """在隔离的符号表副本中推断单个段，返回 (段名, 推断结果, 错误列表)。
+
+        用于并行推断：每个 worker 线程拥有独立的符号表和类型缓存，
+        避免线程间竞争。
+        """
+        errors: List[str] = []
+        # 使用符号表快照创建隔离环境
+        saved_symbol_table = self.symbol_table
+        saved_errors = self.errors
+        saved_typed_errors = self._typed_errors
+        saved_type_cache = self.type_cache
+        saved_hm_subs = self._hm_subs
+        saved_return_type = self._current_return_type
+        saved_collected = self._collected_return_types
+        saved_incremental = self._incremental
+
+        try:
+            # 设置隔离环境
+            self.symbol_table = sym_table_snapshot
+            self.errors = []
+            self._typed_errors = []
+            self.type_cache = {}
+            self._hm_subs = TypeSubstitution()
+            self._incremental = incremental
+
+            # 进入段作用域
+            self.symbol_table.enter_scope()
+            self._hm_subs = TypeSubstitution()
+
+            for param, ptype in zip(segment.parameters, pre_func_type.param_types):
+                self.symbol_table.define(param.name, 'parameter', ptype)
+
+            self._current_return_type = pre_func_type.return_type
+            self._collected_return_types = []
+
+            try:
+                for body_stmt in segment.body:
+                    self._infer_statement(body_stmt)
+            except Exception as e:
+                errors.append(f"段 '{segment.name}' 推断异常: {e}")
+
+            # 应用累积的替换
+            local_subs = self._hm_subs.clone()
+            if self._collected_return_types:
+                try:
+                    for rt in self._collected_return_types:
+                        new_subs = unify(
+                            pre_func_type.return_type.apply_substitution(local_subs),
+                            rt.apply_substitution(local_subs),
+                            local_subs,
+                        )
+                        local_subs = new_subs
+                except UnificationError:
+                    pass
+
+            resolved_params = [pt.apply_substitution(local_subs)
+                               for pt in pre_func_type.param_types]
+            resolved_return = pre_func_type.return_type.apply_substitution(local_subs)
+
+            # 无 return 且未显式声明返回 → 视为空
+            if not self._collected_return_types and not segment.return_type \
+                    and isinstance(resolved_return, TypeVar) \
+                    and resolved_return.name not in local_subs:
+                resolved_return = TYPE_NULL
+
+            final_func_type = FunctionType(resolved_params, resolved_return)
+            generalized = self._generalize(segment.name, final_func_type)
+
+            self.symbol_table.exit_scope()
+
+            return (segment.name, generalized, errors)
+
+        finally:
+            # 恢复原始状态
+            self.symbol_table = saved_symbol_table
+            self.errors = saved_errors
+            self._typed_errors = saved_typed_errors
+            self.type_cache = saved_type_cache
+            self._hm_subs = saved_hm_subs
+            self._current_return_type = saved_return_type
+            self._collected_return_types = saved_collected
+            self._incremental = saved_incremental
+
     def _hm_infer_module(self, module: Module):
         """第二阶段：HM 风格推断所有段体并进行 let-polymorphism 泛化。
 
@@ -405,68 +745,135 @@ class TypeInferencer:
         # ---- 处理段定义 ----
         all_segs = list(_iter_segments())
 
-        for _ in range(2):
-            for segment in all_segs:
-                sym = self.symbol_table.lookup(segment.name)
-                if sym is None or not isinstance(sym.data_type, FunctionType):
-                    continue
+        # ⭐ 构建调用图并拓扑排序
+        self._build_call_graph(module)
+        layers = self._topo_sort_segments(all_segs)
 
-                pre_func_type = sym.data_type
+        # 推断每个段体（支持拓扑分层 + 并行推断 + SCC 多轮迭代）
+        for layer_idx, layer_segs in enumerate(layers):
+            # 判断当前层是否包含 SCC（相互递归），需要 2 轮迭代
+            layer_names = {seg.name for seg in layer_segs}
+            has_scc = any(
+                self._call_graph.get(seg.name, set()) & layer_names
+                for seg in layer_segs
+            )
+            max_iters = 2 if has_scc else 1
 
-                # ⭐ 保存并重置 type_cache，避免上一轮段体推断污染本论推断
-                saved_cache = self.type_cache
-                self.type_cache = {}
+            # ⭐ 并行推断：同层无 SCC 且段数 > 1 时，并行推断
+            use_parallel = (
+                self._parallel
+                and not has_scc
+                and len(layer_segs) > 1
+                and max_iters == 1
+            )
 
-                self.symbol_table.enter_scope()
-                self._hm_subs = TypeSubstitution()
-
-                for param, ptype in zip(segment.parameters, pre_func_type.param_types):
-                    self.symbol_table.define(param.name, 'parameter', ptype)
-
-                self._current_return_type = pre_func_type.return_type
-                self._collected_return_types = []
-                try:
-                    for body_stmt in segment.body:
-                        self._infer_statement(body_stmt)
-                except Exception as e:
-                    self._add_error(f"段 '{segment.name}' 推断异常: {e}", node=segment)
-
-                # 应用累积的替换
-                local_subs = self._hm_subs.clone()
-                if self._collected_return_types:
-                    try:
-                        for rt in self._collected_return_types:
-                            new_subs = unify(
-                                pre_func_type.return_type.apply_substitution(local_subs),
-                                rt.apply_substitution(local_subs),
-                                local_subs,
+            for _ in range(max_iters):
+                if use_parallel:
+                    # ---- 并行推断 ----
+                    sym_table_snap = self.symbol_table.snapshot()
+                    futures = {}
+                    with ThreadPoolExecutor(max_workers=min(self._max_workers, len(layer_segs))) as executor:
+                        for segment in layer_segs:
+                            sym = self.symbol_table.lookup(segment.name)
+                            if sym is None or not isinstance(sym.data_type, FunctionType):
+                                continue
+                            pre_func_type = sym.data_type
+                            # 每个 worker 使用独立的符号表副本
+                            worker_snap = sym_table_snap.snapshot() if sym_table_snap else TypeSymbolTable()
+                            future = executor.submit(
+                                self._infer_segment_isolated,
+                                segment, pre_func_type, worker_snap,
+                                self._call_graph, self._incremental
                             )
-                            local_subs = new_subs
-                    except UnificationError:
-                        pass
+                            futures[future] = (segment, pre_func_type)
 
-                resolved_params = [pt.apply_substitution(local_subs)
-                                   for pt in pre_func_type.param_types]
-                resolved_return = pre_func_type.return_type.apply_substitution(local_subs)
+                        for future in as_completed(futures):
+                            segment, pre_func_type = futures[future]
+                            try:
+                                seg_name, generalized, worker_errors = future.result()
+                                if generalized is not None:
+                                    sym = self.symbol_table.lookup(seg_name)
+                                    if sym and isinstance(sym.data_type, FunctionType):
+                                        sym.data_type = generalized
+                                if worker_errors:
+                                    for err in worker_errors:
+                                        self._add_error(err, node=segment)
+                            except Exception as e:
+                                self._add_error(f"段 '{segment.name}' 并行推断异常: {e}", node=segment)
+                else:
+                    # ---- 串行推断（含 SCC 多轮迭代） ----
+                    for segment in layer_segs:
+                        sym = self.symbol_table.lookup(segment.name)
+                        if sym is None or not isinstance(sym.data_type, FunctionType):
+                            continue
 
-                # 无 return 且未显式声明返回 → 视为空
-                if not self._collected_return_types and not segment.return_type \
-                        and isinstance(resolved_return, TypeVar) \
-                        and resolved_return.name not in local_subs.mapping:
-                    resolved_return = TYPE_NULL
+                        pre_func_type = sym.data_type
 
-                final_func_type = FunctionType(resolved_params, resolved_return)
-                generalized = self._generalize(segment.name, final_func_type)
-                sym.data_type = generalized
+                        # ⭐ 增量推断：构建依赖段类型哈希并检查缓存
+                        source_hash = self._compute_segment_hash(segment)
+                        dep_type_hashes: Dict[str, str] = {}
+                        for dep_name in self._call_graph.get(segment.name, set()):
+                            dep_sym = self.symbol_table.lookup(dep_name)
+                            if dep_sym and isinstance(dep_sym.data_type, FunctionType):
+                                dep_type_hashes[dep_name] = self._compute_type_hash(dep_sym.data_type)
 
-                self._current_return_type = None
-                self._hm_subs = TypeSubstitution()
+                        cached = self._check_cache(segment, dep_type_hashes)
+                        if cached is not None:
+                            sym.data_type = cached
+                            continue
 
-                # 恢复 type_cache（但保留本轮已推断结果，以让后续段体查询能看到新的推断）：
-                # 因为段体推断期间 type_cache 中保存了本论对 body 中调用的推断结果，
-                # 为避免泄漏，我们只合并顶层/符号表而不在 type_cache 中保留段体内容。
-                self.type_cache = saved_cache
-                self.symbol_table.exit_scope()
+                        # ⭐ 保存并重置 type_cache
+                        saved_cache = self.type_cache
+                        self.type_cache = {}
+
+                        self.symbol_table.enter_scope()
+                        self._hm_subs = TypeSubstitution()
+
+                        for param, ptype in zip(segment.parameters, pre_func_type.param_types):
+                            self.symbol_table.define(param.name, 'parameter', ptype)
+
+                        self._current_return_type = pre_func_type.return_type
+                        self._collected_return_types = []
+                        try:
+                            for body_stmt in segment.body:
+                                self._infer_statement(body_stmt)
+                        except Exception as e:
+                            self._add_error(f"段 '{segment.name}' 推断异常: {e}", node=segment)
+
+                        # 应用累积的替换
+                        local_subs = self._hm_subs.clone()
+                        if self._collected_return_types:
+                            try:
+                                for rt in self._collected_return_types:
+                                    new_subs = unify(
+                                        pre_func_type.return_type.apply_substitution(local_subs),
+                                        rt.apply_substitution(local_subs),
+                                        local_subs,
+                                    )
+                                    local_subs = new_subs
+                            except UnificationError:
+                                pass
+
+                        resolved_params = [pt.apply_substitution(local_subs)
+                                           for pt in pre_func_type.param_types]
+                        resolved_return = pre_func_type.return_type.apply_substitution(local_subs)
+
+                        if not self._collected_return_types and not segment.return_type \
+                                and isinstance(resolved_return, TypeVar) \
+                                and resolved_return.name not in local_subs:
+                            resolved_return = TYPE_NULL
+
+                        final_func_type = FunctionType(resolved_params, resolved_return)
+                        generalized = self._generalize(segment.name, final_func_type)
+                        sym.data_type = generalized
+
+                        if self._incremental:
+                            self._update_cache(segment.name, source_hash, dep_type_hashes, generalized)
+
+                        self._current_return_type = None
+                        self._hm_subs = TypeSubstitution()
+                        self.type_cache = saved_cache
+                        self.symbol_table.exit_scope()
 
     # ---- Let-polymorphism：泛化与实例化 ----
     def _generalize(self, name: str, t: Type) -> Type:
@@ -755,51 +1162,51 @@ class TypeInferencer:
         if stmt is None:
             return TYPE_NULL
 
-        if is_instance(stmt, 'VariableDeclaration'):
+        if stmt._ast_type_id == AST_TYPE_ID_VARIABLE_DECLARATION:
             return self._infer_var_decl(stmt)
 
-        elif is_instance(stmt, 'Assignment'):
+        elif stmt._ast_type_id == AST_TYPE_ID_ASSIGNMENT:
             return self._infer_assignment(stmt)
 
-        elif is_instance(stmt, 'IfStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_IF_STATEMENT:
             return self._infer_if_stmt(stmt)
 
-        elif is_instance(stmt, 'ForeachStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_FOREACH_STATEMENT:
             return self._infer_foreach_stmt(stmt)
 
-        elif is_instance(stmt, 'WhileStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_WHILE_STATEMENT:
             return self._infer_while_stmt(stmt)
 
-        elif is_instance(stmt, 'ReturnStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_RETURN_STATEMENT:
             return self._infer_return_stmt(stmt)
 
-        elif is_instance(stmt, 'MatchStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_MATCH_STATEMENT:
             return self._infer_match_stmt(stmt)
 
-        elif is_instance(stmt, 'ExpressionStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_EXPRESSION_STATEMENT:
             return self._infer_expr(stmt.expression)
 
-        elif is_instance(stmt, 'PrintStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_PRINT_STATEMENT:
             if hasattr(stmt, 'value') and stmt.value is not None:
                 self._infer_expr(stmt.value)
             return TYPE_NULL
 
-        elif is_instance(stmt, 'ThrowStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_THROW_STATEMENT:
             if hasattr(stmt, 'value') and stmt.value is not None:
                 self._infer_expr(stmt.value)
             return TYPE_NULL
 
-        elif is_instance(stmt, 'FunctionCall'):
+        elif stmt._ast_type_id == AST_TYPE_ID_FUNCTION_CALL:
             return self._infer_expr(stmt)
 
-        elif is_instance(stmt, 'SegmentDefinition'):
+        elif stmt._ast_type_id == AST_TYPE_ID_SEGMENT_DEFINITION:
             self._infer_segment(stmt)
             return TYPE_NULL
 
-        elif is_instance(stmt, 'DeferStatement'):
+        elif stmt._ast_type_id == AST_TYPE_ID_DEFER_STATEMENT:
             return self._infer_defer_stmt(stmt)
 
-        elif is_instance(stmt, 'AsyncScope'):
+        elif stmt._ast_type_id == AST_TYPE_ID_ASYNC_SCOPE:
             return self._infer_async_scope(stmt)
 
         return TYPE_NULL
@@ -886,7 +1293,7 @@ class TypeInferencer:
         """推断赋值语句"""
         value_type = self._infer_expr(stmt.value)
 
-        if is_instance(stmt.target, 'Identifier'):
+        if stmt.target._ast_type_id == AST_TYPE_ID_IDENTIFIER:
             target_name = stmt.target.name
             symbol = self.symbol_table.lookup(target_name)
             if symbol:
@@ -910,7 +1317,7 @@ class TypeInferencer:
             self.type_cache[id(stmt)] = value_type
             return value_type
 
-        elif is_instance(stmt.target, 'PropertyAccess'):
+        elif stmt.target._ast_type_id == AST_TYPE_ID_PROPERTY_ACCESS:
             self._infer_expr(stmt.target)
             self.type_cache[id(stmt)] = value_type
             return value_type
@@ -991,11 +1398,11 @@ class TypeInferencer:
                     # ⭐ 累积到当前段的 HM 上下文中
                     hm_subs = getattr(self, '_hm_subs', None)
                     if hm_subs is not None:
-                        for k, v in subs.mapping.items():
-                            if k not in hm_subs.mapping:
-                                hm_subs.mapping[k] = v
+                        for k, v in subs.items():
+                            if k not in hm_subs:
+                                hm_subs[k] = v
                             else:
-                                hm_subs.mapping[k] = hm_subs.mapping[k].apply_substitution(subs)
+                                hm_subs[k] = hm_subs[k].apply_substitution(subs)
                     resolved = self._current_return_type.apply_substitution(subs)
                     self._current_return_type = resolved
                 except UnificationError:
@@ -1092,17 +1499,17 @@ class TypeInferencer:
         result_type: Type = TYPE_UNKNOWN
 
         # 字面量
-        if is_instance(expr, 'NumberLiteral'):
+        if expr._ast_type_id == AST_TYPE_ID_NUMBER_LITERAL:
             result_type = TYPE_NUMBER
-        elif is_instance(expr, 'StringLiteral'):
+        elif expr._ast_type_id == AST_TYPE_ID_STRING_LITERAL:
             result_type = TYPE_STRING
-        elif is_instance(expr, 'BooleanLiteral'):
+        elif expr._ast_type_id == AST_TYPE_ID_BOOLEAN_LITERAL:
             result_type = TYPE_BOOLEAN
-        elif is_instance(expr, 'NullLiteral'):
+        elif expr._ast_type_id == AST_TYPE_ID_NULL_LITERAL:
             result_type = TYPE_NULL
 
         # 解包表达式：值! 或 unwrap(值)
-        elif is_instance(expr, 'UnwrapExpression'):
+        elif expr._ast_type_id == AST_TYPE_ID_UNWRAP_EXPRESSION:
             inner_type = self._infer_expr(expr.value)
             if isinstance(inner_type, OptionalTypeWrapper):
                 result_type = inner_type.inner_type
@@ -1114,7 +1521,7 @@ class TypeInferencer:
             return result_type
 
         # 标识符
-        elif is_instance(expr, 'Identifier'):
+        elif expr._ast_type_id == AST_TYPE_ID_IDENTIFIER:
             # 特殊处理：'空'、'None' 等是「可空的底类型」，被推断为 NullType
             if expr.name in ('None', '空', 'null', 'NULL'):
                 result_type = TYPE_NULL
@@ -1132,7 +1539,7 @@ class TypeInferencer:
                     result_type = TYPE_UNKNOWN
 
         # 二元运算
-        elif is_instance(expr, 'BinaryOp'):
+        elif expr._ast_type_id == AST_TYPE_ID_BINARY_OP:
             left_type = self._infer_expr(expr.left)
             right_type = self._infer_expr(expr.right)
             op = expr.operator
@@ -1163,12 +1570,12 @@ class TypeInferencer:
                     # 累积到当前段的 HM 上下文中
                     hm_subs = getattr(self, '_hm_subs', None)
                     if hm_subs is not None:
-                        for k, v in subs1.mapping.items():
-                            if k not in hm_subs.mapping:
-                                hm_subs.mapping[k] = v
-                        for k, v in subs2.mapping.items():
-                            if k not in hm_subs.mapping:
-                                hm_subs.mapping[k] = v
+                        for k, v in subs1.items():
+                            if k not in hm_subs:
+                                hm_subs[k] = v
+                        for k, v in subs2.items():
+                            if k not in hm_subs:
+                                hm_subs[k] = v
                     return True
                 except UnificationError:
                     return False
@@ -1220,7 +1627,7 @@ class TypeInferencer:
                 result_type = TYPE_UNKNOWN
 
         # 一元运算
-        elif is_instance(expr, 'UnaryOp'):
+        elif expr._ast_type_id == AST_TYPE_ID_UNARY_OP:
             operand_type = self._infer_expr(expr.operand)
             if expr.operator in ('非', 'not', '!'):
                 result_type = TYPE_BOOLEAN if isinstance(operand_type, BooleanType) else TYPE_UNKNOWN
@@ -1230,11 +1637,11 @@ class TypeInferencer:
                 result_type = operand_type
 
         # 函数调用 / 段落调用
-        elif is_instance(expr, 'FunctionCall'):
+        elif expr._ast_type_id == AST_TYPE_ID_FUNCTION_CALL:
             result_type = self._infer_function_call(expr)
 
         # 属性访问（支持泛型类实例方法查找）
-        elif is_instance(expr, 'PropertyAccess'):
+        elif expr._ast_type_id == AST_TYPE_ID_PROPERTY_ACCESS:
             obj_type = self._infer_expr(expr.obj)
             property_name = expr.property_name
 
@@ -1272,7 +1679,7 @@ class TypeInferencer:
             result_type = TYPE_UNKNOWN
 
         # 索引访问
-        elif is_instance(expr, 'IndexAccess'):
+        elif expr._ast_type_id == AST_TYPE_ID_INDEX_ACCESS:
             obj_type = self._infer_expr(expr.obj)
             index_type = self._infer_expr(expr.index)
 
@@ -1290,7 +1697,7 @@ class TypeInferencer:
                 result_type = TYPE_UNKNOWN
 
         # 列表字面量（支持泛型元素类型推断）
-        elif is_instance(expr, 'ListLiteral'):
+        elif expr._ast_type_id == AST_TYPE_ID_LIST_LITERAL:
             element_types = [self._infer_expr(e) for e in expr.elements]
             if element_types:
                 # 尝试合一所有元素类型
@@ -1311,7 +1718,7 @@ class TypeInferencer:
                 result_type = ListType(TYPE_UNKNOWN)
 
         # 字典字面量
-        elif is_instance(expr, 'DictLiteral'):
+        elif expr._ast_type_id == AST_TYPE_ID_DICT_LITERAL:
             key_types = []
             val_types = []
             for entry in expr.entries:
@@ -1350,7 +1757,7 @@ class TypeInferencer:
             result_type = DictType(key_type, val_type)
 
         # 类实例化（支持泛型类 + 类型参数推断）
-        elif is_instance(expr, 'NewExpression'):
+        elif expr._ast_type_id == AST_TYPE_ID_NEW_EXPRESSION:
             arg_types = [self._infer_expr(a) for a in expr.arguments]
             class_name = expr.class_name
 
@@ -1418,10 +1825,10 @@ class TypeInferencer:
                 else:
                     result_type = ClassType(class_name)
 
-        elif is_instance(expr, 'SelfReference'):
+        elif expr._ast_type_id == AST_TYPE_ID_SELF_REFERENCE:
             result_type = TYPE_ANY
 
-        elif is_instance(expr, 'ListComprehension'):
+        elif expr._ast_type_id == AST_TYPE_ID_LIST_COMPREHENSION:
             iter_type = self._infer_expr(expr.iterable)
             self.symbol_table.enter_scope()
             if isinstance(iter_type, ListType):
@@ -1439,16 +1846,16 @@ class TypeInferencer:
             self.symbol_table.exit_scope()
             result_type = ListType(elem_type)
 
-        elif is_instance(expr, 'LambdaExpression'):
+        elif expr._ast_type_id == AST_TYPE_ID_LAMBDA_EXPRESSION:
             result_type = self._infer_lambda(expr)
 
-        elif is_instance(expr, 'StringInterpolation'):
+        elif expr._ast_type_id == AST_TYPE_ID_STRING_INTERPOLATION:
             for part in expr.parts:
                 if not isinstance(part, str):
                     self._infer_expr(part)
             result_type = TYPE_STRING
 
-        elif is_instance(expr, 'ConditionalExpression'):
+        elif expr._ast_type_id == AST_TYPE_ID_CONDITIONAL_EXPRESSION:
             cond_type = self._infer_expr(expr.condition)
             if not isinstance(cond_type, (BooleanType, AnyType, UnknownType)):
                 self._add_error(f"条件表达式类型应为布尔，实际为 {cond_type}", node=expr)
@@ -1463,13 +1870,13 @@ class TypeInferencer:
             else:
                 result_type = then_type
 
-        elif is_instance(expr, 'PipeExpression'):
+        elif expr._ast_type_id == AST_TYPE_ID_PIPE_EXPRESSION:
             cur_type = TYPE_UNKNOWN
             for sub_expr in expr.expressions:
                 cur_type = self._infer_expr(sub_expr)
             result_type = cur_type
 
-        elif is_instance(expr, 'AwaitExpression'):
+        elif expr._ast_type_id == AST_TYPE_ID_AWAIT_EXPRESSION:
             inner_type = self._infer_expr(expr.expression)
             if isinstance(inner_type, FutureType):
                 result_type = inner_type.inner_type
@@ -1530,7 +1937,7 @@ class TypeInferencer:
 
         # 获取函数名
         func_name = None
-        if is_instance(expr.name, 'Identifier'):
+        if expr.name._ast_type_id == AST_TYPE_ID_IDENTIFIER:
             func_name = expr.name.name
         elif hasattr(expr.name, 'name'):
             func_name = expr.name.name
@@ -1615,13 +2022,11 @@ class TypeInferencer:
             # ⭐ 累积约束到当前段的 HM 上下文（若存在）
             hm_subs = getattr(self, '_hm_subs', None)
             if hm_subs is not None:
-                # 把 subs 中的新映射合并进 hm_subs
-                for k, v in subs.mapping.items():
-                    if k not in hm_subs.mapping:
-                        hm_subs.mapping[k] = v
+                for k, v in subs.items():
+                    if k not in hm_subs:
+                        hm_subs[k] = v
                     else:
-                        # 已有映射：应用新替换后得到最具体类型
-                        hm_subs.mapping[k] = hm_subs.mapping[k].apply_substitution(subs)
+                        hm_subs[k] = hm_subs[k].apply_substitution(subs)
 
             return resolved_return
 
