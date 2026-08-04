@@ -4,6 +4,9 @@
 将段言AST转换为Python代码
 """
 
+import os, sys
+sys.path.insert(0, os.path.dirname(__file__))
+
 from typing import List, Optional, Dict
 from duan_parser_v3 import *
 from keywords import VERB_ARITY
@@ -2495,7 +2498,7 @@ class PythonCodeGenerator:
             self._add_line(f"    def __repr__(self):")
             self._add_line(f"        if not self.hit: return '{safe_name}<未命中>'")
             if named:
-                parts = "+','+".join([f\"f'{n}={{self.{n}}}'\" for n in named])
+                parts = "+','+".join(['f"' + n + '={self.' + n + '}"' for n in named])
                 self._add_line(f"        return '{safe_name}<' + {parts} + '>'")
             else:
                 self._add_line(f"        return '{safe_name}<命中>'")
