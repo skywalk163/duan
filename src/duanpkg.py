@@ -17,6 +17,11 @@ import sys
 import json
 import shutil
 import argparse
+import urllib.request
+import urllib.error
+import base64
+import io
+import zipfile
 from pathlib import Path
 from datetime import datetime
 
@@ -110,47 +115,22 @@ def cmd_install(args):
     name = args.package
     print(f"正在安装 {name}...")
 
-    # 1. 查找包
+    # 远程安装
+    if args.registry:
+        return _remote_install(args.registry, name, args.version)
+
+    # 本地安装
     pkg_dir = _find_package_dir(name)
     if not pkg_dir:
         print(f"错误: 未找到包 {name}")
         print(f"提示: 使用 'duanpkg search' 查看可用包")
         return 1
 
-    pkg_info = _read_package_json(pkg_dir)
-    if not pkg_info:
-        print(f"错误: {pkg_dir} 缺少 duan.json")
-        return 1
-
-    # 2. 安装到 installed/
-    install_dir = Path(DEFAULT_INSTALL) / pkg_info["name"]
-    if install_dir.exists():
-        if not args.force:
-            print(f"包 {name} 已安装。使用 --force 强制覆盖")
-            return 0
-        shutil.rmtree(install_dir)
-
-    shutil.copytree(pkg_dir, install_dir, dirs_exist_ok=True)
-
-    # 3. 更新注册表
-    reg = _load_registry()
-    reg["packages"][pkg_info["name"]] = {
-        "version": pkg_info["version"],
-        "description": pkg_info.get("description", ""),
-        "author": pkg_info.get("author", ""),
-        "installed_at": str(datetime.now()),
-        "path": str(install_dir)
-    }
-    _save_registry(reg)
-
-    print(f"已安装 {pkg_info['name']} v{pkg_info['version']}")
-    if pkg_info.get("description"):
-        print(f"  {pkg_info['description']}")
-    return 0
+    return _install_local(pkg_dir, args.force)
 
 
 def cmd_publish(args):
-    """发布包到本地注册表"""
+    """发布包到本地或远程注册表"""
     pkg_dir = Path(args.dir or os.getcwd())
     pkg_info = _read_package_json(pkg_dir)
 
@@ -161,7 +141,11 @@ def cmd_publish(args):
     name = pkg_info["name"]
     version = pkg_info["version"]
 
-    # 复制到 contrib/
+    # 远程发布
+    if args.registry:
+        return _remote_publish(args.registry, pkg_info, pkg_dir)
+
+    # 本地发布
     contrib_dir = Path(DEFAULT_CONTRIB) / name
     if contrib_dir.exists():
         if not args.force:
@@ -172,7 +156,6 @@ def cmd_publish(args):
     shutil.copytree(pkg_dir, contrib_dir, dirs_exist_ok=True,
                     ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.git'))
 
-    # 更新注册表
     reg = _load_registry()
     reg["packages"][name] = {
         "version": version,
@@ -190,6 +173,11 @@ def cmd_publish(args):
 
 def cmd_search(args):
     """搜索包"""
+    # 远程搜索
+    if args.registry:
+        return _remote_search(args.registry, args.query or "")
+
+    # 本地搜索
     query = (args.query or "").lower()
     reg = _load_registry()
     packages = reg.get("packages", {})
@@ -271,10 +259,15 @@ def cmd_list(args):
 def cmd_info(args):
     """查看包信息"""
     name = args.package
+
+    # 远程信息
+    if args.registry:
+        return _remote_info(args.registry, name)
+
+    # 本地信息
     pkg_dir = _find_package_dir(name)
 
     if not pkg_dir:
-        # 也检查 installed/
         install_dir = Path(DEFAULT_INSTALL) / name
         if install_dir.exists():
             pkg_dir = install_dir
@@ -328,10 +321,241 @@ def cmd_remove(args):
     return 0
 
 
+# =============================================================================
+# 远程注册表操作
+# =============================================================================
+
+def _http_get(url: str) -> dict:
+    """HTTP GET 请求"""
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'duanpkg/4.1'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8') if e.fp else ''
+        try:
+            err = json.loads(body)
+            print(f"远程错误: {err.get('error', body)}")
+        except:
+            print(f"HTTP {e.code}: {body}")
+        return None
+    except urllib.error.URLError as e:
+        print(f"连接失败: {e.reason}")
+        return None
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+
+def _http_post(url: str, data: dict) -> dict:
+    """HTTP POST 请求"""
+    try:
+        body = json.dumps(data, ensure_ascii=False).encode('utf-8')
+        req = urllib.request.Request(url, data=body, headers={
+            'Content-Type': 'application/json',
+            'User-Agent': 'duanpkg/4.1'
+        })
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8') if e.fp else ''
+        try:
+            err = json.loads(body)
+            print(f"远程错误: {err.get('error', body)}")
+        except:
+            print(f"HTTP {e.code}: {body}")
+        return None
+    except urllib.error.URLError as e:
+        print(f"连接失败: {e.reason}")
+        return None
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return None
+
+
+def _http_download(url: str) -> bytes:
+    """HTTP 下载二进制文件"""
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'duanpkg/4.1'})
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return resp.read()
+    except Exception as e:
+        print(f"下载失败: {e}")
+        return None
+
+
+def _install_local(pkg_dir, force=False):
+    """本地安装包"""
+    pkg_info = _read_package_json(pkg_dir)
+    if not pkg_info:
+        print(f"错误: {pkg_dir} 缺少 duan.json")
+        return 1
+
+    install_dir = Path(DEFAULT_INSTALL) / pkg_info["name"]
+    if install_dir.exists():
+        if not force:
+            print(f"包 {pkg_info['name']} 已安装。使用 --force 强制覆盖")
+            return 0
+        shutil.rmtree(install_dir)
+
+    shutil.copytree(pkg_dir, install_dir, dirs_exist_ok=True)
+
+    reg = _load_registry()
+    reg["packages"][pkg_info["name"]] = {
+        "version": pkg_info["version"],
+        "description": pkg_info.get("description", ""),
+        "author": pkg_info.get("author", ""),
+        "installed_at": str(datetime.now()),
+        "path": str(install_dir)
+    }
+    _save_registry(reg)
+
+    print(f"已安装 {pkg_info['name']} v{pkg_info['version']}")
+    if pkg_info.get("description"):
+        print(f"  {pkg_info['description']}")
+    return 0
+
+
+def _remote_publish(registry_url: str, pkg_info: dict, pkg_dir: Path) -> int:
+    """发布包到远程注册表"""
+    url = registry_url.rstrip('/') + '/api/packages/publish'
+
+    # 创建包 zip
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, 'w', zipfile.ZIP_DEFLATED) as zf:
+        for root, dirs, files in os.walk(pkg_dir):
+            dirs[:] = [d for d in dirs if not d.startswith('.') and d != '__pycache__']
+            for file in files:
+                if file.endswith('.pyc') or file.startswith('.'):
+                    continue
+                full_path = os.path.join(root, file)
+                arcname = os.path.relpath(full_path, pkg_dir)
+                zf.write(full_path, arcname)
+
+    pkg_data = buf.getvalue()
+    content_b64 = base64.b64encode(pkg_data).decode('ascii')
+
+    payload = {
+        'name': pkg_info['name'],
+        'version': pkg_info['version'],
+        'metadata': {
+            'description': pkg_info.get('description', ''),
+            'author': pkg_info.get('author', ''),
+            'license': pkg_info.get('license', 'MIT'),
+            'dependencies': pkg_info.get('dependencies', {}),
+        },
+        'content': content_b64,
+    }
+
+    print(f"正在发布到 {url} ...")
+    result = _http_post(url, payload)
+    if result:
+        print(f"已发布 {result.get('name')} v{result.get('version')}")
+        print(f"  SHA256: {result.get('sha256', 'N/A')[:16]}...")
+        return 0
+    return 1
+
+
+def _remote_install(registry_url: str, name: str, version: str = None) -> int:
+    """从远程注册表安装包"""
+    base = registry_url.rstrip('/')
+
+    # 获取包信息
+    info_url = f'{base}/api/packages/{name}'
+    if version:
+        info_url += f'/{version}'
+
+    info = _http_get(info_url)
+    if not info:
+        return 1
+
+    print(f"找到 {info.get('name', name)} v{info.get('version', info.get('latest_version', '?'))}")
+
+    # 下载包
+    dl_url = f'{base}/api/packages/{name}/download'
+    if version:
+        dl_url += f'?version={version}'
+
+    print(f"正在下载...")
+    data = _http_download(dl_url)
+    if not data:
+        return 1
+
+    # 解压到 installed/
+    install_dir = Path(DEFAULT_INSTALL) / name
+    if install_dir.exists():
+        shutil.rmtree(install_dir)
+
+    os.makedirs(install_dir, exist_ok=True)
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        zf.extractall(install_dir)
+
+    # 更新注册表
+    reg = _load_registry()
+    reg["packages"][name] = {
+        "version": info.get('version', info.get('latest_version', '0.0.0')),
+        "description": info.get('description', ''),
+        "author": info.get('author', ''),
+        "installed_at": str(datetime.now()),
+        "path": str(install_dir),
+        "source": registry_url,
+    }
+    _save_registry(reg)
+
+    print(f"已安装 {name}")
+    return 0
+
+
+def _remote_search(registry_url: str, query: str) -> int:
+    """在远程注册表搜索包"""
+    url = registry_url.rstrip('/') + '/api/search'
+    if query:
+        url += f'?q={query}'
+
+    result = _http_get(url)
+    if not result:
+        return 1
+
+    results = result.get('results', [])
+    if not results:
+        print(f"未找到匹配 '{query}' 的包")
+    else:
+        print(f"找到 {len(results)} 个包:\n")
+        print(f"{'名称':<20} {'版本':<12} {'下载':<8} {'描述'}")
+        print("-" * 70)
+        for pkg in results:
+            print(f"{pkg['name']:<20} v{pkg.get('latest_version','?'):<11} {pkg.get('downloads',0):<8} {pkg.get('description','')[:40]}")
+
+    return 0
+
+
+def _remote_info(registry_url: str, name: str) -> int:
+    """从远程注册表查看包信息"""
+    url = registry_url.rstrip('/') + f'/api/packages/{name}'
+
+    info = _http_get(url)
+    if not info:
+        return 1
+
+    print(f"名称: {info.get('name', name)}")
+    print(f"版本: {info.get('latest_version', info.get('version', '?'))}")
+    print(f"描述: {info.get('description', '无')}")
+    print(f"作者: {info.get('author', '未知')}")
+    print(f"许可: {info.get('license', '?')}")
+    print(f"下载量: {info.get('downloads', 0)}")
+    print(f"更新时间: {info.get('updated', '?')}")
+
+    versions = info.get('versions', [])
+    if versions:
+        print(f"可用版本: {', '.join(versions)}")
+
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog='duanpkg',
-        description='段言包管理器 v4.0'
+        description='段言包管理器 v4.1'
     )
     sub = parser.add_subparsers(dest='command', help='命令')
 
@@ -343,16 +567,20 @@ def main():
     # install
     p_install = sub.add_parser('install', help='安装包')
     p_install.add_argument('package', help='包名')
+    p_install.add_argument('--registry', '-r', help='远程注册表地址')
+    p_install.add_argument('--version', '-v', help='指定版本')
     p_install.add_argument('--force', '-f', action='store_true', help='强制覆盖')
 
     # publish
-    p_publish = sub.add_parser('publish', help='发布包到本地注册表')
+    p_publish = sub.add_parser('publish', help='发布包')
     p_publish.add_argument('--dir', help='包目录')
+    p_publish.add_argument('--registry', '-r', help='远程注册表地址')
     p_publish.add_argument('--force', '-f', action='store_true', help='强制覆盖')
 
     # search
     p_search = sub.add_parser('search', help='搜索包')
     p_search.add_argument('query', nargs='?', help='搜索关键词')
+    p_search.add_argument('--registry', '-r', help='远程注册表地址')
 
     # list
     sub.add_parser('list', help='列出已安装包')
@@ -360,6 +588,7 @@ def main():
     # info
     p_info = sub.add_parser('info', help='查看包信息')
     p_info.add_argument('package', help='包名')
+    p_info.add_argument('--registry', '-r', help='远程注册表地址')
 
     # remove
     p_remove = sub.add_parser('remove', help='卸载包')

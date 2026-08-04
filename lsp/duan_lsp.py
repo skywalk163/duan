@@ -395,7 +395,9 @@ class DuanLanguageServer:
             'textDocumentSync': 1,  # Full sync
             'completionProvider': {
                 'resolveProvider': True,
-                'triggerCharacters': [' ', '设', '定', '打', '定', '导', '类', '接', '返', '当', '遍', '如']
+                'triggerCharacters': [' ', '设', '定', '打', '定', '导', '类', '接', '返', '当', '遍', '如',
+                    # L0 单字关键字触发补全（v4.1）
+                    '若', '否', '试', '捕', '抛', '终', '配', '承', '自', '跳', '过', '并', '且', '或', '非', '空', '真', '假']
             },
             'hoverProvider': True,
             'definitionProvider': True,
@@ -404,6 +406,17 @@ class DuanLanguageServer:
             'documentFormattingProvider': True,
             'documentRangeFormattingProvider': True,
             'renameProvider': True,
+            'signatureHelpProvider': {
+                'triggerCharacters': ['(', '（', ',']
+            },
+            'semanticTokensProvider': {
+                'legend': {
+                    'tokenTypes': ['keyword', 'function', 'variable', 'string', 'number', 'operator', 'comment', 'type'],
+                    'tokenModifiers': ['declaration', 'definition', 'readonly', 'static']
+                },
+                'full': True,
+                'range': False
+            },
             'codeActionProvider': {
                 'codeActionKinds': ['quickfix', 'refactor']
             },
@@ -429,6 +442,8 @@ class DuanLanguageServer:
             'textDocument/formatting': self._handle_formatting,
             'textDocument/rangeFormatting': self._handle_range_formatting,
             'textDocument/rename': self._handle_rename,
+            'textDocument/signatureHelp': self._handle_signature_help,
+            'textDocument/semanticTokens/full': self._handle_semantic_tokens,
             'textDocument/codeAction': self._handle_code_action,
         }
         
@@ -447,7 +462,7 @@ class DuanLanguageServer:
             'capabilities': self.capabilities,
             'serverInfo': {
                 'name': '段言语言服务器',
-                'version': '1.6.0'
+                'version': '4.1.0'
             }
         }
     
@@ -501,24 +516,53 @@ class DuanLanguageServer:
                     '定义': '定义变量：定义 变量名 等于 值。',
                     '设': '设变量为值：设 变量名 为 值。',
                     '如果': '条件语句：如果 条件 那么：...结束。',
-                    '若': '条件语句（简写）：若 条件 则：...结束。',
+                    '若': '条件语句（L0简写）：若 条件 则：...结束。',
                     '那么': '条件语句 then 分支',
                     '否则': '条件语句 else 分支',
+                    '否': '条件语句 else 分支（L0简写）：否则/否 条件：...结束。',
                     '否则若': '条件语句 elif 分支',
                     '遍历': '遍历循环：遍历 变量 于 列表：...结束。',
+                    '遍': '遍历循环（L0简写）：遍 变量 之 列表：...结束。',
                     '当': '条件循环：当 条件：...结束。',
                     '返回': '返回语句：返回 表达式。',
+                    '返': '返回语句（L0简写）：返 表达式。',
                     '跳出': '跳出循环：跳出。',
+                    '跳': '跳出循环（L0简写）：跳。',
                     '跳过': '跳过本次迭代：跳过。',
+                    '过': '跳过本次迭代（L0简写）：过。',
                     '段落': '段落（函数）定义：段落 段名 接收 参数：...结束。',
+                    '段': '段落（函数）定义（L0简写）：段 段名(参数)：...结束。',
                     '类': '类定义：类 类名：...结束。',
+                    '承': '继承（L0简写）：类 子类 承 父类：...结束。',
                     '接口': '接口定义：接口 接口名：...结束。',
+                    '接': '接口定义（L0简写）：接 接口名：...结束。',
                     '尝试': '异常处理：尝试：...捕获 异常：...结束。',
+                    '试': '异常处理（L0简写）：试：...捕 异常：...结束。',
+                    '捕获': '异常捕获：捕获 异常类型：...结束。',
+                    '捕': '异常捕获（L0简写）：捕 异常类型：...结束。',
                     '抛出': '抛出异常：抛出 异常对象。',
+                    '抛': '抛出异常（L0简写）：抛 异常对象。',
+                    '最终': '最终执行块：最终：...结束。',
+                    '终': '最终执行块（L0简写）：终：...结束。',
                     '导入': '导入模块：导入 模块名。',
+                    '导': '导入模块（L0简写）：导 模块名。',
+                    '导出': '导出模块：导出 模块名。',
+                    '出': '导出模块（L0简写）：出 模块名。',
                     '匹配': '模式匹配：匹配 表达式：情况 模式：...结束。',
+                    '配': '模式匹配（L0简写）：配 表达式：情况 模式：...结束。',
                     '异步': '异步函数定义：异步 段落 段名...',
                     '等待': '等待异步操作：等待 异步调用。',
+                    '自': '自引用（L0）：自.属性 或 自.方法()，等价于 self。',
+                    '之': '属性提取符（L0）：对象之属性，等价于 对象.属性。',
+                    '并': '管道连接符（L0）：数据 并 处理1 并 处理2。',
+                    '且': '逻辑与（L0）：条件1 且 条件2。',
+                    '或': '逻辑或（L0）：条件1 或 条件2。',
+                    '非': '逻辑非（L0）：非 条件。',
+                    '真': '布尔值：真（True）。',
+                    '假': '布尔值：假（False）。',
+                    '空': '空值：空（None/null）。',
+                    '是': '判断/相等（L0）：甲 是 乙 等价于 甲 == 乙。',
+                    '从': '从...导入（L0）：从 模块 导入 名称。',
                 }
                 item = {
                     'label': kw,
@@ -796,8 +840,8 @@ class DuanLanguageServer:
             if not line:
                 continue
 
-            # 减少缩进：结束、否则、否则若、捕获、最终
-            decrease_keywords = ['结束', '否则', '否则若', '捕获', '最终']
+            # 减少缩进：结束、否则/否、否则若/否若、捕获/捕、最终/终
+            decrease_keywords = ['结束', '否则', '否', '否则若', '否若', '捕获', '捕', '最终', '终']
             for kw in decrease_keywords:
                 if line.startswith(kw):
                     indent_level = max(0, indent_level - 1)
@@ -806,10 +850,11 @@ class DuanLanguageServer:
             # 应用缩进
             formatted_lines[i] = indent * indent_level + line
 
-            # 增加缩进：如果...那么、遍历...、当...、段落...、类...、尝试...、匹配...
+            # 增加缩进：如果/若、遍历/遍、当、段落/段、类、接口/接、尝试/试、匹配/配、否则/否、否则若/否若、捕获/捕
             if any(line.endswith(kw) for kw in ['：', ':']):
                 if any(line.startswith(kw) for kw in
-                       ['如果', '若', '遍历', '当', '段落', '类', '接口', '尝试', '匹配', '否则', '否则若', '捕获']):
+                       ['如果', '若', '遍历', '遍', '当', '段落', '段', '类', '接口', '接',
+                        '尝试', '试', '匹配', '配', '否则', '否', '否则若', '否若', '捕获', '捕']):
                     indent_level += 1
                 elif any(kw in line for kw in ['接收', '构造']):
                     indent_level += 1
@@ -939,6 +984,164 @@ class DuanLanguageServer:
                 })
 
         return code_actions
+
+    def _handle_signature_help(self, params: Dict) -> Optional[Dict]:
+        """处理函数签名帮助请求"""
+        doc = self.doc_manager.get_document(params.get('textDocument', {}).get('uri', ''))
+        if not doc:
+            return None
+
+        position = params.get('position', {})
+        line = position.get('line', 0)
+        character = position.get('character', 0)
+        line_text = doc.get_line(line)
+
+        # 查找当前正在调用的函数名
+        # 从光标位置向左搜索，找到函数调用开始处
+        func_name = ''
+        paren_depth = 0
+        for i in range(character - 1, -1, -1):
+            ch = line_text[i]
+            if ch == ')' or ch == '）':
+                paren_depth += 1
+            elif ch == '(' or ch == '（':
+                if paren_depth > 0:
+                    paren_depth -= 1
+                else:
+                    # 找到函数参数开始，向左找函数名
+                    j = i - 1
+                    while j >= 0 and (line_text[j].isalnum() or '\u4e00' <= line_text[j] <= '\u9fff' or line_text[j] == '_'):
+                        j -= 1
+                    func_name = line_text[j + 1:i]
+                    break
+
+        if not func_name:
+            return {'signatures': [], 'activeSignature': 0, 'activeParameter': 0}
+
+        # 计算当前参数索引
+        active_param = 0
+        depth = 0
+        for i in range(character - 1, 0, -1):
+            ch = line_text[i]
+            if ch == ')' or ch == '）':
+                depth += 1
+            elif ch == '(' or ch == '（':
+                if depth > 0:
+                    depth -= 1
+                else:
+                    break
+            elif ch == ',' or ch == '，':
+                if depth == 0:
+                    active_param += 1
+
+        # 查找函数签名
+        signatures = []
+        if doc.uri in self.doc_manager.definitions:
+            info = self.doc_manager.definitions[doc.uri].get(func_name + '__info')
+            if info and info.get('type') == '函数':
+                params_list = info.get('params', [])
+                label = f"{func_name}({', '.join(params_list)})"
+                signatures.append({
+                    'label': label,
+                    'documentation': {'kind': 'markdown', 'value': f'**函数**: `{func_name}`\n\n参数: {", ".join(params_list)}'},
+                    'parameters': [{'label': p} for p in params_list]
+                })
+
+        # 检查是否是内置动词
+        if not signatures and func_name in VERB_ARITY:
+            arity = VERB_ARITY[func_name]
+            if arity == -1:
+                label = f"{func_name}(参数...)"
+                params = [{'label': f'参数{i+1}'} for i in range(3)]
+            elif arity == 0:
+                label = f"{func_name}()"
+                params = []
+            else:
+                params = [{'label': f'参数{i+1}'} for i in range(arity)]
+                label = f"{func_name}({', '.join(p['label'] for p in params)})"
+            signatures.append({
+                'label': label,
+                'documentation': {'kind': 'markdown', 'value': f'**动词**: `{func_name}` (元数: {arity})'},
+                'parameters': params
+            })
+
+        if not signatures:
+            return {'signatures': [], 'activeSignature': 0, 'activeParameter': 0}
+
+        return {
+            'signatures': signatures,
+            'activeSignature': 0,
+            'activeParameter': min(active_param, len(signatures[0].get('parameters', [])) - 1) if signatures[0].get('parameters') else 0
+        }
+
+    def _handle_semantic_tokens(self, params: Dict) -> Dict:
+        """处理语义令牌请求（语法高亮增强）"""
+        doc = self.doc_manager.get_document(params.get('textDocument', {}).get('uri', ''))
+        if not doc:
+            return {'data': []}
+
+        try:
+            from lexer import Lexer
+            from tokens import TokenType as TT
+
+            lexer = Lexer()
+            tokens = lexer.tokenize(doc.text)
+
+            # Token type mapping
+            token_type_map = {
+                TT.KEYWORD: 0,      # keyword
+                TT.IDENTIFIER: 1,   # function (temporary, will be refined)
+                TT.STRING: 3,       # string
+                TT.NUMBER: 4,       # number
+                TT.OPERATOR: 5,     # operator
+                TT.COMMENT: 6,      # comment
+            }
+
+            # L0/L1 keyword modifier mapping
+            l0_keywords = {'若', '否', '当', '遍', '跳', '过', '返', '设', '段', '类', '承', '接', '配',
+                          '试', '捕', '抛', '终', '自', '之', '并', '从', '是', '且', '或', '非', '真', '假', '空',
+                          '导', '出'}
+
+            data = []
+            prev_line = 0
+            prev_col = 0
+
+            for tok in tokens:
+                if tok.type == TT.EOF or tok.type == TT.NEWLINE:
+                    continue
+
+                tt = token_type_map.get(tok.type)
+                if tt is None:
+                    continue
+
+                line = tok.line - 1
+                col = tok.col - 1
+                length = len(tok.value)
+
+                # Delta encoding
+                if prev_line == line and prev_col == col:
+                    delta_line = 0
+                    delta_col = 0
+                elif prev_line == line:
+                    delta_line = 0
+                    delta_col = col - prev_col
+                else:
+                    delta_line = line - prev_line
+                    delta_col = col
+
+                prev_line = line
+                prev_col = col
+
+                # Modifier: 0 = none
+                modifier = 0
+                if tok.type == TT.KEYWORD and tok.value in l0_keywords:
+                    modifier = 0  # Could use bit flags for L0 keyword modifier
+
+                data.extend([delta_line, delta_col, length, tt, modifier])
+
+            return {'data': data}
+        except Exception:
+            return {'data': []}
 
     def _handle_did_open(self, params: Dict):
         """处理文档打开"""

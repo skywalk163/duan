@@ -102,16 +102,16 @@ class ParserStmtMixin:
         if tok.type == TokenType.EMBED_BLOCK:
             return self._parse_embed_block()
 
-        # 导入语句：导入
-        if tok.type == TokenType.KEYWORD and tok.value == '导入':
+        # 导入语句：导入 / 导
+        if tok.type == TokenType.KEYWORD and tok.value in ('导入', '导'):
             return self._parse_import_stmt()
         
         # 从...导入语句：从
         if tok.type == TokenType.KEYWORD and tok.value == '从':
             return self._parse_from_import_stmt()
         
-        # 导出语句：导出
-        if tok.type == TokenType.KEYWORD and tok.value == '导出':
+        # 导出语句：导出 / 出
+        if tok.type == TokenType.KEYWORD and tok.value in ('导出', '出'):
             return self._parse_export_stmt()
         
         # 变量声明：定义
@@ -145,28 +145,28 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value in ('如果', '若'):
             return self._parse_if_stmt()
         
-        # 遍历循环：遍历
-        if tok.type == TokenType.KEYWORD and tok.value == '遍历':
+        # 遍历循环：遍历 / 遍
+        if tok.type == TokenType.KEYWORD and tok.value in ('遍历', '遍'):
             return self._parse_foreach_stmt()
         
         # 当循环：当
         if tok.type == TokenType.KEYWORD and tok.value == '当':
             return self._parse_while_stmt()
         
-        # 返回语句：返回
-        if tok.type == TokenType.KEYWORD and tok.value == '返回':
+        # 返回语句：返回 / 返
+        if tok.type == TokenType.KEYWORD and tok.value in ('返回', '返'):
             return self._parse_return_stmt()
         
-        # 跳出语句：跳出
-        if tok.type == TokenType.KEYWORD and tok.value == '跳出':
-            self._consume(TokenType.KEYWORD, '跳出')
+        # 跳出语句：跳出 / 跳
+        if tok.type == TokenType.KEYWORD and tok.value in ('跳出', '跳'):
+            self._consume(TokenType.KEYWORD, tok.value)
             if self._current() and self._current().type == TokenType.PERIOD:
                 self._consume(TokenType.PERIOD)
             return BreakStmt()
         
-        # 跳过语句：跳过
-        if tok.type == TokenType.KEYWORD and tok.value == '跳过':
-            self._consume(TokenType.KEYWORD, '跳过')
+        # 跳过语句：跳过 / 过
+        if tok.type == TokenType.KEYWORD and tok.value in ('跳过', '过'):
+            self._consume(TokenType.KEYWORD, tok.value)
             if self._current() and self._current().type == TokenType.PERIOD:
                 self._consume(TokenType.PERIOD)
             return ContinueStmt()
@@ -204,25 +204,25 @@ class ParserStmtMixin:
                             self._consume(TokenType.PERIOD)
                         return TypeCheckToggleStmt(enable, line, col)
         
-        # 异常捕获：尝试
-        if tok.type == TokenType.KEYWORD and tok.value == '尝试':
+        # 异常捕获：尝试 / 试
+        if tok.type == TokenType.KEYWORD and tok.value in ('尝试', '试'):
             return self._parse_try_stmt()
         
-        # 抛出异常：抛出
-        if tok.type == TokenType.KEYWORD and tok.value == '抛出':
+        # 抛出异常：抛出 / 抛
+        if tok.type == TokenType.KEYWORD and tok.value in ('抛出', '抛'):
             return self._parse_throw_stmt()
         
         # 异步相关：异步 段落 / 异步作用域 / 异步 遍历 / 等待
         if tok.type == TokenType.KEYWORD and tok.value == '异步':
             # 查看下一个 token 判断是异步段落还是异步作用域还是异步遍历
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落'):
-                # 异步段落：异步 函数/段落 段名 ...
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落', '段'):
+                # 异步段落：异步 函数/段落/段 段名 ...
                 return self._parse_async_paragraph()
             elif next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '作用域':
                 # 异步作用域：异步作用域 ...
                 return self._parse_async_scope()
-            elif next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '遍历':
+            elif next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('遍历', '遍'):
                 # 异步遍历：异步 遍历 变量 于 可迭代对象
                 self._consume(TokenType.KEYWORD, '异步')
                 return self._parse_foreach_stmt(is_async=True)
@@ -233,14 +233,14 @@ class ParserStmtMixin:
         # 严格段落：严格 段落 段名 ...
         if tok.type == TokenType.KEYWORD and tok.value == '严格':
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落'):
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落', '段'):
                 return self._parse_strict_paragraph()
             # 否则作为普通标识符处理（严格可能作为变量名）
         
         # 松散段落：松散 段落 段名 ...（显式声明为松散模式）
         if tok.type == TokenType.KEYWORD and tok.value == '松散':
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落'):
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('函数', '段落', '段'):
                 self._consume(TokenType.KEYWORD, '松散')
                 para = self._parse_paragraph_v2()
                 if '松散' not in para.modifiers:
@@ -272,12 +272,12 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '类':
             return self._parse_class_definition()
 
-        # 接口定义：接口 接口名
-        if tok.type == TokenType.KEYWORD and tok.value == '接口':
+        # 接口定义：接口 / 接 接口名
+        if tok.type == TokenType.KEYWORD and tok.value in ('接口', '接'):
             return self._parse_interface_definition()
 
-        # 模式匹配：匹配
-        if tok.type == TokenType.KEYWORD and tok.value == '匹配':
+        # 模式匹配：匹配 / 配
+        if tok.type == TokenType.KEYWORD and tok.value in ('匹配', '配'):
             return self._parse_match_stmt()
 
         # 上下文管理器：使用
@@ -306,8 +306,8 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value in VERB_ARITY:
             return self._parse_expr_stmt()
         
-        # self赋值语句：己属性名 为 值
-        if tok.type == TokenType.KEYWORD and tok.value == '己':
+        # self赋值语句：己/自 属性名 为 值
+        if tok.type == TokenType.KEYWORD and tok.value in ('己', '自'):
             return self._parse_self_assignment()
 
         # super调用：父.方法名(参数)
@@ -416,8 +416,8 @@ class ParserStmtMixin:
         # 保存当前位置（在消耗己之前），用于回溯
         saved_pos_before_ji = self.pos
         
-        # 己
-        self._consume(TokenType.KEYWORD, '己')
+        # 己 / 自
+        self._consume(TokenType.KEYWORD, self._current().value)
         
         # 保存当前位置（在消耗己之后），用于回退到无点号情况
         saved_pos = self.pos
@@ -695,6 +695,7 @@ class ParserStmtMixin:
             '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
             '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
             '匹配', '的', '之', '对', '步', '至', '到',
+            '导', '出', '遍', '返', '跳', '过', '试', '捕', '抛', '终', '配', '否', '接', '承', '自',
         })
         while self._current():
             tok = self._current()
@@ -784,6 +785,7 @@ class ParserStmtMixin:
             '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
             '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
             '匹配', '情况', '的', '之', '对', '步', '至', '到', '在', '于', '中的',
+            '导', '出', '遍', '返', '跳', '过', '试', '捕', '抛', '终', '配', '否', '接', '承', '自',
         })
         while self._current():
             tok = self._current()
@@ -957,8 +959,8 @@ class ParserStmtMixin:
         9. 导入 C: 模块名。（导入C语言库）
         10. 导入 标准模块名。（导入段言标准库，"标准"前缀可选）
         """
-        # 导入
-        self._consume(TokenType.KEYWORD, '导入')
+        # 导入 / 导
+        self._consume(TokenType.KEYWORD, self._current().value)
         
         # 检查语言前缀：Python: / C:
         language = None
@@ -1110,8 +1112,8 @@ class ParserStmtMixin:
                     self.pos -= 1
                     break
         
-        # 导入
-        self._consume(TokenType.KEYWORD, '导入')
+        # 导入 / 导
+        self._consume(TokenType.KEYWORD, self._current().value)
         
         # 符号列表（可以是书名号包裹、标识符或关键字）
         symbols = []
@@ -1429,8 +1431,8 @@ class ParserStmtMixin:
         2. 导出《符号一》，《符号二》。
         3. 导出 全部。
         """
-        # 导出
-        self._consume(TokenType.KEYWORD, '导出')
+        # 导出 / 出
+        self._consume(TokenType.KEYWORD, self._current().value)
         
         # 检查是否是"全部"
         if self._match(TokenType.IDENTIFIER, '全部'):
@@ -1522,10 +1524,10 @@ class ParserStmtMixin:
             # 处理 否则 / 否则如果 链
             result = IfStmt(condition, then_body, None)
             current = result
-            while self._current() and self._match(TokenType.KEYWORD, '否则'):
-                self._consume(TokenType.KEYWORD, '否则')
-                if self._match(TokenType.KEYWORD, '如果'):
-                    self._consume(TokenType.KEYWORD, '如果')
+            while self._current() and (self._match(TokenType.KEYWORD, '否则') or self._match(TokenType.KEYWORD, '否')):
+                self._consume(TokenType.KEYWORD, self._current().value)
+                if self._match(TokenType.KEYWORD, '如果') or self._match(TokenType.KEYWORD, '若'):
+                    self._consume(TokenType.KEYWORD, self._current().value)
                     elif_condition = self._parse_expr()
                     if self._match(TokenType.KEYWORD, '那么'):
                         self._consume(TokenType.KEYWORD, '那么')
@@ -1544,8 +1546,8 @@ class ParserStmtMixin:
             result = IfStmt(condition, then_body, None)
             current = result
             # 处理 C 风格的 否则 / 否则如果 链
-            while self._current() and self._match(TokenType.KEYWORD, '否则'):
-                self._consume(TokenType.KEYWORD, '否则')
+            while self._current() and (self._match(TokenType.KEYWORD, '否则') or self._match(TokenType.KEYWORD, '否')):
+                self._consume(TokenType.KEYWORD, self._current().value)
                 if self._match(TokenType.KEYWORD, '如果'):
                     # 否则如果(cond){body}
                     self._consume(TokenType.KEYWORD, '如果')
@@ -1612,7 +1614,7 @@ class ParserStmtMixin:
         
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '否则':
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('否则', '否'):
                 pass
             else:
                 self._consume(TokenType.KEYWORD, '结束')
@@ -1620,7 +1622,7 @@ class ParserStmtMixin:
                     self._consume(TokenType.PERIOD)
         elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
             next_tok = self._peek(1)
-            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '否则':
+            if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('否则', '否'):
                 pass
             else:
                 self._consume(TokenType.IDENTIFIER)
@@ -1632,7 +1634,7 @@ class ParserStmtMixin:
         current = result
         
         # 循环处理否则如果/否则分支
-        while self._current() and (self._match(TokenType.KEYWORD, '否则') or self._match(TokenType.KEYWORD, '否则若')):
+        while self._current() and (self._match(TokenType.KEYWORD, '否则') or self._match(TokenType.KEYWORD, '否') or self._match(TokenType.KEYWORD, '否则若')):
             if self._match(TokenType.KEYWORD, '否则若'):
                 # 否则若：作为单个token的elif
                 self._consume(TokenType.KEYWORD, '否则若')
@@ -1661,12 +1663,12 @@ class ParserStmtMixin:
                 # 创建新节点并链接
                 current.else_body = IfStmt(elif_condition, elif_body, None)
                 current = current.else_body
-            elif self._match(TokenType.KEYWORD, '否则'):
-                self._consume(TokenType.KEYWORD, '否则')
+            elif self._match(TokenType.KEYWORD, '否则') or self._match(TokenType.KEYWORD, '否'):
+                self._consume(TokenType.KEYWORD, self._current().value)
                 
-                if self._match(TokenType.KEYWORD, '如果'):
-                    # 否则如果：创建新的 IfStmt 作为 else_body
-                    self._consume(TokenType.KEYWORD, '如果')
+                if self._match(TokenType.KEYWORD, '如果') or self._match(TokenType.KEYWORD, '若'):
+                    # 否则如果/否若：创建新的 IfStmt 作为 else_body
+                    self._consume(TokenType.KEYWORD, self._current().value)
                     elif_condition = self._parse_expr()
                     
                     if self._match(TokenType.KEYWORD, '则'):
@@ -1720,9 +1722,11 @@ class ParserStmtMixin:
         if self._current() and self._current().type == TokenType.NEWLINE:
             self._consume(TokenType.NEWLINE)
         
-        # 遍历 / 对
+        # 遍历 / 对 / 遍
         if self._match(TokenType.KEYWORD, '对'):
             self._consume(TokenType.KEYWORD, '对')
+        elif self._match(TokenType.KEYWORD, '遍'):
+            self._consume(TokenType.KEYWORD, '遍')
         else:
             self._consume(TokenType.KEYWORD, '遍历')
         
@@ -1734,6 +1738,7 @@ class ParserStmtMixin:
             '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
             '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
             '匹配', '情况', '的', '之', '对', '步', '至', '到', '在', '于', '中的',
+            '导', '出', '遍', '返', '跳', '过', '试', '捕', '抛', '终', '配', '否', '接', '承', '自',
         })
         name_parts = []
         while self._current():
@@ -1778,21 +1783,38 @@ class ParserStmtMixin:
         else:
             variable = ''.join(name_parts)
         
-        # 在 / 之 / 中的 / 于
-        tok = self._current()
-        if self._match(TokenType.KEYWORD, '在'):
-            self._consume(TokenType.KEYWORD, '在')
-        elif self._match(TokenType.KEYWORD, '之'):
-            self._consume(TokenType.KEYWORD, '之')
-        elif self._match(TokenType.KEYWORD, '中的'):
-            self._consume(TokenType.KEYWORD, '中的')
-        elif self._match(TokenType.KEYWORD, '于'):
-            self._consume(TokenType.KEYWORD, '于')
-        else:
-            self._error(f"遍历循环期望'在'、'之'、'于'或'中的'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
+        # 处理词法分析器将'之'合并到变量名中的情况
+        # （'之'在 _COMPOUND_SAFE_SINGLE_KEYWORDS 中，防止拆分复合词）
+        # 如「遍历元素之列表」→ variable='元素之列表'，需拆分为 变量='元素' + iterable=列表
+        iterable = None
+        if '之' in variable and variable != '_':
+            # 检查下一个 token 是否匹配 '之' 关键字（正常情况）
+            # 如果已经被合并，则下一个 token 不会匹配
+            if not (self._match(TokenType.KEYWORD, '在') or self._match(TokenType.KEYWORD, '之')
+                    or self._match(TokenType.KEYWORD, '中的') or self._match(TokenType.KEYWORD, '于')):
+                idx = variable.index('之')
+                iterable_name = variable[idx + 1:]
+                variable = variable[:idx]
+                if not variable:
+                    variable = '_'
+                iterable = Identifier(iterable_name)
         
-        # 可迭代对象
-        iterable = self._parse_expr()
+        if iterable is None:
+            # 在 / 之 / 中的 / 于
+            tok = self._current()
+            if self._match(TokenType.KEYWORD, '在'):
+                self._consume(TokenType.KEYWORD, '在')
+            elif self._match(TokenType.KEYWORD, '之'):
+                self._consume(TokenType.KEYWORD, '之')
+            elif self._match(TokenType.KEYWORD, '中的'):
+                self._consume(TokenType.KEYWORD, '中的')
+            elif self._match(TokenType.KEYWORD, '于'):
+                self._consume(TokenType.KEYWORD, '于')
+            else:
+                self._error(f"遍历循环期望'在'、'之'、'于'或'中的'，但得到 {tok.type} = '{tok.value}'", tok.line, tok.col)
+            
+            # 可迭代对象
+            iterable = self._parse_expr()
         
         # 处理隐式范围表达式：遍历 i 于 0self.hash_count（无 至/到 关键字）
         # 当可迭代对象解析后，下一个 token 不是 : 或 { 时，尝试解析为范围表达式
@@ -1879,7 +1901,7 @@ class ParserStmtMixin:
     def _parse_return_stmt(self) -> ReturnStmt:
         """解析返回语句"""
         # 返回
-        self._consume(TokenType.KEYWORD, '返回')
+        self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
         
         # 表达式（可选）
         value = None
@@ -1900,10 +1922,10 @@ class ParserStmtMixin:
                             # 段落定义，作为语句关键字
                             is_stmt_keyword = True
                     else:
-                        is_stmt_keyword = (tok.value in ('设', '定义', '当', '如果', '若', '遍历', 
-                                                          '打印', '导入', '导出', '跳出', '跳过', 
-                                                          '尝试', '抛出', '匹配', '返回', '属性', 
-                                                          '构造', '类', '接口'))
+                        is_stmt_keyword = (tok.value in ('设', '定义', '当', '如果', '若', '遍历', '遍',
+                                                          '打印', '导入', '导', '导出', '出', '跳出', '跳', '跳过', '过',
+                                                          '尝试', '试', '抛出', '抛', '匹配', '配', '返回', '返', '属性', 
+                                                          '构造', '类', '接口', '接'))
                 if not is_stmt_keyword:
                     # 先解析第一个表达式（不含逗号/管道）
                     first = self._parse_logical_expr()
@@ -1913,8 +1935,8 @@ class ParserStmtMixin:
                         self._consume(TokenType.KEYWORD, '如果')
                         condition = self._parse_logical_expr()
                         else_expr = None
-                        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '否则':
-                            self._consume(TokenType.KEYWORD, '否则')
+                        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value in ('否则', '否'):
+                            self._consume(TokenType.KEYWORD, self._current().value)
                             else_expr = self._parse_expr()
                         value = ConditionalExpression(condition, first, else_expr)
                     # 检查是否是多值返回（逗号分隔）
@@ -2072,8 +2094,8 @@ class ParserStmtMixin:
           语句...
         结束。
         """
-        # 尝试
-        self._consume(TokenType.KEYWORD, '尝试')
+        # 尝试 / 试
+        self._consume(TokenType.KEYWORD, self._current().value)
         
         # 冒号
         self._consume(TokenType.COLON)
@@ -2088,8 +2110,8 @@ class ParserStmtMixin:
         catch_body = []
         
         first_catch = True
-        while self._match(TokenType.KEYWORD, '捕获'):
-            self._consume(TokenType.KEYWORD, '捕获')
+        while self._match(TokenType.KEYWORD, '捕获') or self._match(TokenType.KEYWORD, '捕'):
+            self._consume(TokenType.KEYWORD, self._current().value)
             
             ct, cv, cb = self._parse_catch_clause()
             catch_clauses.append((ct, cv, cb))
@@ -2102,8 +2124,8 @@ class ParserStmtMixin:
         
         # 最终（可选）
         finally_body = []
-        if self._match(TokenType.KEYWORD, '最终'):
-            self._consume(TokenType.KEYWORD, '最终')
+        if self._match(TokenType.KEYWORD, '最终') or self._match(TokenType.KEYWORD, '终'):
+            self._consume(TokenType.KEYWORD, self._current().value)
             
             # 冒号
             self._consume(TokenType.COLON)
@@ -2130,8 +2152,8 @@ class ParserStmtMixin:
         
         语法：抛出 表达式。 或 抛出（重新抛出当前异常）
         """
-        # 抛出
-        self._consume(TokenType.KEYWORD, '抛出')
+        # 抛出 / 抛
+        self._consume(TokenType.KEYWORD, self._current().value)
         
         # 检查是否是裸抛出（重新抛出当前异常）
         tok = self._current()
@@ -2312,10 +2334,10 @@ class ParserStmtMixin:
             )
             self._consume(TokenType.KEYWORD, '接收')
             
-            _stmt_keywords = {'设', '定义', '当', '如果', '若', '遍历', '返回', '打印', '导入', '导出', '跳出', '跳过', '尝试', '抛出', '匹配'}
+            _stmt_keywords = {'设', '定义', '当', '如果', '若', '遍历', '遍', '返回', '返', '打印', '导入', '导', '导出', '出', '跳出', '跳', '跳过', '过', '尝试', '试', '抛出', '抛', '匹配', '配', '类', '接口', '接'}
             while self._current() and self._current().type != TokenType.COLON:
                 tok = self._current()
-                if tok.type == TokenType.KEYWORD and (tok.value == '返回' or tok.value in _stmt_keywords):
+                if tok.type == TokenType.KEYWORD and (tok.value == '返回' or tok.value == '返' or tok.value in _stmt_keywords):
                     break
                 # 支持 -> 返回类型语法
                 if tok.type == TokenType.ARROW:
@@ -2387,7 +2409,7 @@ class ParserStmtMixin:
                     if tok.value == '接收':
                         self._consume(TokenType.KEYWORD, tok.value)
                         continue
-                    if tok.value == '返回' or tok.value in _stmt_keywords:
+                    if tok.value == '返回' or tok.value == '返' or tok.value in _stmt_keywords:
                         break
                     if tok.value == '等于':
                         # 这是前一个参数的默认值，消耗它和值
@@ -2432,7 +2454,7 @@ class ParserStmtMixin:
         if (self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '返回'):
             next_tok = self._peek(1)
             if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                self._consume(TokenType.KEYWORD, '返回')
+                self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
                 return_type = self._consume().value
         elif (self._current() and self._current().type == TokenType.ARROW):
             self._consume(TokenType.ARROW)
@@ -2596,27 +2618,27 @@ class ParserStmtMixin:
 
             # 否则标记（if语句的else分支）- 在 depth==0 时遇到否则总是停止
             # 让调用者（如_parse_if_stmt）来处理
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '否则':
+            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('否则', '否'):
                 # 检查后面是否是冒号或如果
                 next_tok = self._peek(1)
                 if next_tok and next_tok.type == TokenType.COLON:
                     # 否则: - 这是 if 语句的 else 分支，停止解析让调用者处理
                     break
-                if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '如果':
+                if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value in ('如果', '若'):
                     # 否则如果 - 这是 if 语句的 elif 分支，停止解析让调用者处理
                     break
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '否则若':
+            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('否则若', '否若'):
                 # 否则若 - 作为单个token的elif，停止解析让调用者处理
                 break
 
             # 异常处理的特殊标记（捕获、最终、结束）- 仅在 depth==0 时停止
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('捕获', '最终', '结束'):
+            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('捕获', '捕', '最终', '终', '结束'):
                 break
             if depth == 0 and tok.type == TokenType.IDENTIFIER and tok.value == '结束':
                 break
 
             # 类/接口定义（在body中遇到的，作为嵌套处理）- 仅在 depth==0 时停止
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('类', '接口'):
+            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('类', '接口', '接'):
                 break
 
             # 跳过孤立的句号（块结束后的可选终止符）
@@ -2624,7 +2646,7 @@ class ParserStmtMixin:
                 self._consume(TokenType.PERIOD)
                 continue
 
-            if stop_on_paragraph and depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
+            if stop_on_paragraph and depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落', '段'):
                 # 检查后面是否是段名后跟括号（段落调用）
                 next_tok = self._peek(1)
                 second_tok = self._peek(2)
@@ -2679,10 +2701,10 @@ class ParserStmtMixin:
         if self._match(TokenType.KEYWORD, '接收'):
             self._consume(TokenType.KEYWORD, '接收')
             
-            _stmt_keywords = {'设', '定义', '当', '如果', '若', '遍历', '返回', '打印', '导入', '导出', '跳出', '跳过', '尝试', '抛出', '匹配'}
+            _stmt_keywords = {'设', '定义', '当', '如果', '若', '遍历', '遍', '返回', '返', '打印', '导入', '导', '导出', '出', '跳出', '跳', '跳过', '过', '尝试', '试', '抛出', '抛', '匹配', '配', '类', '接口', '接'}
             while self._current() and self._current().type != TokenType.COLON:
                 tok = self._current()
-                if tok.type == TokenType.KEYWORD and (tok.value == '返回' or tok.value in _stmt_keywords):
+                if tok.type == TokenType.KEYWORD and (tok.value == '返回' or tok.value == '返' or tok.value in _stmt_keywords):
                     break
                 if tok.type == TokenType.ARROW:
                     break
@@ -2719,7 +2741,7 @@ class ParserStmtMixin:
                     if tok.value == '接收':
                         self._consume(TokenType.KEYWORD, tok.value)
                         continue
-                    if tok.value == '返回' or tok.value in _stmt_keywords:
+                    if tok.value == '返回' or tok.value == '返' or tok.value in _stmt_keywords:
                         break
                     if tok.value == '等于':
                         self._consume(TokenType.KEYWORD, '等于')
@@ -2948,7 +2970,7 @@ class ParserStmtMixin:
         if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
             while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 # 检查是否遇到"继承"或"实现"关键字
-                if self._current().type == TokenType.KEYWORD and self._current().value in ('继承', '实现'):
+                if self._current().type == TokenType.KEYWORD and self._current().value in ('继承', '承', '实现'):
                     break
                 # 检查是否遇到句号或冒号
                 if self._current().type in (TokenType.PERIOD, TokenType.COLON):    
@@ -2976,8 +2998,8 @@ class ParserStmtMixin:
 
         # 继承？（可选）
         base_classes = []
-        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '继承':
-            self._consume(TokenType.KEYWORD, '继承')
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value in ('继承', '承'):
+            self._consume(TokenType.KEYWORD, self._current().value)
             base_tok = self._current()
             if base_tok and base_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 base_classes = [base_tok.value]
@@ -3352,7 +3374,7 @@ class ParserStmtMixin:
         # 返回类型（可选）：返回 类型 或 -> 类型
         return_type = None
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '返回':
-            self._consume(TokenType.KEYWORD, '返回')
+            self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
         elif self._current() and self._current().type == TokenType.ARROW:
@@ -3419,14 +3441,14 @@ class ParserStmtMixin:
         接口 名称 继承 父接口1, 父接口2：
           ...
         """
-        # 接口
-        self._consume(TokenType.KEYWORD, '接口')
+        # 接口 / 接
+        self._consume(TokenType.KEYWORD, self._current().value)
 
         # 接口名（可能由多个token组成，与类名类似）
         name_parts = []
         while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
             # 检查是否遇到"继承"关键字或冒号/句号
-            if self._current().type == TokenType.KEYWORD and self._current().value == '继承':
+            if self._current().type == TokenType.KEYWORD and self._current().value in ('继承', '承'):
                 break
             if self._current().type in (TokenType.COLON, TokenType.PERIOD):        
                 break
@@ -3437,8 +3459,8 @@ class ParserStmtMixin:
 
         # 继承（可选）
         super_interfaces = []
-        if self._match(TokenType.KEYWORD, '继承'):
-            self._consume(TokenType.KEYWORD, '继承')
+        if self._match(TokenType.KEYWORD, '继承') or self._match(TokenType.KEYWORD, '承'):
+            self._consume(TokenType.KEYWORD, self._current().value)
             while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 # 收集多 token 名称（如"可打印"被拆为"可"+"打印"）
                 parts = []
@@ -3550,7 +3572,7 @@ class ParserStmtMixin:
         # 返回类型（可选）
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
-            self._consume(TokenType.KEYWORD, '返回')
+            self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
 
@@ -3572,8 +3594,8 @@ class ParserStmtMixin:
           情况 _：
             语句。
         """
-        # 匹配
-        self._consume(TokenType.KEYWORD, '匹配')
+        # 匹配 / 配
+        self._consume(TokenType.KEYWORD, self._current().value)
 
         # 匹配的值（表达式）
         subject = self._parse_expr()
@@ -3734,6 +3756,7 @@ class ParserStmtMixin:
                     '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
                     '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
                     '匹配', '情况', '的', '之', '对', '步', '至', '到',
+                    '导', '出', '遍', '返', '跳', '过', '试', '捕', '抛', '终', '配', '否', '接', '承', '自',
                 })
                 while self._current():
                     _t = self._current()
@@ -4087,7 +4110,7 @@ class ParserStmtMixin:
         # 返回类型：返回 类型
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
-            self._consume(TokenType.KEYWORD, '返回')
+            self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
         
@@ -4177,7 +4200,7 @@ class ParserStmtMixin:
             
             while self._current():
                 ptok = self._current()
-                if ptok.type == TokenType.KEYWORD and ptok.value == '返回':
+                if ptok.type == TokenType.KEYWORD and ptok.value == '返回' or tok.value == '返':
                     break
                 if ptok.type == TokenType.PERIOD:
                     break
@@ -4215,7 +4238,7 @@ class ParserStmtMixin:
         # 返回类型：返回 类型
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
-            self._consume(TokenType.KEYWORD, '返回')
+            self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
         
@@ -4404,7 +4427,7 @@ class ParserStmtMixin:
         # 返回类型：返回 类型
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
-            self._consume(TokenType.KEYWORD, '返回')
+            self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
         
@@ -4503,7 +4526,7 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '接收')
             while self._current():
                 ptok = self._current()
-                if ptok.type == TokenType.KEYWORD and ptok.value == '返回':
+                if ptok.type == TokenType.KEYWORD and ptok.value == '返回' or tok.value == '返':
                     break
                 if ptok.type == TokenType.PERIOD:
                     break
@@ -4536,7 +4559,7 @@ class ParserStmtMixin:
         
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
-            self._consume(TokenType.KEYWORD, '返回')
+            self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 return_type = self._consume().value
         

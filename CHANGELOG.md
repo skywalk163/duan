@@ -1,5 +1,47 @@
 # 段言 CHANGELOG
 
+## v4.1.0 (2026-08-04) — 工具链生态与浏览器端支持
+
+### R 阶段：L0 解析器补全
+- 解析器 `parser_stmt.py` 全面支持 L0 单字关键字（若、遍、跳、过、返、试、捕、抛、终、导、出、否、接、承、配、自）
+- 词法分析器 `lexer.py` 更新 `_COMPOUND_SAFE_SINGLE_KEYWORDS` 避免复合词误拆分
+- 关键字定义 `keywords.py` 冻结 30 字 L0 核心字表
+
+### S 阶段：LSP 语言服务器增强
+- LSP 服务器 `lsp/duan_lsp.py` 补全 30 个 L0 关键字文档
+- 支持悬停提示、自动补全、格式化功能
+- 补全触发字符包含所有 L0 单字关键字
+
+### T 阶段：格式化器与代码检查器
+- 代码格式化器 `formatter.py` 更新 L0 关键字缩进和冒号规则
+- 新建代码检查器 `linter.py`，包含 15 条规则（语法 S、风格 L、废弃 D、质量 Q）
+- 支持 L0/L1 风格一致性检查、废弃语法检测、自动修复
+
+### U 阶段：在线包注册表
+- 包管理器 `duanpkg.py` 新增远程注册表支持（安装、发布、搜索）
+- 新建注册表服务器 `registry_server.py`，提供 REST API（GET/POST 端点）
+- 支持包存储、版本管理、下载分发
+
+### V 阶段：AST 编译优化
+- 新建 AST-based 优化器包 `optimizer/`（7 个模块）
+- 常量折叠 `constant_fold.py`、死代码消除 `dead_code.py`、循环不变量 `loop_invariant.py`
+- 窥孔优化 `peephole.py`、公共子表达式消除 `cse.py`、内联优化 `inline.py`
+
+### W 阶段：交互式教程系统
+- 新建 `playground/static/tutorial.js`，包含 6 章 20 课交互式教程
+- 覆盖 L0 核心关键字、L1/L2 文体风格、L3 领域嵌入、L4 外部引用
+- 支持代码验证、进度追踪、键盘导航、localStorage 持久化
+
+### X 阶段：WebAssembly 编译目标
+- 新建 `wasm_target.py`，支持 Pyodide 模式和独立 HTML 生成
+- 新建 `playground/static/wasm.js`，Playground 集成 WASM 执行模式
+- 支持 numpy/pandas/matplotlib 等常用包预加载
+
+### Y 阶段：集成测试 + v4.1.0 发布
+- 新建 `tests/test_v4_1_integration.py`，40 个集成测试覆盖全部新功能
+- 版本号更新至 v4.1.0
+- 现有测试集 132 通过（2 个已有边缘测试待修复）
+
 ## v4.0.0 (2026-08-04) — 五层分层语法架构正式发布
 
 段言 v4.0 是自 v3.3 以来最大的一次架构升级，核心立意是**借鉴中文"一套字 + 多种文体 + 自然吸收专业符号"的智慧**，让段言既能服务青少年教学，也能用于商用大型项目。

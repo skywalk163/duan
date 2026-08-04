@@ -42,6 +42,10 @@
             </button>
         </div>
         <div class="nav-right">
+            <button class="btn btn-tutorial" onclick="openTutorial()" title="交互式教程">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 100 14A7 7 0 008 1zM6.5 4.5h3v1.5h-3v-1.5zm0 3h3v1.5h-3v-1.5zm0 3h2v1.5h-2v-1.5z"/></svg>
+                教程
+            </button>
             <button class="btn btn-grammar" onclick="openGrammarModal()" title="语法速查">
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2 1.5A1.5 1.5 0 00.5 3v10A1.5 1.5 0 002 14.5h12a1.5 1.5 0 001.5-1.5V3A1.5 1.5 0 0014 1.5H2zM2 3h12v2H2V3zm0 4h12v2H2V7zm0 4h7v2H2v-2z"/></svg>
                 语法
@@ -118,6 +122,8 @@
             <div class="output-section">
                 <div class="section-header">
                     <span class="section-title">输出</span>
+                    <span class="wasm-status" id="wasmStatus" style="display:none"></span>
+                    <button class="btn btn-wasm" id="wasmToggleBtn" onclick="toggleWasmMode()" title="切换 WebAssembly 模式">⚡WASM</button>
                     <div class="output-tabs">
                         <button class="tab active" data-tab="output" onclick="switchTab('output')">运行结果</button>
                         <button class="tab" data-tab="ast" onclick="switchTab('ast')">AST 分析</button>
@@ -256,6 +262,8 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.min.js"></script>
+    <script src="/static/tutorial.js"></script>
+    <script src="/static/wasm.js"></script>
     <script src="/static/app.js"></script>
 </body>
 </html>

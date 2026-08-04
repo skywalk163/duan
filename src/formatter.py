@@ -29,10 +29,12 @@ BLOCK_START = {
     '类', '接口',
     '构造',
     '异步',
+    # L0 单字关键字（v4.1）
+    '若', '遍', '试', '捕', '配', '否',
 }
 
 # 需要冒号的关键字
-NEEDS_COLON = BLOCK_START | {'否则', '接收'}
+NEEDS_COLON = BLOCK_START | {'否则', '接收', '否', '返', '跳', '过', '抛', '终'}
 
 
 def _get_first_word(content: str) -> str:
@@ -91,7 +93,7 @@ def format_code(source: str) -> str:
         keyword = _get_keyword(content, NEEDS_COLON)
 
         # 处理"否则"和"否则如果"：它们应该与对应的"如果"同级
-        if keyword in ('否则', '否则如果', '捕获'):
+        if keyword in ('否则', '否则如果', '捕获', '否', '捕'):
             actual_indent = max(0, indent - 1)
         else:
             actual_indent = indent
@@ -107,7 +109,7 @@ def format_code(source: str) -> str:
         # 更新下一行的缩进
         if keyword in BLOCK_START:
             indent = actual_indent + 1
-        elif keyword in ('否则', '否则如果', '捕获'):
+        elif keyword in ('否则', '否则如果', '捕获', '否', '捕'):
             indent = actual_indent + 1
         else:
             indent = actual_indent
