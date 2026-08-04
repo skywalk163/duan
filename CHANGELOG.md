@@ -1,5 +1,24 @@
 # 段言 CHANGELOG
 
+## v4.2.0 (2026-08-04) — 可选类型系统与词法分析器修复
+
+### Z 阶段：可选类型系统
+- 增强 `type_checker.py`: GradedTypeChecker（三级检查：SIGNATURE/VARIABLE/EXPRESSION）
+- 新增 `DuanTypeBridge`：Duan 类型 ↔ Python 类型桥接
+- 新增 `CFGAnalyzer`：控制流分析（全路径返回检查、不可达代码检测）
+- 增强 `type_inferencer.py`：HM 风格类型推断 + 类型缓存
+- 增强 `parser_stmt.py`：支持复杂类型标注解析（泛型/联合类型/可选类型/函数类型）
+- 增强 `compiler.py`：集成类型检查管道
+- 8 个示例文件（Z1-Z8）：基本类型、泛型、联合类型、函数标注、分级检查、类型推断、类与接口、综合实战
+- 53 个类型系统专项测试全部通过
+
+### 词法分析器修复
+- 在 `_COMPOUND_SAFE_SINGLE_KEYWORDS` 中补全 `加/减/乘/除`，避免复合词如"加法"被错误拆分
+- 修复 `_tokenize_chinese_sequence` 中用户定义前缀匹配逻辑：当完整标识符本身是关键字时优先识别
+- 新增 3 个词法分析器单元测试（18 子测试）
+- 修复 `test_list_pop` 解析失败问题
+- `test_L4_python_e2e.py` 添加网络可达性检测，动态跳过不可达网络测试
+
 ## v4.1.0 (2026-08-04) — 工具链生态与浏览器端支持
 
 ### R 阶段：L0 解析器补全
