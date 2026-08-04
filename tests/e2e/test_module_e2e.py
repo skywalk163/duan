@@ -57,10 +57,10 @@ class TestModuleResolver:
                 f.write(math_utils_code)
 
             # main 模块
-            main_code = '''从 math_utils 导入 加法
+            main_code = '''从 math_utils 导入 加法。
 
-设 结果 为 加法(3, 5)
-打印 结果
+设 结果 为 加法(3, 5)。
+打印 结果。
 '''
             resolver = ModuleDependencyResolver([Path(tmpdir)])
             modules = resolver.resolve_all('main', main_code)

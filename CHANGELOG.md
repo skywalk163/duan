@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-08-04
+
+### Added
+- **duanpub P1 桥接**: HTTP客户端, Socket, SQLite 三个模块可导入使用
+- **CLI 统一命令**: `duan run/build/pkg/repl` 子命令体系
+- **转译器语义验证**: 转译后代码自动通过 DuanParser 验证，生成 CONVERSION_REPORT.md
+- **模块解析器增强**: 支持 `从...导入...` 语法完整解析
+- **Python 特性统计**: 转译器自动统计源项目使用的 Python 特性并生成报告
+
+### Fixed
+- **5 个 pre-existing 测试失败**: 浮点精度、模块依赖、clang 可选跳过
+- **FFI 缺失函数补齐**: 30 个中文函数实现
+- **Lexer 前缀拆分 bug**: "使用CSV""返回值"等不再被误拆
+- **Parser 装饰器 bug**: @抽象 等装饰器后跟接口方法不再报错
+- **stdlib API 名称不一致**: 日期时间等模块函数名统一
+- **转译器链式调用**: a.b.c() 正确转译
+- **模块解析器**: "从...导入..." 语法正确识别
+- **旧语法残留清理**: 17+3 个 .duan 文件花括号清理完毕
+
+### Changed
+- **赋值语法统一**: 全面使用 `设 x 为 y` 格式
+- **文档更新**: 核心 10 个 .md 文档更新到 v4.0 语法
+- **版本号**: 1.11.0 → 4.0.0
+- **pyproject.toml**: 完善打包配置，支持 pip install
+
 ## [1.14.0] - 2026-07-13
 
 ### Added

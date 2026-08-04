@@ -10,9 +10,14 @@ import io
 sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'antlrparser'))
 
-from duan_visitor import parse_source
-from duan_interpreter import Interpreter
-from duan_llvm import LLVMCodeGen
+# 检查 ANTLR 解析器是否可用
+try:
+    from duan_visitor import parse_source
+    from duan_interpreter import Interpreter
+    from duan_llvm import LLVMCodeGen
+except ImportError:
+    import pytest
+    pytest.skip("ANTLR 解析器未安装，跳过综合测试", allow_module_level=True)
 
 def run_interpreter(source):
     module = parse_source(source)

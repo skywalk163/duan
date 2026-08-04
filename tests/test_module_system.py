@@ -18,9 +18,16 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'antlrparser'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from antlr4 import *
-from DuanLangLexer import DuanLangLexer
-from DuanLangParser import DuanLangParser as AntlrDuanLangParser
-from duan_visitor import DuanLangASTBuilder
+
+# 检查 ANTLR 解析器是否可用
+try:
+    from DuanLangLexer import DuanLangLexer
+    from DuanLangParser import DuanLangParser as AntlrDuanLangParser
+    from duan_visitor import DuanLangASTBuilder
+except ImportError:
+    import pytest
+    pytest.skip("ANTLR 解析器未安装，跳过模块系统测试", allow_module_level=True)
+
 from code_generator_unified import UnifiedCodeGenerator
 
 

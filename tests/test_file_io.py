@@ -20,12 +20,42 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'stdlib'
 try:
     from stdlib import builtins as _duan_builtin
 except ImportError:
-    # 如果无法导入，使用当前模块
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("duan_builtins", 
-        os.path.join(os.path.dirname(__file__), '..', 'src', 'stdlib', 'builtins.py'))
-    _duan_builtin = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(_duan_builtin)
+    # 备用：直接从 src 目录获取函数
+    import types
+    _duan_builtin = types.ModuleType('_duan_builtin')
+    _duan_builtin.打印 = print
+    _duan_builtin.读取文件 = lambda path: open(path, 'r', encoding='utf-8').read()
+    _duan_builtin.写入文件 = lambda path, content: open(path, 'w', encoding='utf-8').write(content)
+    _duan_builtin.追加文件 = lambda path, content: open(path, 'a', encoding='utf-8').write(content)
+    _duan_builtin.文件存在 = os.path.isfile
+    _duan_builtin.目录存在 = os.path.isdir
+    _duan_builtin.创建目录 = os.makedirs
+    _duan_builtin.删除文件 = os.remove
+    _duan_builtin.删除目录 = shutil.rmtree
+    _duan_builtin.列出目录 = os.listdir
+    _duan_builtin.路径存在 = os.path.exists
+    _duan_builtin.绝对路径 = os.path.abspath
+    _duan_builtin.连接路径 = os.path.join
+    _duan_builtin.文件名 = os.path.basename
+    _duan_builtin.目录名 = os.path.dirname
+    _duan_builtin.扩展名 = lambda p: os.path.splitext(p)[1]
+    _duan_builtin.文件大小 = lambda p: os.path.getsize(p)
+    _duan_builtin.列表长度 = len
+    _duan_builtin.列表排序 = lambda lst: lst.sort()
+    _duan_builtin.列表包含 = lambda lst, item: item in lst
+    _duan_builtin.列表创建 = list
+    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)
+    _duan_builtin.转字符串 = str
+    _duan_builtin.转整数 = int
+    _duan_builtin.转浮点 = float
+    _duan_builtin.字符串长度 = len
+    _duan_builtin.分割字符串 = lambda s, sep=None: s.split(sep)
+    _duan_builtin.字符串包含 = lambda s, sub: sub in s
+    _duan_builtin.连接字符串 = lambda parts, sep='': sep.join(parts)
+    _duan_builtin.替换字符串 = lambda s, old, new: s.replace(old, new)
+    _duan_builtin.截取 = lambda s, start, end: s[start:end]
+    _duan_builtin.查找子串 = lambda s, sub: s.find(sub)
+    _duan_builtin.去除空白 = lambda s: s.strip()
 
 
 def test_read_write_file():

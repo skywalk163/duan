@@ -177,7 +177,10 @@ class TestVerifyIRWithClang(unittest.TestCase):
     """测试 compiler 层的 clang IR 验证"""
 
     def setUp(self):
-        self.clang = find_clang()
+        try:
+            self.clang = find_clang()
+        except RuntimeError:
+            raise unittest.SkipTest("未安装 clang 编译器，跳过 clang 验证测试")
 
     def test_valid_ir_passes_clang_verify(self):
         """合法 IR 应通过 clang 验证"""

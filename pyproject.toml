@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "duan"
-version = "1.11.0"
+version = "4.0.0"
 description = "段言（Duan）— 中文自然语言编程语言"
 readme = "README.md"
 license = {text = "MIT"}
@@ -60,7 +60,7 @@ BugTracker = "https://github.com/skywalk163/duan/issues"
 Documentation = "https://github.com/skywalk163/duan/tree/main/docs"
 
 [project.scripts]
-duan = "cli.duan:main"
+duan = "cli.duan_unified:main"
 duanc = "cli.duanc:main"
 
 [tool.setuptools.packages.find]

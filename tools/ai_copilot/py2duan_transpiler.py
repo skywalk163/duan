@@ -119,6 +119,165 @@ BINOP_PRECEDENCE = {
 }
 
 
+class FeatureUsageCollector(ast.NodeVisitor):
+    """收集 Python 源码中使用的语言特性统计"""
+
+    FEATURE_CATEGORIES = {
+        'match_case': 'match-case 模式匹配',
+        'async_await': 'async/await 异步',
+        'decorator': '装饰器',
+        'type_annotation': '类型注解',
+        'lambda': 'lambda 匿名函数',
+        'generator': '生成器 (yield)',
+        'list_comp': '列表推导式',
+        'dict_comp': '字典推导式',
+        'set_comp': '集合推导式',
+        'generator_expr': '生成器表达式',
+        'fstring': 'f-string',
+        'star_import': '星号导入 (from x import *)',
+        'relative_import': '相对导入',
+        'annotated_assign': '类型注解赋值',
+        'named_expr': '海象运算符 (:=)',
+        'exception_chain': '异常链 (raise ... from)',
+        'class': '类定义',
+        'dataclass': '数据类 (dataclass)',
+        'property': 'property 特性',
+        'staticmethod': 'staticmethod',
+        'classmethod': 'classmethod',
+        'with': '上下文管理器 (with)',
+        'try_except': '异常处理 (try/except)',
+    }
+
+    def __init__(self):
+        self.features = {}
+        for key in self.FEATURE_CATEGORIES:
+            self.features[key] = 0
+
+    def visit_Match(self, node):
+        self.features['match_case'] += 1
+        self.generic_visit(node)
+
+    def visit_AsyncFunctionDef(self, node):
+        self.features['async_await'] += 1
+        self.generic_visit(node)
+
+    def visit_Await(self, node):
+        self.features['async_await'] += 1
+        self.generic_visit(node)
+
+    def visit_AsyncFor(self, node):
+        self.features['async_await'] += 1
+        self.generic_visit(node)
+
+    def visit_AsyncWith(self, node):
+        self.features['async_await'] += 1
+        self.generic_visit(node)
+
+    def visit_FunctionDef(self, node):
+        if node.decorator_list:
+            self.features['decorator'] += 1
+            for dec in node.decorator_list:
+                if isinstance(dec, ast.Name):
+                    if dec.id == 'staticmethod':
+                        self.features['staticmethod'] += 1
+                    elif dec.id == 'classmethod':
+                        self.features['classmethod'] += 1
+                    elif dec.id == 'property':
+                        self.features['property'] += 1
+        if node.returns:
+            self.features['type_annotation'] += 1
+        self.generic_visit(node)
+
+    def visit_AnnAssign(self, node):
+        self.features['type_annotation'] += 1
+        if isinstance(node.annotation, ast.Name) and node.annotation.id == 'dataclass':
+            self.features['dataclass'] += 1
+        self.generic_visit(node)
+
+    def visit_ClassDef(self, node):
+        self.features['class'] += 1
+        for dec in node.decorator_list:
+            if isinstance(dec, ast.Name) and dec.id == 'dataclass':
+                self.features['dataclass'] += 1
+        self.generic_visit(node)
+
+    def visit_Lambda(self, node):
+        self.features['lambda'] += 1
+        self.generic_visit(node)
+
+    def visit_Yield(self, node):
+        self.features['generator'] += 1
+        self.generic_visit(node)
+
+    def visit_YieldFrom(self, node):
+        self.features['generator'] += 1
+        self.generic_visit(node)
+
+    def visit_ListComp(self, node):
+        self.features['list_comp'] += 1
+        self.generic_visit(node)
+
+    def visit_DictComp(self, node):
+        self.features['dict_comp'] += 1
+        self.generic_visit(node)
+
+    def visit_SetComp(self, node):
+        self.features['set_comp'] += 1
+        self.generic_visit(node)
+
+    def visit_GeneratorExp(self, node):
+        self.features['generator_expr'] += 1
+        self.generic_visit(node)
+
+    def visit_JoinedStr(self, node):
+        # 只统计包含格式化的 f-string (非纯字符串)
+        has_fmt = any(isinstance(v, ast.FormattedValue) for v in node.values)
+        if has_fmt:
+            self.features['fstring'] += 1
+        self.generic_visit(node)
+
+    def visit_ImportFrom(self, node):
+        if any(a.name == '*' for a in node.names):
+            self.features['star_import'] += 1
+        if node.level and node.level > 0:
+            self.features['relative_import'] += 1
+        self.generic_visit(node)
+
+    def visit_NamedExpr(self, node):
+        self.features['named_expr'] += 1
+        self.generic_visit(node)
+
+    def visit_Raise(self, node):
+        if node.cause:
+            self.features['exception_chain'] += 1
+        self.generic_visit(node)
+
+    def visit_With(self, node):
+        self.features['with'] += 1
+        self.generic_visit(node)
+
+    def visit_Try(self, node):
+        self.features['try_except'] += 1
+        self.generic_visit(node)
+
+    def get_summary(self) -> dict:
+        """返回非零特性统计"""
+        return {k: v for k, v in sorted(self.features.items()) if v > 0}
+
+    def get_report_lines(self) -> list:
+        """生成特性统计报告行"""
+        summary = self.get_summary()
+        if not summary:
+            return ["(未检测到特殊 Python 特性)\n"]
+        lines = []
+        lines.append("| 特性 | 使用次数 |")
+        lines.append("|------|---------|")
+        for key, count in summary.items():
+            label = self.FEATURE_CATEGORIES.get(key, key)
+            lines.append(f"| {label} | {count} |")
+        return lines
+
+
 class Py2DuanTranspiler:
     """Python → 段言 确定性转译器"""
 

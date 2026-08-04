@@ -216,9 +216,8 @@ log。
 打印 复杂运算(3, 4, 10)。
 """
         output = compile_and_run(code)
-        # 注：段言解析器中乘除优先级低于加减（从右向左结合）
-        # 3 * (4 + 10/2) = 3 * 9 = 27
-        self.assertIn("27", output)
+        # 标准数学优先级: 3 * 4 + 10 / 2 = 12 + 5 = 17.0
+        self.assertIn("17.0", output)
 
 
 class TestEdgeCasesControlFlow(unittest.TestCase):
@@ -473,13 +472,12 @@ class TestEdgeCasesExpressions(unittest.TestCase):
     def test_complex_arithmetic(self):
         """复杂算术表达式"""
         code = """
-# 段言解析器优先级：乘除右操作数以加减解析
-# 1 + (2 * (3 - (4/2))) = 1 + (2 * 1) = 1 + 2 = 3.0
+# 标准数学优先级: 1 + (2 * 3) - (4 / 2) = 1 + 6 - 2 = 5.0
 设 甲 为 1 加 2 乘 3 减 4 除 2。
 打印 甲。
 """
         output = compile_and_run(code)
-        self.assertIn("3.0", output)
+        self.assertIn("5.0", output)
     
     def test_comparison_chain(self):
         """比较链"""

@@ -235,6 +235,143 @@ class DuanUnifiedCLI:
             print("[错误] 调试REPL模块不可用", file=sys.stderr)
             return 1
     
+    def pkg_init(self, project_name: str) -> int:
+        """创建新的段言项目骨架"""
+        project_dir = Path(project_name)
+        if project_dir.exists():
+            print(f"[错误] 目录已存在: {project_dir}", file=sys.stderr)
+            return 1
+
+        project_dir.mkdir(parents=True)
+
+        # main.duan - 示例入口文件
+        main_duan = project_dir / 'main.duan'
+        main_duan.write_text('''# 段言示例程序
+# 这是 main.duan — 项目入口文件
+
+设 甲 为 42。
+打印("甲 = ", 甲)
+
+段落 加法 接收 数甲, 数乙:
+    返回 数甲 加 数乙。
+
+设 结果 为 加法(3, 5)。
+打印("3 + 5 = ", 结果)
+''', encoding='utf-8')
+
+        # duan.json - 项目配置文件
+        duan_json = project_dir / 'duan.json'
+        duan_json.write_text('''{
+    "name": "%s",
+    "version": "0.1.0",
+    "entry": "main.duan",
+    "description": "段言项目"
+}
+''' % project_name, encoding='utf-8')
+
+        # build.py - 构建脚本
+        build_py = project_dir / 'build.py'
+        build_py.write_text('''#!/usr/bin/env python3
+"""段言项目构建脚本 - 编译 .duan 文件为 .py"""
+
+import os
+import sys
+import subprocess
+from pathlib import Path
+
+
+def build():
+    """编译项目中所有 .duan 文件"""
+    project_dir = Path(__file__).parent
+    entry = project_dir / "main.duan"
+
+    if not entry.exists():
+        print(f"[错误] 入口文件不存在: {entry}")
+        return False
+
+    # 调用 duan compile
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.duan_unified", "compile", str(entry)],
+        capture_output=True, text=True, cwd=str(project_dir)
+    )
+    if result.returncode != 0:
+        print(result.stderr or result.stdout)
+        return False
+
+    print(f"[成功] 已编译: {entry}")
+    return True
+
+
+if __name__ == "__main__":
+    success = build()
+    sys.exit(0 if success else 1)
+''', encoding='utf-8')
+
+        print(f"[成功] 已创建项目: {project_name}/")
+        print(f"  main.duan    入口文件")
+        print(f"  duan.json    项目配置")
+        print(f"  build.py     构建脚本")
+        print(f"\n运行: duan run {project_name}/main.duan")
+        print(f"构建: cd {project_name} && duan pkg build")
+        return 0
+
+    def pkg_build(self, project_dir: str = '.') -> int:
+        """编译项目中的 .duan 文件为 .py"""
+        root = Path(project_dir)
+        if not root.is_dir():
+            print(f"[错误] 目录不存在: {root}", file=sys.stderr)
+            return 1
+
+        duan_files = list(root.glob('*.duan'))
+        if not duan_files:
+            print(f"[错误] 未找到 .duan 文件: {root}", file=sys.stderr)
+            return 1
+
+        success_count = 0
+        for f in duan_files:
+            source = f.read_text(encoding='utf-8')
+            output_file = f.with_suffix('.py')
+            try:
+                # 尝试 src 后端
+                from duan_parser_v3 import DuanParser
+                from code_generator import PythonCodeGenerator
+                parser = DuanParser()
+                module = parser.parse(source)
+                if module is None:
+                    print(f"[跳过] 解析失败: {f}", file=sys.stderr)
+                    continue
+                generator = PythonCodeGenerator()
+                py_code = generator.generate(module)
+                output_file.write_text(py_code, encoding='utf-8')
+                print(f"[编译] {f.name} -> {output_file.name}")
+                success_count += 1
+            except ImportError:
+                # 尝试 ANTLR 后端
+                try:
+                    from duan_visitor import DuanParser as DuanParser2
+                    from code_generator_unified import UnifiedCodeGenerator
+                    from indent_preprocessor import preprocess_v3_syntax
+                    processed = preprocess_v3_syntax(source)
+                    parser = DuanParser2()
+                    module = parser.parse(processed)
+                    if module is None:
+                        print(f"[跳过] 解析失败: {f}", file=sys.stderr)
+                        continue
+                    generator = UnifiedCodeGenerator()
+                    py_code = generator.generate(module)
+                    output_file.write_text(py_code, encoding='utf-8')
+                    print(f"[编译] {f.name} -> {output_file.name}")
+                    success_count += 1
+                except ImportError:
+                    print(f"[错误] 无可用编译后端", file=sys.stderr)
+                    return 1
+            except Exception as e:
+                print(f"[错误] 编译 {f.name} 失败: {e}", file=sys.stderr)
+                continue
+
+        print(f"\n[摘要] 成功: {success_count}/{len(duan_files)}")
+        return 0 if success_count > 0 else 1
+
     def show_ast(self, source: str, backend: str = 'antlr') -> int:
         """显示AST结构"""
         if backend == 'antlr':
@@ -288,7 +425,7 @@ def main():
     cli = DuanUnifiedCLI()
     
     # 检查是否是子命令模式
-    if len(sys.argv) > 1 and sys.argv[1] in ['run', 'compile', 'repl']:
+    if len(sys.argv) > 1 and sys.argv[1] in ['run', 'compile', 'repl', 'debug', 'pkg']:
         # 子命令模式
         parser = argparse.ArgumentParser(description='段言（Duan）编程语言编译器')
         subparsers = parser.add_subparsers(dest='command', help='子命令')
@@ -312,6 +449,16 @@ def main():
         # debug 子命令
         debug_parser = subparsers.add_parser('debug', help='启动调试REPL')
         debug_parser.add_argument('file', nargs='?', help='要调试的文件路径（可选）')
+        
+        # pkg 子命令
+        pkg_parser = subparsers.add_parser('pkg', help='项目管理（init/build）')
+        pkg_sub = pkg_parser.add_subparsers(dest='pkg_command', help='pkg 子命令')
+        
+        pkg_init_parser = pkg_sub.add_parser('init', help='创建新项目骨架')
+        pkg_init_parser.add_argument('name', help='项目名称')
+        
+        pkg_build_parser = pkg_sub.add_parser('build', help='编译项目中的 .duan 文件为 .py')
+        pkg_build_parser.add_argument('--dir', default='.', help='项目目录（默认: 当前目录）')
         
         args = parser.parse_args()
         
@@ -350,6 +497,15 @@ def main():
                 return 0
             else:
                 return cli.start_debug_repl()
+        
+        elif args.command == 'pkg':
+            if not getattr(args, 'pkg_command', None):
+                pkg_parser.print_help()
+                return 1
+            if args.pkg_command == 'init':
+                return cli.pkg_init(args.name)
+            elif args.pkg_command == 'build':
+                return cli.pkg_build(args.dir)
     
     else:
         # 默认模式：编译并运行
@@ -373,7 +529,7 @@ def main():
         parser.add_argument('-o', '--output', help='输出文件路径')
         parser.add_argument('--run', action='store_true', help='编译并运行')
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
-        parser.add_argument('--version', action='version', version='段言 v1.0.0')
+        parser.add_argument('--version', action='version', version='段言 v4.0.0')
         
         args = parser.parse_args()
         

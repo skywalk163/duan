@@ -1093,6 +1093,12 @@ class DuanCompiler:
 # 顶层便捷函数
 # =============================================================================
 
+def _normalize_cache_path(path: str) -> str:
+    """规范化缓存路径（Windows 上统一小写，避免大小写不一致导致缓存未命中）"""
+    abs_path = os.path.abspath(path)
+    return os.path.normcase(abs_path)
+
+
 def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
     """编译文件并返回编译结果
 
@@ -1103,11 +1109,12 @@ def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
     Returns:
         编译结果字典，与 DuanCompiler.compile() 返回格式相同
     """
+    cache_key = _normalize_cache_path(file_path)
     abs_path = os.path.abspath(file_path)
     mtime = os.path.getmtime(abs_path)
 
-    if use_cache and abs_path in _compile_cache:
-        cached_mtime, cached_result = _compile_cache[abs_path]
+    if use_cache and cache_key in _compile_cache:
+        cached_mtime, cached_result = _compile_cache[cache_key]
         if cached_mtime == mtime:
             return cached_result
 
@@ -1118,7 +1125,7 @@ def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
     result = compiler.compile(source)
 
     if use_cache:
-        _compile_cache[abs_path] = (mtime, result)
+        _compile_cache[cache_key] = (mtime, result)
 
     return result
 

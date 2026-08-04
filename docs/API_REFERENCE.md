@@ -27,8 +27,8 @@ from compiler import DuanCompiler
 
 compiler = DuanCompiler()
 result = compiler.compile("""
-    定义 消息 等于 "你好，段言！"。
-    显示 消息。
+    令 消息 = "你好，段言！"
+    打印 消息
 """)
 
 if result.success:
@@ -44,7 +44,7 @@ else:
 from duan_parser_v3 import DuanParser
 
 parser = DuanParser()
-module = parser.parse("定义 x 等于 10。")
+module = parser.parse("令 x = 10")
 print("AST 节点数:", len(module.statements))
 ```
 
@@ -111,10 +111,10 @@ from duan_parser_v3 import DuanParser
 
 parser = DuanParser()
 module = parser.parse("""
-    定义 x 等于 10。
-    定义 y 等于 20。
-    如果 x 小于 y：
-        显示 "x 较小"。
+    令 x = 10
+    令 y = 20
+    如果 x < y：
+        打印 "x 较小"
 """)
 
 for stmt in module.statements:
@@ -229,7 +229,7 @@ from code_generator import PythonCodeGenerator
 parser = DuanParser()
 generator = PythonCodeGenerator()
 
-ast = parser.parse("定义 消息 等于 '你好'。")
+ast = parser.parse("令 消息 = '你好'")
 code = generator.generate(ast)
 
 # 执行生成的代码
@@ -316,8 +316,8 @@ resolved = resolver.resolve_module("我的模块")
 **使用示例:**
 
 ```
-导入 数学。
-显示 数学.加(1, 2)。
+导入 数学
+打印 数学.加(1, 2)
 ```
 
 ---
@@ -379,7 +379,7 @@ python -m cli.duan
 python -m cli.duan examples/hello.duan
 
 # 执行代码片段
-python -m cli.duan -c '显示 "你好"。'
+python -m cli.duan -c '打印 "你好"'
 ```
 
 ### `duanc` 命令 (编译器)
