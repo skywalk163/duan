@@ -587,7 +587,7 @@ class AstAdapter:
         )
 
     def _convert_dict_literal(self, node) -> ast.DictLiteral:
-        return ast.DictLiteral(elements=self._convert_list(getattr(node, 'elements', [])))
+        return ast.DictLiteral(entries=self._convert_list(getattr(node, 'elements', [])))
 
     def _convert_dict_comprehension(self, node) -> ast.ListComprehension:
         # 简化：映射为列表推导式占位

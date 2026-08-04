@@ -45,6 +45,87 @@ class ParserStmtMixin:
     """语句解析混入类"""
     
     # =========================================================================
+    # 类型标注解析
+    # =========================================================================
+    
+    def _parse_type_annotation(self) -> Optional[str]:
+        """解析复杂类型标注，如 列表<整数>、整数|浮点、可空整数、字典<字符串, 整数>
+        
+        返回完整的类型标注字符串，不包含后续的运算符/分隔符。
+        返回 None 表示没有类型标注。
+        """
+        parts = []
+        self._parse_type_union(parts)
+        if not parts:
+            return None
+        return ''.join(parts)
+    
+    def _parse_type_union(self, parts: list):
+        """解析联合类型：type(|type)*"""
+        self._parse_type_atom(parts)
+        while self._current() and self._current().type == TokenType.PIPE:
+            parts.append(self._consume(TokenType.PIPE).value)
+            self._parse_type_atom(parts)
+    
+    def _parse_type_atom(self, parts: list):
+        """解析类型原子：基本类型 | 泛型类型 | 可选类型
+        
+        支持：
+        - 基本类型：整数、浮点、字符串、布尔、空、任意、int、float、str、bool
+        - 泛型类型：列表<元素类型>、字典<键类型, 值类型>
+        - 可选类型：可空 类型
+        """
+        if not self._current():
+            return
+        
+        tok = self._current()
+        
+        # 可选类型：可空 整数
+        if tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD) and tok.value == '可空':
+            parts.append(self._consume().value)
+            self._parse_type_atom(parts)
+            return
+        
+        # 基本类型名
+        if tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            type_name = self._consume().value
+            parts.append(type_name)
+            
+            # 泛型类型：列表<...> 或 字典<...>
+            if self._current() and self._current().type == TokenType.LESS:
+                parts.append(self._consume(TokenType.LESS).value)
+                # 泛型参数
+                self._parse_type_union(parts)  # 第一个泛型参数
+                # 字典<键, 值> 需要逗号分隔
+                while self._current() and self._current().type == TokenType.COMMA:
+                    parts.append(self._consume(TokenType.COMMA).value)
+                    self._parse_type_union(parts)
+                if self._current() and self._current().type == TokenType.GREATER:
+                    parts.append(self._consume(TokenType.GREATER).value)
+                # 支持嵌套泛型：列表<字典<字符串, 整数>> 的连续 >>
+                while self._current() and self._current().type == TokenType.GREATER:
+                    # 但不要把单个 > 当作闭括号重复消费
+                    # 检查是否后面还有 >（嵌套泛型结束）
+                    next_tok = self._peek(1)
+                    if next_tok and next_tok.type == TokenType.GREATER:
+                        # 这是嵌套泛型的闭合，需要把 > 留到外层处理
+                        # 但当前 token 是 GREATER，且之前已经消费了对应的 LESS
+                        # 这种情况下，外层 LESS 已经消费了一个 GREATER
+                        # 内层嵌套的 LESS 也需要对应的 GREATER
+                        # 实际上，外层 LESS 消费后会递归调用 _parse_type_atom
+                        # 递归调用会自己消费 GREATER
+                        # 所以这里不需要再消费
+                        break
+                    break
+        else:
+            # 可能是括号包裹的类型：(整数|浮点) -> 字符串
+            if self._current().type == TokenType.LPAREN:
+                parts.append(self._consume(TokenType.LPAREN).value)
+                self._parse_type_union(parts)
+                if self._current() and self._current().type == TokenType.RPAREN:
+                    parts.append(self._consume(TokenType.RPAREN).value)
+    
+    # =========================================================================
     # 语法规则
     # =========================================================================
     
@@ -744,8 +825,7 @@ class ParserStmtMixin:
                     # 支持参数类型注解：param: type
                     if self._current() and self._current().type == TokenType.COLON:
                         self._consume(TokenType.COLON)
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     # 支持默认值：= 值
                     if self._current() and self._current().type == TokenType.EQUALS:
                         self._consume(TokenType.EQUALS)
@@ -806,8 +886,7 @@ class ParserStmtMixin:
         type_annotation = None
         if self._current() and self._current().type == TokenType.COLON:
             self._consume(TokenType.COLON)
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                type_annotation = self._consume().value
+            type_annotation = self._parse_type_annotation()
 
         # = 或 等于
         if self._match(TokenType.EQUALS):
@@ -1365,11 +1444,7 @@ class ParserStmtMixin:
         type_annotation = None
         if self._current() and self._current().type == TokenType.COLON:
             self._consume(TokenType.COLON)
-            type_tok = self._current()
-            if type_tok and type_tok.type == TokenType.IDENTIFIER:
-                type_annotation = self._consume(TokenType.IDENTIFIER).value
-            elif type_tok and type_tok.type == TokenType.KEYWORD:
-                type_annotation = self._consume(TokenType.KEYWORD).value
+            type_annotation = self._parse_type_annotation()
         
         # 为（支持设 变量 为 值 和 设 变量 为 类型 = 值 两种语法）
         if self._match(TokenType.KEYWORD, '为'):
@@ -2181,10 +2256,10 @@ class ParserStmtMixin:
     def _is_paragraph_definition(self) -> bool:
         """向前扫描，判断 段落 主(...) 是段落定义还是段落调用。
         
-        段落定义：段落 主()： 或 段落 主(参数1, 参数2)：
+        段落定义：段落 主()： 或 段落 主(参数1, 参数2)： 或 段落 主(参数) 返回 类型：
         段落调用：段落 主()  （无冒号）
         
-        从当前token（段落/段关键字）开始，扫描到匹配的 ) 后检查是否有 :。
+        从当前token（段落/段关键字）开始，扫描到匹配的 ) 后检查是否有 : 或 返回/-> 类型 :。
         """
         # 当前位置是 段落/段 关键字，后面是 段名(参数...)
         # 从段名后的 ( 开始扫描，找到匹配的 )
@@ -2205,11 +2280,32 @@ class ParserStmtMixin:
             elif t.type == TokenType.RPAREN:
                 paren_depth -= 1
                 if paren_depth == 0:
-                    # 找到匹配的 )，检查下一个token是否是 :
+                    # 找到匹配的 )，检查下一个token是否是 : 或 返回/-> 类型 :
                     next_idx = idx + 1
                     if next_idx < len(self.tokens):
                         next_t = self.tokens[next_idx]
-                        return next_t.type == TokenType.COLON
+                        if next_t.type == TokenType.COLON:
+                            return True
+                        # 支持 返回 类型: 或 -> 类型: 语法
+                        if (next_t.type == TokenType.KEYWORD and next_t.value == '返回') or \
+                           next_t.type == TokenType.ARROW:
+                            # 扫描到下一个 : 确认是段落定义
+                            scan_idx = next_idx + 1
+                            paren_depth2 = 0
+                            while scan_idx < len(self.tokens):
+                                st = self.tokens[scan_idx]
+                                if st.type == TokenType.LESS:
+                                    paren_depth2 += 1
+                                elif st.type == TokenType.GREATER:
+                                    paren_depth2 -= 1
+                                elif st.type == TokenType.COLON and paren_depth2 == 0:
+                                    return True
+                                elif st.type == TokenType.LPAREN:
+                                    paren_depth2 += 1
+                                elif st.type == TokenType.RPAREN:
+                                    paren_depth2 -= 1
+                                scan_idx += 1
+                        return False
                     return False
             idx += 1
         return False
@@ -2281,19 +2377,15 @@ class ParserStmtMixin:
                     param_type = None
                     # 检查类型注解：参数名: 类型
                     if self._current() and self._current().type == TokenType.COLON:
-                        next_tok = self._peek(1)
-                        if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            self._consume(TokenType.COLON)
-                            param_type = self._consume().value
+                        self._consume(TokenType.COLON)
+                        param_type = self._parse_type_annotation()
                     params.append({'name': param_name, 'type': param_type})
                 elif tok.type == TokenType.KEYWORD and tok.value not in _stmt_keywords_paren:
                     param_name = self._consume(TokenType.KEYWORD).value
                     param_type = None
                     if self._current() and self._current().type == TokenType.COLON:
-                        next_tok = self._peek(1)
-                        if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            self._consume(TokenType.COLON)
-                            param_type = self._consume().value
+                        self._consume(TokenType.COLON)
+                        param_type = self._parse_type_annotation()
                     params.append({'name': param_name, 'type': param_type})
                 else:
                     break
@@ -2372,9 +2464,7 @@ class ParserStmtMixin:
                         if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.CHINESE_NUM) \
                                 and (next_tok.type != TokenType.KEYWORD or next_tok.value not in ('返回', '设', '定义', '当', '如果', '若', '遍历', '打印', '导入', '导出', '跳出', '跳过', '尝试', '抛出', '匹配')):
                             self._consume(TokenType.COLON)
-                            type_tok = self._current()
-                            if type_tok and type_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD, TokenType.CHINESE_NUM):
-                                param_type = self._consume().value
+                            param_type = self._parse_type_annotation()
                         else:
                             params.append({'name': param_name, 'type': param_type})
                             break
@@ -2396,7 +2486,7 @@ class ParserStmtMixin:
                                 is_type = True
                         
                         if is_type:
-                            param_type = self._consume().value
+                            param_type = self._parse_type_annotation()
                     
                     params.append({'name': param_name, 'type': param_type})
                     # 支持默认值：参数名 等于 默认值 或 参数名 = 默认值
@@ -2425,9 +2515,7 @@ class ParserStmtMixin:
                         next_tok = self._peek(1)
                         if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD, TokenType.CHINESE_NUM):
                             self._consume(TokenType.COLON)
-                            type_tok = self._current()
-                            if type_tok and type_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD, TokenType.CHINESE_NUM):
-                                param_type = self._consume().value
+                            param_type = self._parse_type_annotation()
                         else:
                             params.append({'name': param_name, 'type': param_type})
                             break
@@ -2436,10 +2524,10 @@ class ParserStmtMixin:
                         next_tok = self._current()
                         next_next = self._peek(1)
                         if next_tok.value in BUILTIN_TYPES:
-                            param_type = self._consume().value
+                            param_type = self._parse_type_annotation()
                         elif next_tok.type == TokenType.IDENTIFIER and next_next and \
                              (next_next.type == TokenType.COMMA or next_next.type == TokenType.COLON):
-                            param_type = self._consume().value
+                            param_type = self._parse_type_annotation()
                     
                     params.append({'name': param_name, 'type': param_type})
                     # 支持默认值：参数名 等于 默认值 或 参数名 = 默认值
@@ -2455,12 +2543,10 @@ class ParserStmtMixin:
             next_tok = self._peek(1)
             if next_tok and next_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
-                return_type = self._consume().value
+                return_type = self._parse_type_annotation()
         elif (self._current() and self._current().type == TokenType.ARROW):
             self._consume(TokenType.ARROW)
-            # 消耗返回类型（可能是单个标识符或关键字）
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
         
         if self._current() and self._current().type == TokenType.PERIOD:
             self._consume(TokenType.PERIOD)
@@ -3375,12 +3461,10 @@ class ParserStmtMixin:
         return_type = None
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '返回':
             self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
         elif self._current() and self._current().type == TokenType.ARROW:
             self._consume(TokenType.ARROW)
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
 
         # 句号或冒号
         tok_colon = self._current()
@@ -3562,8 +3646,7 @@ class ParserStmtMixin:
                     param_type = None
                     if self._match(TokenType.COLON):
                         self._consume(TokenType.COLON)
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     params.append(Parameter(param_name, param_type))
                 else:
                     break
@@ -3573,8 +3656,7 @@ class ParserStmtMixin:
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
             self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
 
         # 句号（可选）
         if self._current() and self._current().type == TokenType.PERIOD:
@@ -4092,12 +4174,10 @@ class ParserStmtMixin:
                     param_type = None
                     if self._match(TokenType.KEYWORD, '为'):
                         self._consume(TokenType.KEYWORD, '为')
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     elif self._match(TokenType.COLON):
                         self._consume(TokenType.COLON)
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     
                     params.append({'name': param_name, 'type': param_type})
                     
@@ -4111,8 +4191,7 @@ class ParserStmtMixin:
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
             self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
         
         # 库别名：在 库别名
         library_alias = ''
@@ -4221,12 +4300,10 @@ class ParserStmtMixin:
                     param_type = None
                     if self._match(TokenType.KEYWORD, '为'):
                         self._consume(TokenType.KEYWORD, '为')
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     elif self._match(TokenType.COLON):
                         self._consume(TokenType.COLON)
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     
                     params.append({'name': param_name, 'type': param_type})
                     
@@ -4239,8 +4316,7 @@ class ParserStmtMixin:
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
             self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
         
         # 句号（可选）
         if self._current() and self._current().type == TokenType.PERIOD:
@@ -4410,12 +4486,10 @@ class ParserStmtMixin:
                     param_type = None
                     if self._match(TokenType.KEYWORD, '为'):
                         self._consume(TokenType.KEYWORD, '为')
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     elif self._match(TokenType.COLON):
                         self._consume(TokenType.COLON)
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     
                     params.append({'name': param_name, 'type': param_type})
                     
@@ -4428,8 +4502,7 @@ class ParserStmtMixin:
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
             self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
         
         # 库别名：在 库别名
         library_alias = ''
@@ -4545,12 +4618,10 @@ class ParserStmtMixin:
                     param_type = None
                     if self._match(TokenType.KEYWORD, '为'):
                         self._consume(TokenType.KEYWORD, '为')
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     elif self._match(TokenType.COLON):
                         self._consume(TokenType.COLON)
-                        if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                            param_type = self._consume().value
+                        param_type = self._parse_type_annotation()
                     params.append({'name': param_name, 'type': param_type})
                     if self._match(TokenType.COMMA):
                         self._consume(TokenType.COMMA)
@@ -4560,8 +4631,7 @@ class ParserStmtMixin:
         return_type = None
         if self._match(TokenType.KEYWORD, '返回'):
             self._consume(TokenType.KEYWORD, self._current().value)  # 返回 / 返
-            if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-                return_type = self._consume().value
+            return_type = self._parse_type_annotation()
         
         if self._current() and self._current().type == TokenType.PERIOD:
             self._consume(TokenType.PERIOD)
