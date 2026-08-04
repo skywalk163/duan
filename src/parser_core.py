@@ -124,9 +124,9 @@ def _generate_hint(message: str, token_value: str = None) -> str:
     if not token_value:
         # 无 token_value 的通用建议
         if '输入意外结束' in message or '意外的输入结束' in message:
-            return '代码可能不完整，请检查是否缺少语句结尾的句号「。」或缺少右括号「)」。'
+            return '代码可能不完整，请检查是否缺少右括号「)」或冒号「:」。句号「。」是可选的，不需要每句末尾都加。'
         if '期望句号或冒号' in message:
-            return '函数/类定义后面需要冒号「:」，语句结尾需要句号「。」。'
+            return '函数/类定义后面需要冒号「:」。句号「。」是可选的。'
         return ''
     
     tv = token_value

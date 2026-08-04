@@ -1555,7 +1555,8 @@ class PythonCodeGenerator:
         elif isinstance(expr, UnaryOp):
             operand = self._generate_expr(expr.operand)
             op = self.operator_map.get(expr.operator, expr.operator)
-            return f"({op} {operand})"
+            # 一元运算符不留空格：(-5) 而非 (- 5)
+            return f"({op}{operand})"
         
         elif isinstance(expr, ParagraphCall):
             name = self._sanitize_name(expr.name)

@@ -365,7 +365,7 @@ class ParserStmtMixin:
             )
         elif tok.type == TokenType.EQUALS:
             self._error(
-                f"赋值需要使用「设」关键字。如：设 甲 为 10。而不是 甲 = 10。",
+                f"赋值需要使用「设」或「令」关键字。如：设 甲 为 10。或：令 甲 = 10。",
                 tok.line, tok.col, tok.value
             )
         else:
@@ -589,7 +589,14 @@ class ParserStmtMixin:
         return SelfAssignment(attr_name, value)
     
     def _parse_assignment_stmt(self) -> ASTNode:
-        """解析赋值语句：标识符 等于 值。或 标识符 加上/减去/乘以/除以 值。"""
+        """解析赋值语句：标识符 等于 值。或 标识符 加上/减去/乘以/除以 值。
+        
+        支持以下形式：
+        - 标识符 等于/为/= 值
+        - 标识符 加上/减去/乘以/除以 值（复合赋值）
+        - 标识符[索引] 等于/为/= 值（索引赋值）
+        - obj.attr 等于/为/= 值（属性赋值，v3.4 新增）
+        """
         # 复合赋值运算符映射
         compound_ops = {
             '加上': '加',
@@ -606,6 +613,33 @@ class ParserStmtMixin:
         # 标识符
         name_tok = self._consume(TokenType.IDENTIFIER)
         name = name_tok.value
+        
+        # 检查属性赋值：obj.attr 等于/为/= 值（v3.4 新增）
+        if self._current() and self._current().type == TokenType.DOT:
+            self._consume(TokenType.DOT)
+            # 读取属性名
+            attr_tok = self._current()
+            if attr_tok and attr_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                attr_name = self._consume().value
+                # 构建赋值目标：MemberAccess(Identifier(name), attr_name)
+                target = MemberAccess(Identifier(name), attr_name)
+                
+                # 检查等于/为/=
+                if self._match(TokenType.KEYWORD, '等于') or self._match(TokenType.KEYWORD, '为') or self._match(TokenType.EQUALS):
+                    self._consume()
+                    value = self._parse_expr()
+                    # 句号（可选）
+                    if self._current() and self._current().type == TokenType.PERIOD:
+                        self._consume(TokenType.PERIOD)
+                    return Assignment(target, value)
+                
+                # 可能是链式属性访问（如 obj.a.b = value），回退到表达式
+                self.pos = saved_pos
+                return self._parse_expr_stmt()
+            
+            # 属性名不是有效的标识符/关键字，回退
+            self.pos = saved_pos
+            return self._parse_expr_stmt()
         
         # 检查索引赋值：甲[丁] 为/等于 值。
         if self._current() and self._current().type == TokenType.LBRACKET:
