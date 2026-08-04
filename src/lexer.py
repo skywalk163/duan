@@ -202,6 +202,11 @@ _COMPOUND_SAFE_SINGLE_KEYWORDS = frozenset({
     '且',   # 并且
     '或',   # 或者
     '非',   # 非常
+    # 算术运算符（v4.2 补全 — 常见于复合词）
+    '加',   # 加法/增加
+    '减',   # 减法/减少
+    '乘',   # 乘法/乘坐
+    '除',   # 除法/删除
 })
 
 # 符号到 TokenType 的映射（模块级常量）
@@ -226,6 +231,7 @@ _SYMBOL_TOKEN_MAP = {
     '%': TokenType.PERCENT,
     '<': TokenType.LESS,
     '>': TokenType.GREATER,
+    '|': TokenType.PIPE,
     '!': TokenType.BANG,
     '\uff01': TokenType.BANG,
 }
@@ -1197,13 +1203,20 @@ class Lexer:
                     continue
             
             # 检查前缀是否在用户定义中（如"阶乘结果"在定义中，当前标识符为"阶乘结果等于"）
+            # 但若完整标识符本身是关键字（如"列表弹出"在VERB_ARITY中），则优先识别为关键字
             if user_definitions:
                 prefix_matched = None
-                for plen in range(len(full_identifier) - 1, 0, -1):
-                    prefix = full_identifier[:plen]
-                    if prefix in user_definitions:
-                        prefix_matched = prefix
-                        break
+                # 先检查完整标识符是否本身就是关键字（优先级高于用户定义前缀匹配）
+                full_is_keyword = False
+                kw_check, _ = _match_kw(source, pos)
+                if kw_check == full_identifier:
+                    full_is_keyword = True
+                if not full_is_keyword:
+                    for plen in range(len(full_identifier) - 1, 0, -1):
+                        prefix = full_identifier[:plen]
+                        if prefix in user_definitions:
+                            prefix_matched = prefix
+                            break
                 if prefix_matched:
                     # 输出用户定义的前缀部分作为标识符，剩余部分由后续循环处理
                     _tokens_append(_Token(_TokenType.IDENTIFIER, prefix_matched, line, current_col))
@@ -1353,7 +1366,12 @@ class Lexer:
                             elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
                                 # 单字 compound_safe 关键字（非"当"）
                                 if sub_kw in OPERATOR_VERBS:
-                                    # 运算符动词：总是识别为关键字（不跳过）
+                                    if scan_pos == 0:
+                                        # 运算符在词首，作为复合词的一部分（如"加法"、"减法"）
+                                        # 例如：加法(3, 5) → 加法 作为整体标识符
+                                        scan_pos += sub_len
+                                        continue
+                                    # 运算符在词中，识别为关键字（不跳过）
                                     # 例如：甲加乙 -> [甲] [加] [乙]
                                     pass
                                 else:
@@ -1417,8 +1435,12 @@ class Lexer:
                                         if next_char != ':' and not next_char.isspace():
                                             skip_after_rematch = True
                                 elif sub_len == 1 and sub_kw in self.compound_safe_single_keywords:
-                                    # 只跳过不在词尾的关键字；在词尾时作为关键字输出
-                                    if sub_len < len(full_identifier):
+                                    if sub_kw in OPERATOR_VERBS:
+                                        # 运算符动词：不跳过，始终识别为关键字
+                                        # 例如：甲加乙 → 加 作为关键字
+                                        pass
+                                    elif sub_len < len(full_identifier):
+                                        # 只跳过不在词尾的关键字；在词尾时作为关键字输出
                                         skip_after_rematch = True
                                 elif sub_len == 1 and sub_kw in OPERATOR_VERBS:
                                     # 单字运算符动词：检查后面是否是括号（可能是函数名的一部分，如"阶乘"）

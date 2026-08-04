@@ -7,6 +7,7 @@ import os
 import sys
 import io
 import unittest
+import socket
 
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _src_dir = os.path.join(_project_root, 'src')
@@ -16,6 +17,15 @@ for _p in [_src_dir, _project_root]:
 
 from duan_parser_v3 import DuanParser
 from code_generator import PythonCodeGenerator
+
+
+def _is_network_available(host="httpbin.org", port=443, timeout=3):
+    """检测网络是否可达"""
+    try:
+        socket.create_connection((host, port), timeout=timeout)
+        return True
+    except OSError:
+        return False
 
 
 def _run_duan(code: str) -> str:
@@ -146,6 +156,7 @@ class TestL4_Matplotlib_E2E(unittest.TestCase):
 class TestL4_Requests_E2E(unittest.TestCase):
     """L4 requests 引用层"""
 
+    @unittest.skipUnless(_is_network_available(), "httpbin.org 不可达，跳过网络测试")
     def test_requests_get(self):
         """requests HTTP GET 请求"""
         code = '''

@@ -66,6 +66,64 @@ class TestLexer(unittest.TestCase):
         cn_num_tokens = [t for t in tokens if t.type == self.TokenType.CHINESE_NUM]
         self.assertEqual(len(cn_num_tokens), 2)
 
+    def test_arithmetic_operator_compound_words(self):
+        """测试算术运算符复合词不拆分（v4.2 修复）
+        "加法"、"减法"、"乘法"、"除法" 应整体识别为标识符，不拆分为关键字+字
+        """
+        test_cases = [
+            ('加法(a, b)', '加法 应整体识别'),
+            ('减法(a, b)', '减法 应整体识别'),
+            ('乘法(a, b)', '乘法 应整体识别'),
+            ('除法(a, b)', '除法 应整体识别'),
+        ]
+        for code, description in test_cases:
+            with self.subTest(code=code, desc=description):
+                lexer = self.Lexer(code)
+                tokens = [t for t in lexer.tokenize() if t.type != self.TokenType.EOF]
+                # 第一个 token 应该是完整的标识符，不是关键字
+                first_token = tokens[0]
+                self.assertEqual(first_token.type, self.TokenType.IDENTIFIER,
+                               f"{description}: 期望 IDENTIFIER，实际 {first_token.type}: {first_token.value}")
+
+    def test_arithmetic_operator_mid_expression(self):
+        """测试算术运算符在表达式中应识别为关键字
+        "甲加乙" → [甲][加][乙]，"加" 应识别为关键字
+        """
+        test_cases = [
+            ('甲加乙', ['甲', '加', '乙']),
+            ('甲减乙', ['甲', '减', '乙']),
+            ('甲乘乙', ['甲', '乘', '乙']),
+            ('甲除乙', ['甲', '除', '乙']),
+        ]
+        for code, expected_values in test_cases:
+            with self.subTest(code=code):
+                lexer = self.Lexer(code)
+                tokens = [t for t in lexer.tokenize() if t.type != self.TokenType.EOF]
+                # 应该有三个 token：标识符、关键字、标识符
+                self.assertEqual(len(tokens), 3, f"{code} 应产生3个token，实际 {len(tokens)}")
+                self.assertEqual(tokens[0].type, self.TokenType.IDENTIFIER)
+                self.assertEqual(tokens[0].value, expected_values[0])
+                self.assertEqual(tokens[1].type, self.TokenType.KEYWORD)
+                self.assertEqual(tokens[1].value, expected_values[1])
+                self.assertEqual(tokens[2].type, self.TokenType.IDENTIFIER)
+                self.assertEqual(tokens[2].value, expected_values[2])
+
+    def test_arithmetic_compound_keywords(self):
+        """测试双字算术运算符关键字（加上、减去、乘以、除以）"""
+        test_cases = [
+            ('加上', '加上'),
+            ('减去', '减去'),
+            ('乘以', '乘以'),
+            ('除以', '除以'),
+        ]
+        for keyword, expected in test_cases:
+            with self.subTest(keyword=keyword):
+                lexer = self.Lexer(keyword + ' a b')
+                tokens = [t for t in lexer.tokenize() if t.type != self.TokenType.EOF]
+                keyword_tokens = [t for t in tokens if t.type == self.TokenType.KEYWORD and t.value == expected]
+                self.assertGreater(len(keyword_tokens), 0,
+                                 f"关键字 {keyword} 未被正确识别")
+
     def test_list_literal(self):
         """测试列表字面量"""
         lexer = self.Lexer('设列表为[1, 2, 3]。')
