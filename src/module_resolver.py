@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import List, Dict, Set, Optional, Tuple, Any
 from dataclasses import dataclass, field
 
-# 添加父目录到路径
+# 添加 src 目录到路径
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, os.path.dirname(__file__))
 
 from lexer import Lexer
 from duan_parser_v3 import DuanParser, ImportStmt
