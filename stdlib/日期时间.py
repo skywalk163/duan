@@ -408,6 +408,43 @@ def 解析相对时间(相对时间: str) -> 日期时间:
 # 测试兼容 API（phase2 测试期望的函数名，兼容 Python datetime 和段言日期时间）
 # =============================================================================
 
+def 日期转时间戳(dt) -> float:
+    """日期转时间戳（别名，对应 STDLIB_VERB_ARITY 注册）"""
+    if isinstance(dt, 日期时间):
+        return dt.转为时间戳()
+    return dt.timestamp()
+
+
+def 星期几(dt=None) -> int:
+    """返回星期几（0=周一，6=周日）（别名，对应 STDLIB_VERB_ARITY 注册）"""
+    if dt is None:
+        dt = _datetime.now()
+    elif isinstance(dt, 日期时间):
+        return dt.星期()
+    return dt.weekday()
+
+
+def 星期名称(dt=None) -> str:
+    """返回星期名称（别名，对应 STDLIB_VERB_ARITY 注册）"""
+    if dt is None:
+        dt = _datetime.now()
+    return 获取星期几名称(dt)
+
+
+def 是否工作日(dt=None) -> bool:
+    """判断是否为工作日（别名，对应 STDLIB_VERB_ARITY 注册）"""
+    if dt is None:
+        dt = _datetime.now()
+    if isinstance(dt, 日期时间):
+        return dt.是否工作日()
+    return dt.weekday() < 5
+
+
+def 是否周末(dt=None) -> bool:
+    """判断是否为周末（别名，对应 STDLIB_VERB_ARITY 注册）"""
+    return not 是否工作日(dt)
+
+
 def 当前日期() -> _datetime:
     """返回当前日期（不含时间部分）"""
     return _datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)

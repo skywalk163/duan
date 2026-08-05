@@ -495,6 +495,25 @@ def 清空日志():
     _debug_log.clear()
 
 
+# =============================================================================
+# 别名（对齐 STDLIB_VERB_ARITY 注册名）
+# =============================================================================
+
+def FFI调试():
+    """FFI调试（别名）"""
+    return 启用调试()
+
+
+def FFI禁用调试():
+    """FFI禁用调试（别名）"""
+    return 禁用调试()
+
+
+def FFI获取日志() -> List[str]:
+    """FFI获取日志（别名）"""
+    return 获取日志()
+
+
 def _debug_log_call(函数名: str, 参数: tuple, 返回值: Any = None):
     """内部：记录函数调用"""
     if _debug_config['enabled'] and _debug_config['log_calls']:

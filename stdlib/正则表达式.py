@@ -92,6 +92,16 @@ def 查找所有(模式: str, 文本: str, 标志: int = 0) -> List[str]:
     return re.findall(模式, 文本, 标志)
 
 
+def 全部匹配(模式: str, 文本: str, 标志: int = 0) -> List[str]:
+    """全部匹配（别名，对应 STDLIB_VERB_ARITY 注册）"""
+    return 查找所有(模式, 文本, 标志)
+
+
+def 匹配迭代(模式: str, 文本: str, 标志: int = 0):
+    """匹配迭代（别名，对应 STDLIB_VERB_ARITY 注册）"""
+    return re.finditer(模式, 文本, 标志)
+
+
 def 替换(模式: str, 文本: str, 替换文本: str, 最大替换次数: int = 0, 标志: int = 0) -> str:
     """替换匹配项"""
     return re.sub(模式, 替换文本, 文本, 最大替换次数, 标志)
