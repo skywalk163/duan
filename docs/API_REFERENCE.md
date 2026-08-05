@@ -1,4 +1,4 @@
-# 段言（Duan）API 参考 v1.0
+# 段言（Duan）API 参考 v4.2
 
 ## 目录
 
@@ -27,7 +27,7 @@ from compiler import DuanCompiler
 
 compiler = DuanCompiler()
 result = compiler.compile("""
-    令 消息 = "你好，段言！"
+    设 消息 为 "你好，段言！"
     打印 消息
 """)
 
@@ -44,7 +44,7 @@ else:
 from duan_parser_v3 import DuanParser
 
 parser = DuanParser()
-module = parser.parse("令 x = 10")
+module = parser.parse("设 x 为 10")
 print("AST 节点数:", len(module.statements))
 ```
 
@@ -111,8 +111,8 @@ from duan_parser_v3 import DuanParser
 
 parser = DuanParser()
 module = parser.parse("""
-    令 x = 10
-    令 y = 20
+    设 x 为 10
+    设 y 为 20
     如果 x < y：
         打印 "x 较小"
 """)
@@ -229,7 +229,7 @@ from code_generator import PythonCodeGenerator
 parser = DuanParser()
 generator = PythonCodeGenerator()
 
-ast = parser.parse("令 消息 = '你好'")
+ast = parser.parse("设 消息 为 '你好'")
 code = generator.generate(ast)
 
 # 执行生成的代码
@@ -414,7 +414,7 @@ python -m cli.duanc run
 
 ```toml
 name = "我的项目"
-version = "1.0.0"
+version = "4.2.0"
 description = "段言示例项目"
 authors = ["作者名"]
 
@@ -438,9 +438,9 @@ target = "python"
 from compiler import DuanCompiler
 
 c = DuanCompiler()
-print(c.version())  # 1.0.0
+print(c.version())  # 4.2.0
 ```
 
 ---
 
-*本文件随段言 v1.0 同步更新*
+*本文件随段言 v4.2 同步更新*

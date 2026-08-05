@@ -281,8 +281,14 @@ class Lexer:
         col = 1
         n = len(source)
 
-        # 预扫描：收集用户定义的标识符
+        # 预扫描：收集用户定义的标识符（段落名 / 方法名 / 变量名等）
         user_definitions = self._scan_user_definitions(source)
+        # 暴露给解析器：parser_expr 需要区分「含运算符动词的函数名」（如 添加任务，
+        # 用户确实定义了该段落）与「紧凑二元表达式」（如 n乘阶乘 中 乘 是运算符，
+        # n乘 并不是用户定义）。因此把预扫描结果通过 self.user_definitions 属性
+        # 共享给 parser_expr 的 _parse_primary / _collect_primary_arg / _collect_single_arg，
+        # 供它们在合并"动词函数名"前做合法性校验（见 parser_expr.py 对应注释）。
+        self.user_definitions = user_definitions
 
         # 处理缩进
         indent_stack = [0]
@@ -704,6 +710,21 @@ class Lexer:
         start_col = col
         quote_char = source[i]
 
+        # 三引号字符串（docstring）："""...""" 或 '''...'''
+        # Bug 根因：原实现只按成对引号处理，"""...""" 会被拆成三个 STRING token
+        # （"" + "内容" + ""），作为独立语句时首 token 为空字符串，解析器报
+        # "无法识别的语法元素：''"（bootstrap_eval/lexer.duan 的 docstring 失败）。
+        # 修复方案：检测连续三个相同引号，把整个三引号块作为单个 STRING token 消费，
+        # 内容为三引号之间的原文（支持跨行），供裸字符串语句（docstring）解析使用。
+        if i + 2 < len(source) and source[i] == source[i + 1] == source[i + 2]:
+            triple = quote_char * 3
+            close_idx = source.find(triple, i + 3)
+            if close_idx == -1:
+                raise LexerError(
+                    f"字符串未闭合: 三引号 '{triple}' 缺少匹配的结束符", line, start_col)
+            value = source[i + 3:close_idx]
+            return Token(TokenType.STRING, value, line, start_col), close_idx + 3 - i
+
         if quote_char in _QUOTE_MAP:
             # 中文引号
             close_quote = _CLOSE_QUOTE_MAP[quote_char]
@@ -1022,16 +1043,24 @@ class Lexer:
                 j += 1
 
             # 检查是否紧跟汉字（如 evennum集），如果是则合并
-            # 但只合并非关键字的汉字，避免破坏 left至right 这类范围表达式
+            #
+            # Bug 根因：原实现只判断汉字序列开头是否命中 ALL_KEYWORDS，但运算符动词
+            # （减/乘/除/至/等于 等）存放在 VERB_ARITY 而【不在】ALL_KEYWORDS，导致
+            # "n减1" 中 "减" 未被识别为关键字，汉字序列被整体并入标识符，
+            # "n减1" 被切成单个标识符 "n减"，运行时产生 NameError。
+            #
+            # 修复方案：从汉字起点 j 处用 _match_keyword 做最长关键字匹配（该函数同时
+            # 覆盖 VERB_ARITY 中的运算符动词），一旦命中关键字立即停止合并，从而把
+            # "n减1" 正确切分为 标识符 n + 关键字 减 + 数字 1；未命中关键字的纯后缀
+            # 汉字（如 evennum 后的 集）仍按原逻辑合并，保持 "evennum集" 为单个标识符。
             while j < n and _is_han(source[j]):
-                # 检查从 j 开始的汉字序列是否是关键字
+                # 从 j 处做最长关键字匹配（_match_keyword 覆盖 VERB_ARITY 中的动词）
+                han_kw, _ = self._match_keyword(source, j)
+                if han_kw:
+                    break
                 k = j
                 while k < n and _is_han(source[k]):
                     k += 1
-                han_seq = source[j:k]
-                # 如果汉字序列是关键字，则不合并
-                if han_seq in ALL_KEYWORDS:
-                    break
                 j = k
 
             word = source[i:j]
@@ -1373,9 +1402,22 @@ class Lexer:
                                 # 策略：多字比较运算符总是作为关键字识别
                                 pass  # 不跳过，继续输出为关键字
                             elif sub_len > 1 and sub_kw in IDENTIFIER_SAFE_KEYWORDS:
-                                # 标识符安全关键字（如"函数"、"输出"）：跳过，作为复合标识符的一部分
-                                scan_pos += sub_len
-                                continue
+                                # IDENTIFIER_SAFE_KEYWORDS（函数/段落/输出/返回 等）常作
+                                # 复合标识符的后缀部分（如 处理函数 / 输出列表），
+                                # 因此默认跳过、并入标识符。
+                                #
+                                # Bug 根因：原实现【无条件】跳过这些关键字，导致紧随其
+                                # 他关键字之后、位于剩余标识符开头的安全关键字也被吞掉，
+                                # 例如 "那么返回一" 中的 "返回"（紧跟 那么）被并入，
+                                # "返回一" 被并成单个标识符，丢失关键字语义。
+                                #
+                                # 修复方案：仅当 scan_pos > 0（即该关键字位于复合词
+                                # 【后缀】位置，如 处理返回 中的 返回）时才跳过；
+                                # 位于词首（scan_pos == 0）时按普通关键字输出，
+                                # "那么返回一" 正确切分为 那么 + 返回 + 一。
+                                if scan_pos > 0:
+                                    scan_pos += sub_len
+                                    continue
                             elif sub_len > 1:
                                 # 其他多字关键字（如接收、段落等），直接输出
                                 pass  # 不跳过，继续输出为关键字

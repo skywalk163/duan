@@ -1187,3 +1187,115 @@ class EmbedBlock(ASTNode):
     
     def __repr__(self):
         return f"EmbedBlock({self.language}, {len(self.code)} chars)"
+
+
+class TypeAnnotation(ASTNode):
+    """类型注解节点
+
+    表示段言的类型注解，支持以下形式：
+    - 基本类型: 整数, 文本, 布尔, 小数, 空
+    - 列表类型: [整数]（整数列表）
+    - 字典类型: {文本: 整数}（文本键、整数值的字典）
+    - 可选类型: 整数?（可选整数）
+    - 函数类型: 接收 整数, 文本 返回 布尔
+
+    类型注解为零成本：仅用于类型检查与文档，不影响运行时语义。
+    """
+    __slots__ = ('base_type', 'is_optional', 'is_list', 'is_dict',
+                 'key_type', 'value_type', 'params', 'return_type')
+
+    # 段言基本类型名 → Python 类型名（与 code_generator._map_type 保持一致）
+    _DUAN_TO_PYTHON = {
+        '整数': 'int',
+        '小数': 'float',
+        '浮数': 'float',
+        '数': 'float',
+        '文本': 'str',
+        '串': 'str',
+        '布尔': 'bool',
+        '空': 'None',
+        '任意': 'Any',
+        '列表': 'list',
+        '列': 'list',
+        '字典': 'dict',
+        '典': 'dict',
+        '集合': 'set',
+        '集': 'set',
+    }
+
+    def __init__(self, base_type: str = '', is_optional: bool = False,
+                 is_list: bool = False, is_dict: bool = False,
+                 key_type: Optional[str] = None, value_type: Optional[str] = None,
+                 params: Optional[List[str]] = None,
+                 return_type: Optional[str] = None,
+                 line: int = 0, col: int = 0):
+        super().__init__(line, col)
+        self.base_type = base_type
+        self.is_optional = is_optional
+        self.is_list = is_list
+        self.is_dict = is_dict
+        self.key_type = key_type
+        self.value_type = value_type
+        self.params = params if params is not None else []
+        self.return_type = return_type
+
+    def _fields(self):
+        """返回字段元组（用于结构化比较/序列化）"""
+        return (self.base_type, self.is_optional, self.is_list, self.is_dict,
+                self.key_type, self.value_type, tuple(self.params), self.return_type)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """转换为字典表示"""
+        return {
+            'node': 'TypeAnnotation',
+            'base_type': self.base_type,
+            'is_optional': self.is_optional,
+            'is_list': self.is_list,
+            'is_dict': self.is_dict,
+            'key_type': self.key_type,
+            'value_type': self.value_type,
+            'params': list(self.params),
+            'return_type': self.return_type,
+        }
+
+    @classmethod
+    def _map_basic(cls, duan_type: str) -> str:
+        """将段言基本类型名映射为 Python 类型名"""
+        return cls._DUAN_TO_PYTHON.get(duan_type, duan_type)
+
+    def to_python_type(self) -> str:
+        """转换为 Python 类型表达式字符串"""
+        # 函数类型：接收 ... 返回 ...
+        if self.return_type is not None and self.params:
+            param_py = ', '.join(self._map_basic(p) for p in self.params)
+            ret_py = self._map_basic(self.return_type)
+            base = f"Callable[[{param_py}], {ret_py}]"
+        elif self.is_dict:
+            k = self._map_basic(self.key_type) if self.key_type else 'Any'
+            v = self._map_basic(self.value_type) if self.value_type else 'Any'
+            base = f"Dict[{k}, {v}]"
+        elif self.is_list:
+            elem = self._map_basic(self.base_type) if self.base_type else 'Any'
+            base = f"List[{elem}]"
+        else:
+            base = self._map_basic(self.base_type)
+        # 可选包装
+        if self.is_optional:
+            base = f"Optional[{base}]"
+        return base
+
+    def __repr__(self):
+        if self.return_type is not None and self.params:
+            params_str = ', '.join(self.params)
+            s = f"接收 {params_str} 返回 {self.return_type}"
+        elif self.is_dict:
+            k = self.key_type or ''
+            v = self.value_type or ''
+            s = f"{{{k}: {v}}}"
+        elif self.is_list:
+            s = f"[{self.base_type}]"
+        else:
+            s = self.base_type
+        if self.is_optional:
+            s = f"{s}?"
+        return f"TypeAnnotation({s})"

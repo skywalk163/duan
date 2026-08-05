@@ -528,7 +528,7 @@ def main():
         parser.add_argument('-o', '--output', help='输出文件路径')
         parser.add_argument('--run', action='store_true', help='编译并运行')
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
-        parser.add_argument('--version', action='version', version='段言 v4.0.2')
+        parser.add_argument('--version', action='version', version='段言 v4.2.0')
         
         args = parser.parse_args()
         

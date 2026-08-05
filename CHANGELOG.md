@@ -5,7 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.1.0] - 2026-08-05（未发布）
+## [4.2.0] - 2026-08-05
+
+### Added
+- **duanpub P2 桥接（7个包）**: 新增 JSON、CSV、日期时间、文件系统、正则表达式、数学运算、加密 共 7 个 Python 桥接模块，duanpub 可用包从 7 个提升到 14 个
+- **duanpub 友好错误提示**: `stdlib/duanpub/__init__.py` 新增 `__getattr__` 模块级钩子，访问不存在的属性时给出迁移建议（告知正确的包名和导入方式）
+- **VS Code 扩展完整化**: 新增 `package.json`（9 个命令、7 个快捷键、配置项）、`syntaxes/duan.tmLanguage.json`（35 个关键字 + 40+ 内置函数语法高亮）、`snippets/duan.json`（30 个代码片段）、`language-configuration.json`、格式化提供器（`DuanFormattingProvider`）
+- **Level 6 无空格分词测试**: `tests/test_level6_lexer.py`（7 个用例：设x为10/如果x大于0/遍历i从1到10/混合空格/字符串紧跟关键字/反引号转义）
+- **Level 6 纯缩进语法测试**: `tests/test_level6_indent.py`（6 个用例：简单缩进/嵌套块/混合结束关键字/多层退出/2空格缩进）
+- **类型注解 AST 节点**: `src/ast_nodes_v3.py` 新增 `TypeAnnotation` 类，支持基本类型/列表/字典/可选/函数类型，含 `to_python_type()` 映射方法
+- **类型注解系统测试**: `tests/test_level6_types.py`（109 个用例：节点创建/类型映射/可选类型/列表类型/字典类型/函数类型/零开销验证/类型检查器/类型推断引擎）
+- **文档迁移工具**: `scripts/migrate_docs.py` 扫描 .md 文件中的过时语法（旧赋值/旧函数定义/分号/花括号/旧版本号），支持 CI 集成
+
+### Changed
+- **文档更新**: `docs/syntax.md` 全部示例迁移到 v4.2 语法（`令 X = Y` → `设 X 为 Y`，`函数` → `段落`）；`docs/API_REFERENCE.md` 版本号 1.0.0 → 4.2.0
+- **版本号**: 4.0.2 → 4.2.0
+
+### Test
+- 完整测试套件 **1535 通过**，27 跳过，0 失败（较 v4.0.2 的 1412 新增 123 个测试）
+
+## [4.1.0] - 2026-08-05（未发布，合并到 4.2.0）
 
 ### Added
 - **VS Code 扩展补全全覆盖**: 补全提供器补齐全部 AST 节点对应关键字，新增 28 个补全项（`使用`、`数据`、`枚举`、`外部`、`至`/`到`/`步`、`pass`、`嵌入`、`并`、`标注`、`错误`、`trait`、`类型别名`、`推迟`、`并行`、类型检查开关、10 个 FFI 指针/内存操作），均带代码片段模板与悬浮提示文档

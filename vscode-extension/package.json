@@ -1,0 +1,222 @@
+{
+    "name": "duan",
+    "displayName": "段言 DuanLang",
+    "description": "段言 (Duan) 编程语言 VS Code 扩展 — 中文编程语言支持，提供语法高亮、自动补全、诊断、格式化等功能",
+    "version": "4.2.0",
+    "publisher": "dumate",
+    "license": "MIT",
+    "engines": {
+        "vscode": "^1.70.0"
+    },
+    "categories": [
+        "Programming Languages",
+        "Snippets",
+        "Language Packs"
+    ],
+    "activationEvents": [
+        "onLanguage:duan"
+    ],
+    "main": "./extension.js",
+    "contributes": {
+        "languages": [
+            {
+                "id": "duan",
+                "extensions": [".duan"],
+                "aliases": ["Duan", "段言"],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "duan",
+                "scopeName": "source.duan",
+                "path": "./syntaxes/duan.tmLanguage.json"
+            }
+        ],
+        "snippets": [
+            {
+                "language": "duan",
+                "path": "./snippets/duan.json"
+            }
+        ],
+        "commands": [
+            {
+                "command": "duan.run",
+                "title": "段言: 运行当前文件",
+                "category": "段言"
+            },
+            {
+                "command": "duan.build",
+                "title": "段言: 构建当前文件",
+                "category": "段言"
+            },
+            {
+                "command": "duan.format",
+                "title": "段言: 格式化当前文件",
+                "category": "段言"
+            },
+            {
+                "command": "duan.check",
+                "title": "段言: 检查语法",
+                "category": "段言"
+            },
+            {
+                "command": "duan.compile",
+                "title": "段言: 编译当前文件",
+                "category": "段言"
+            },
+            {
+                "command": "duan.compileLLVM",
+                "title": "段言: 编译当前文件 (LLVM-Typed 原生)",
+                "category": "段言"
+            },
+            {
+                "command": "duan.typeCheck",
+                "title": "段言: 类型检查当前文件",
+                "category": "段言"
+            },
+            {
+                "command": "duan.repl",
+                "title": "段言: 打开 REPL",
+                "category": "段言"
+            },
+            {
+                "command": "duan.restartLSP",
+                "title": "段言: 重启语言服务器",
+                "category": "段言"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "duan.run",
+                "key": "ctrl+shift+r",
+                "mac": "cmd+shift+r",
+                "when": "editorTextFocus && resourceLangId == duan"
+            },
+            {
+                "command": "duan.build",
+                "key": "ctrl+shift+b",
+                "mac": "cmd+shift+b",
+                "when": "editorTextFocus && resourceLangId == duan"
+            },
+            {
+                "command": "duan.format",
+                "key": "shift+alt+f",
+                "mac": "shift+alt+f",
+                "when": "editorTextFocus && resourceLangId == duan"
+            },
+            {
+                "command": "duan.check",
+                "key": "ctrl+shift+c",
+                "mac": "cmd+shift+c",
+                "when": "editorTextFocus && resourceLangId == duan"
+            },
+            {
+                "command": "duan.compile",
+                "key": "ctrl+shift+e",
+                "mac": "cmd+shift+e",
+                "when": "editorTextFocus && resourceLangId == duan"
+            },
+            {
+                "command": "duan.typeCheck",
+                "key": "ctrl+shift+t",
+                "mac": "cmd+shift+t",
+                "when": "editorTextFocus && resourceLangId == duan"
+            },
+            {
+                "command": "duan.repl",
+                "key": "ctrl+shift+i",
+                "mac": "cmd+shift+i",
+                "when": "resourceLangId == duan"
+            }
+        ],
+        "configuration": {
+            "title": "段言",
+            "properties": {
+                "duan.serverPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "段言 LSP 服务器路径（留空则自动查找）"
+                },
+                "duan.pythonPath": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Python 解释器路径（留空则使用系统默认 python/python3）"
+                },
+                "duan.trace.server": {
+                    "type": "string",
+                    "enum": ["off", "messages", "verbose"],
+                    "default": "off",
+                    "description": "LSP 通信日志级别"
+                },
+                "duan.format.enable": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "启用段言代码格式化提供器"
+                },
+                "duan.format.indentSize": {
+                    "type": "number",
+                    "default": 4,
+                    "minimum": 1,
+                    "maximum": 8,
+                    "description": "缩进空格数（制表符将转换为此数量的空格）"
+                },
+                "duan.format.trimTrailingWhitespace": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "格式化时去除行尾空白字符"
+                },
+                "duan.format.insertFinalNewline": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "确保文件以换行符结尾"
+                }
+            }
+        },
+        "breakpoints": [
+            {
+                "language": "duan"
+            }
+        ],
+        "taskDefinitions": [
+            {
+                "type": "duan",
+                "required": ["task"],
+                "properties": {
+                    "task": {
+                        "type": "string",
+                        "description": "段言任务类型: build / run / check / compile / compile-llvm",
+                        "enum": ["build", "run", "check", "compile", "compile-llvm"]
+                    },
+                    "file": {
+                        "type": "string",
+                        "description": "目标文件路径（默认: 当前文件）"
+                    }
+                }
+            }
+        ],
+        "problemMatchers": [
+            {
+                "name": "duan",
+                "label": "段言错误",
+                "owner": "duan",
+                "fileLocation": "absolute",
+                "pattern": {
+                    "regexp": "^(.*?):(\\d+):(\\d+):\\s*(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "message": 4
+                }
+            }
+        ]
+    },
+    "scripts": {
+        "compile": "echo No compilation needed",
+        "watch": "echo No watch needed",
+        "package": "vsce package"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.70.0"
+    }
+}

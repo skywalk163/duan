@@ -282,6 +282,7 @@ class PythonCodeGenerator:
             '列表获取': '_duan_builtin.列表获取',
             '列表追加': '_duan_builtin.列表追加',
             '列表弹出': '_duan_builtin.列表弹出',
+            '列表插入': '_duan_builtin.列表插入',
             '列表排序': '_duan_builtin.列表排序',
             '列表反转': '_duan_builtin.列表反转',
             '列表包含': '_duan_builtin.列表包含',
@@ -433,6 +434,9 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.列表长度 = len")
         self._add_line("        _duan_builtin.列 = lambda *args: list(args)")
         self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
+        self._add_line("        _duan_builtin.列表获取 = lambda lst, i: lst[i]")
+        self._add_line("        _duan_builtin.列表弹出 = lambda lst, i=-1: lst.pop(i)")
+        self._add_line("        _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("        _duan_builtin.包含 = lambda sub, s: sub in s")
         self._add_line("        _duan_builtin.字符串长度 = len")
@@ -473,6 +477,9 @@ class PythonCodeGenerator:
         self._add_line("    _duan_builtin.列表长度 = len")
         self._add_line("    _duan_builtin.列 = lambda *args: list(args)")
         self._add_line("    _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
+        self._add_line("    _duan_builtin.列表获取 = lambda lst, i: lst[i]")
+        self._add_line("    _duan_builtin.列表弹出 = lambda lst, i=-1: lst.pop(i)")
+        self._add_line("    _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)")
         self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("    _duan_builtin.包含 = lambda sub, s: sub in s")
         self._add_line("    _duan_builtin.字符串长度 = len")
@@ -731,6 +738,14 @@ class PythonCodeGenerator:
             self._add_line(expr_str)
         elif isinstance(stmt, EmbedBlock):
             self._generate_embed_block(stmt)
+        elif isinstance(stmt, StringLiteral):
+            # 裸字符串语句（docstring）生成：配合 lexer/parser 的三引号 docstring 修复
+            # （lexer.py _tokenize_string、parser_stmt.py _parse_statement），
+            # 这里输出 Python 字符串表达式语句——
+            # Python 会把函数/类/模块体首行的字符串视为 docstring，
+            # 其余位置的裸字符串为无操作表达式（与 Python 语义一致）。
+            # 修复前该节点没有语句级分支，会抛 CodeGenError「未知语句类型」。
+            self._add_line(self._generate_expr(stmt))
         else:
             raise CodeGenError(f"未知语句类型", type(stmt).__name__)
     
@@ -1720,6 +1735,12 @@ class PythonCodeGenerator:
                 if builtin_target and builtin_target.startswith('_duan_builtin.'):
                     # 内置函数：转为函数式调用
                     func_name = builtin_target.split('.', 1)[1]
+                    # 若 obj 本身已是内置命名空间（_duan_builtin.方法(...)，如
+                    # test_turing.duan 的 _duan_builtin.字典设置(...)），方法名已可
+                    # 直接调用，不能再把 _duan_builtin 注入为第一个参数，
+                    # 否则会多出一个参数（lambda 形参不匹配，TypeError）。
+                    if obj == '_duan_builtin':
+                        return f"{builtin_target}({args_str})"
                     if args_str:
                         return f"{builtin_target}({obj}, {args_str})"
                     else:
@@ -1752,6 +1773,7 @@ class PythonCodeGenerator:
         elif isinstance(expr, StringInterpolation):
             # 字符串插值 -> f-string
             parts = []
+            expr_parts = []  # 表达式部分（花括号内代码），用于选择外层引号
             for part in expr.parts:
                 if isinstance(part, str):
                     # 转义特殊字符（反斜杠、换行、回车、制表符）
@@ -1761,21 +1783,39 @@ class PythonCodeGenerator:
                     # 带格式说明符的表达式：(expr_node, format_spec)
                     expr_code = self._generate_expr(part[0])
                     parts.append('{' + expr_code + ':' + part[1] + '}')
+                    expr_parts.append(expr_code)
                 elif isinstance(part, ASTNode):
                     # 生成表达式代码并放入花括号
                     expr_code = self._generate_expr(part)
                     parts.append('{' + expr_code + '}')
-            fstr = ''.join(parts)
-            # 选择合适的外层引号：如果内容包含双引号，使用单引号避免冲突
-            if '"' in fstr:
-                if "'" in fstr:
-                    # 两种引号都有，转义双引号并保留双引号外层
-                    fstr = fstr.replace('"', '\\"')
-                    return f'f"{fstr}"'
-                else:
-                    return f"f'{fstr}'"
+                    expr_parts.append(expr_code)
+
+            # 选择外层引号并只在【字面量部分】转义，避免破坏花括号内表达式。
+            #
+            # Bug 根因：原实现先拼接整个 f-string，再用 fstr.replace('"', '\\"')
+            # 全局转义双引号。若花括号内表达式含字符串（如 {处理数据("hello")}），
+            # 表达式里的 " 会被转成 \" —— 在 f-string 花括号内属于无效语法
+            # （"unexpected character after line continuation character"）。
+            #
+            # 修复方案：
+            # 1) 表达式部分由 _generate_expr 生成（字符串统一用双引号），
+            #    因此只要表达式含 "，外层引号就必须选单引号 '（花括号内出现 " 合法）；
+            # 2) 外层引号只出现在字面量部分，若字面量含同种引号则仅在该处转义
+            #    （花括号外的 \' 或 \" 是合法转义）。
+            if any('"' in p for p in expr_parts):
+                outer = "'"
+            elif any("'" in p for p in parts if isinstance(p, str)):
+                outer = '"'
             else:
-                return f'f"{fstr}"'
+                outer = '"'
+            # 仅转义字面量部分中的外层引号
+            out = []
+            for p in parts:
+                if isinstance(p, str) and outer in p:
+                    out.append(p.replace(outer, '\\' + outer))
+                else:
+                    out.append(p)
+            return f"f{outer}{''.join(out)}{outer}"
         
         elif isinstance(expr, ListComprehension):
             # 列表推导 -> [expr for var in iterable if condition ...]

@@ -146,6 +146,7 @@ class UnifiedCodeGenerator:
             '列表获取': '_duan_builtin.列表获取',
             '列表追加': '_duan_builtin.列表追加',
             '列表弹出': '_duan_builtin.列表弹出',
+            '列表插入': '_duan_builtin.列表插入',
             '列表排序': '_duan_builtin.列表排序',
             '列表反转': '_duan_builtin.列表反转',
             '列表包含': '_duan_builtin.列表包含',
@@ -267,6 +268,9 @@ class UnifiedCodeGenerator:
         self._add_line("        _duan_builtin.打印 = print")
         self._add_line("        _duan_builtin.列表创建 = list")
         self._add_line("        _duan_builtin.列表追加 = lambda lst, item: lst.append(item)")
+        self._add_line("        _duan_builtin.列表获取 = lambda lst, i: lst[i]")
+        self._add_line("        _duan_builtin.列表弹出 = lambda lst, i=-1: lst.pop(i)")
+        self._add_line("        _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("        _duan_builtin.字符串长度 = len")
         self._add_line("        _duan_builtin.字典创建 = dict")

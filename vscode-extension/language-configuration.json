@@ -1,0 +1,53 @@
+{
+    "comments": {
+        "lineComment": "#",
+        "blockComment": ["（*", "*）"]
+    },
+    "brackets": [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"],
+        ["（", "）"],
+        ["【", "】"],
+        ["《", "》"],
+        ["｛", "｝"],
+        ["「", "」"]
+    ],
+    "autoClosingPairs": [
+        { "open": "{", "close": "}" },
+        { "open": "[", "close": "]" },
+        { "open": "(", "close": ")" },
+        { "open": "（", "close": "）" },
+        { "open": "【", "close": "】" },
+        { "open": "《", "close": "》" },
+        { "open": "｛", "close": "｝" },
+        { "open": "「", "close": "」" },
+        { "open": "\"", "close": "\"", "notIn": ["string"] },
+        { "open": "'", "close": "'", "notIn": ["string", "comment"] },
+        { "open": "「", "close": "」", "notIn": ["string"] }
+    ],
+    "surroundingPairs": [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"],
+        ["（", "）"],
+        ["【", "】"],
+        ["《", "》"],
+        ["｛", "｝"],
+        ["「", "」"],
+        ["\"", "\""],
+        ["'", "'"]
+    ],
+    "autoCloseBefore": ";:.,=}])>` \n\t",
+    "wordPattern": "[\\w\\u4e00-\\u9fff]+",
+    "indentationRules": {
+        "increaseIndentPattern": "^.*[：:]\\s*$",
+        "decreaseIndentPattern": "^\\s*(结束|否则|否则如果|捕获|最终)\\b"
+    },
+    "folding": {
+        "markers": {
+            "start": "^\\s*#region\\b",
+            "end": "^\\s*#endregion\\b"
+        }
+    }
+}

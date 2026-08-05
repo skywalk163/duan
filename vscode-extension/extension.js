@@ -625,6 +625,62 @@ class DuanHoverProvider {
 }
 
 // =============================================================================
+// 格式化提供器
+// =============================================================================
+
+class DuanFormattingProvider {
+    provideDocumentFormattingEdits(document) {
+        const config = vscode.workspace.getConfiguration('duan.format');
+        const indentSize = config.get('indentSize', 4);
+        const trimTrailing = config.get('trimTrailingWhitespace', true);
+        const insertFinalNewline = config.get('insertFinalNewline', true);
+
+        const edits = [];
+        const lineCount = document.lineCount;
+        if (lineCount === 0) return edits;
+
+        const firstLine = document.lineAt(0);
+        const lastLine = document.lineAt(lineCount - 1);
+        const fullRange = new vscode.Range(
+            firstLine.range.start,
+            lastLine.range.end
+        );
+
+        const indentSpaces = ' '.repeat(indentSize);
+        const lines = [];
+
+        for (let i = 0; i < lineCount; i++) {
+            let line = document.lineAt(i).text;
+
+            // 将制表符转换为空格，确保缩进一致
+            line = line.replace(/\t/g, indentSpaces);
+
+            // 去除行尾空白
+            if (trimTrailing) {
+                line = line.replace(/[ \t]+$/, '');
+            }
+
+            lines.push(line);
+        }
+
+        let result = lines.join('\n');
+
+        // 确保文件以换行符结尾
+        if (insertFinalNewline && !result.endsWith('\n')) {
+            result += '\n';
+        }
+
+        const originalText = document.getText();
+        if (result === originalText) {
+            return edits;
+        }
+
+        edits.push(vscode.TextEdit.replace(fullRange, result));
+        return edits;
+    }
+}
+
+// =============================================================================
 // 命令注册
 // =============================================================================
 
@@ -639,6 +695,29 @@ function registerCommands(context) {
         const projectRoot = getProjectRoot();
         const pythonCmd = getPythonPath();
         terminal.sendText(`cd "${projectRoot}" ; ${pythonCmd} -m cli.duan run "${filePath}"`);
+    });
+
+    // --- 构建文件 ---
+    const buildCmd = vscode.commands.registerCommand('duan.build', () => {
+        const filePath = getActiveDuanFile();
+        if (!filePath) return;
+
+        const terminal = vscode.window.createTerminal(`段言构建: ${path.basename(filePath)}`);
+        terminal.show();
+        const projectRoot = getProjectRoot();
+        const pythonCmd = getPythonPath();
+        const outPath = filePath.replace(/\.duan$/, '');
+        terminal.sendText(`cd "${projectRoot}" ; ${pythonCmd} -m cli.duan compile "${filePath}" -o "${outPath}"`);
+    });
+
+    // --- 格式化文件 ---
+    const formatCmd = vscode.commands.registerCommand('duan.format', () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor || editor.document.languageId !== 'duan') {
+            vscode.window.showInformationMessage('请打开一个段言 (.duan) 文件');
+            return;
+        }
+        vscode.commands.executeCommand('editor.action.formatDocument');
     });
 
     // --- 语法检查 ---
@@ -710,7 +789,7 @@ function registerCommands(context) {
     });
 
     context.subscriptions.push(
-        runCmd, checkCmd, compileCmd, compileLLVMCmd,
+        runCmd, buildCmd, formatCmd, checkCmd, compileCmd, compileLLVMCmd,
         typeCheckCmd, replCmd, restartCmd
     );
 }
@@ -768,6 +847,18 @@ function activate(context) {
             new DuanHoverProvider()
         )
     );
+
+    // 注册格式化提供器
+    const formatEnabled = vscode.workspace.getConfiguration('duan.format').get('enable', true);
+    if (formatEnabled) {
+        context.subscriptions.push(
+            vscode.languages.registerDocumentFormattingEditProvider(
+                { scheme: 'file', language: 'duan' },
+                new DuanFormattingProvider()
+            )
+        );
+        outputChannel.appendLine('[段言] 格式化提供器已注册');
+    }
 
     outputChannel.appendLine('[段言] 扩展初始化完成');
 }

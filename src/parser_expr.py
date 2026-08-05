@@ -818,7 +818,22 @@ class ParserExprMixin:
                     else:
                         break
                 if self._current() and self._current().type == TokenType.LPAREN:
-                    name = ''.join(_fn_parts2)
+                    _fn_candidate = ''.join(_fn_parts2)
+                    # 函数名含运算符动词的合并需以「用户已定义该名字」为前提。
+                    #
+                    # Bug 根因：词法器把 "n乘阶乘(" 拆成 标识符 n + 动词 乘 + 标识符 阶乘，
+                    # 解析器原先无条件把这些相邻令牌合并成函数名 "n乘阶乘"，使本应是
+                    # 乘法表达式 n * 阶乘(...) 的紧凑写法被误当成函数调用（NameError）。
+                    #
+                    # 修复方案：合并结果必须是 lexer 预扫描出的用户定义
+                    # （lexer.user_definitions，来自段落/方法/变量声明）才生效，
+                    # 否则回退令牌位置，交由二元运算符解析机制处理。
+                    # 与 _parse_primary / _collect_single_arg 保持同一套规则（三处必须同步）。
+                    _user_defs = getattr(self.lexer, 'user_definitions', None) or set()
+                    if _fn_candidate in _user_defs:
+                        name = _fn_candidate
+                    else:
+                        self.pos = _fn_saved_pos
                 else:
                     self.pos = _fn_saved_pos
             
@@ -965,13 +980,25 @@ class ParserExprMixin:
                 expr = StringInterpolation(parts)
                 return self._parse_postfix(expr)
             
-            # 合并连续的 IDENTIFIER 令牌（用于处理 tokenizer 将 "字典创建" 拆分为两个 IDENTIFIER 的情况）
-            # 但不合并运算符动词（如"减去"、"取余"等）
+            # 合并连续的 IDENTIFIER 令牌（tokenizer 可能把 "字典创建" 拆成两个 IDENTIFIER）。
+            # 不合并运算符动词（如"减去"、"取余"等）。
+            #
+            # Bug 根因：原实现合并时不检查令牌在源码中是否相邻（无空格），
+            # 使 "转字符串 x"（转字符串 与 x 之间有空格）被错误合并成 "转字符串x"。
+            #
+            # 修复方案：用列号追踪相邻性 —— 仅当后一个 IDENTIFIER 的起始列恰好等于
+            # 前一个令牌的结束列（col + len(value)）时才合并；带空格的 "转字符串 x"
+            # 保持为两个独立标识符（转字符串 为函数调用，x 为参数）。
+            _prev_col = tok.col + len(tok.value)
             while self._current() and self._current().type == TokenType.IDENTIFIER \
                     and self._current().value not in self.ADD_OP_MAP \
                     and self._current().value not in self.MUL_OP_MAP \
                     and self._current().value != '不':
+                _cur = self._current()
+                if _cur.col != _prev_col:
+                    break
                 name += self._consume().value
+                _prev_col = _cur.col + len(_cur.value)
             
             # 函数名含动词关键字合并（如"添加模板"被拆分为 添+加+模+板，其中加/模是 OPERATOR_VERBS）
             # 仅当 token 在源码中相邻（无空格）且合并后紧跟 ( 时才合并
@@ -1004,7 +1031,22 @@ class ParserExprMixin:
                     else:
                         break
                 if self._current() and self._current().type == TokenType.LPAREN:
-                    name = ''.join(_fn_parts)
+                    _fn_candidate = ''.join(_fn_parts)
+                    # 函数名含运算符动词的合并需以「用户已定义该名字」为前提。
+                    #
+                    # Bug 根因：词法器把 "n乘阶乘(" 拆成 标识符 n + 动词 乘 + 标识符 阶乘，
+                    # 解析器原先无条件合并成函数名 "n乘阶乘"，使紧凑乘法表达式
+                    # n * 阶乘(n-1) 被误当成函数调用（NameError）。
+                    #
+                    # 修复方案：合并结果必须是 lexer 预扫描出的用户定义
+                    # （lexer.user_definitions，来自段落/方法/变量声明）才生效，
+                    # 否则回退令牌位置，交由二元运算符机制解析（n * 阶乘((n-1))）。
+                    # 与 _collect_primary_arg / _collect_single_arg 保持同一套规则（三处必须同步）。
+                    _user_defs = getattr(self.lexer, 'user_definitions', None) or set()
+                    if _fn_candidate in _user_defs:
+                        name = _fn_candidate
+                    else:
+                        self.pos = _fn_saved_pos
                 else:
                     self.pos = _fn_saved_pos
             

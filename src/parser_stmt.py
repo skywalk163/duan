@@ -318,6 +318,22 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '父':
             return self._parse_expr_stmt()
 
+        # 裸字符串语句（docstring）："""...""" 或 "..." 单独成行。
+        #
+        # Bug 根因：_parse_statement 原先没有任何 STRING 分支，裸字符串作为独立
+        # 语句时直接落入末尾的"无法识别的语法元素"报错分支；而词法器此前还会把
+        # """...""" 拆成三个 STRING token（见 lexer.py _tokenize_string 的修复），
+        # 首 token 为空字符串，报错信息形如「无法识别的语法元素：''」。
+        # 这导致 bootstrap_eval.duan / bootstrap_lexer.duan 中函数体首行的
+        # """文档字符串""" 无法解析。
+        #
+        # 修复方案（配合词法器三引号修复）：此处将 STRING 作为表达式语句解析，
+        # codegen 输出 Python 字符串语句——Python 会把函数/类/模块体首行的字符串
+        # 视为 docstring，其余位置的裸字符串为无操作表达式，与 Python 语义一致。
+        # 对应 codegen 分支见 code_generator.py _generate_statement 的 StringLiteral 分支。
+        if tok.type == TokenType.STRING:
+            return self._parse_expr_stmt()
+
         # 装饰器：@段落名 标注 段落 ...
         if tok.type == TokenType.AT:
             return self._parse_decorator()
@@ -3203,6 +3219,17 @@ class ParserStmtMixin:
             if self._current().type == TokenType.NEWLINE:
                 break
             if self._current().type == TokenType.COLON:
+                break
+            # 赋值关键字（等于/为）不是属性名的一部分，停止收集以便解析默认值。
+            #
+            # Bug 根因：属性名收集循环原先只处理 PERIOD/NEWLINE/COLON 三种分隔符，
+            # 会把「等于/为」当作属性名的一部分吞掉，导致 docstring 声明支持的
+            # "属性 名称 等于 默认值"（如 class_complete.duan 的 属性 品种 等于 "金毛"）
+            # 解析失败，级联产生大量"无法识别的语法元素"错误。
+            #
+            # 修复方案：遇到 等于/为 立即停止收集属性名，交由下方"默认值（可选）"
+            # 逻辑继续解析 等于 默认值 部分。
+            if self._current().value in ('等于', '为'):
                 break
             attr_name_parts.append(self._current().value)
             self._consume()

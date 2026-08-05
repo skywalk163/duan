@@ -137,16 +137,17 @@ def list_packages(category: str = None, priority: str = None) -> list[str]:
 # 桥接：P0 包路由到现有 stdlib Python 实现
 # =============================================================================
 
-# P0 包名 → stdlib Python 模块名映射
-# 这些包已有 Python 实现，导入时直接路由到 stdlib
+# P0 包名 → duanpub 桥接模块名映射
+# 这些包已有 Python 桥接实现，导入时路由到 stdlib/duanpub/ 下的桥接模块
+# 桥接模块封装 Python 标准库，提供中文名 API
 _STDLIB_BRIDGE = {
-    '文件系统':   '文件系统',     # stdlib/文件系统.py
-    'JSON':       'json',         # Python 标准库 json
-    'CSV':        'csv',          # Python 标准库 csv
-    '正则表达式': 're',           # Python 标准库 re
-    '日期时间':   'datetime',     # Python 标准库 datetime
-    '数学运算':   'math',         # Python 标准库 math
-    '加密':       'hashlib',      # Python 标准库 hashlib（部分）
+    '文件系统':   '文件系统',     # 桥接: stdlib/duanpub/文件系统.py → os/shutil
+    'JSON':       'JSON',         # 桥接: stdlib/duanpub/JSON.py → json
+    'CSV':        'CSV',          # 桥接: stdlib/duanpub/CSV.py → csv
+    '正则表达式': '正则表达式',   # 桥接: stdlib/duanpub/正则表达式.py → re
+    '日期时间':   '日期时间',     # 桥接: stdlib/duanpub/日期时间.py → datetime/time
+    '数学运算':   '数学运算',     # 桥接: stdlib/duanpub/数学运算.py → math
+    '加密':       '加密',         # 桥接: stdlib/duanpub/加密.py → hashlib/hmac
 }
 
 
@@ -277,6 +278,52 @@ def print_summary():
     print(f"按分类:")
     for cat, count in sorted(stats['categories'].items()):
         print(f"  {cat}: {count} 包")
+
+
+# =============================================================================
+# 友好错误提示：访问不存在的属性时给出迁移建议
+# =============================================================================
+
+# 常见 stdlib 函数名 → duanpub 包名映射（用于友好提示）
+_FUNCTION_TO_PACKAGE = {
+    '读取文件': '文件系统', '写入文件': '文件系统', '文件存在': '文件系统',
+    '解析JSON': 'JSON', '生成JSON': 'JSON',
+    '读取CSV': 'CSV', '写入CSV': 'CSV',
+    '匹配': '正则表达式', '搜索': '正则表达式', '替换': '正则表达式',
+    '当前时间': '日期时间', '格式化时间': '日期时间',
+    '排序': None, '去重': None,  # 核心动词，无需导入
+}
+
+
+def __getattr__(name):
+    """
+    模块级 __getattr__：当用户直接访问 stdlib.duanpub.<name> 失败时，
+    提供友好提示，引导用户正确导入。
+    """
+    # 检查是否是已知的 stdlib 函数名
+    pkg = _FUNCTION_TO_PACKAGE.get(name)
+    if pkg:
+        raise AttributeError(
+            f"'{name}' 是 duanpub 包 '{pkg}' 中的函数。\n"
+            f"请在段言代码中使用：导入 {pkg}\n"
+            f"然后调用：{pkg}.{name}(...)"
+        )
+
+    # 检查是否是 duanpub 包名（用户可能想获取包信息）
+    if name in PACKAGES:
+        raise AttributeError(
+            f"'{name}' 是 duanpub 包名，不能直接访问。\n"
+            f"请使用 get_package_info('{name}') 获取包元数据，\n"
+            f"或在段言代码中使用：导入 {name}"
+        )
+
+    # 通用提示
+    raise AttributeError(
+        f"模块 'stdlib.duanpub' 没有属性 '{name}'。\n"
+        f"可用函数：resolve_import, get_package_info, list_packages, "
+        f"get_functions, search_functions, get_stdlib_bridge\n"
+        f"可用包列表：list_packages()"
+    )
 
 
 if __name__ == '__main__':
