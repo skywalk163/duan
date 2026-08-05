@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] - 2026-08-05（未发布）
+
+### Added
+- **VS Code 扩展补全全覆盖**: 补全提供器补齐全部 AST 节点对应关键字，新增 28 个补全项（`使用`、`数据`、`枚举`、`外部`、`至`/`到`/`步`、`pass`、`嵌入`、`并`、`标注`、`错误`、`trait`、`类型别名`、`推迟`、`并行`、类型检查开关、10 个 FFI 指针/内存操作），均带代码片段模板与悬浮提示文档
+- **Web Playground 调试器**: 调试工具栏（调试/继续/跳过/进入/跳出/停止）、500ms 状态轮询、变量/调用栈/日志三面板输出；示例搜索栏与快捷键弹窗（Ctrl+/）
+- **性能基准测试**: `benchmark.py` + `docs/performance.md`（8 项基准的均值/中位数/标准差、CPython 对比、4 个 Mermaid 图表、瓶颈分析）+ `docs/benchmark_data.csv` 导出
+- **环境变量模板**: 新增 `.env.example`，提供 SSH / PyPI / AI Studio 等凭证的配置示例（真实凭证一律放入已 gitignore 的 `.env`）
+
+### Fixed
+- **VS Code 扩展**: 修复 `导入`/`从` 代码片段占位符 `}` 缺失（`${1:模块名》` → `${1:模块名}》`），占位符可被正确识别
+- **代码生成器**: `DecoratorDefinition` 的 `args` 改用 `getattr` 兼容旧 AST 节点，无 `args` 字段时不再崩溃
+- **FFI 表达式级代码生成**: 补齐 `FFIPointerType`、`FFIArrayType`、`FFIAddressOf`、`FFIDereference`、`FFIPointerOffset`、`FFIGetLastError`、`FFIGetErrno` 共 7 个节点的 codegen 分发
+- **stdlib/FFI**: 新增 `FFI调试`、`FFI禁用调试`、`FFI获取日志` 三个别名，对齐 `STDLIB_VERB_ARITY` 注册名
+
 ## [4.0.2] - 2026-08-05
 
 ### Fixed
