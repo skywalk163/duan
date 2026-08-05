@@ -155,20 +155,20 @@ class DuanUnifiedCLI:
                 traceback.print_exc()
                 return 1
         else:
-            # Python 代码生成：完整编译流程
-            result = compiler.compile(source)
-            
-            if compiler.errors:
-                for error in compiler.errors:
-                    print(f"[错误] {error}", file=sys.stderr)
-                return 1
-            
-            module = result.get('ast')
+            # Python 代码生成：直接使用 v3 解析器 + 代码生成器
+            # （注意：不走 DuanCompiler.compile 的 adapt 步骤 —— adapt 会把
+            #   Paragraph/段落定义丢弃，导致运行时 NameError 或生成器报
+            #   “未知语句类型 VariableDeclaration”，与 cli/duan.py 的
+            #   _compile_src 保持一致的可用路径）
+            from duan_parser_v3 import DuanParser
+            from code_generator import PythonCodeGenerator
+
+            parser = DuanParser()
+            module = parser.parse(source)
             if not module:
                 print("[语法错误] 解析失败", file=sys.stderr)
                 return 1
-            
-            from code_generator import PythonCodeGenerator
+
             generator = PythonCodeGenerator()
             python_code = generator.generate(module)
             
