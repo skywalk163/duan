@@ -120,7 +120,6 @@ llvm-mingw*.zip
 llvm-mingw-*/
 
 # Bootstrap 生成产物（由 .duan 源码重新生成，不应入库）
-bootstrap/level*_generated.py
 bootstrap/level*_self_compiled*.py
 bootstrap/level*_bootstrapped.py
 bootstrap/duan_ast_out.py
