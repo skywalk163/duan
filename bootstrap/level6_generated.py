@@ -10,7 +10,7 @@ def 转字符串(v):
     return str(v)
 
 def 关键字列表():
-    return 列表创建("设", "段落", "段", "返回", "为", "如果", "否则", "当", "接收", "加", "减", "乘", "除", "取模", "等于", "小于", "大于", "小于等于", "大于等于", "不等于", "且", "或", "非", "遍历", "在", "类", "属性", "己", "继承", "父", "尝试", "捕获", "最终", "抛出", "导入", "导出")
+    return 列表创建("设", "段落", "段", "返回", "为", "如果", "否则", "当", "接收", "加", "减", "乘", "除", "取模", "等于", "小于", "大于", "小于等于", "大于等于", "不等于", "且", "或", "非", "遍历", "在", "类", "属性", "己", "继承", "父", "尝试", "捕获", "最终", "抛出", "导入", "导出", "开启类型检查", "关闭类型检查")
 
 def 是关键字(w):
     kws = 关键字列表()
@@ -34,6 +34,70 @@ def 建(t, v):
 def 列表弹栈(lst):
     if 列表长度(lst) > 0:
         lst.pop()
+
+def 是类型名(name):
+    return name in ("整数", "文本", "小数", "布尔", "空", "列表", "字典")
+
+def 类型名到Python(tname):
+    if tname == "整数":
+        return "int"
+    if tname == "文本":
+        return "str"
+    if tname == "小数":
+        return "float"
+    if tname == "布尔":
+        return "bool"
+    if tname == "空":
+        return "None"
+    if tname == "列表":
+        return "list"
+    if tname == "字典":
+        return "dict"
+    return tname
+
+def 解析类型(toks, p):
+    """解析类型表达式，返回 (类型字符串, 新位置)。支持复合类型如 列表[整数]、字典[文本, 整数]"""
+    if p >= 列表长度(toks):
+        return 列表创建("", p)
+    tok = 列表获取(toks, p)
+    if 列表获取(tok, 0) != "ID":
+        return 列表创建("", p)
+    type_name = 列表获取(tok, 1)
+    if not 是类型名(type_name):
+        return 列表创建("", p)
+    type_str = 类型名到Python(type_name)
+    p = p + 1
+    # 检查泛型参数: 列表[整数]
+    if p < 列表长度(toks):
+        ntok = 列表获取(toks, p)
+        if 列表获取(ntok, 0) == "LBRACKET":
+            type_str += "["
+            p = p + 1
+            first = 真
+            while p < 列表长度(toks):
+                ntok = 列表获取(toks, p)
+                if 列表获取(ntok, 0) == "RBRACKET":
+                    type_str += "]"
+                    p = p + 1
+                    break
+                if not first:
+                    if 列表获取(ntok, 0) == "COMMA":
+                        type_str += ", "
+                        p = p + 1
+                        continue
+                first = 假
+                elem_result = 解析类型(toks, p)
+                elem_type = 列表获取(elem_result, 0)
+                if elem_type == "":
+                    break
+                type_str += elem_type
+                p = 列表获取(elem_result, 1)
+    return 列表创建(type_str, p)
+
+def 生成类型检查代码(var_name, py_type, indent):
+    """生成运行时类型检查代码"""
+    indent_str = "    " * indent
+    return indent_str + "if 类型检查开启:\n" + indent_str + "    if not isinstance(" + var_name + ", " + py_type + "):\n" + indent_str + "        raise TypeError(f\"期望 " + py_type + ", 实际 {type(" + var_name + ")}\")\n"
 
 def 数字(src, p, n, s):
     while p < n:
@@ -181,12 +245,24 @@ def 扫(src, p, n, toks):
                 列表追加(toks, 建("RPAREN", ")"))
                 p = p + 1
                 已处理 = 真
+            if 已处理 == 假 and c == "[":
+                列表追加(toks, 建("LBRACKET", "["))
+                p = p + 1
+                已处理 = 真
+            if 已处理 == 假 and c == "]":
+                列表追加(toks, 建("RBRACKET", "]"))
+                p = p + 1
+                已处理 = 真
             if 已处理 == 假 and c == ",":
                 列表追加(toks, 建("COMMA", ","))
                 p = p + 1
                 已处理 = 真
             if 已处理 == 假 and c == ".":
                 列表追加(toks, 建("DOT", "."))
+                p = p + 1
+                已处理 = 真
+            if 已处理 == 假 and c == "=":
+                列表追加(toks, 建("EQ", "="))
                 p = p + 1
                 已处理 = 真
             if 已处理 == 假 and c >= "0" and c <= "9":
@@ -211,12 +287,12 @@ def 扫(src, p, n, toks):
                     已处理 = 真
             if 已处理 == 假:
                 # 读取标识符，同时检查关键字匹配
-                是字母 = c == "_" or (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c >= "一"
+                是字母 = c == "_" or (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or (c >= "\u4e00" and c <= "\u9fff")
                 if 是字母:
                     word = ""
                     while p < n:
                         c = 字符串获取(src, p)
-                        is_letter = c == "_" or (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or c >= "一"
+                        is_letter = c == "_" or (c >= "a" and c <= "z") or (c >= "A" and c <= "Z") or (c >= "\u4e00" and c <= "\u9fff")
                         if not is_letter:
                             break
                         # 检查从当前位置开始是否能匹配到关键字
@@ -424,8 +500,8 @@ def 一元表达式(toks, p):
             if np < 列表长度(toks):
                 tok = 列表获取(toks, np)
                 if 列表获取(tok, 0) == "RPAREN":
-                    return 列表创建(expr, np + 1)
-            return 列表创建(expr, np)
+                    return 列表创建('(' + expr + ')', np + 1)
+            return 列表创建('(' + expr + ')', np)
         if 列表获取(tok, 0) == "NUM":
             return 列表创建(列表获取(tok, 1), p + 1)
         if 列表获取(tok, 0) == "STR":
@@ -450,6 +526,36 @@ def 一元表达式(toks, p):
                     np = 列表获取(参数结果, 1)
                     return 列表创建(name + "(" + args + ")", np)
             return 列表创建(name, np)
+        if 列表获取(tok, 0) == "LBRACKET":
+            # 列表字面量 [elem1, elem2, ...]
+            np = p + 1
+            elems = 列表创建()
+            while np < 列表长度(toks):
+                tok = 列表获取(toks, np)
+                if 列表获取(tok, 0) == "RBRACKET":
+                    elem_str = ""
+                    i = 0
+                    while i < 列表长度(elems):
+                        if i > 0:
+                            elem_str = elem_str + ", "
+                        elem_str = elem_str + 列表获取(elems, i)
+                        i = i + 1
+                    return 列表创建("[" + elem_str + "]", np + 1)
+                if 列表获取(tok, 0) == "COMMA":
+                    np = np + 1
+                    continue
+                结果 = 表达式(toks, np)
+                expr = 列表获取(结果, 0)
+                np = 列表获取(结果, 1)
+                列表追加(elems, expr)
+            elem_str = ""
+            i = 0
+            while i < 列表长度(elems):
+                if i > 0:
+                    elem_str = elem_str + ", "
+                elem_str = elem_str + 列表获取(elems, i)
+                i = i + 1
+            return 列表创建("[" + elem_str + "]", np)
     return 列表创建("None", p)
 
 def 解析参数列表(toks, p):
@@ -566,10 +672,26 @@ def comp_set(toks, p):
                         tok = 列表获取(toks, np)
                         if 列表获取(tok, 1) == "为":
                             np = np + 1
-                            结果 = 表达式(toks, np)
-                            expr = 列表获取(结果, 0)
-                            np = 列表获取(结果, 1)
-                            return 列表创建(var + " = " + expr, np)
+                            if np < 列表长度(toks):
+                                # 检查是否为类型注解（支持复合类型）
+                                type_result = 解析类型(toks, np)
+                                py_type = 列表获取(type_result, 0)
+                                if py_type != "":
+                                    np = 列表获取(type_result, 1)
+                                    if np < 列表长度(toks):
+                                        assign_tok = 列表获取(toks, np)
+                                        if 列表获取(assign_tok, 1) == "=":
+                                            np = np + 1
+                                            结果 = 表达式(toks, np)
+                                            expr = 列表获取(结果, 0)
+                                            np = 列表获取(结果, 1)
+                                            return 列表创建(var + ": " + py_type + " = " + expr + "\n" + 生成类型检查代码(var, py_type, 0), np)
+                                    return 列表创建(var + ": " + py_type + " = None\n" + 生成类型检查代码(var, py_type, 0), np)
+                                else:
+                                    结果 = 表达式(toks, np)
+                                    expr = 列表获取(结果, 0)
+                                    np = 列表获取(结果, 1)
+                                    return 列表创建(var + " = " + expr, np)
             return 列表创建("", p + 1)
     return 列表创建("", p)
 
@@ -865,11 +987,19 @@ def compile_block(toks, p, end_p, indent, out):
                         np = np + 1
                 p = np
                 已处理 = 真
+            if 已处理 == 假 and tv == "开启类型检查":
+                out = out + indent + "类型检查开启 = 真\n"
+                p = p + 1
+                已处理 = 真
+            if 已处理 == 假 and tv == "关闭类型检查":
+                out = out + indent + "类型检查开启 = 假\n"
+                p = p + 1
+                已处理 = 真
             if tv == "设":
                 结果 = comp_set(toks, p)
                 stmt = 列表获取(结果, 0)
                 np = 列表获取(结果, 1)
-                out = out + indent + stmt + "\n"
+                out = out + add_indent(stmt, indent) + "\n"
                 p = np
                 已处理 = 真
             if 已处理 == 假 and tv == "如果":
@@ -1100,11 +1230,19 @@ def compile_stmts(toks, p, out):
         tok = 列表获取(toks, p)
         tv = 列表获取(tok, 1)
         已处理 = 假
+        if 已处理 == 假 and tv == "开启类型检查":
+            out = out + "    类型检查开启 = 真\n"
+            p = p + 1
+            已处理 = 真
+        if 已处理 == 假 and tv == "关闭类型检查":
+            out = out + "    类型检查开启 = 假\n"
+            p = p + 1
+            已处理 = 真
         if tv == "设":
             结果 = comp_set(toks, p)
             stmt = 列表获取(结果, 0)
             np = 列表获取(结果, 1)
-            out = out + "    " + stmt + "\n"
+            out = out + add_indent(stmt, "    ") + "\n"
             p = np
             已处理 = 真
         if 已处理 == 假 and tv == "如果":
@@ -1222,11 +1360,19 @@ def 收集参数(toks, p, acc):
                     if acc == "":
                         return 列表创建(v, p + 1)
                     return 列表创建(acc + ", " + v, p + 1)
-            if acc == "":
-                acc = v
-            else:
-                acc = acc + ", " + v
+            param_entry = v
             p = p + 1
+            # 检查是否有类型注解（参数名后紧跟类型名，支持复合类型）
+            if p < 列表长度(toks):
+                type_result = 解析类型(toks, p)
+                resolved_type = 列表获取(type_result, 0)
+                if resolved_type != "":
+                    param_entry = v + ": " + resolved_type
+                    p = 列表获取(type_result, 1)
+            if acc == "":
+                acc = param_entry
+            else:
+                acc = acc + ", " + param_entry
             已处理 = 真
         if 已处理 == 假 and 列表获取(tok, 0) == "KW":
             v = 列表获取(tok, 1)
@@ -1331,6 +1477,18 @@ def compile_class_method(toks, p, class_name):
         final_params = "self"
         if params != "":
             final_params = "self, " + params
+    # 检查返回类型
+    return_type = ""
+    if np < 列表长度(toks):
+        tok = 列表获取(toks, np)
+        if 列表获取(tok, 0) == "KW" and 列表获取(tok, 1) == "返回":
+            np = np + 1
+            if np < 列表长度(toks):
+                type_result = 解析类型(toks, np)
+                resolved_type = 列表获取(type_result, 0)
+                if resolved_type != "":
+                    return_type = " -> " + resolved_type
+                    np = 列表获取(type_result, 1)
     # 跳过 NEWLINE
     if np < 列表长度(toks):
         nt = 列表获取(toks, np)
@@ -1345,7 +1503,7 @@ def compile_class_method(toks, p, class_name):
     body = compile_block(toks, np, method_end - 1, "        ", "")
     if body == "":
         body = "        pass"
-    code = "    def " + name + "(" + final_params + "):\n" + body + "\n"
+    code = "    def " + name + "(" + final_params + ")" + return_type + ":\n" + body + "\n"
     return 列表创建(code, method_end)
 
 def compile_top(toks, p, out):
@@ -1401,6 +1559,18 @@ def compile_single_func(toks, p):
     参数结果 = 解析参数(toks, np)
     params = 列表获取(参数结果, 0)
     np = 列表获取(参数结果, 1)
+    # 检查返回类型
+    return_type = ""
+    if np < 列表长度(toks):
+        tok = 列表获取(toks, np)
+        if 列表获取(tok, 0) == "KW" and 列表获取(tok, 1) == "返回":
+            np = np + 1
+            if np < 列表长度(toks):
+                type_result = 解析类型(toks, np)
+                resolved_type = 列表获取(type_result, 0)
+                if resolved_type != "":
+                    return_type = " -> " + resolved_type
+                    np = 列表获取(type_result, 1)
     # 跳过 NEWLINE
     if np < 列表长度(toks):
         nt = 列表获取(toks, np)
@@ -1415,7 +1585,7 @@ def compile_single_func(toks, p):
     body = compile_block(toks, np, body_end - 1, "    ", "")
     if body == "":
         body = "    pass\n"
-    code = "def " + name + "(" + params + "):\n" + body + "\n"
+    code = "def " + name + "(" + params + ")" + return_type + ":\n" + body + "\n"
     return 列表创建(code, body_end)
 
 def 压缩代码(src):
@@ -1456,7 +1626,7 @@ def 压缩代码(src):
     return out
 
 def 编译(src):
-    header = "# Generated by Duan Level 6\n"
+    header = "# Generated by Duan Level 6\n类型检查开启 = 假\n"
     toks = 词法(src)
     code = compile_top(toks, 0, "")
     result = header + code

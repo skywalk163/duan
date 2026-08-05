@@ -377,8 +377,8 @@
       如果 np 小于 列表长度(toks)：
         设 tok 为 列表获取(toks, np)
         如果 列表获取(tok, 0) 等于 "RPAREN"：
-          返回 列表创建(expr, np 加 1)
-      返回 列表创建(expr, np)
+          返回 列表创建("(" 加 expr 加 ")", np 加 1)
+      返回 列表创建("(" 加 expr 加 ")", np)
     如果 列表获取(tok, 0) 等于 "NUM"：
       返回 列表创建(列表获取(tok, 1), p 加 1)
     如果 列表获取(tok, 0) 等于 "STR"：
@@ -599,6 +599,8 @@
           设 try_body_end 为 finally_pos
         否则：
           设 try_body_end 为 try_end
+        结束
+      结束
       设 try_result 为 compile_block(toks, np, try_body_end, body_indent, "")
       设 out 为 out 加 try_result
       设 ci 为 0
@@ -607,6 +609,7 @@
         设 next_pos 为 try_end
         如果 ci 加 1 小于 列表长度(catch_positions)：
           设 next_pos 为 列表获取(catch_positions, ci 加 1)
+        结束
         设 需要用finally 为 假
         如果 finally_pos 不等于 0：
           如果 finally_pos 大于 cp：
@@ -616,8 +619,13 @@
               设 next_catch 为 列表获取(catch_positions, ci 加 1)
               如果 next_catch 大于 finally_pos：
                 设 需要用finally 为 真
+              结束
+            结束
+          结束
+        结束
         如果 需要用finally 为 真：
           设 next_pos 为 finally_pos
+        结束
         设 catch_type 为 ""
         设 catch_var 为 ""
         设 catch_body_start 为 cp 加 1
@@ -632,6 +640,7 @@
             否则：
               设 catch_body_start 为 ctp 加 1
             设 找类型 为 假
+          结束
           如果 找类型 且 (ctt 等于 "ID" 或 ctt 等于 "KW")：
             如果 catch_type 等于 ""：
               如果 ctt 等于 "ID" 且 (ctp 加 1) 小于 next_pos：
@@ -642,9 +651,12 @@
                 否则：
                   设 catch_type 为 列表获取(ct, 1)
                   设 ctp 为 ctp 加 1
+                结束
               否则：
                 设 catch_type 为 列表获取(ct, 1)
                 设 ctp 为 ctp 加 1
+            结束
+          结束
           如果 找类型 且 catch_type 不等于 "" 且 ctt 等于 "ID"：
             设 ctv 为 列表获取(ct, 1)
             如果 ctv 等于 "as"：
@@ -653,32 +665,41 @@
                 设 vt 为 列表获取(toks, ctp)
                 设 catch_var 为 列表获取(vt, 1)
                 设 ctp 为 ctp 加 1
+              结束
               设 catch_body_start 为 ctp
               设 找类型 为 假
             否则：
               设 catch_body_start 为 ctp
               设 找类型 为 假
+          结束
           如果 找类型 且 catch_type 不等于 "" 且 ctt 不等于 "ID"：
             设 catch_body_start 为 ctp
             设 找类型 为 假
+          结束
           如果 找类型 且 ctt 不等于 "LPAREN" 且 ctt 不等于 "ID" 且 ctt 不等于 "KW"：
             设 catch_body_start 为 ctp
             设 找类型 为 假
+          结束
+        结束
         设 except_line 为 indent 加 "except"
         如果 catch_type 不等于 ""：
           设 mapped_type 为 异常类型映射(catch_type)
           设 except_line 为 except_line 加 " " 加 mapped_type
+        结束
         如果 catch_var 不等于 ""：
           设 except_line 为 except_line 加 " as " 加 catch_var
+        结束
         设 except_line 为 except_line 加 ":\n"
         设 out 为 out 加 except_line
         设 catch_result 为 compile_block(toks, catch_body_start, next_pos, body_indent, "")
         设 out 为 out 加 catch_result
         设 ci 为 ci 加 1
+      结束
       如果 finally_pos 不等于 0：
         设 out 为 out 加 indent 加 "finally:\n"
         设 fin_result 为 compile_block(toks, finally_pos 加 1, try_end, body_indent, "")
         设 out 为 out 加 fin_result
+      结束
       返回 列表创建(out, try_end 加 1)
   返回 列表创建("", p)
 
@@ -719,23 +740,27 @@
       设 已处理 为 假
       如果 已处理 等于 假 且 tv 等于 "导入"：
         设 np 为 p 加 1
-        当 np 小于 列表长度(toks)：
+        设 找导入结束 为 真
+        当 np 小于 列表长度(toks) 且 找导入结束：
           设 nt 为 列表获取(toks, np)
           设 ntv 为 列表获取(nt, 1)
           如果 ntv 等于 "。" 或 ntv 等于 "\n"：
-            跳出
-          设 np 为 np 加 1
+            设 找导入结束 为 假
+          否则：
+            设 np 为 np 加 1
         设 p 为 np
         设 已处理 为 真
       如果 已处理 等于 假 且 tv 等于 "导出"：
         设 np 为 p 加 1
-        当 np 小于 列表长度(toks)：
+        设 找导出结束 为 真
+        当 np 小于 列表长度(toks) 且 找导出结束：
           设 nt 为 列表获取(toks, np)
           设 ntv 为 列表获取(nt, 1)
           如果 ntv 等于 "。"：
             设 np 为 np 加 1
-            跳出
-          设 np 为 np 加 1
+            设 找导出结束 为 假
+          否则：
+            设 np 为 np 加 1
         设 p 为 np
         设 已处理 为 真
       如果 tv 等于 "设"：
