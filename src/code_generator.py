@@ -10,7 +10,7 @@ import ast_nodes as ast_nodes_module
 
 
 # 需要导入新的AST节点类型
-from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
+from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef, FFIPointerType, FFIArrayType, FFIAddressOf, FFIDereference, FFIPointerOffset, FFIGetLastError, FFIGetErrno
 from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock, FunctionCallExpr
 from ast_nodes import ExpressionStatement, SegmentName
 
@@ -1353,10 +1353,12 @@ class PythonCodeGenerator:
                 self._needs_abc = True
         else:
             # 自定义装饰器（支持带参数：@decorator(args)）
+            # 使用 getattr 兼容旧 AST（ast_nodes.DecoratorDefinition 无 args 字段）
             sanitized = self._sanitize_name(decorator_name)
-            if stmt.args:
+            decorator_args = getattr(stmt, 'args', None)
+            if decorator_args:
                 args_parts = []
-                for a in stmt.args:
+                for a in decorator_args:
                     if isinstance(a, KeywordArg):
                         args_parts.append(f"{a.name}={self._generate_expr(a.value)}")
                     else:
@@ -1901,6 +1903,22 @@ class PythonCodeGenerator:
             inner = self._generate_expr(expr.expression)
             return f"await {inner}"
         
+        # FFI 表达式节点
+        elif isinstance(expr, FFIPointerType):
+            return self._generate_ffi_pointer_type(expr)
+        elif isinstance(expr, FFIArrayType):
+            return self._generate_ffi_array_type(expr)
+        elif isinstance(expr, FFIAddressOf):
+            return self._generate_ffi_address_of(expr)
+        elif isinstance(expr, FFIDereference):
+            return self._generate_ffi_dereference(expr)
+        elif isinstance(expr, FFIPointerOffset):
+            return self._generate_ffi_pointer_offset(expr)
+        elif isinstance(expr, FFIGetLastError):
+            return self._generate_ffi_get_last_error(expr)
+        elif isinstance(expr, FFIGetErrno):
+            return self._generate_ffi_get_errno(expr)
+        
         else:
             raise CodeGenError(f"不支持的表达式类型", type(expr).__name__)
     
@@ -2432,6 +2450,47 @@ class PythonCodeGenerator:
         self._add_line(f"# C预处理器宏: {name} = {stmt.value}")
         self._add_line(f"_duan_ffi.定义宏('{name}', {repr(stmt.value)})")
         self._add_line("")
+
+    # =========================================================================
+    # C FFI 表达式级代码生成（第二阶段：指针/数组/错误处理）
+    # =========================================================================
+
+    def _generate_ffi_pointer_type(self, expr: FFIPointerType) -> str:
+        """生成指针类型表达式：指针[整数] → ctypes.POINTER(ctypes.c_int)"""
+        base_type = self._ffi_type_map.get(expr.base_type, expr.base_type)
+        return f"ctypes.POINTER({base_type})"
+
+    def _generate_ffi_array_type(self, expr: FFIArrayType) -> str:
+        """生成数组类型表达式：数组[整数, 5] → (ctypes.c_int * 5)"""
+        base_type = self._ffi_type_map.get(expr.base_type, expr.base_type)
+        if expr.size is not None:
+            size = self._generate_expr(expr.size) if isinstance(expr.size, ASTNode) else str(expr.size)
+            return f"({base_type} * {size})"
+        return f"({base_type} * 0)"
+
+    def _generate_ffi_address_of(self, expr: FFIAddressOf) -> str:
+        """生成取地址表达式：取地址(变量) → ctypes.pointer(变量)"""
+        target = self._generate_expr(expr.target)
+        return f"ctypes.pointer({target})"
+
+    def _generate_ffi_dereference(self, expr: FFIDereference) -> str:
+        """生成解引用表达式：解引用(指针) → 指针[0]"""
+        pointer = self._generate_expr(expr.pointer)
+        return f"{pointer}[0]"
+
+    def _generate_ffi_pointer_offset(self, expr: FFIPointerOffset) -> str:
+        """生成指针偏移表达式：指针偏移(指针, 偏移量) → ctypes.cast(指针, ctypes.POINTER(ctypes.c_byte))[偏移量]"""
+        pointer = self._generate_expr(expr.pointer)
+        offset = self._generate_expr(expr.offset)
+        return f"ctypes.cast({pointer}, ctypes.POINTER(ctypes.c_byte))[{offset}]"
+
+    def _generate_ffi_get_last_error(self, expr: FFIGetLastError) -> str:
+        """生成获取FFI错误表达式：获取FFI错误() → _duan_ffi.获取FFI错误()"""
+        return "_duan_ffi.获取FFI错误()"
+
+    def _generate_ffi_get_errno(self, expr: FFIGetErrno) -> str:
+        """生成获取系统错误码表达式：获取系统错误码() → ctypes.get_errno()"""
+        return "ctypes.get_errno()"
 
     def _generate_embed_block(self, stmt: EmbedBlock):
         """生成嵌入块代码
