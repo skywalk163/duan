@@ -12,6 +12,7 @@ import ast_nodes as ast_nodes_module
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef
 from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock, FunctionCallExpr
+from ast_nodes import ExpressionStatement, SegmentName
 
 
 # =============================================================================
@@ -720,6 +721,10 @@ class PythonCodeGenerator:
             # 花括号代码块
             for s in stmt.statements:
                 self._generate_statement(s)
+        elif isinstance(stmt, ExpressionStatement):
+            # 表达式语句包装（如 "打印 xxx。" 解析为 ExpressionStatement）
+            expr_str = self._generate_expr(stmt.expression)
+            self._add_line(expr_str)
         elif isinstance(stmt, (IndexAccess, MemberAccess, ParagraphCall)):
             # 表达式语句（如 obj[key].append(v) 或 obj.method()）
             expr_str = self._generate_expr(stmt)
@@ -1544,7 +1549,31 @@ class PythonCodeGenerator:
         # 检查 ast_nodes 模块中的 Identifier（兼容两种定义）
         elif hasattr(expr, 'name') and hasattr(expr, 'line'):
             # 可能是来自 ast_nodes 的 Identifier
-            return self._sanitize_name(expr.name)
+            name_val = expr.name
+            if isinstance(name_val, str):
+                return self._sanitize_name(name_val)
+            elif hasattr(name_val, 'name'):
+                # SegmentName 嵌套：name 字段本身可能是 SegmentName 对象
+                # 尝试递归提取字符串
+                inner = name_val
+                while hasattr(inner, 'name') and not isinstance(inner.name, str):
+                    inner = inner.name
+                if hasattr(inner, 'name'):
+                    return self._sanitize_name(inner.name)
+                return self._sanitize_name(str(inner))
+            return self._sanitize_name(str(name_val))
+        
+        elif isinstance(expr, SegmentName):
+            # SegmentName 段落名
+            name_val = expr.name
+            if isinstance(name_val, str):
+                return self._sanitize_name(name_val)
+            # 递归提取
+            while hasattr(name_val, 'name') and not isinstance(name_val.name, str):
+                name_val = name_val.name
+            if hasattr(name_val, 'name'):
+                return self._sanitize_name(name_val.name)
+            return self._sanitize_name(str(name_val))
         
         elif isinstance(expr, BinaryOp):
             left = self._generate_expr(expr.left)

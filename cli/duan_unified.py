@@ -192,16 +192,15 @@ class DuanUnifiedCLI:
             return 0
     
     def interpret_run(self, source_file: str) -> int:
-        """使用解释器直接运行"""
+        """使用编译器编译并运行（替代旧版解释器）"""
         try:
-            from duan_interpreter import run_file
-            run_file(source_file)
-            return 0
-        except ImportError:
-            print("[错误] 解释器模块不可用", file=sys.stderr)
-            return 1
+            with open(source_file, 'r', encoding='utf-8') as f:
+                source = f.read()
+            return self.compile_with_src(source, run=True)
         except Exception as e:
             print(f"[运行错误] {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
             return 1
     
     def start_repl(self) -> int:
@@ -529,7 +528,7 @@ def main():
         parser.add_argument('-o', '--output', help='输出文件路径')
         parser.add_argument('--run', action='store_true', help='编译并运行')
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
-        parser.add_argument('--version', action='version', version='段言 v4.0.0')
+        parser.add_argument('--version', action='version', version='段言 v4.0.2')
         
         args = parser.parse_args()
         

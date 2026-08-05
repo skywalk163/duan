@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.2] - 2026-08-05
+
+### Fixed
+- **代码生成器**: 添加 `SegmentName` 节点处理，修复 `ExpressionStatement` 中的名称引用导致 `TypeError: 'SegmentName' object is not subscriptable` 的问题
+- **代码生成器**: 添加 `ExpressionStatement` 节点分发处理，修复 `duan compile` 编译含表达式语句的段言代码时崩溃（"未知语句类型: ExpressionStatement"）的问题
+- **duan run 命令**: 重写 `interpret_run()` 为使用 `compile_with_src(run=True)` 路径，替换已移除的 `duan_interpreter` 模块，修复「解释器模块不可用」错误
+- **CLI --version**: 版本号字符串与 `pyproject.toml` 同步更新
+
+### Changed
+- **版本号**: 4.0.0 → 4.0.2（跳过了不可用的 4.0.1）
+
+### Test
+- 完整测试套件 1393 通过，26 跳过，0 失败
+
+## [4.0.1] - 2026-08-05（未发布 — 合并到 4.0.2）
+
+4.0.1 在 PyPI 上短暂存在但包含 `SegmentName` 未处理的运行时错误，请直接使用 4.0.2。
+
 ## [4.0.0] - 2026-08-04
 
 ### Added
