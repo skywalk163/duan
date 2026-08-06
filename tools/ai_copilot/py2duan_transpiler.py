@@ -98,6 +98,59 @@ BUILTIN_FUNC_MAP = {
     'enumerate': 'enumerate',
 }
 
+# 方法名映射：Python 对象方法 → 段言函数调用
+METHOD_MAP = {
+    'upper':    '字符串转大写',
+    'lower':    '字符串转小写',
+    'strip':    '字符串去空白',
+    'split':    '字符串分割',
+    'replace':  '字符串替换',
+    'find':     '字符串查找',
+    'index':    '字符串查找',
+    'startswith': '字符串开头是',
+    'endswith':   '字符串结尾是',
+    'count':    '字符串计数',
+    'join':     '字符串拼接',
+    'append':   '追加',
+    'pop':      '弹出',
+    'remove':   '删除',
+    'clear':    '清空',
+    'insert':   '插入',
+    'sort':     '排序',
+    'reverse':  '反转',
+    'keys':     '键列表',
+    'values':   '值列表',
+    'items':    '项目',
+    'get':      '获取',
+    'encode':   '编码',
+    'decode':   '解码',
+    'read':     '读取',
+    'write':    '写入',
+    'close':    '关闭',
+}
+
+# v5.0 异常名映射
+EXCEPTION_MAP = {
+    'StopIteration':     '迭代停止',
+    'StopAsyncIteration': '异步迭代停止',
+    'ValueError':        '数值错误',
+    'TypeError':         '类型错误',
+    'KeyError':          '键错误',
+    'IndexError':        '索引错误',
+    'ZeroDivisionError': '除以零',
+    'FileNotFoundError': '文件未找到',
+    'PermissionError':   '权限错误',
+    'AttributeError':    '属性错误',
+    'ImportError':       '导入错误',
+    'ModuleNotFoundError': '模块未找到',
+    'RuntimeError':      '运行时错误',
+    'RecursionError':    '递归错误',
+    'MemoryError':       '内存错误',
+    'OverflowError':     '溢出错误',
+    'AssertionError':    '断言错误',
+    'Exception':         '异常',
+}
+
 NAME_MAP = {
     'self':  '己',
     'super': '父',
@@ -412,10 +465,16 @@ class Py2DuanTranspiler:
         name = node.name
         params = self._format_params(node.args, is_method)
 
+        # 类型注解（返回值）
+        return_annotation = ""
+        if node.returns:
+            ret_type = self._visit_expr(node.returns) if not isinstance(node.returns, ast.Name) else node.returns.id
+            return_annotation = f" 返回 {ret_type}"
+
         if params:
-            self._emit(f"{prefix}函数 {name} 接收 {params}：")
+            self._emit(f"{prefix}段落 {name} 接收 {params}{return_annotation}：")
         else:
-            self._emit(f"{prefix}函数 {name}：")
+            self._emit(f"{prefix}段落 {name}{return_annotation}：")
 
         self.indent_level += 1
         for stmt in node.body:
@@ -593,7 +652,7 @@ class Py2DuanTranspiler:
             self._emit(f"{prefix}遍历 {target_str} 于 {range_expr}：")
         else:
             iter_str = self._visit_expr(node.iter)
-            self._emit(f"{prefix}遍历 {target_str} 之 {iter_str}：")
+            self._emit(f"{prefix}遍历 {target_str} 于 {iter_str}：")
 
         self.indent_level += 1
         for stmt in node.body:
@@ -712,6 +771,12 @@ class Py2DuanTranspiler:
             self._emit(f"抛出 {exc_str} from {cause_str}")
         else:
             exc_str = self._visit_expr(node.exc)
+            # 异常名映射
+            if isinstance(node.exc, ast.Call) and isinstance(node.exc.func, ast.Name):
+                exc_name = node.exc.func.id
+                if exc_name in EXCEPTION_MAP:
+                    exc_str = self._visit_expr(node.exc)
+                    exc_str = exc_str.replace(exc_name, EXCEPTION_MAP[exc_name], 1)
             self._emit(f"抛出 {exc_str}")
 
     def _visit_Import(self, node: ast.Import):
@@ -927,9 +992,36 @@ class Py2DuanTranspiler:
         if isinstance(node.func, ast.Name) and node.func.id == 'super':
             return '父'
 
-        func_str = self._visit_expr(node.func)
+        # 处理链式方法调用：如 "hello".upper().strip()
+        if isinstance(node.func, ast.Attribute):
+            attr_name = node.func.attr
+            value_str = self._visit_expr(node.func.value)
 
-        # 内置函数翻译（仅当 func 是 Name 节点时，且优先保留 _visit_expr 的翻译结果）
+            # 如果方法名在 METHOD_MAP 中，转换为函数调用形式
+            if attr_name in METHOD_MAP:
+                func_name = METHOD_MAP[attr_name]
+                args = []
+                for arg in node.args:
+                    if isinstance(arg, ast.Starred):
+                        args.append(f"*{self._visit_expr(arg.value)}")
+                    else:
+                        args.append(self._visit_expr(arg))
+                for kw in node.keywords:
+                    if kw.arg is None:
+                        args.append(f"**{self._visit_expr(kw.value)}")
+                    else:
+                        args.append(f"{kw.arg}={self._visit_expr(kw.value)}")
+                args_str = ", ".join(args)
+                if args_str:
+                    return f"{func_name}({value_str}, {args_str})"
+                else:
+                    return f"{func_name}({value_str})"
+            else:
+                func_str = f"{value_str}.{attr_name}"
+        else:
+            func_str = self._visit_expr(node.func)
+
+        # 内置函数翻译（仅当 func 是 Name 节点时）
         if isinstance(node.func, ast.Name):
             translated = BUILTIN_FUNC_MAP.get(node.func.id, func_str)
             func_str = translated
@@ -989,7 +1081,7 @@ class Py2DuanTranspiler:
         test_str = self._visit_expr(node.test)
         body_str = self._visit_expr(node.body)
         orelse_str = self._visit_expr(node.orelse)
-        return f"{body_str} 如果 {test_str} 否则 {orelse_str}"
+        return f"如果 {test_str} 则 {body_str} 否则 {orelse_str}"
 
     def _visit_ListComp(self, node: ast.ListComp) -> str:
         elt_str = self._visit_expr(node.elt)
@@ -997,7 +1089,7 @@ class Py2DuanTranspiler:
         for gen in node.generators:
             target_str = self._format_target(gen.target)
             iter_str = self._visit_expr(gen.iter)
-            gen_str = f"遍历 {target_str} 之 {iter_str}"
+            gen_str = f"遍历 {target_str} 于 {iter_str}"
             for cond in gen.ifs:
                 cond_str = self._visit_expr(cond)
                 gen_str += f" 若 {cond_str}"
@@ -1011,7 +1103,7 @@ class Py2DuanTranspiler:
         for gen in node.generators:
             target_str = self._format_target(gen.target)
             iter_str = self._visit_expr(gen.iter)
-            gen_str = f"遍历 {target_str} 之 {iter_str}"
+            gen_str = f"遍历 {target_str} 于 {iter_str}"
             for cond in gen.ifs:
                 cond_str = self._visit_expr(cond)
                 gen_str += f" 若 {cond_str}"
@@ -1024,7 +1116,7 @@ class Py2DuanTranspiler:
         for gen in node.generators:
             target_str = self._format_target(gen.target)
             iter_str = self._visit_expr(gen.iter)
-            gen_str = f"遍历 {target_str} 之 {iter_str}"
+            gen_str = f"遍历 {target_str} 于 {iter_str}"
             for cond in gen.ifs:
                 cond_str = self._visit_expr(cond)
                 gen_str += f" 若 {cond_str}"
@@ -1057,7 +1149,7 @@ class Py2DuanTranspiler:
                     parts.append(f"{{{inner}{conversion}:{spec}}}")
                 else:
                     parts.append(f"{{{inner}{conversion}}}")
-        return f'f"{''.join(parts)}"'
+        return 'f"' + "".join(parts) + '"'
 
     def _visit_Starred(self, node: ast.Starred) -> str:
         return f"*{self._visit_expr(node.value)}"
@@ -1093,7 +1185,12 @@ class Py2DuanTranspiler:
 
         regular_args = all_args[start_idx:]
         for arg in regular_args:
-            parts.append(arg.arg)
+            param_name = arg.arg
+            # 类型注解
+            if arg.annotation:
+                ann_str = self._visit_expr(arg.annotation) if not isinstance(arg.annotation, ast.Name) else arg.annotation.id
+                param_name = f"{param_name}（{ann_str}）"
+            parts.append(param_name)
 
         # 默认值（对齐到 args.args 末尾）
         defaults = args.defaults
@@ -1108,11 +1205,19 @@ class Py2DuanTranspiler:
 
         # *args
         if args.vararg:
-            parts.append(f"*{args.vararg.arg}")
+            vararg_name = args.vararg.arg
+            if args.vararg.annotation:
+                ann_str = self._visit_expr(args.vararg.annotation) if not isinstance(args.vararg.annotation, ast.Name) else args.vararg.annotation.id
+                vararg_name = f"{vararg_name}（{ann_str}）"
+            parts.append(f"*{vararg_name}")
 
         # **kwargs
         if args.kwarg:
-            parts.append(f"**{args.kwarg.arg}")
+            kwarg_name = args.kwarg.arg
+            if args.kwarg.annotation:
+                ann_str = self._visit_expr(args.kwarg.annotation) if not isinstance(args.kwarg.annotation, ast.Name) else args.kwarg.annotation.id
+                kwarg_name = f"{kwarg_name}（{ann_str}）"
+            parts.append(f"**{kwarg_name}")
 
         return ", ".join(parts)
 

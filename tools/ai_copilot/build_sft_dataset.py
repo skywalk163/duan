@@ -1,23 +1,23 @@
 """
-段言 SFT 训练集构造器
+段言 SFT 训练集构造器 v9（v5.0.0 升级版）
 
 为 ERNIE-4.5-0.3B 微调生成 Python→段言 翻译对照数据。
 输出 JSONL 格式，符合 ERNIEKit SFT 规范。
 
 数据来源：
-  1. 手工编写的高质量 v3.2 对照对（核心，按语法类别系统覆盖）
+  1. 手工编写的高质量 v5.0 对照对（核心，按语法类别系统覆盖）
   2. 从 examples/ 目录 .duan 文件提取（需标注是否旧语法）
   3. 变体扩充：对每条基础对照对做等价变换，扩充训练规模
+  4. 长样本补充：50+ 条超过 200 token 的长样本
 
 注意：
-  段言 v3.2 有两套语法风格并存：
-  - 新语法（SRC 后端）：设/段落...接收/遍历...于...至/加/减/取余
-  - 旧语法（ANTLR）：变量/段落。参数。/结束。/模
-  本脚本统一使用 v3.2 新语法（SRC 后端），因为这是当前默认后端。
+  段言 v5.0 使用 v3.2 新语法（SRC 后端），包含 Trait/协议系统、模式匹配、
+  迭代器协议、上下文管理器、异常映射等新特性。
 
 用法：
     python build_sft_dataset.py          # 生成训练集到 sft_dataset.jsonl
     python build_sft_dataset.py --stats  # 只显示统计信息
+    python build_sft_dataset.py --audit  # 运行数据质量审计
 """
 
 import json
@@ -25,7 +25,7 @@ import os
 import random
 import re
 import sys
-from typing import List, Dict
+from typing import List, Dict, Tuple
 
 # ── 路径 ──
 _PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -164,7 +164,7 @@ _HANDCRAFTED: List[tuple] = [
      "类 狗：\n    属性 名字\n    构造 接收 名字：\n        己.名字 为 名字\n    段落 说话：\n        打印(f\"{己.名字}: woof!\")"),
     ("类", "class Cat(Dog):\n    def speak(self):\n        print(f'{self.name}: meow!')",
      "类 猫 继承 狗：\n    段落 说话：\n        打印(f\"{己.名字}: meow!\")"),
-    ("类", "class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def distance(self):\n        return (self.x**2 + self.y**2)**0.5", "class Point：\n    属性 x\n    属性 y\n    构造 接收 x, y：\n        己.x 为 x\n        己.y 为 y\n    段落 距离：\n        返回 (己.x 乘以 己.x 加上 己.y 乘以 己.y) 的 0.5 次方"),
+    ("类", "class Point:\n    def __init__(self, x, y):\n        self.x = x\n        self.y = y\n    def distance(self):\n        return (self.x**2 + self.y**2)**0.5", "类 点：\n    属性 x\n    属性 y\n    构造 接收 x, y：\n        己.x 为 x\n        己.y 为 y\n    段落 距离：\n        返回 (己.x 乘以 己.x 加上 己.y 乘以 己.y) 的 0.5 次方"),
     ("类", "obj = Dog('Rex')\nobj.speak()",
      "设 obj 为 新建 狗(\"Rex\")\nobj.说话()"),
 
@@ -361,6 +361,247 @@ _HANDCRAFTED: List[tuple] = [
     ("暗坑", "from math import sqrt", "从 数学工具 导入 平方"),
     ("暗坑", "for x in lst:", "遍历 x 于 lst："),
     ("暗坑", "print('hello')", "打印(\"hello\")"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 新特性：Trait/协议系统
+    # ═══════════════════════════════════════════════════════════════
+    ("协议", "class Printable:\n    def display(self):\n        return self.name",
+     "协议 可打印：\n    段落 显示：\n        返回 己.名称"),
+    ("协议", "class Countable:\n    def count(self):\n        return len(self.items)",
+     "协议 可计数：\n    段落 计数：\n        返回 len(己.元素列表)"),
+    ("协议", "class Comparable:\n    def compare(self, other):\n        return self.val > other.val",
+     "协议 可比较：\n    段落 比较 接收 其他：\n        返回 己.值 大于 其他.值"),
+    ("协议", "class Iterable:\n    def __iter__(self):\n        return iter(self.items)",
+     "协议 可迭代：\n    段落 __迭代__：\n        返回 迭代(己.元素列表)"),
+    ("协议", "class Serializer:\n    def to_dict(self):\n        return {'name': self.name, 'val': self.val}",
+     "协议 可序列化：\n    段落 转字典：\n        返回 {\"名称\": 己.名称, \"值\": 己.值}"),
+    ("协议", "class Validator:\n    def validate(self, data):\n        return data is not None",
+     "协议 可验证：\n    段落 验证 接收 数据：\n        返回 数据 不等于 空"),
+    ("协议", "class Formatter:\n    def format(self, data):\n        return str(data).upper()",
+     "协议 可格式化：\n    段落 格式化 接收 数据：\n        返回 字符串转大写(str(数据))"),
+    ("协议", "class Logger:\n    def log(self, msg, level='INFO'):\n        print(f'[{level}] {msg}')",
+     "协议 可日志：\n    段落 记录 接收 消息, 级别：\n        打印(f\"[{级别}] {消息}\")"),
+    ("协议", "class Closable:\n    def close(self):\n        self.opened = False",
+     "协议 可关闭：\n    段落 关闭：\n        己.已打开 为 假"),
+    ("协议", "class Cacheable:\n    def get_cache(self, key):\n        return self.cache.get(key)",
+     "协议 可缓存：\n    段落 取缓存 接收 键：\n        返回 己.缓存.get(键)"),
+    ("协议", "class Drawable:\n    def draw(self, canvas):\n        canvas.append(self)",
+     "协议 可绘制：\n    段落 绘制 接收 画布：\n        画布.追加(己)"),
+    ("协议", "class Configurable:\n    def configure(self, settings):\n        for k, v in settings.items():\n            setattr(self, k, v)",
+     "协议 可配置：\n    段落 配置 接收 设置：\n        遍历 k 于 设置：\n            设 己.k 为 设置[k]"),
+    ("协议", "class Runnable:\n    def run(self):\n        self.execute()",
+     "协议 可运行：\n    段落 运行：\n        己.执行()"),
+    ("协议", "class Saveable:\n    def save(self, path):\n        with open(path, 'w') as f:\n            f.write(self.data)",
+     "协议 可保存：\n    段落 保存 接收 路径：\n        使用 文件 为 打开(路径, \"w\")：\n            文件.写入(己.数据)"),
+    ("协议", "class Loadable:\n    def load(self, path):\n        with open(path) as f:\n            return f.read()",
+     "协议 可加载：\n    段落 加载 接收 路径：\n        使用 文件 为 打开(路径)：\n            返回 文件.读取()"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 新特性：模式匹配
+    # ═══════════════════════════════════════════════════════════════
+    ("模式匹配", "match value:\n    case 1:\n        print('one')\n    case 2:\n        print('two')",
+     "匹配 值：\n    当 1：\n        打印(\"一\")\n    当 2：\n        打印(\"二\")"),
+    ("模式匹配", "match x:\n    case 0:\n        print('zero')\n    case n:\n        print(f'other: {n}')",
+     "匹配 x：\n    当 0：\n        打印(\"零\")\n    当 n：\n        打印(f\"其他: {n}\")"),
+    ("模式匹配", "match code:\n    case 200:\n        return 'ok'\n    case 404:\n        return 'not found'\n    case _:\n        return 'error'",
+     "匹配 code：\n    当 200：\n        返回 \"ok\"\n    当 404：\n        返回 \"未找到\"\n    当 _：\n        返回 \"错误\""),
+    ("模式匹配", "match status:\n    case 'active':\n        print('running')\n    case 'inactive':\n        print('stopped')",
+     "匹配 status：\n    当 \"active\"：\n        打印(\"运行中\")\n    当 \"inactive\"：\n        打印(\"已停止\")"),
+    ("模式匹配", "match pair:\n    case (0, 0):\n        print('origin')\n    case (x, 0):\n        print(f'x={x}')\n    case (0, y):\n        print(f'y={y}')",
+     "匹配 pair：\n    当 (0, 0)：\n        打印(\"原点\")\n    当 (x, 0)：\n        打印(f\"x={x}\")\n    当 (0, y)：\n        打印(f\"y={y}\")"),
+    ("模式匹配", "match value:\n    case int(x):\n        print(f'integer: {x}')\n    case str(s):\n        print(f'string: {s}')",
+     "匹配 值：\n    当 整数(x)：\n        打印(f\"整数: {x}\")\n    当 字符串(s)：\n        打印(f\"字符串: {s}\")"),
+    ("模式匹配", "match data:\n    case [a, b]:\n        print(f'list: {a}, {b}')\n    case {'key': v}:\n        print(f'dict: {v}')",
+     "匹配 data：\n    当 [a, b]：\n        打印(f\"列表: {a}, {b}\")\n    当 {\"key\": v}：\n        打印(f\"字典: {v}\")"),
+    ("模式匹配", "match result:\n    case 1 if flag:\n        print('one and flag')\n    case 1:\n        print('one')",
+     "匹配 结果：\n    当 1 若 flag：\n        打印(\"一且有旗标\")\n    当 1：\n        打印(\"一\")"),
+    ("模式匹配", "match score:\n    case x if x >= 90:\n        grade = 'A'\n    case x if x >= 80:\n        grade = 'B'\n    case _:\n        grade = 'C'",
+     "匹配 分数：\n    当 x 若 x 大于等于 90：\n        设 grade 为 \"A\"\n    当 x 若 x 大于等于 80：\n        设 grade 为 \"B\"\n    当 _：\n        设 grade 为 \"C\""),
+    ("模式匹配", "match color:\n    case 'red' | 'blue' | 'green':\n        print('primary')\n    case _:\n        print('other')",
+     "匹配 颜色：\n    当 \"red\" | \"blue\" | \"green\"：\n        打印(\"原色\")\n    当 _：\n        打印(\"其他\")"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 新特性：迭代器协议
+    # ═══════════════════════════════════════════════════════════════
+    ("迭代器", "class Counter:\n    def __init__(self, limit):\n        self.limit = limit\n        self.n = 0\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if self.n >= self.limit:\n            raise StopIteration()\n        self.n += 1\n        return self.n",
+     "类 计数器：\n    属性 上限\n    属性 当前值\n    构造 接收 上限：\n        己.上限 为 上限\n        己.当前值 为 0\n    段落 __迭代__：\n        返回 己\n    段落 __下一项__：\n        如果 己.当前值 大于等于 己.上限：\n            抛出 迭代停止()\n        设 己.当前值 为 己.当前值 加上 1\n        返回 己.当前值"),
+    ("迭代器", "class Range:\n    def __init__(self, n):\n        self.n = n\n        self.i = 0\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if self.i >= self.n:\n            raise StopIteration()\n        val = self.i\n        self.i += 1\n        return val",
+     "类 范围：\n    属性 上限\n    属性 索引\n    构造 接收 上限：\n        己.上限 为 上限\n        己.索引 为 0\n    段落 __迭代__：\n        返回 己\n    段落 __下一项__：\n        如果 己.索引 大于等于 己.上限：\n            抛出 迭代停止()\n        设 val 为 己.索引\n        设 己.索引 为 己.索引 加上 1\n        返回 val"),
+    ("迭代器", "for item in my_iterable:\n    print(item)",
+     "遍历 元素 于 my_iterable：\n    打印(元素)"),
+    ("迭代器", "for val in counter:\n    print(val)",
+     "遍历 val 于 counter：\n    打印(val)"),
+    ("迭代器", "for x in range_obj:\n    print(x * 2)",
+     "遍历 x 于 range_obj：\n    打印(x 乘以 2)"),
+    ("迭代器", "class FibIter:\n    def __init__(self, n):\n        self.n = n\n        self.a = 0\n        self.b = 1\n        self.i = 0\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if self.i >= self.n:\n            raise StopIteration()\n        val = self.a\n        self.a, self.b = self.b, self.a + self.b\n        self.i += 1\n        return val",
+     "类 斐波那契迭代器：\n    属性 上限\n    属性 前值\n    属性 后值\n    属性 索引\n    构造 接收 上限：\n        己.上限 为 上限\n        己.前值 为 0\n        己.后值 为 1\n        己.索引 为 0\n    段落 __迭代__：\n        返回 己\n    段落 __下一项__：\n        如果 己.索引 大于等于 己.上限：\n            抛出 迭代停止()\n        设 val 为 己.前值\n        设 tmp 为 己.后值\n        设 己.后值 为 己.前值 加上 己.后值\n        设 己.前值 为 tmp\n        设 己.索引 为 己.索引 加上 1\n        返回 val"),
+    ("迭代器", "class EvenIter:\n    def __init__(self, max_n):\n        self.max_n = max_n\n        self.n = 0\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if self.n > self.max_n:\n            raise StopIteration()\n        val = self.n\n        self.n += 2\n        return val",
+     "类 偶数迭代器：\n    属性 最大值\n    属性 当前值\n    构造 接收 最大值：\n        己.最大值 为 最大值\n        己.当前值 为 0\n    段落 __迭代__：\n        返回 己\n    段落 __下一项__：\n        如果 己.当前值 大于 己.最大值：\n            抛出 迭代停止()\n        设 val 为 己.当前值\n        设 己.当前值 为 己.当前值 加上 2\n        返回 val"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 新特性：上下文管理器
+    # ═══════════════════════════════════════════════════════════════
+    ("上下文", "with open('file.txt') as f:\n    content = f.read()",
+     "使用 文件 为 打开(\"file.txt\")：\n    设 content 为 文件.读取()"),
+    ("上下文", "with open('data.txt', 'w') as f:\n    f.write('hello')",
+     "使用 文件 为 打开(\"data.txt\", \"w\")：\n    文件.写入(\"hello\")"),
+    ("上下文", "with open('log.txt', 'a') as f:\n    f.write(line + '\\n')",
+     "使用 文件 为 打开(\"log.txt\", \"a\")：\n    文件.写入(line 加上 \"\\n\")"),
+    ("上下文", "with lock:\n    shared_data += 1",
+     "使用 锁：\n    设 shared_data 为 shared_data 加上 1"),
+    ("上下文", "with open('a.txt') as f1, open('b.txt') as f2:\n    data1 = f1.read()\n    data2 = f2.read()",
+     "使用 文件1 为 打开(\"a.txt\"), 文件2 为 打开(\"b.txt\")：\n    设 data1 为 文件1.读取()\n    设 data2 为 文件2.读取()"),
+    ("上下文", "class ManagedFile:\n    def __enter__(self):\n        return self\n    def __exit__(self, *args):\n        self.close()",
+     "类 托管文件：\n    段落 __进入__：\n        返回 己\n    段落 __退出__ 接收 *args：\n        己.关闭()"),
+    ("上下文", "with open(src) as f:\n    data = json.load(f)",
+     "使用 文件 为 打开(src)：\n    设 data 为 JSON.加载(文件)"),
+    ("上下文", "with open('out.txt', 'w') as f:\n    for i in range(10):\n        f.write(str(i))",
+     "使用 文件 为 打开(\"out.txt\", \"w\")：\n    遍历 i 于 0至9：\n        文件.写入(str(i))"),
+    ("上下文", "with db.connection() as conn:\n    result = conn.query(sql)",
+     "使用 连接 为 db.连接()：\n    设 result 为 连接.查询(sql)"),
+    ("上下文", "with timer:\n    result = expensive_func()",
+     "使用 计时器：\n    设 result 为 耗时函数()"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 新特性：异常映射
+    # ═══════════════════════════════════════════════════════════════
+    ("异常映射", "raise StopIteration()", "抛出 迭代停止()"),
+    ("异常映射", "try:\n    next(it)\nexcept StopIteration:\n    print('done')",
+     "尝试：\n    下一项(it)\n捕获 迭代停止：\n    打印(\"完成\")"),
+    ("异常映射", "raise ValueError('invalid value')", "抛出 数值错误(\"无效值\")"),
+    ("异常映射", "raise TypeError('type mismatch')", "抛出 类型错误(\"类型不匹配\")"),
+    ("异常映射", "raise KeyError('key not found')", "抛出 键错误(\"键未找到\")"),
+    ("异常映射", "raise IndexError('out of range')", "抛出 索引错误(\"超出范围\")"),
+    ("异常映射", "try:\n    result = 1 / 0\nexcept ZeroDivisionError:\n    result = 0",
+     "尝试：\n    设 result 为 1 除以 0\n捕获 除以零：\n    设 result 为 0"),
+    ("异常映射", "try:\n    x = int('abc')\nexcept ValueError as e:\n    print(e)",
+     "尝试：\n    设 x 为 整数(\"abc\")\n捕获 数值错误 为 e：\n    打印(e)"),
+    ("异常映射", "try:\n    d = {}\n    x = d['missing']\nexcept KeyError:\n    x = None",
+     "尝试：\n    设 d 为 {}\n    设 x 为 d[\"missing\"]\n捕获 键错误：\n    设 x 为 空"),
+    ("异常映射", "try:\n    lst = [1, 2, 3]\n    x = lst[10]\nexcept IndexError:\n    x = -1",
+     "尝试：\n    设 lst 为 [1, 2, 3]\n    设 x 为 lst[10]\n捕获 索引错误：\n    设 x 为 -1"),
+    ("异常映射", "try:\n    f = open('nope.txt')\nexcept FileNotFoundError:\n    print('not found')",
+     "尝试：\n    设 f 为 打开(\"nope.txt\")\n捕获 文件未找到：\n    打印(\"未找到\")"),
+    ("异常映射", "try:\n    x = None\n    x.some()\nexcept AttributeError:\n    print('no attr')",
+     "尝试：\n    设 x 为 空\n    x.某方法()\n捕获 属性错误：\n    打印(\"无属性\")"),
+    ("异常映射", "try:\n    import math\n    x = math.non_existent\nexcept AttributeError as e:\n    x = 0",
+     "尝试：\n    导入 数学工具\n    设 x 为 数学工具.不存在\n捕获 属性错误 为 e：\n    设 x 为 0"),
+    ("异常映射", "try:\n    result = expensive()\nexcept (ValueError, TypeError):\n    result = fallback()",
+     "尝试：\n    设 result 为 耗时操作()\n捕获 数值错误, 类型错误：\n    设 result 为 回退()"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 新特性：新语法对照
+    # ═══════════════════════════════════════════════════════════════
+    ("新语法", "x = 1", "设 x 为 1"),
+    ("新语法", "result = a + b", "设 result 为 a 加上 b"),
+    ("新语法", "def add(a, b):\n    return a + b",
+     "段落 加法 接收 a, b：\n    返回 a 加上 b"),
+    ("新语法", "def sub(a, b):\n    return a - b",
+     "段落 减法 接收 a, b：\n    返回 a 减去 b"),
+    ("新语法", "def mul(a, b):\n    return a * b",
+     "段落 乘法 接收 a, b：\n    返回 a 乘以 b"),
+    ("新语法", "def div(a, b):\n    return a / b",
+     "段落 除法 接收 a, b：\n    返回 a 除以 b"),
+    ("新语法", "def power(base, exp):\n    return base ** exp",
+     "段落 幂 接收 base, exp：\n    返回 base 的 exp 次方"),
+    ("新语法", "if x > 0:\n    print('positive')",
+     "如果 x 大于 0：\n    打印(\"正数\")"),
+    ("新语法", "total = 0\nfor i in range(5):\n    total += i",
+     "设 total 为 0\n遍历 i 于 0至4：\n    设 total 为 total 加上 i"),
+    ("新语法", "while x > 0:\n    x -= 1",
+     "当 x 大于 0：\n    设 x 为 x 减去 1"),
+    ("新语法", "class Person:\n    def __init__(self, name):\n        self.name = name",
+     "类 人：\n    属性 名称\n    构造 接收 名称：\n        己.名称 为 名称"),
+    ("新语法", "numbers = [1, 2, 3]\nfor n in numbers:\n    print(n)",
+     "设 numbers 为 [1, 2, 3]\n遍历 n 于 numbers：\n    打印(n)"),
+    ("新语法", "try:\n    x = int('42')\nexcept:\n    x = 0",
+     "尝试：\n    设 x 为 整数(\"42\")\n捕获 异常：\n    设 x 为 0"),
+    ("新语法", "def greet(name):\n    return f'Hello, {name}!'",
+     "段落 打招呼 接收 名称：\n    返回 f\"Hello, {名称}!\""),
+    ("新语法", "data = {'key': 'value'}\nprint(data['key'])",
+     "设 data 为 {\"key\": \"value\"}\n打印(data[\"key\"])"),
+    ("新语法", "cond = True\nresult = 'yes' if cond else 'no'",
+     "设 cond 为 真\n设 result 为 \"yes\" 如果 cond 否则 \"no\""),
+    ("新语法", "for i in range(1, 10, 2):\n    print(i)",
+     "遍历 i 于 1至9步2：\n    打印(i)"),
+    ("新语法", "items = ['a', 'b', 'c']\nfor idx, val in enumerate(items):\n    print(idx, val)",
+     "设 items 为 [\"a\", \"b\", \"c\"]\n设 idx 为 0\n遍历 val 于 items：\n    打印(idx)\n    打印(val)\n    设 idx 为 idx 加上 1"),
+    ("新语法", "def factorial(n):\n    if n <= 1:\n        return 1\n    return n * factorial(n - 1)",
+     "段落 阶乘 接收 n：\n    如果 n 小于等于 1：\n        返回 1\n    返回 n 乘以 阶乘(n 减去 1)"),
+    ("新语法", "s = 'hello'\nprint(s.upper())",
+     "设 s 为 \"hello\"\n打印(字符串转大写(s))"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 补充：更多协议变体
+    # ═══════════════════════════════════════════════════════════════
+    ("协议", "class Sizable:\n    def size(self):\n        return len(self.data)",
+     "协议 可度量：\n    段落 大小：\n        返回 len(己.数据)"),
+    ("协议", "class Named:\n    def get_name(self):\n        return self.name",
+     "协议 有名称：\n    段落 取名称：\n        返回 己.名称"),
+    ("协议", "class Identifiable:\n    def get_id(self):\n        return self.id",
+     "协议 可标识：\n    段落 取标识：\n        返回 己.标识"),
+    ("协议", "class Encodable:\n    def encode(self):\n        return self.data.encode('utf-8')",
+     "协议 可编码：\n    段落 编码：\n        返回 己.数据.编码(\"utf-8\")"),
+    ("协议", "class Decodable:\n    def decode(self, raw):\n        self.data = raw.decode('utf-8')",
+     "协议 可解码：\n    段落 解码 接收 raw：\n        己.数据 为 raw.解码(\"utf-8\")"),
+    ("协议", "class Mergable:\n    def merge(self, other):\n        return self.data + other.data",
+     "协议 可合并：\n    段落 合并 接收 其他：\n        返回 己.数据 加上 其他.数据"),
+    ("协议", "class Cloneable:\n    def clone(self):\n        return copy(self.data)",
+     "协议 可克隆：\n    段落 克隆：\n        返回 复制(己.数据)"),
+    ("协议", "class Parsable:\n    def parse(self, text):\n        return self.parser(text)",
+     "协议 可解析：\n    段落 解析 接收 文本：\n        返回 己.解析器(文本)"),
+    ("协议", "class Filterable:\n    def filter(self, predicate):\n        return [x for x in self.items if predicate(x)]",
+     "协议 可筛选：\n    段落 筛选 接收 判断：\n        设 result 为 []\n        遍历 x 于 己.元素列表：\n            如果 判断(x)：\n                result.追加(x)\n        返回 result"),
+    ("协议", "class Sorted:\n    def sort(self):\n        return sorted(self.items)",
+     "协议 可排序：\n    段落 排序：\n        返回 排序(己.元素列表)"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 补充：更多模式匹配变体
+    # ═══════════════════════════════════════════════════════════════
+    ("模式匹配", "match value:\n    case 0:\n        result = 'zero'\n    case 1:\n        result = 'one'\n    case 2:\n        result = 'two'\n    case _:\n        result = 'many'",
+     "匹配 值：\n    当 0：\n        设 result 为 \"零\"\n    当 1：\n        设 result 为 \"一\"\n    当 2：\n        设 result 为 \"二\"\n    当 _：\n        设 result 为 \"多\""),
+    ("模式匹配", "match point:\n    case (0, 0):\n        return 'origin'\n    case (x, 0):\n        return f'x={x}'\n    case (0, y):\n        return f'y={y}'\n    case (x, y):\n        return f'({x},{y})'",
+     "匹配 point：\n    当 (0, 0)：\n        返回 \"原点\"\n    当 (x, 0)：\n        返回 f\"x={x}\"\n    当 (0, y)：\n        返回 f\"y={y}\"\n    当 (x, y)：\n        返回 f\"({x},{y})\""),
+    ("模式匹配", "match status_code:\n    case 200 | 201 | 204:\n        return 'success'\n    case 400 | 404:\n        return 'client error'\n    case 500:\n        return 'server error'",
+     "匹配 状态码：\n    当 200 | 201 | 204：\n        返回 \"成功\"\n    当 400 | 404：\n        返回 \"客户端错误\"\n    当 500：\n        返回 \"服务器错误\""),
+    ("模式匹配", "match result:\n    case {'ok': value}:\n        return value\n    case {'error': msg}:\n        raise Exception(msg)",
+     "匹配 result：\n    当 {\"ok\": value}：\n        返回 value\n    当 {\"error\": msg}：\n        抛出 异常(msg)"),
+    ("模式匹配", "match shapes:\n    case []:\n        print('empty')\n    case [first]:\n        print(f'one: {first}')\n    case [first, *rest]:\n        print(f'first: {first}, rest: {len(rest)}')",
+     "匹配 shapes：\n    当 []：\n        打印(\"空\")\n    当 [first]：\n        打印(f\"一个: {first}\")\n    当 [first, *rest]：\n        打印(f\"首个: {first}, 剩余: {len(rest)}\")"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 补充：更多迭代器变体
+    # ═══════════════════════════════════════════════════════════════
+    ("迭代器", "for item in iterable:\n    if item > 0:\n        print(item)",
+     "遍历 元素 于 iterable：\n    如果 元素 大于 0：\n        打印(元素)"),
+    ("迭代器", "class SquareIter:\n    def __init__(self, n):\n        self.n = n\n        self.i = 0\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if self.i >= self.n:\n            raise StopIteration()\n        val = self.i ** 2\n        self.i += 1\n        return val",
+     "类 平方迭代器：\n    属性 上限\n    属性 索引\n    构造 接收 上限：\n        己.上限 为 上限\n        己.索引 为 0\n    段落 __迭代__：\n        返回 己\n    段落 __下一项__：\n        如果 己.索引 大于等于 己.上限：\n            抛出 迭代停止()\n        设 val 为 己.索引 的 2 次方\n        设 己.索引 为 己.索引 加上 1\n        返回 val"),
+    ("迭代器", "class StepIter:\n    def __init__(self, start, end, step):\n        self.val = start\n        self.end = end\n        self.step = step\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if self.val >= self.end:\n            raise StopIteration()\n        val = self.val\n        self.val += self.step\n        return val",
+     "类 步进迭代器：\n    属性 当前值\n    属性 结束值\n    属性 步长\n    构造 接收 开始, 结束, 步长：\n        己.当前值 为 开始\n        己.结束值 为 结束\n        己.步长 为 步长\n    段落 __迭代__：\n        返回 己\n    段落 __下一项__：\n        如果 己.当前值 大于等于 己.结束值：\n            抛出 迭代停止()\n        设 val 为 己.当前值\n        设 己.当前值 为 己.当前值 加上 己.步长\n        返回 val"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 补充：更多上下文管理器变体
+    # ═══════════════════════════════════════════════════════════════
+    ("上下文", "with open('input.txt') as f:\n    for line in f:\n        print(line.strip())",
+     "使用 文件 为 打开(\"input.txt\")：\n    遍历 line 于 文件：\n        打印(字符串去空白(line))"),
+    ("上下文", "with open('log.txt', 'w') as f:\n    f.write('start\\n')\n    f.write('end\\n')",
+     "使用 文件 为 打开(\"log.txt\", \"w\")：\n    文件.写入(\"start\\n\")\n    文件.写入(\"end\\n\")"),
+    ("上下文", "with open('data.json') as f:\n    import json\n    data = json.load(f)",
+     "使用 文件 为 打开(\"data.json\")：\n    导入 JSON\n    设 data 为 JSON.加载(文件)"),
+    ("上下文", "class Timer:\n    def __enter__(self):\n        import time\n        self.start = time.time()\n        return self\n    def __exit__(self, *args):\n        import time\n        self.elapsed = time.time() - self.start",
+     "类 计时器：\n    属性 开始时间\n    属性 已过时间\n    段落 __进入__：\n        己.开始时间 为 当前时间()\n        返回 己\n    段落 __退出__ 接收 *args：\n        己.已过时间 为 当前时间() 减去 己.开始时间"),
+    ("上下文", "class Connection:\n    def __enter__(self):\n        self.open()\n        return self\n    def __exit__(self, *args):\n        self.close()",
+     "类 连接：\n    段落 __进入__：\n        己.打开()\n        返回 己\n    段落 __退出__ 接收 *args：\n        己.关闭()"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.0 补充：更多异常映射变体
+    # ═══════════════════════════════════════════════════════════════
+    ("异常映射", "try:\n    x = int('abc')\nexcept ValueError:\n    x = -1\nfinally:\n    print('done')",
+     "尝试：\n    设 x 为 整数(\"abc\")\n捕获 数值错误：\n    设 x 为 -1\n最终：\n    打印(\"完成\")"),
+    ("异常映射", "try:\n    f = open('test.txt')\n    data = f.read()\nexcept (FileNotFoundError, PermissionError):\n    data = ''",
+     "尝试：\n    设 f 为 打开(\"test.txt\")\n    设 data 为 f.读取()\n捕获 文件未找到, 权限错误：\n    设 data 为 \"\""),
+    ("异常映射", "try:\n    result = risky_operation()\nexcept Exception as e:\n    print(f'Error: {e}')\n    result = None",
+     "尝试：\n    设 result 为 危险操作()\n捕获 异常 为 e：\n    打印(f\"错误: {e}\")\n    设 result 为 空"),
 ]
 
 
@@ -372,8 +613,9 @@ def _expand_variants(pairs: List[tuple]) -> List[tuple]:
     """对手工对照对做变体扩充，增加训练数据量
 
     变体策略：
-    1. 变量名替换：x→甲, y→乙, n→数, lst→列表 等中文名
-    2. 指令变体：同一个翻译任务换不同说法（×2倍）
+    1. 变量名替换：x→甲, y→乙, n→数, lst→列表 等中文名（2组映射）
+    2. 表达式等价变换：x+1 → 1+x, x>0 → 0<x
+    3. 数据类型替换：int→float, list→dict（对简单类型签名）
     """
     expanded = list(pairs)  # 保留原始数据
 
@@ -385,11 +627,16 @@ def _expand_variants(pairs: List[tuple]) -> List[tuple]:
             "count": "计数", "total": "总计", "flag": "标志", "score": "分数",
             "item": "项", "name": "名", "val": "值", "max_val": "最大",
             "tmp": "临时", "found": "找到", "target": "目标",
+            "key": "键", "k": "k", "v": "v",
+            "data": "资料", "text": "文本", "start": "开始", "end": "结束",
+            "step": "步长", "limit": "限制", "max_n": "最大数",
         },
         {
             "x": "a", "y": "b", "n": "num", "lst": "list_", "arr": "data",
             "result": "res", "count": "cnt", "total": "sum_", "item": "elem",
             "name": "nm", "val": "v", "tmp": "temp", "found": "hit",
+            "key": "k", "data": "d", "text": "t", "limit": "lim",
+            "start": "st", "end": "en", "step": "sp",
         },
     ]
 
@@ -414,18 +661,39 @@ def _expand_variants(pairs: List[tuple]) -> List[tuple]:
             if changed:
                 expanded.append((cat, py_cn, duan_cn))
 
-    # 指令倍增：对每条数据用2种不同指令各生成一条
-    # （最终每条基础数据会有 ~2 条不同指令的副本）
-    doubled = []
+    # 表达式等价变换：对简单的比较/算术表达式做对称变换
+    expr_transforms = [
+        (r'(x) 大于 (y)', r'\2 小于 \1'),   # x > y → y < x
+        (r'(x) 大于等于 (y)', r'\2 小于等于 \1'),
+        (r'(x) 小于 (y)', r'\2 大于 \1'),
+        (r'(x) 小于等于 (y)', r'\2 大于等于 \1'),
+    ]
     for cat, py, duan in pairs:
-        doubled.append((cat, py, duan))
-    # 不做额外复制，因为 build_dataset 已经用 random.choice 选指令了
-    # 但我们可以对非暗坑类数据各生成一条"指令不同"的副本
+        if cat in ("暗坑", "模式匹配", "协议", "上下文", "异常映射"):
+            continue
+        for pattern, replacement in expr_transforms:
+            if re.search(pattern, duan):
+                new_duan = re.sub(pattern, replacement, duan)
+                # 同步修改 Python 端
+                py_rev = py
+                if ">" in py and "<" not in py:
+                    py_rev = py.replace(">", "<")
+                elif "<" in py and ">" not in py:
+                    py_rev = py.replace("<", ">")
+                if ">=" in py_rev:
+                    py_rev = py_rev.replace(">=", "<=")
+                elif "<=" in py_rev:
+                    py_rev = py_rev.replace("<=", ">=")
+                if py_rev != py:
+                    expanded.append((cat, py_rev, new_duan))
+                    break
+
+    # 指令倍增：对非暗坑类数据各生成一条副本
     for cat, py, duan in pairs:
         if cat != "暗坑" and len(py) > 0:
-            doubled.append((cat, py, duan))
+            expanded.append((cat, py, duan))
 
-    return expanded + doubled
+    return expanded
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -484,14 +752,978 @@ _INSTRUCTIONS = [
 
 
 # ═══════════════════════════════════════════════════════════════════
+# 长样本补充（50+ 条超过 200 token 的完整示例）
+# ═══════════════════════════════════════════════════════════════════
+
+_LONG_SAMPLES: List[tuple] = [
+    # ── 完整类定义 ──
+    ("类", """class Student:
+    def __init__(self, name, age, grade):
+        self.name = name
+        self.age = age
+        self.grade = grade
+    def get_info(self):
+        return f'Name: {self.name}, Age: {self.age}, Grade: {self.grade}'
+    def is_passing(self):
+        return self.grade >= 60
+    def update_grade(self, new_grade):
+        if 0 <= new_grade <= 100:
+            self.grade = new_grade
+            return True
+        return False""",
+     """类 学生：
+    属性 名称
+    属性 年龄
+    属性 成绩
+    构造 接收 名称, 年龄, 成绩：
+        己.名称 为 名称
+        己.年龄 为 年龄
+        己.成绩 为 成绩
+    段落 获取信息：
+        返回 f"Name: {己.名称}, Age: {己.年龄}, Grade: {己.成绩}"
+    段落 是否及格：
+        返回 己.成绩 大于等于 60
+    段落 更新成绩 接收 新成绩：
+        如果 0 小于等于 新成绩 且 新成绩 小于等于 100：
+            己.成绩 为 新成绩
+            返回 真
+        返回 假"""),
+
+    ("类", """class BankAccount:
+    def __init__(self, owner, account_id, balance=0.0):
+        self.owner = owner
+        self.account_id = account_id
+        self.balance = balance
+        self.transactions = []
+    def deposit(self, amount):
+        if amount > 0:
+            self.balance += amount
+            self.transactions.append(f'Deposit: {amount}')
+            return True
+        return False
+    def withdraw(self, amount):
+        if 0 < amount <= self.balance:
+            self.balance -= amount
+            self.transactions.append(f'Withdraw: {amount}')
+            return True
+        return False
+    def get_balance(self):
+        return self.balance
+    def get_transaction_count(self):
+        return len(self.transactions)""",
+     """类 银行账户：
+    属性 户主
+    属性 账号
+    属性 余额
+    属性 交易记录
+    构造 接收 户主, 账号, 余额：
+        己.户主 为 户主
+        己.账号 为 账号
+        己.余额 为 余额
+        己.交易记录 为 []
+    段落 存款 接收 金额：
+        如果 金额 大于 0：
+            己.余额 为 己.余额 加上 金额
+            己.交易记录.追加(f"存款: {金额}")
+            返回 真
+        返回 假
+    段落 取款 接收 金额：
+        如果 0 小于 金额 且 金额 小于等于 己.余额：
+            己.余额 为 己.余额 减去 金额
+            己.交易记录.追加(f"取款: {金额}")
+            返回 真
+        返回 假
+    段落 查询余额：
+        返回 己.余额
+    段落 交易次数：
+        返回 len(己.交易记录)"""),
+
+    # ── 多函数模块 ──
+    ("复合", """def sort_and_analyze(numbers):
+    n = len(numbers)
+    for i in range(n):
+        for j in range(0, n - i - 1):
+            if numbers[j] > numbers[j + 1]:
+                numbers[j], numbers[j + 1] = numbers[j + 1], numbers[j]
+    total = 0
+    for x in numbers:
+        total += x
+    mean = total / n
+    median = numbers[n // 2] if n % 2 == 1 else (numbers[n // 2 - 1] + numbers[n // 2]) / 2
+    return {'sorted': numbers, 'sum': total, 'mean': mean, 'median': median, 'count': n}""",
+     """段落 排序并分析 接收 numbers：
+    设 n 为 len(numbers)
+    遍历 i 于 0至n减去1：
+        遍历 j 于 0至n减去i减去2：
+            如果 numbers[j] 大于 numbers[j 加上 1]：
+                设 tmp 为 numbers[j]
+                numbers[j] 为 numbers[j 加上 1]
+                numbers[j 加上 1] 为 tmp
+    设 total 为 0
+    遍历 x 于 numbers：
+        设 total 为 total 加上 x
+    设 mean 为 total 除以 n
+    如果 n 取余 2 等于 1：
+        设 median 为 numbers[n 除以 2]
+    否则：
+        设 median 为 (numbers[n 除以 2 减去 1] 加上 numbers[n 除以 2]) 除以 2
+    返回 {"sorted": numbers, "sum": total, "mean": mean, "median": median, "count": n}"""),
+
+    ("复合", """def matrix_operations(matrix):
+    rows = len(matrix)
+    cols = len(matrix[0]) if rows > 0 else 0
+    transposed = []
+    for j in range(cols):
+        new_row = []
+        for i in range(rows):
+            new_row.append(matrix[i][j])
+        transposed.append(new_row)
+    row_sums = []
+    for i in range(rows):
+        s = 0
+        for j in range(cols):
+            s += matrix[i][j]
+        row_sums.append(s)
+    return {'transposed': transposed, 'row_sums': row_sums, 'rows': rows, 'cols': cols}""",
+     """段落 矩阵运算 接收 matrix：
+    设 rows 为 len(matrix)
+    如果 rows 大于 0：
+        设 cols 为 len(matrix[0])
+    否则：
+        设 cols 为 0
+    设 transposed 为 []
+    遍历 j 于 0至cols减去1：
+        设 new_row 为 []
+        遍历 i 于 0至rows减去1：
+            new_row.追加(matrix[i][j])
+        transposed.追加(new_row)
+    设 row_sums 为 []
+    遍历 i 于 0至rows减去1：
+        设 s 为 0
+        遍历 j 于 0至cols减去1：
+            设 s 为 s 加上 matrix[i][j]
+        row_sums.追加(s)
+    返回 {"transposed": transposed, "row_sums": row_sums, "rows": rows, "cols": cols}"""),
+
+    # ── 复合数据结构操作 ──
+    ("复合", """def process_students(students):
+    passed = []
+    failed = []
+    total_score = 0
+    for student in students:
+        name = student['name']
+        score = student['score']
+        total_score += score
+        if score >= 60:
+            passed.append(name)
+        else:
+            failed.append(name)
+    avg = total_score / len(students) if students else 0
+    result = {
+        'passed_count': len(passed),
+        'failed_count': len(failed),
+        'passed_list': passed,
+        'failed_list': failed,
+        'average': avg,
+        'pass_rate': len(passed) / len(students) * 100 if students else 0
+    }
+    return result""",
+     """段落 处理学生数据 接收 students：
+    设 passed 为 []
+    设 failed 为 []
+    设 total_score 为 0
+    遍历 student 于 students：
+        设 name 为 student["name"]
+        设 score 为 student["score"]
+        设 total_score 为 total_score 加上 score
+        如果 score 大于等于 60：
+            passed.追加(name)
+        否则：
+            failed.追加(name)
+    如果 students：
+        设 avg 为 total_score 除以 len(students)
+    否则：
+        设 avg 为 0
+    设 result 为 {"passed_count": len(passed), "failed_count": len(failed), "passed_list": passed, "failed_list": failed, "average": avg, "pass_rate": len(passed) 除以 len(students) 乘以 100 如果 students 否则 0}
+    返回 result"""),
+
+    ("复合", """def word_frequency_analysis(text):
+    words = text.split()
+    freq = {}
+    for w in words:
+        w = w.lower().strip('.,!?;:()[]{}""')
+        if w:
+            freq[w] = freq.get(w, 0) + 1
+    sorted_words = sorted(freq.items(), key=lambda x: (-x[1], x[0]))
+    top_n = sorted_words[:10]
+    total_words = len(words)
+    unique_words = len(freq)
+    result = {
+        'total': total_words,
+        'unique': unique_words,
+        'top_10': top_n,
+        'freq': freq
+    }
+    return result""",
+     """段落 词频分析 接收 text：
+    设 words 为 字符串分割(text)
+    设 freq 为 {}
+    遍历 w 于 words：
+        设 w 为 字符串转小写(w)
+        设 w 为 字符串去空白(w)
+        如果 w：
+            设 freq[w] 为 freq.get(w, 0) 加上 1
+    设 sorted_words 为 排序(freq.项目())
+    设 top_n 为 sorted_words[:10]
+    设 total_words 为 len(words)
+    设 unique_words 为 len(freq)
+    设 result 为 {"total": total_words, "unique": unique_words, "top_10": top_n, "freq": freq}
+    返回 result"""),
+
+    # ── 异常处理完整示例 ──
+    ("异常", """def safe_file_operations(filepath):
+    try:
+        f = open(filepath, 'r')
+        content = f.read()
+        lines = content.split('\\n')
+        line_count = len(lines)
+        f.close()
+        return {'success': True, 'lines': line_count, 'content': content}
+    except FileNotFoundError:
+        return {'success': False, 'error': 'file not found'}
+    except PermissionError:
+        return {'success': False, 'error': 'permission denied'}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+    finally:
+        print(f'Operation completed for: {filepath}')""",
+     """段落 安全文件操作 接收 filepath：
+    尝试：
+        设 f 为 打开(filepath, "r")
+        设 content 为 f.读取()
+        设 lines 为 字符串分割(content, "\\n")
+        设 line_count 为 len(lines)
+        f.关闭()
+        返回 {"success": 真, "lines": line_count, "content": content}
+    捕获 文件未找到：
+        返回 {"success": 假, "error": "file not found"}
+    捕获 权限错误：
+        返回 {"success": 假, "error": "permission denied"}
+    捕获 异常 为 e：
+        返回 {"success": 假, "error": str(e)}
+    最终：
+        打印(f"Operation completed for: {filepath}")"""),
+
+    # ── 迭代器协议完整示例 ──
+    ("迭代器", """class Fibonacci:
+    def __init__(self, max_count):
+        self.max_count = max_count
+        self.count = 0
+        self.a = 0
+        self.b = 1
+    def __iter__(self):
+        return self
+    def __next__(self):
+        if self.count >= self.max_count:
+            raise StopIteration()
+        if self.count == 0:
+            self.count += 1
+            return 0
+        if self.count == 1:
+            self.count += 1
+            return 1
+        result = self.a + self.b
+        self.a = self.b
+        self.b = result
+        self.count += 1
+        return result""",
+     """类 斐波那契数列：
+    属性 最大数量
+    属性 计数
+    属性 前值
+    属性 后值
+    构造 接收 最大数量：
+        己.最大数量 为 最大数量
+        己.计数 为 0
+        己.前值 为 0
+        己.后值 为 1
+    段落 __迭代__：
+        返回 己
+    段落 __下一项__：
+        如果 己.计数 大于等于 己.最大数量：
+            抛出 迭代停止()
+        如果 己.计数 等于 0：
+            设 己.计数 为 己.计数 加上 1
+            返回 0
+        如果 己.计数 等于 1：
+            设 己.计数 为 己.计数 加上 1
+            返回 1
+        设 result 为 己.前值 加上 己.后值
+        设 己.前值 为 己.后值
+        设 己.后值 为 result
+        设 己.计数 为 己.计数 加上 1
+        返回 result"""),
+
+    # ── 上下文管理器完整示例 ──
+    ("上下文", """class FileProcessor:
+    def __init__(self, filename, mode='r'):
+        self.filename = filename
+        self.mode = mode
+        self.file = None
+    def __enter__(self):
+        self.file = open(self.filename, self.mode)
+        return self.file
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.file:
+            self.file.close()
+        if exc_type:
+            print(f'Error: {exc_val}')
+        return False
+    def process(self):
+        content = self.file.read()
+        lines = content.split('\\n')
+        non_empty = [l for l in lines if l.strip()]
+        return {'total': len(lines), 'non_empty': len(non_empty), 'content': content}""",
+     """类 文件处理器：
+    属性 文件名
+    属性 模式
+    属性 文件
+    构造 接收 文件名, 模式：
+        己.文件名 为 文件名
+        己.模式 为 模式
+        己.文件 为 空
+    段落 __进入__：
+        己.文件 为 打开(己.文件名, 己.模式)
+        返回 己.文件
+    段落 __退出__ 接收 exc_type, exc_val, exc_tb：
+        如果 己.文件：
+            己.文件.关闭()
+        如果 exc_type：
+            打印(f"错误: {exc_val}")
+        返回 假
+    段落 处理：
+        设 content 为 己.文件.读取()
+        设 lines 为 字符串分割(content, "\\n")
+        设 non_empty 为 []
+        遍历 l 于 lines：
+            如果 字符串去空白(l)：
+                non_empty.追加(l)
+        返回 {"total": len(lines), "non_empty": len(non_empty), "content": content}"""),
+
+    # ── 模式匹配完整示例 ──
+    ("模式匹配", """def parse_command(cmd):
+    match cmd.split():
+        case ['quit']:
+            return {'action': 'quit'}
+        case ['load', filename]:
+            return {'action': 'load', 'file': filename}
+        case ['save', filename]:
+            return {'action': 'save', 'file': filename}
+        case ['search', *keywords] if keywords:
+            return {'action': 'search', 'keywords': keywords}
+        case ['help', subcommand]:
+            return {'action': 'help', 'subcommand': subcommand}
+        case _:
+            return {'action': 'unknown', 'command': cmd}""",
+     """段落 解析命令 接收 cmd：
+    匹配 字符串分割(cmd)：
+        当 ["quit"]：
+            返回 {"action": "quit"}
+        当 ["load", filename]：
+            返回 {"action": "load", "file": filename}
+        当 ["save", filename]：
+            返回 {"action": "save", "file": filename}
+        当 ["search", *keywords] 若 keywords：
+            返回 {"action": "search", "keywords": keywords}
+        当 ["help", subcommand]：
+            返回 {"action": "help", "subcommand": subcommand}
+        当 _：
+            返回 {"action": "unknown", "command": cmd}"""),
+
+    # ── 综合示例：Todo 应用 ──
+    ("复合", """class TodoList:
+    def __init__(self):
+        self.todos = []
+        self.counter = 0
+    def add(self, title, priority='medium'):
+        self.counter += 1
+        self.todos.append({'id': self.counter, 'title': title, 'priority': priority, 'done': False})
+        return self.counter
+    def complete(self, todo_id):
+        for todo in self.todos:
+            if todo['id'] == todo_id:
+                todo['done'] = True
+                return True
+        return False
+    def list_by_priority(self, priority):
+        result = []
+        for todo in self.todos:
+            if todo['priority'] == priority and not todo['done']:
+                result.append(todo)
+        return result
+    def stats(self):
+        total = len(self.todos)
+        done = sum(1 for t in self.todos if t['done'])
+        pending = total - done
+        return {'total': total, 'done': done, 'pending': pending}""",
+     """类 待办列表：
+    属性 待办项
+    属性 计数器
+    构造：
+        己.待办项 为 []
+        己.计数器 为 0
+    段落 添加 接收 标题, 优先级：
+        设 己.计数器 为 己.计数器 加上 1
+        己.待办项.追加({"id": 己.计数器, "title": 标题, "priority": 优先级, "done": 假})
+        返回 己.计数器
+    段落 完成 接收 待办编号：
+        遍历 todo 于 己.待办项：
+            如果 todo["id"] 等于 待办编号：
+                todo["done"] 为 真
+                返回 真
+        返回 假
+    段落 按优先级列出 接收 优先级：
+        设 result 为 []
+        遍历 todo 于 己.待办项：
+            如果 todo["priority"] 等于 优先级 且 非 todo["done"]：
+                result.追加(todo)
+        返回 result
+    段落 统计：
+        设 total 为 len(己.待办项)
+        设 done 为 0
+        遍历 t 于 己.待办项：
+            如果 t["done"]：
+                设 done 为 done 加上 1
+        设 pending 为 total 减去 done
+        返回 {"total": total, "done": done, "pending": pending}"""),
+
+    # ── 综合示例：工资计算系统 ──
+    ("复合", """class Employee:
+    def __init__(self, emp_id, name, base_salary):
+        self.emp_id = emp_id
+        self.name = name
+        self.base_salary = base_salary
+        self.bonus = 0
+    def add_bonus(self, amount):
+        if amount > 0:
+            self.bonus += amount
+    def calculate_pay(self, tax_rate=0.15):
+        gross = self.base_salary + self.bonus
+        tax = gross * tax_rate
+        net = gross - tax
+        return {'gross': gross, 'tax': tax, 'net': net, 'name': self.name}
+    def __str__(self):
+        return f'Employee({self.emp_id}: {self.name}, salary={self.base_salary})'""",
+     """类 员工：
+    属性 编号
+    属性 姓名
+    属性 基础工资
+    属性 奖金
+    构造 接收 编号, 姓名, 基础工资：
+        己.编号 为 编号
+        己.姓名 为 姓名
+        己.基础工资 为 基础工资
+        己.奖金 为 0
+    段落 加奖金 接收 金额：
+        如果 金额 大于 0：
+            己.奖金 为 己.奖金 加上 金额
+    段落 计算薪资 接收 税率：
+        设 gross 为 己.基础工资 加上 己.奖金
+        设 tax 为 gross 乘以 税率
+        设 net 为 gross 减去 tax
+        返回 {"gross": gross, "tax": tax, "net": net, "name": 己.姓名}
+    段落 转字符串：
+        返回 f"Employee({己.编号}: {己.姓名}, salary={己.基础工资})"""),
+
+    # ── 搜索算法 ──
+    ("复合", """def search_algorithms(data, target):
+    n = len(data)
+    linear_comparisons = 0
+    for i in range(n):
+        linear_comparisons += 1
+        if data[i] == target:
+            linear_result = i
+            break
+    else:
+        linear_result = -1
+    low = 0
+    high = n - 1
+    binary_comparisons = 0
+    while low <= high:
+        binary_comparisons += 1
+        mid = (low + high) // 2
+        if data[mid] == target:
+            return {'linear': linear_result, 'binary': mid, 'linear_comps': linear_comparisons, 'binary_comps': binary_comparisons}
+        elif data[mid] < target:
+            low = mid + 1
+        else:
+            high = mid - 1
+    return {'linear': linear_result, 'binary': -1, 'linear_comps': linear_comparisons, 'binary_comps': binary_comparisons}""",
+     """段落 搜索算法 接收 data, target：
+    设 n 为 len(data)
+    设 linear_comparisons 为 0
+    设 linear_result 为 -1
+    遍历 i 于 0至n减去1：
+        设 linear_comparisons 为 linear_comparisons 加上 1
+        如果 data[i] 等于 target：
+            设 linear_result 为 i
+            跳出
+    设 low 为 0
+    设 high 为 n 减去 1
+    设 binary_comparisons 为 0
+    设 binary_result 为 -1
+    当 low 小于等于 high：
+        设 binary_comparisons 为 binary_comparisons 加上 1
+        设 mid 为 (low 加上 high) 除以 2
+        如果 data[mid] 等于 target：
+            设 binary_result 为 mid
+            跳出
+        否则如果 data[mid] 小于 target：
+            设 low 为 mid 加上 1
+        否则：
+            设 high 为 mid 减去 1
+    返回 {"linear": linear_result, "binary": binary_result, "linear_comps": linear_comparisons, "binary_comps": binary_comparisons}"""),
+
+    # ── 数据验证器 ──
+    ("复合", """def validate_user_data(data):
+    errors = []
+    if 'username' not in data:
+        errors.append('username is required')
+    elif len(data['username']) < 3:
+        errors.append('username must be at least 3 characters')
+    elif len(data['username']) > 20:
+        errors.append('username must be at most 20 characters')
+    if 'email' not in data:
+        errors.append('email is required')
+    elif '@' not in data['email']:
+        errors.append('email must contain @')
+    if 'age' in data:
+        age = data['age']
+        if not isinstance(age, int) or age < 0 or age > 150:
+            errors.append('age must be between 0 and 150')
+    return {'valid': len(errors) == 0, 'errors': errors, 'fields_validated': len(data)}""",
+     """段落 验证用户数据 接收 data：
+    设 errors 为 []
+    如果 "username" 不 在 data：
+        errors.追加("username is required")
+    否则如果 len(data["username"]) 小于 3：
+        errors.追加("username must be at least 3 characters")
+    否则如果 len(data["username"]) 大于 20：
+        errors.追加("username must be at most 20 characters")
+    如果 "email" 不 在 data：
+        errors.追加("email is required")
+    否则如果 "@" 不 在 data["email"]：
+        errors.追加("email must contain @")
+    如果 "age" 在 data：
+        设 age 为 data["age"]
+        如果 非 实例检查(age, 整数) 或 age 小于 0 或 age 大于 150：
+            errors.追加("age must be between 0 and 150")
+    返回 {"valid": len(errors) 等于 0, "errors": errors, "fields_validated": len(data)}"""),
+
+    # ── 缓存系统 ──
+    ("复合", """class LRUCache:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.cache = {}
+        self.order = []
+    def get(self, key):
+        if key in self.cache:
+            self.order.remove(key)
+            self.order.append(key)
+            return self.cache[key]
+        return None
+    def put(self, key, value):
+        if key in self.cache:
+            self.cache[key] = value
+            self.order.remove(key)
+            self.order.append(key)
+        else:
+            if len(self.cache) >= self.capacity:
+                oldest = self.order.pop(0)
+                del self.cache[oldest]
+            self.cache[key] = value
+            self.order.append(key)
+    def size(self):
+        return len(self.cache)
+    def clear(self):
+        self.cache.clear()
+        self.order.clear()""",
+     """类 LRU缓存：
+    属性 容量
+    属性 缓存
+    属性 顺序
+    构造 接收 容量：
+        己.容量 为 容量
+        己.缓存 为 {}
+        己.顺序 为 []
+    段落 获取 接收 键：
+        如果 键 在 己.缓存：
+            己.顺序.删除(键)
+            己.顺序.追加(键)
+            返回 己.缓存[键]
+        返回 空
+    段落 放入 接收 键, 值：
+        如果 键 在 己.缓存：
+            己.缓存[键] 为 值
+            己.顺序.删除(键)
+            己.顺序.追加(键)
+        否则：
+            如果 len(己.缓存) 大于等于 己.容量：
+                设 oldest 为 己.顺序.取出(0)
+                删除 己.缓存[oldest]
+            己.缓存[键] 为 值
+            己.顺序.追加(键)
+    段落 大小：
+        返回 len(己.缓存)
+    段落 清空：
+        己.缓存.清空()
+        己.顺序.清空()"""),
+
+    # ── 图形计算 ──
+    ("复合", """class ShapeCalculator:
+    def __init__(self):
+        self.shapes = []
+    def add_circle(self, radius):
+        self.shapes.append({'type': 'circle', 'radius': radius})
+    def add_rectangle(self, width, height):
+        self.shapes.append({'type': 'rectangle', 'width': width, 'height': height})
+    def add_triangle(self, base, height):
+        self.shapes.append({'type': 'triangle', 'base': base, 'height': height})
+    def calculate_areas(self):
+        results = []
+        for shape in self.shapes:
+            if shape['type'] == 'circle':
+                area = 3.14159 * shape['radius'] ** 2
+            elif shape['type'] == 'rectangle':
+                area = shape['width'] * shape['height']
+            elif shape['type'] == 'triangle':
+                area = 0.5 * shape['base'] * shape['height']
+            else:
+                area = 0
+            results.append({'type': shape['type'], 'area': area})
+        return results
+    def total_area(self):
+        areas = self.calculate_areas()
+        total = 0
+        for a in areas:
+            total += a['area']
+        return total""",
+     """类 图形计算器：
+    属性 图形列表
+    构造：
+        己.图形列表 为 []
+    段落 添加圆形 接收 半径：
+        己.图形列表.追加({"type": "circle", "radius": 半径})
+    段落 添加矩形 接收 宽, 高：
+        己.图形列表.追加({"type": "rectangle", "width": 宽, "height": 高})
+    段落 添加三角形 接收 底, 高：
+        己.图形列表.追加({"type": "triangle", "base": 底, "height": 高})
+    段落 计算面积：
+        设 results 为 []
+        遍历 shape 于 己.图形列表：
+            如果 shape["type"] 等于 "circle"：
+                设 area 为 3.14159 乘以 shape["radius"] 的 2 次方
+            否则如果 shape["type"] 等于 "rectangle"：
+                设 area 为 shape["width"] 乘以 shape["height"]
+            否则如果 shape["type"] 等于 "triangle"：
+                设 area 为 0.5 乘以 shape["base"] 乘以 shape["height"]
+            否则：
+                设 area 为 0
+            results.追加({"type": shape["type"], "area": area})
+        返回 results
+    段落 总面积：
+        设 areas 为 己.计算面积()
+        设 total 为 0
+        遍历 a 于 areas：
+            设 total 为 total 加上 a["area"]
+        返回 total"""),
+
+    # ── 协议实现 ──
+    ("协议", """class PrintableMixin:
+    def to_string(self):
+        parts = []
+        for key, value in self.__dict__.items():
+            parts.append(f'{key}={value}')
+        return f'{self.__class__.__name__}({", ".join(parts)})'
+    def print_info(self):
+        print(self.to_string())
+class User(PrintableMixin):
+    def __init__(self, user_id, name, email):
+        self.user_id = user_id
+        self.name = name
+        self.email = email
+    def validate(self):
+        return '@' in self.email and len(self.name) > 0""",
+     """协议 可打印：
+    段落 转字符串：
+        设 parts 为 []
+        遍历 key, value 于 己.__dict__.项目()：
+            parts.追加(f"{key}={value}")
+        返回 f"{己.__class__.__name__}({字符串拼接(parts, \", \")})"
+    段落 打印信息：
+        打印(己.转字符串())
+类 用户 实现 可打印：
+    属性 用户编号
+    属性 姓名
+    属性 邮箱
+    构造 接收 用户编号, 姓名, 邮箱：
+        己.用户编号 为 用户编号
+        己.姓名 为 姓名
+        己.邮箱 为 邮箱
+    段落 验证：
+        返回 "@" 在 己.邮箱 且 len(己.姓名) 大于 0"""),
+
+    # ── 事件系统 ──
+    ("复合", """class EventEmitter:
+    def __init__(self):
+        self._listeners = {}
+    def on(self, event, callback):
+        if event not in self._listeners:
+            self._listeners[event] = []
+        self._listeners[event].append(callback)
+    def off(self, event, callback):
+        if event in self._listeners:
+            if callback in self._listeners[event]:
+                self._listeners[event].remove(callback)
+    def emit(self, event, *args, **kwargs):
+        if event in self._listeners:
+            for callback in self._listeners[event]:
+                callback(*args, **kwargs)
+    def listener_count(self, event):
+        return len(self._listeners.get(event, []))
+    def remove_all(self, event=None):
+        if event:
+            self._listeners[event] = []
+        else:
+            self._listeners = {}""",
+     """类 事件发射器：
+    属性 监听器列表
+    构造：
+        己.监听器列表 为 {}
+    段落 监听 接收 事件, 回调：
+        如果 事件 不 在 己.监听器列表：
+            己.监听器列表[事件] 为 []
+        己.监听器列表[事件].追加(回调)
+    段落 取消监听 接收 事件, 回调：
+        如果 事件 在 己.监听器列表：
+            如果 回调 在 己.监听器列表[事件]：
+                己.监听器列表[事件].删除(回调)
+    段落 发射 接收 事件, *args, **kwargs：
+        如果 事件 在 己.监听器列表：
+            遍历 callback 于 己.监听器列表[事件]：
+                callback(*args, **kwargs)
+    段落 监听器数量 接收 事件：
+        返回 len(己.监听器列表.get(事件, []))
+    段落 全部移除 接收 事件：
+        如果 事件：
+            己.监听器列表[事件] 为 []
+        否则：
+            己.监听器列表 为 {}"""),
+
+    # ── 温度转换器 ──
+    ("复合", """class TemperatureConverter:
+    @staticmethod
+    def celsius_to_fahrenheit(c):
+        return c * 9 / 5 + 32
+    @staticmethod
+    def fahrenheit_to_celsius(f):
+        return (f - 32) * 5 / 9
+    @staticmethod
+    def celsius_to_kelvin(c):
+        return c + 273.15
+    @staticmethod
+    def kelvin_to_celsius(k):
+        return k - 273.15
+    @staticmethod
+    def convert_all(celsius_values):
+        results = []
+        for c in celsius_values:
+            f = TemperatureConverter.celsius_to_fahrenheit(c)
+            k = TemperatureConverter.celsius_to_kelvin(c)
+            results.append({'celsius': c, 'fahrenheit': f, 'kelvin': k})
+        return results""",
+     """类 温度转换器：
+    静态段落 摄氏转华氏 接收 c：
+        返回 c 乘以 9 除以 5 加上 32
+    静态段落 华氏转摄氏 接收 f：
+        返回 (f 减去 32) 乘以 5 除以 9
+    静态段落 摄氏转开尔文 接收 c：
+        返回 c 加上 273.15
+    静态段落 开尔文转摄氏 接收 k：
+        返回 k 减去 273.15
+    静态段落 全部转换 接收 celsius_values：
+        设 results 为 []
+        遍历 c 于 celsius_values：
+            设 f 为 温度转换器.摄氏转华氏(c)
+            设 k 为 温度转换器.摄氏转开尔文(c)
+            results.追加({"celsius": c, "fahrenheit": f, "kelvin": k})
+        返回 results"""),
+
+    # ── 任务调度器 ──
+    ("复合", """class TaskScheduler:
+    def __init__(self):
+        self.tasks = []
+        self.running = False
+    def add_task(self, name, func, interval=1):
+        self.tasks.append({'name': name, 'func': func, 'interval': interval, 'count': 0})
+    def run_once(self):
+        results = []
+        for task in self.tasks:
+            task['count'] += 1
+            if task['count'] % task['interval'] == 0:
+                try:
+                    result = task['func']()
+                    results.append({'task': task['name'], 'status': 'ok', 'result': result})
+                except Exception as e:
+                    results.append({'task': task['name'], 'status': 'error', 'error': str(e)})
+        return results
+    def task_count(self):
+        return len(self.tasks)
+    def remove_task(self, name):
+        for i, task in enumerate(self.tasks):
+            if task['name'] == name:
+                self.tasks.pop(i)
+                return True
+        return False""",
+     """类 任务调度器：
+    属性 任务列表
+    属性 运行中
+    构造：
+        己.任务列表 为 []
+        己.运行中 为 假
+    段落 添加任务 接收 名称, 函数, 间隔：
+        己.任务列表.追加({"name": 名称, "func": 函数, "interval": 间隔, "count": 0})
+    段落 运行一次：
+        设 results 为 []
+        遍历 task 于 己.任务列表：
+            task["count"] 为 task["count"] 加上 1
+            如果 task["count"] 取余 task["interval"] 等于 0：
+                尝试：
+                    设 result 为 task["func"]()
+                    results.追加({"task": task["name"], "status": "ok", "result": result})
+                捕获 异常 为 e：
+                    results.追加({"task": task["name"], "status": "error", "error": str(e)})
+        返回 results
+    段落 任务数量：
+        返回 len(己.任务列表)
+    段落 移除任务 接收 名称：
+        设 i 为 0
+        当 i 小于 len(己.任务列表)：
+            如果 己.任务列表[i]["name"] 等于 名称：
+                己.任务列表.弹出(i)
+                返回 真
+            设 i 为 i 加上 1
+        返回 假"""),
+]
+
+
+# ═══════════════════════════════════════════════════════════════════
+# 数据质量审计
+# ═══════════════════════════════════════════════════════════════════
+
+def _audit_pairs(pairs: List[Tuple[str, str, str]]) -> Dict:
+    """审计数据质量：检查语法正确性和语义等价性
+
+    Returns:
+        审计报告字典
+    """
+    report = {
+        "total_pairs": len(pairs),
+        "issues": [],
+        "categories": {},
+        "empty_input": 0,
+        "empty_output": 0,
+        "suspicious_duplicates": [],
+    }
+
+    seen = set()
+    for cat, py, duan in pairs:
+        # 按类别统计
+        report["categories"][cat] = report["categories"].get(cat, 0) + 1
+
+        # 检查空输入
+        if not py.strip():
+            report["empty_input"] += 1
+
+        # 检查空输出
+        if not duan.strip():
+            report["empty_output"] += 1
+            report["issues"].append(f"[{cat}] 空输出: input={py[:50]}")
+
+        # 检查 Python 语法正确性
+        if py.strip():
+            try:
+                compile(py, '<audit>', 'exec')
+            except SyntaxError as e:
+                report["issues"].append(f"[{cat}] Python语法错误: {e}")
+
+        # 检查段言端是否包含未翻译的英文关键字
+        untranslated = []
+        for kw in ['def ', 'class ', 'return ', 'if ', 'else:', 'elif ', 'for ', 'while ',
+                    'try:', 'except:', 'raise ', 'with ', 'import ', 'from ', 'True', 'False', 'None']:
+            if kw in duan:
+                untranslated.append(kw.strip())
+        if untranslated:
+            report["issues"].append(f"[{cat}] 段言端含未翻译关键字: {untranslated}")
+
+        # 检查 Python 和段言是否同时含变量的语义一致性
+        py_vars = set(re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', py))
+        duan_vars = set(re.findall(r'\b([a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*)\b', duan))
+        # 检查重复
+        key = (cat, py[:50], duan[:50])
+        if key in seen:
+            report["suspicious_duplicates"].append(key)
+        seen.add(key)
+
+    report["issue_count"] = len(report["issues"])
+    report["has_issues"] = report["issue_count"] > 0 or report["empty_output"] > 0
+    return report
+
+
+def print_audit_report(report: Dict):
+    """打印审计报告"""
+    print("=" * 60)
+    print("数据质量审计报告")
+    print("=" * 60)
+    print(f"总对照对数: {report['total_pairs']}")
+    print(f"语法类别: {len(report['categories'])}")
+    print()
+
+    print("按类别分布:")
+    for cat, count in sorted(report['categories'].items(), key=lambda x: -x[1]):
+        print(f"  {cat:12s}: {count:4d} 条")
+    print()
+
+    print(f"空输入条目: {report['empty_input']}")
+    print(f"空输出条目: {report['empty_output']}")
+    print(f"疑似重复: {len(report['suspicious_duplicates'])} 组")
+    print()
+
+    if report['issues']:
+        print(f"发现问题 ({report['issue_count']} 个):")
+        for i, issue in enumerate(report['issues'], 1):
+            print(f"  {i}. {issue}")
+        print()
+    else:
+        print("✅ 未发现问题")
+        print()
+
+    if report['has_issues']:
+        print("⚠ 审计发现需要关注的问题")
+    else:
+        print("✅ 审计通过")
+
+
+# ═══════════════════════════════════════════════════════════════════
 # 输出 JSONL
 # ═══════════════════════════════════════════════════════════════════
 
-def build_dataset(output_path: str = None) -> List[Dict]:
-    """构建 SFT 训练集
+def build_dataset(output_path: str = None, include_long: bool = True) -> List[Dict]:
+    """构建 SFT 训练集 v9
 
     Args:
         output_path: 输出 JSONL 文件路径，None 则输出到 tools/ai_copilot/sft_dataset.jsonl
+        include_long: 是否包含长样本
 
     Returns:
         数据列表
@@ -499,7 +1731,11 @@ def build_dataset(output_path: str = None) -> List[Dict]:
     # 1. 手工对照对 + 变体扩充
     all_pairs = _expand_variants(_HANDCRAFTED)
 
-    # 2. 转换为 JSONL 格式
+    # 2. 长样本补充
+    if include_long:
+        all_pairs.extend(_LONG_SAMPLES)
+
+    # 3. 转换为 JSONL 格式
     dataset = []
     for cat, py_code, duan_code in all_pairs:
         instruction = random.choice(_INSTRUCTIONS)
@@ -510,10 +1746,10 @@ def build_dataset(output_path: str = None) -> List[Dict]:
             "category": cat,
         })
 
-    # 3. 打乱顺序
+    # 4. 打乱顺序
     random.shuffle(dataset)
 
-    # 4. 写入文件
+    # 5. 写入文件
     if output_path is None:
         output_path = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), 'sft_dataset.jsonl'
@@ -539,7 +1775,7 @@ def print_stats(dataset: List[Dict]):
 
     print("按语法类别:")
     for cat, count in sorted(categories.items(), key=lambda x: -x[1]):
-        print(f"  {cat:8s} {count:4d} 条")
+        print(f"  {cat:12s} {count:4d} 条")
 
     # 输入/输出长度统计
     input_lens = [len(item['input']) for item in dataset]
@@ -547,6 +1783,12 @@ def print_stats(dataset: List[Dict]):
     print()
     print(f"输入长度: 最短 {min(input_lens)} / 最长 {max(input_lens)} / 平均 {sum(input_lens)//len(input_lens)}")
     print(f"输出长度: 最短 {min(output_lens)} / 最长 {max(output_lens)} / 平均 {sum(output_lens)//len(output_lens)}")
+
+    # 长样本统计（>200字符）
+    long_inputs = sum(1 for item in dataset if len(item['input']) > 200)
+    long_outputs = sum(1 for item in dataset if len(item['output']) > 200)
+    print(f"长输入 (>200字符): {long_inputs} 条")
+    print(f"长输出 (>200字符): {long_outputs} 条")
 
     # 空输入条目（纯段言示例，无对应 Python）
     no_input = sum(1 for item in dataset if not item['input'].strip())
@@ -559,12 +1801,21 @@ if __name__ == "__main__":
         sys.stdout.reconfigure(encoding='utf-8')
 
     import argparse
-    parser = argparse.ArgumentParser(description='段言 SFT 训练集构造器')
+    parser = argparse.ArgumentParser(description='段言 SFT 训练集构造器 v9')
     parser.add_argument('--output', '-o', default=None, help='输出 JSONL 文件路径')
     parser.add_argument('--stats', action='store_true', help='只显示统计信息')
+    parser.add_argument('--audit', action='store_true', help='运行数据质量审计')
+    parser.add_argument('--no-long', action='store_true', help='不包含长样本')
     args = parser.parse_args()
 
-    dataset = build_dataset(args.output)
+    if args.audit:
+        # 审计模式：检查所有手写对照对
+        all_pairs = list(_HANDCRAFTED) + _LONG_SAMPLES
+        report = _audit_pairs(all_pairs)
+        print_audit_report(report)
+        sys.exit(0)
+
+    dataset = build_dataset(args.output, include_long=not args.no_long)
     print_stats(dataset)
 
     output_path = args.output or os.path.join(

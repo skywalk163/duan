@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.1.0] - 2026-08-07
+
+### Added
+- **LLVM 后端 ARM64 交叉编译**: `detect_target_arch()` 自动检测目标架构，`find_clang()` 支持 ARM64 交叉编译器路径检测，`compile_duan_typed()` 和 `compile_duan_project()` 新增 `target` 参数支持
+- **LLVM 优化 Pass 增强**: `get_optimization_flags()` 将 -O0/-O1/-O2/-O3 映射到具体 clang 编译参数，添加 `-mllvm -inline`、`-mllvm -loop-unroll`、`-mllvm -mem2reg` 等优化 Pass，确保 `optimize_level` 参数真正生效
+- **LLVM 接口 vtable 分发**: 运行时新增 `dv_call_interface_method()` 函数实现接口方法的多态分发，在 `codegen_typed.py` 中添加接口方法声明
+- **TypedLLVMCodeGen 目标架构感知**: 新增 `target_arch` 参数，支持根据架构切换数据模型（x86_64 vs aarch64）
+- **AI 工具链升级**: 数据集 v9 扩展（覆盖 v5.0 新特性：协议/模式匹配/迭代器/上下文管理器/异常映射），新增 50+ 长样本，增加数据质量审计函数
+- **py2duan 转译器升级**: 修复链式方法调用，支持新语法（类定义/with 语句/for 循环/三元表达式/类型注解/异常处理/raise 语句），新增 `duan py2duan` CLI 命令
+- **文档站全面升级**: MkDocs 导航重构为「语言参考」「标准库」「教程」「项目」「变更记录」五大分类
+- **交互式教程**: 新增 `docs/tutorials/入门教程.md`（5分钟入门、数据类型与控制流、函数与类）和 `docs/tutorials/进阶教程.md`（FFI与C交互、Web应用开发、并发编程、测试调试），每篇 ≥5 个可执行示例
+- **API 文档自动生成**: `tools/gen_api_docs.py` 从 stdlib/ 和 duanpub/ 源码自动提取函数签名与文档字符串，生成 Markdown API 参考页
+- **贡献指南**: `CONTRIBUTING.md` 包含代码规范、PR 流程、开发环境搭建、测试要求
+- **社区模板**: `.github/ISSUE_TEMPLATE/bug_report.md`、`feature_request.md`、`.github/PULL_REQUEST_TEMPLATE.md`
+- **VS Code 扩展 Marketplace 发布准备**: 新增 `LICENSE`、完善 `package.json`（`publisher`/`icon`/`license`/`repository` 字段）、更新 `version` 为 5.1.0、优化 `.vscodeignore` 减小包体积
+- **文档语法升级**: `docs/examples.md`、`docs/端到端实战教程.md`、`docs/syntax.md` 等核心文档语法示例更新至 v5.0 标准语法（`设`/`段落`/`遍历`）
+- **duanpub 包文档自动生成**: `tools/gen_duanpub_docs.py` 从 `__index__.py` 元数据和桥接模块源码自动提取函数签名与文档字符串，为 109 个包生成分类 API 文档到 `docs/duanpub/`
+- **CLI 包管理命令**: `duan pkg search <keyword>` 搜索 duanpub 包、`duan pkg info <name>` 查看包详情、`duan pkg list --category` 按分类列出包
+- **项目模板系统**: `duan init` 命令支持 cli/web/lib 三种模板，生成标准项目结构含 `duan.json` 配置
+- **CI/CD 跨平台测试**: 测试矩阵扩展至 Python 3.10-3.13 + ubuntu/windows/macos，`continue-on-error` 策略保障非 Linux 平台失败不阻塞流水线
+- **安全审计报告**: `docs/security_audit_report.md` 覆盖依赖安全、硬编码凭据、路径遍历、命令注入、eval/exec 使用等 5 大维度
+
+### Changed
+- **版本号**: 5.0.0 → 5.1.0
+- **文档导航重构**: 按「语言参考」「标准库」「教程」「项目」「变更记录」分类，确保 5 秒内可找到目标
+- **VS Code 扩展版本**: 4.2.0 → 5.1.0
+- **CI 工作流**: `.github/workflows/ci.yml` 从单平台单版本扩展为 3×4 矩阵（3 操作系统 × 4 Python 版本）
+
+### Documentation
+- 新增 `docs/tutorials/入门教程.md` - 面向初学者的交互式教程
+- 新增 `docs/tutorials/进阶教程.md` - 面向有经验的开发者的进阶教程
+- 新增 `docs/api/index.md` - API 文档索引页
+- 新增 `docs/api/builtins.md` - 内置函数 API 参考
+- 新增 `docs/api/stdlib.md` - 标准模块 API 参考
+- 新增 `docs/security_audit_report.md` - 安全审计报告
+- 新增 `CONTRIBUTING.md` - 贡献指南
+- 新增 `docs/duanpub/` 目录 - 109 个 duanpub 包的分类 API 文档
+- 更新 `docs/syntax.md` - 版本号更新至 v5.0，清除过时语法
+- 更新 `docs/examples.md` - 全部示例迁移至 v5.0 语法
+- 更新 `docs/端到端实战教程.md` - 全部示例迁移至 v5.0 语法
+
 ## [5.0.0] - 2026-08-06
 
 ### Added

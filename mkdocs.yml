@@ -63,45 +63,54 @@ nav:
   - 首页: index.md
   - 快速开始: getting-started.md
 
-  - 用户手册:
-      - 概览: USER_MANUAL.md
+  - 📖 语言参考:
       - 语法规范: syntax.md
-      - 标准库: stdlib.md
-      - 案例: examples.md
-
-  - 语言特性:
+      - 完整规范文档: 段言-完整规范文档.md
       - 类系统设计: class_system_design.md
-      - trait/协议系统: interface-design.md
+      - Trait/协议系统: interface-design.md
       - 模式匹配: interface-plan.md
-      - 泛型与类型: superpowers/specs/2026-07-01-level6-type-annotation-design.md
+      - 泛型与类型注解: superpowers/specs/2026-07-01-level6-type-annotation-design.md
       - 模块系统: 模块系统与包管理.md
-      - FFI 设计: ffi.md
-      - 完整规范: 段言-完整规范文档.md
+      - FFI 外部函数接口: ffi.md
+      - 类型推断系统: HM全局类型推断系统.md
+      - 可空类型系统: 可空类型unwrap系统.md
 
-  - 开发指南:
+  - 📚 标准库:
+      - 标准库总览: stdlib.md
+      - API 参考: API_REFERENCE.md
+      - API 文档:
+          - 概述: api/index.md
+      - 内置函数: api/builtins.md
+      - 标准模块: api/stdlib.md
+      - duanpub 生态: duanpub_integration_design.md
+      - duanpub 包文档:
+          - 索引与分类: duanpub/README.md
+          - 核心包 (P0): duanpub/README.md
+          - 全部包列表: duanpub/README.md
+
+  - 🎓 教程:
+      - 30 分钟入门: 30分钟入门段言.md
+      - 入门教程: tutorials/入门教程.md
+      - 进阶教程: tutorials/进阶教程.md
+      - 端到端实战: 端到端实战教程.md
+      - 示例代码: examples.md
+
+  - 🔧 项目:
       - 架构设计: architecture.md
       - 开发指南: DEVELOPMENT_GUIDE.md
       - 项目结构: 项目结构说明.md
-      - API 参考: API_REFERENCE.md
-
-  - 工具链:
-      - 工具总览: tools.md
+      - 工具链总览: tools.md
       - REPL 设计: REPL_DESIGN.md
       - 引导策略: BOOTSTRAP_STRATEGY.md
       - LLVM 后端: llvm_backend_design.md
-
-  - 性能与优化:
       - 性能优化: PERFORMANCE_OPTIMIZATION.md
       - 优化分析: OPTIMIZATION_ANALYSIS.md
-      - 文件 I/O 报告: FILE_IO_REPORT.md
-      - 模块系统验证: MODULE_SYSTEM_VERIFICATION.md
-
-  - 项目计划:
-      - 三个月计划: 三个月工作计划_2026Q3Q4.md
+      - 项目计划: 三个月工作计划_2026Q3Q4.md
       - 进度报告: PROGRESS_REPORT.md
 
-  - 变更记录:
-      - 语言扩展: LANGUAGE_EXTENSIONS.md
+  - 📝 变更记录:
+      - 版本日志: ../CHANGELOG.md
+      - 语言扩展历史: LANGUAGE_EXTENSIONS.md
       - 语法变更:
           - v3.1: 统一语法规范_v3.1.md
           - v3.2: 统一语法规范_v3.2.md

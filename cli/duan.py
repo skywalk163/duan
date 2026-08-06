@@ -17,6 +17,7 @@
   duan compile hello.duan -o out.py  # 编译为 Python
 """
 
+import ast
 import re
 import sys
 import os
@@ -33,7 +34,7 @@ sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
 
-VERSION = '段言编译器 v5.0.0'
+VERSION = '段言编译器 v5.1.0'
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -332,7 +333,8 @@ def _compile_to_exe(py_code: str, exe_path: Path, args):
             if error_msg:
                 # 只显示最后几行关键错误
                 lines = error_msg.strip().split('\n')
-                print(f"PyInstaller 错误:\n{'\n'.join(lines[-10:])}", file=sys.stderr)
+                detail = '\n'.join(lines[-10:])
+                print(f"PyInstaller 错误:\n{detail}", file=sys.stderr)
             raise RuntimeError(f"PyInstaller 打包失败 (exit code {result.returncode})")
 
         # 清理构建文件
@@ -510,24 +512,188 @@ def cmd_init(args):
     print(f"✅ 项目 '{project_name}' 初始化完成")
     print(f"   模板: {template.name} ({template.description})")
     print(f"   目录: {project_dir.resolve()}")
-    print(f"   配置: package.toml")
+    print(f"   配置: duan.json")
     print(f"   入口: 主.duan")
+    print(f"   目录结构:")
+    print(f"     {project_name}/")
+    print(f"     ├── duan.json       项目配置文件")
+    print(f"     ├── 主.duan         入口文件")
+    print(f"     ├── src/            源代码目录")
+    print(f"     └── tests/          测试目录")
     print(f"\n可用命令:")
-    print(f"   duan pkg run                  运行项目")
-    print(f"   duan pkg build                编译项目")
     print(f"   duan run {project_name}/主.duan      直接运行入口")
     print(f"\n可用模板:")
     for t in list_templates():
         print(f"   {t['name']:8} - {t['description']}")
 
 
+def _load_duanpub_index():
+    """加载 duanpub 包索引"""
+    try:
+        from stdlib.duanpub.__index__ import PACKAGES, CATEGORIES, PRIORITY
+        return PACKAGES, CATEGORIES, PRIORITY
+    except ImportError:
+        try:
+            sys.path.insert(0, os.path.join(_PROJECT_DIR, 'stdlib'))
+            from duanpub.__index__ import PACKAGES, CATEGORIES, PRIORITY
+            return PACKAGES, CATEGORIES, PRIORITY
+        except ImportError:
+            return {}, {}, {}
+
+
+CATEGORY_NAMES = {
+    'dev': '开发工具', 'net': '网络通信', 'database': '数据库',
+    'security': '安全加密', 'language': '语言特性', 'media': '多媒体',
+    'graphics': '图形渲染', 'infrastructure': '基础设施', 'output': '输出生成',
+}
+
+
+def cmd_pkg_search(args):
+    """按关键词搜索 duanpub 包"""
+    PACKAGES, _, _ = _load_duanpub_index()
+    keyword = args.keyword.lower()
+    results = []
+
+    for name, info in PACKAGES.items():
+        # 搜索包名
+        if keyword in name.lower():
+            results.append((name, info))
+            continue
+        # 搜索关键词
+        for kw in info.get('keywords', []):
+            if keyword in kw.lower():
+                results.append((name, info))
+                break
+        # 搜索描述
+        if keyword in info.get('description', '').lower():
+            if (name, info) not in results:
+                results.append((name, info))
+
+    if not results:
+        print(f"未找到匹配 '{args.keyword}' 的包")
+        return
+
+    print(f"找到 {len(results)} 个匹配包:")
+    print()
+    for name, info in sorted(results, key=lambda x: x[0]):
+        priority = info.get('priority', '')
+        desc = info.get('description', '')
+        version = info.get('version', '')
+        print(f"  {name:20} v{version:6} [{priority}] {desc}")
+
+
+def cmd_pkg_info(args):
+    """查看包详情"""
+    PACKAGES, _, _ = _load_duanpub_index()
+    pkg_name = args.package_name
+    info = PACKAGES.get(pkg_name)
+
+    if not info:
+        # 尝试模糊匹配
+        matches = [n for n in PACKAGES if pkg_name.lower() in n.lower()]
+        if matches:
+            print(f"未找到包 '{pkg_name}'，您是不是要找：")
+            for m in matches[:5]:
+                print(f"  - {m}")
+        else:
+            print(f"错误: 未找到包 '{pkg_name}'")
+        return
+
+    cat_name = CATEGORY_NAMES.get(info.get('category', ''), info.get('category', '未分类'))
+    print(f"=== {pkg_name} ===")
+    print(f"  描述:     {info.get('description', '')}")
+    print(f"  版本:     {info.get('version', '')}")
+    print(f"  分类:     {cat_name}")
+    print(f"  优先级:   {info.get('priority', '')}")
+    print(f"  函数数:   {info.get('function_count', 0)}")
+    print(f"  FFI 数:   {info.get('ffi_count', 0)}")
+
+    stdlib_eq = info.get('stdlib_equivalent')
+    if stdlib_eq:
+        print(f"  stdlib:   {stdlib_eq}")
+
+    deps = info.get('dependencies', [])
+    if deps:
+        print(f"  依赖:     {', '.join(deps)}")
+
+    keywords = info.get('keywords', [])
+    if keywords:
+        print(f"  关键词:   {', '.join(keywords)}")
+
+    note = info.get('note', '')
+    if note:
+        print(f"  备注:     {note}")
+
+    functions = info.get('functions', [])
+    if functions:
+        print(f"\n  函数列表 ({len(functions)} 个):")
+        for func in functions:
+            print(f"    - {func}")
+
+    print(f"\n  导入方式: 导入 {pkg_name} 或 导入 标准{pkg_name}")
+
+
+def cmd_pkg_list(args):
+    """按类别列出包"""
+    PACKAGES, CATEGORIES, PRIORITY = _load_duanpub_index()
+
+    if args.category:
+        cat_name = CATEGORY_NAMES.get(args.category, args.category)
+        pkg_list = CATEGORIES.get(args.category, [])
+        if not pkg_list:
+            print(f"分类 '{cat_name}' 中没有包")
+            return
+        print(f"=== {cat_name} ({len(pkg_list)} 个包) ===")
+        print()
+        for name in sorted(pkg_list):
+            info = PACKAGES.get(name, {})
+            desc = info.get('description', '')
+            priority = info.get('priority', '')
+            print(f"  {name:20} [{priority}] {desc}")
+    elif args.priority:
+        label = {'P0': '核心包', 'P1': '高频包', 'P2': '扩展包'}.get(args.priority, args.priority)
+        pkg_list = PRIORITY.get(args.priority, [])
+        if not pkg_list:
+            print(f"优先级 '{args.priority}' 中没有包")
+            return
+        print(f"=== {label} ({len(pkg_list)} 个包) ===")
+        print()
+        for name in sorted(pkg_list):
+            info = PACKAGES.get(name, {})
+            desc = info.get('description', '')
+            print(f"  {name:20} {desc}")
+    else:
+        print(f"=== duanpub 包列表 ({len(PACKAGES)} 个包) ===")
+        print()
+        print(f"可用分类: {', '.join(sorted(CATEGORIES.keys()))}")
+        print(f"可用优先级: P0 (核心), P1 (高频), P2 (扩展)")
+        print()
+        print(f"用法: duan pkg list --category <分类名>")
+        print(f"      duan pkg list --priority P0")
+        print(f"      duan pkg search <关键词>")
+
+
 def cmd_pkg(args):
-    """包管理子命令（统一入口：init/build/run/native）"""
+    """包管理子命令（统一入口：init/build/run/native/search/info/list）"""
+    pkg_command = getattr(args, 'pkg_command', None)
+
+    # 搜索/信息/列表命令直接处理
+    if pkg_command == 'search':
+        cmd_pkg_search(args)
+        return
+    elif pkg_command == 'info':
+        cmd_pkg_info(args)
+        return
+    elif pkg_command == 'list':
+        cmd_pkg_list(args)
+        return
+
+    # 其余命令需要 PackageManager
     from package_manager import PackageManager
 
     project_root = Path(getattr(args, 'project', None) or '.').resolve()
 
-    if args.pkg_command == 'init':
+    if pkg_command == 'init':
         name = args.name
         if name:
             # 在 ./name/ 子目录下初始化
@@ -635,6 +801,41 @@ def cmd_publish(args):
     """发布段言段件"""
     from package_installer import run_publish
     run_publish(args)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# py2duan 转译命令
+# ═══════════════════════════════════════════════════════════════════
+
+def cmd_py2duan(args):
+    """将 Python 代码转译为段言代码"""
+    _AI_DIR = os.path.join(_PROJECT_DIR, 'tools', 'ai_copilot')
+    sys.path.insert(0, _AI_DIR)
+
+    from py2duan_transpiler import Py2DuanTranspiler, TranspileError, FeatureUsageCollector
+
+    if args.file:
+        with open(args.file, 'r', encoding='utf-8') as f:
+            code = f.read()
+    else:
+        code = sys.stdin.read()
+
+    if args.stats:
+        collector = FeatureUsageCollector()
+        tree = compile(code, '<input>', 'exec', ast.PyCF_ONLY_AST)
+        collector.visit(tree)
+        print("Python 特性统计:")
+        for line in collector.get_report_lines():
+            print(line)
+        return
+
+    transpiler = Py2DuanTranspiler()
+    try:
+        result = transpiler.transpile(code)
+        print(result)
+    except TranspileError as e:
+        print(f"转译错误: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -871,7 +1072,7 @@ def main():
                         default='default', help='项目模板（默认: default）')
 
     # ── pkg ──
-    pkg_p = subparsers.add_parser('pkg', help='包管理（init/build/run/native）')
+    pkg_p = subparsers.add_parser('pkg', help='包管理（init/build/run/native/search/info/list）')
     pkg_p.add_argument('--project', '-p', default='.', help='项目根目录（默认: 当前目录）')
     pkg_sub = pkg_p.add_subparsers(dest='pkg_command', help='包管理子命令')
 
@@ -885,6 +1086,19 @@ def main():
     pkg_native = pkg_sub.add_parser('native', help='使用 LLVM 后端编译为原生可执行文件')
     pkg_native.add_argument('-o', '--output', default=None, help='输出文件路径')
     pkg_native.add_argument('-v', '--verbose', action='store_true', help='详细输出')
+
+    # ── pkg search ──
+    pkg_search = pkg_sub.add_parser('search', help='搜索 duanpub 包')
+    pkg_search.add_argument('keyword', help='搜索关键词（包名/描述/关键词）')
+
+    # ── pkg info ──
+    pkg_info = pkg_sub.add_parser('info', help='查看 duanpub 包详情')
+    pkg_info.add_argument('package_name', help='包名')
+
+    # ── pkg list ──
+    pkg_list = pkg_sub.add_parser('list', help='列出 duanpub 包')
+    pkg_list.add_argument('--category', '-c', default=None, help='按分类筛选（dev/net/database/security/language 等）')
+    pkg_list.add_argument('--priority', '-p', default=None, choices=['P0', 'P1', 'P2'], help='按优先级筛选')
 
     # ── ai ──
     ai_p = subparsers.add_parser('ai', help='AI Copilot 辅助工具（算力不足场景下的段言代码生成）')
@@ -973,6 +1187,11 @@ def main():
     tutorial_p.add_argument('--step', action='store_true', help='逐步运行（每节暂停）')
     tutorial_p.add_argument('--repl', action='store_true', help='交互式练习模式')
 
+    # ── py2duan ──
+    py2duan_p = subparsers.add_parser('py2duan', help='将 Python 代码转译为段言代码')
+    py2duan_p.add_argument('file', nargs='?', help='Python 源文件路径（默认从 stdin 读取）')
+    py2duan_p.add_argument('--stats', action='store_true', help='显示 Python 特性统计信息')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1030,6 +1249,9 @@ def main():
         if args.repl:
             sys.argv.append('--repl')
         tutorial_main()
+
+    elif args.command == 'py2duan':
+        cmd_py2duan(args)
 
 
 if __name__ == '__main__':

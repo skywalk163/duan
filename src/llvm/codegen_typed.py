@@ -6,11 +6,27 @@ LLVM 代码生成器 - 类型版 (v3)
 
 from typing import Optional, Tuple, List
 import sys
+import platform as _platform
 import ast_nodes as ast
 try:
     from .codegen import LLVMCodeGen
 except ImportError:
     from codegen import LLVMCodeGen
+
+
+def _detect_target_arch_internal(target_arg: str = None) -> str:
+    """内部目标架构检测函数（避免循环导入）"""
+    if target_arg is None:
+        machine = _platform.machine().lower()
+        if machine in ('aarch64', 'arm64', 'armv8l', 'armv8b'):
+            return 'aarch64'
+        return 'x86_64'
+    target_lower = target_arg.lower().replace('-', '_').replace(' ', '_')
+    if any(t in target_lower for t in ('aarch64', 'arm64', 'armv8')):
+        return 'aarch64'
+    if any(t in target_lower for t in ('x86_64', 'x64', 'amd64', 'x86')):
+        return 'x86_64'
+    return 'x86_64'
 
 
 # LLVM 结构体类型：与 C 端 DuanValue 布局匹配
@@ -45,7 +61,7 @@ _DEBUG_METADATA_KINDS = {
 class TypedLLVMCodeGen(LLVMCodeGen):
     """类型版 LLVM 代码生成器"""
 
-    def __init__(self, target_platform: str = None, debug: bool = False):
+    def __init__(self, target_platform: str = None, target_arch: str = None, debug: bool = False):
         super().__init__()
         self._dv_struct_slots = {}  # 栈上分配的结构体槽位
         self._classes = {}  # 类定义收集：class_name -> ClassDefinition
@@ -67,6 +83,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
         self._coro_resume_point = 0  # 下一个 await 点的编号
         # 目标平台：win32 / linux / darwin，默认根据当前系统判断
         self.target_platform = target_platform or sys.platform
+        # 目标架构：x86_64 / aarch64，默认根据参数或本地架构检测
+        self.target_arch = _detect_target_arch_internal(target_arch) if target_arch else 'x86_64'
         # IR 优化：SSA 值到 slot 指针的缓存，避免冗余 load/store
         self._dv_ssa_to_slot = {}  # dv_ssa_reg -> slot_ptr
         # 调试信息生成（DWARF）
@@ -365,6 +383,8 @@ class TypedLLVMCodeGen(LLVMCodeGen):
             f'declare i32 @dv_register_static_method(ptr, ptr, ptr)',
             f'declare void @dv_call_class_method(ptr, ptr, ptr, ptr, i32)',
             f'declare void @dv_call_static_method(ptr, ptr, ptr, ptr, i32)',
+            # 接口 vtable 分发
+            f'declare i32 @dv_call_interface_method(ptr, ptr, ptr, ptr, ptr, i32)',
             # 异常栈追踪
             f'declare void @dv_stack_push(ptr, ptr, i32)',
             f'declare void @dv_stack_pop()',

@@ -7,8 +7,21 @@
   - cli: 命令行工具
   - lib: 库/包
   - web: Web 应用
+
+每个模板生成 duan.json 配置文件，格式：
+  {
+      "name": "<项目名>",
+      "version": "0.1.0",
+      "description": "<描述>",
+      "dependencies": {},
+      "build": {
+          "entry": "主.duan",
+          "output_dir": "dist"
+      }
+  }
 """
 
+import json
 import os
 from pathlib import Path
 
@@ -24,6 +37,11 @@ class ProjectTemplate:
         """创建项目结构"""
         raise NotImplementedError
 
+    def _write_duan_json(self, project_dir: Path, config: dict):
+        """写入 duan.json 配置文件"""
+        path = project_dir / 'duan.json'
+        path.write_text(json.dumps(config, ensure_ascii=False, indent=4), encoding='utf-8')
+
 
 class DefaultTemplate(ProjectTemplate):
     """默认空项目模板"""
@@ -35,15 +53,16 @@ class DefaultTemplate(ProjectTemplate):
         (project_dir / 'src').mkdir()
         (project_dir / 'tests').mkdir()
 
-        # package.toml
-        pkg_content = f'''[package]
-name = "{project_dir.name}"
-version = "0.1.0"
-description = "段言项目"
-
-[dependencies]
-'''
-        (project_dir / 'package.toml').write_text(pkg_content, encoding='utf-8')
+        self._write_duan_json(project_dir, {
+            "name": project_dir.name,
+            "version": "0.1.0",
+            "description": "段言项目",
+            "dependencies": {},
+            "build": {
+                "entry": "主.duan",
+                "output_dir": "dist"
+            }
+        })
 
         # 主.duan
         main_content = '''# 主程序入口
@@ -62,14 +81,16 @@ class CLITemplate(ProjectTemplate):
         (project_dir / 'src').mkdir()
         (project_dir / 'tests').mkdir()
 
-        pkg_content = f'''[package]
-name = "{project_dir.name}"
-version = "0.1.0"
-description = "段言命令行工具"
-
-[dependencies]
-'''
-        (project_dir / 'package.toml').write_text(pkg_content, encoding='utf-8')
+        self._write_duan_json(project_dir, {
+            "name": project_dir.name,
+            "version": "0.1.0",
+            "description": "段言命令行工具",
+            "dependencies": {},
+            "build": {
+                "entry": "主.duan",
+                "output_dir": "dist"
+            }
+        })
 
         main_content = '''# 命令行工具入口
 导入 系统
@@ -131,14 +152,16 @@ class LibTemplate(ProjectTemplate):
         (project_dir / 'src').mkdir()
         (project_dir / 'tests').mkdir()
 
-        pkg_content = f'''[package]
-name = "{project_dir.name}"
-version = "0.1.0"
-description = "段言库"
-
-[dependencies]
-'''
-        (project_dir / 'package.toml').write_text(pkg_content, encoding='utf-8')
+        self._write_duan_json(project_dir, {
+            "name": project_dir.name,
+            "version": "0.1.0",
+            "description": "段言库",
+            "dependencies": {},
+            "build": {
+                "entry": "主.duan",
+                "output_dir": "dist"
+            }
+        })
 
         main_content = '''# 库入口
 # 导出公共 API
@@ -230,14 +253,16 @@ class WebTemplate(ProjectTemplate):
         (project_dir / 'tests').mkdir()
         (project_dir / 'static').mkdir()
 
-        pkg_content = f'''[package]
-name = "{project_dir.name}"
-version = "0.1.0"
-description = "段言 Web 应用"
-
-[dependencies]
-'''
-        (project_dir / 'package.toml').write_text(pkg_content, encoding='utf-8')
+        self._write_duan_json(project_dir, {
+            "name": project_dir.name,
+            "version": "0.1.0",
+            "description": "段言 Web 应用",
+            "dependencies": {},
+            "build": {
+                "entry": "主.duan",
+                "output_dir": "dist"
+            }
+        })
 
         main_content = '''# Web 应用入口
 导入 网络

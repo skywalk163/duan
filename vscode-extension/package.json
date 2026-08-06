@@ -2,9 +2,18 @@
     "name": "duan",
     "displayName": "段言 DuanLang",
     "description": "段言 (Duan) 编程语言 VS Code 扩展 — 中文编程语言支持，提供语法高亮、自动补全、诊断、格式化等功能",
-    "version": "4.2.0",
+    "version": "5.1.0",
     "publisher": "dumate",
     "license": "MIT",
+    "icon": "icon.png",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/skywalk163/duan.git"
+    },
+    "homepage": "https://skywalk163.github.io/duan",
+    "bugs": {
+        "url": "https://github.com/skywalk163/duan/issues"
+    },
     "engines": {
         "vscode": "^1.70.0"
     },

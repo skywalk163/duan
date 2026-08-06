@@ -32,8 +32,12 @@ except ImportError:
     import ast_nodes as ast
 
 
-def get_exe_extension() -> str:
-    """根据当前平台返回可执行文件后缀"""
+def get_exe_extension(target_arch: str = None) -> str:
+    """根据当前平台返回可执行文件后缀
+
+    Args:
+        target_arch: 目标架构（'x64'/'arm64'/None），None 表示本地架构
+    """
     if sys.platform == 'win32':
         return '.exe'
     return ''
@@ -45,6 +49,109 @@ def _strip_exe_ext(path: str) -> str:
     if ext and path.endswith(ext):
         return path[:-len(ext)]
     return path
+
+
+def detect_target_arch(target_arg: str = None) -> str:
+    """检测目标架构
+
+    根据 --target 参数或 -arch 参数自动选择 x64/ARM64 目标三元组。
+
+    Args:
+        target_arg: 目标架构参数（如 'x86_64'、'aarch64'、'arm64'、'x64'）
+
+    Returns:
+        目标架构字符串：'x86_64' 或 'aarch64'
+    """
+    if target_arg is None:
+        return 'x86_64'
+
+    target_lower = target_arg.lower().replace('-', '_').replace(' ', '_')
+
+    # ARM64 架构匹配
+    if any(t in target_lower for t in ('aarch64', 'arm64', 'armv8')):
+        return 'aarch64'
+
+    # x86_64 架构匹配
+    if any(t in target_lower for t in ('x86_64', 'x64', 'amd64', 'x86')):
+        return 'x86_64'
+
+    # 默认返回本地架构
+    import platform as _platform
+    machine = _platform.machine().lower()
+    if machine in ('aarch64', 'arm64', 'armv8l', 'armv8b'):
+        return 'aarch64'
+    return 'x86_64'
+
+
+def get_target_triple(target_arch: str, target_platform: str = None) -> str:
+    """获取 LLVM 目标三元组
+
+    Args:
+        target_arch: 目标架构（'x86_64'/'aarch64'）
+        target_platform: 目标平台（win32/linux/darwin），None 表示当前平台
+
+    Returns:
+        LLVM 目标三元组字符串
+    """
+    if target_platform is None:
+        target_platform = sys.platform
+
+    os_part = {
+        'win32': 'windows-msvc',
+        'linux': 'linux-gnu',
+        'darwin': 'macosx',
+    }.get(target_platform, 'linux-gnu')
+
+    if target_arch == 'aarch64':
+        if target_platform == 'win32':
+            return 'aarch64-pc-windows-msvc'
+        elif target_platform == 'darwin':
+            return 'arm64-apple-macosx'
+        else:
+            return 'aarch64-unknown-linux-gnu'
+    else:
+        if target_platform == 'win32':
+            return 'x86_64-pc-windows-msvc'
+        elif target_platform == 'darwin':
+            return 'x86_64-apple-macosx'
+        else:
+            return 'x86_64-unknown-linux-gnu'
+
+
+def get_optimization_flags(optimize_level: int) -> list:
+    """根据优化级别返回 clang 编译参数
+
+    将 -O0/-O1/-O2/-O3 映射到对应的 clang 编译参数，
+    并添加 -mllvm 传递的 LLVM Pass 控制参数。
+
+    Args:
+        optimize_level: 优化级别（0-3）
+
+    Returns:
+        clang 编译参数列表
+    """
+    flags = [f'-O{optimize_level}']
+
+    # 根据优化级别添加 LLVM Pass 控制参数
+    if optimize_level >= 1:
+        # -O1 及以上：启用内联、mem2reg（SSA 构建）
+        flags.extend(['-mllvm', '-inline'])
+        flags.extend(['-mllvm', '-mem2reg'])
+
+    if optimize_level >= 2:
+        # -O2 及以上：启用循环展开、合并、GVN
+        flags.extend(['-mllvm', '-loop-unroll'])
+        flags.extend(['-mllvm', '-loop-rotate'])
+        flags.extend(['-mllvm', '-gvn'])
+
+    if optimize_level >= 3:
+        # -O3：启用向量化、SLP、更多循环优化
+        flags.extend(['-mllvm', '-loop-vectorize'])
+        flags.extend(['-mllvm', '-slp-vectorize'])
+        flags.extend(['-mllvm', '-licm'])
+        flags.extend(['-mllvm', '-simplifycfg'])
+
+    return flags
 
 
 def compile_source(source: str, verbose: bool = False) -> str:
@@ -121,7 +228,8 @@ def _run_type_check_on_ast(source: str, module, verbose: bool = False):
             print(f"  [类型检查] 跳过: {e}")
 
 
-def compile_source_typed(source: str, verbose: bool = False, target_platform: str = None, debug: bool = False) -> str:
+def compile_source_typed(source: str, verbose: bool = False, target_platform: str = None,
+                         target_arch: str = None, debug: bool = False) -> str:
     """
     编译段言源码为 LLVM IR 字符串（typed 模式）
 
@@ -129,6 +237,7 @@ def compile_source_typed(source: str, verbose: bool = False, target_platform: st
         source: 段言源码字符串
         verbose: 是否输出详细信息
         target_platform: 目标平台（win32/linux/darwin），默认自动检测
+        target_arch: 目标架构（'x86_64'/'aarch64'），影响数据模型选择
         debug: 是否生成 DWARF 调试信息
 
     Returns:
@@ -155,7 +264,7 @@ def compile_source_typed(source: str, verbose: bool = False, target_platform: st
     if verbose:
         print(f"[3/3] 生成 LLVM IR (typed)...")
 
-    codegen = TypedLLVMCodeGen(target_platform=target_platform, debug=debug)
+    codegen = TypedLLVMCodeGen(target_platform=target_platform, target_arch=target_arch, debug=debug)
     ir = codegen.generate(module)
 
     if verbose:
@@ -190,7 +299,8 @@ def compile_source_to_ir(source: str, output_ll: str = None, verbose: bool = Fal
     return output_ll
 
 
-def compile_duan(source_path: str, output_path: str = None, verbose: bool = False, optimize_level: int = 2, debug: bool = False):
+def compile_duan(source_path: str, output_path: str = None, verbose: bool = False,
+                 target: str = None, optimize_level: int = 2, debug: bool = False):
     """
     编译 .duan 文件为原生可执行文件
 
@@ -198,6 +308,7 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
         source_path: .duan 源文件路径
         output_path: 输出 .exe 路径（默认与源文件同名）
         verbose: 是否输出详细信息
+        target: 目标架构（'x86_64'/'aarch64'/'arm64'），默认本地架构
         optimize_level: 优化级别（0-3），默认 2
         debug: 是否生成 DWARF 调试信息
     """
@@ -207,6 +318,9 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
 
     if verbose:
         print(f"[1/5] 读取源码: {len(source)} 字符")
+
+    # 检测目标架构
+    target_arch = detect_target_arch(target)
 
     # 生成 LLVM IR
     ir = compile_source(source, verbose=verbose)
@@ -224,7 +338,7 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
         print(f"  IR 已写入: {ll_path} ({len(ir)} 字符)")
 
     # 查找 clang
-    clang = find_clang()
+    clang = find_clang(target_arch=target_arch)
     if verbose:
         print(f"  使用编译器: {clang}")
 
@@ -233,14 +347,15 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
     runtime_c = os.path.join(runtime_dir, 'runtime.c')
     runtime_o = base_path + '_runtime.o'
 
-    opt_flag = f'-O{optimize_level}'
+    opt_flags = get_optimization_flags(optimize_level)
+    arch_flags = get_arch_specific_cflags(target_arch)
     debug_flags = ['-g'] if debug else []
 
     if verbose:
         print("[3/6] 编译运行时库...")
 
     result = subprocess.run(
-        [clang, '-c', opt_flag, *debug_flags, runtime_c, '-o', runtime_o],
+        [clang, '-c', *opt_flags, *arch_flags, *debug_flags, runtime_c, '-o', runtime_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -252,18 +367,19 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
 
     ir_o = base_path + '.o'
     result = subprocess.run(
-        [clang, '-c', opt_flag, *debug_flags, ll_path, '-o', ir_o],
+        [clang, '-c', *opt_flags, *arch_flags, *debug_flags, ll_path, '-o', ir_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
         raise RuntimeError(f"IR 编译失败:\n{result.stderr}")
 
     # 链接为 .exe
-    exe_path = base_path + '.exe'
+    exe_ext = get_exe_extension()
+    exe_path = base_path + exe_ext
     if verbose:
         print(f"[5/6] 链接为 .exe...")
 
-    link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+    link_args = [clang, *arch_flags, ir_o, runtime_o, '-o', exe_path]
     if debug:
         link_args.append('-g')
     if not sys.platform.startswith('win'):
@@ -294,7 +410,9 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
     return exe_path
 
 
-def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None, optimize_level: int = 2, debug: bool = False):
+def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool = False,
+                       target_platform: str = None, target: str = None,
+                       optimize_level: int = 2, debug: bool = False):
     """
     编译 .duan 文件为原生可执行文件（typed 模式）
 
@@ -305,6 +423,7 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
         output_path: 输出可执行文件路径（默认与源文件同名）
         verbose: 是否输出详细信息
         target_platform: 目标平台（win32/linux/darwin），默认自动检测
+        target: 目标架构（'x86_64'/'aarch64'/'arm64'），默认本地架构
         optimize_level: 优化级别（0-3），默认 2
         debug: 是否生成 DWARF 调试信息
     """
@@ -314,7 +433,13 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     if verbose:
         print(f"[1/5] 读取源码: {len(source)} 字符")
 
-    ir = compile_source_typed(source, verbose=verbose, target_platform=target_platform, debug=debug)
+    # 检测目标架构
+    target_arch = detect_target_arch(target)
+    if verbose:
+        print(f"  目标架构: {target_arch}")
+
+    ir = compile_source_typed(source, verbose=verbose, target_platform=target_platform,
+                              target_arch=target_arch, debug=debug)
 
     base_path = output_path or source_path.replace('.duan', '')
     base_path = _strip_exe_ext(base_path)
@@ -326,7 +451,8 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     if verbose:
         print(f"  IR 已写入: {ll_path} ({len(ir)} 字符)")
 
-    clang = find_clang()
+    # 根据目标架构查找编译器
+    clang = find_clang(target_arch=target_arch)
     if verbose:
         print(f"  使用编译器: {clang}")
 
@@ -338,14 +464,16 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     runtime_c = os.path.join(runtime_dir, 'runtime_typed.c')
     runtime_o = base_path + '_runtime.o'
 
-    opt_flag = f'-O{optimize_level}'
+    # 使用优化级别对应的编译参数
+    opt_flags = get_optimization_flags(optimize_level)
+    arch_flags = get_arch_specific_cflags(target_arch)
     debug_flags = ['-g'] if debug else []
 
     if verbose:
         print("[3/6] 编译 typed 运行时库...")
 
     result = subprocess.run(
-        [clang, '-c', opt_flag, *debug_flags, runtime_c, '-o', runtime_o],
+        [clang, '-c', *opt_flags, *arch_flags, *debug_flags, runtime_c, '-o', runtime_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -357,7 +485,7 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
 
     ir_o = base_path + '.o'
     result = subprocess.run(
-        [clang, '-c', opt_flag, *debug_flags, ll_path, '-o', ir_o],
+        [clang, '-c', *opt_flags, *arch_flags, *debug_flags, ll_path, '-o', ir_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -369,7 +497,7 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     if verbose:
         print(f"[5/6] 链接为可执行文件...")
 
-    link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+    link_args = [clang, *arch_flags, ir_o, runtime_o, '-o', exe_path]
     if debug:
         link_args.append('-g')
     if not sys.platform.startswith('win'):
@@ -499,10 +627,25 @@ def verify_ir(ll_path: str, verbose: bool = False) -> bool:
         raise
 
 
-def find_clang():
-    """查找 clang 编译器（支持 MSVC 和 MinGW 两种模式）"""
+def find_clang(target_arch: str = None):
+    """查找 clang 编译器（支持 MSVC 和 MinGW 两种模式）
+
+    Args:
+        target_arch: 目标架构（'x86_64'/'aarch64'/None），
+                    指定 ARM64 时会检测交叉编译器
+
+    Returns:
+        clang 可执行文件路径
+    """
     import sys as _sys
-    
+
+    # 如果指定了 ARM64 目标，先尝试查找交叉编译器
+    if target_arch == 'aarch64':
+        arm64_candidates = get_arm64_cross_compiler_candidates()
+        for c in arm64_candidates:
+            if os.path.exists(c):
+                return c
+
     # 常见路径（优先 MinGW，因为它自带 C 标准库头文件）
     candidates = [
         # MinGW-w64 LLVM 工具链（自带 C 标准库）
@@ -526,6 +669,55 @@ def find_clang():
         if os.path.exists(mingw_clang):
             return mingw_clang
     raise RuntimeError("未找到 clang 编译器。请安装 LLVM:\n  Windows: https://github.com/llvm/llvm-project/releases\n  macOS: brew install llvm\n  Linux: sudo apt install clang")
+
+
+def get_arm64_cross_compiler_candidates() -> list:
+    """获取 ARM64 交叉编译器候选路径
+
+    Returns:
+        ARM64 交叉编译器候选路径列表
+    """
+    import sys as _sys
+    if _sys.platform == 'win32':
+        return [
+            # llvm-mingw ARM64 工具链
+            r'c:\traework\duan\llvm-mingw-20240619-ucrt-aarch64\bin\clang.exe',
+            r'c:\traework\duan\llvm-mingw-20240619-ucrt-x86_64\bin\clang.exe',
+            # MSVC ARM64 交叉编译器
+            r'C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Tools\Llvm\bin\clang.exe',
+            # 通用 ARM64 工具链
+            r'E:\Program Files\LLVM\bin\clang.exe',
+            r'C:\Program Files\LLVM\bin\clang.exe',
+        ]
+    elif _sys.platform == 'darwin':
+        return [
+            '/usr/bin/clang',
+            '/usr/local/bin/clang',
+            '/opt/homebrew/bin/clang',
+        ]
+    else:
+        # Linux
+        return [
+            'aarch64-linux-gnu-gcc',
+            'aarch64-linux-gnu-g++',
+            '/usr/bin/aarch64-linux-gnu-gcc',
+            '/usr/bin/clang',
+            '/usr/local/bin/clang',
+        ]
+
+
+def get_arch_specific_cflags(target_arch: str) -> list:
+    """获取架构特定的编译参数
+
+    Args:
+        target_arch: 目标架构（'x86_64'/'aarch64'）
+
+    Returns:
+        架构特定的编译参数列表
+    """
+    if target_arch == 'aarch64':
+        return ['--target=aarch64-linux-gnu']
+    return []
 
 
 def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool = False, target_platform: str = None, debug: bool = False) -> str:
@@ -664,7 +856,9 @@ def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool 
     return ir
 
 
-def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False, target_platform: str = None, optimize_level: int = 2, debug: bool = False):
+def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False,
+                         target_platform: str = None, target: str = None,
+                         optimize_level: int = 2, debug: bool = False):
     """
     编译段言项目为原生可执行文件（支持多模块）
 
@@ -675,9 +869,15 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
         output_path: 输出路径
         verbose: 是否输出详细信息
         target_platform: 目标平台
+        target: 目标架构（'x86_64'/'aarch64'/'arm64'），默认本地架构
         optimize_level: 优化级别（0-3），默认 2
         debug: 是否生成 DWARF 调试信息
     """
+    # 检测目标架构
+    target_arch = detect_target_arch(target)
+    if verbose:
+        print(f"  目标架构: {target_arch}")
+
     try:
         from ..module_resolver import ModuleResolver
     except ImportError:
@@ -723,7 +923,6 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
 
     # 编译所有模块
     ir = compile_modules_typed(sources, main_module=main_name, verbose=verbose, target_platform=target_platform, debug=debug)
-    _ = optimize_level  # 当前未实现，预留参数
 
     # 写入 .ll 文件
     base_path = output_path or source_path.replace('.duan', '')
@@ -736,7 +935,8 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     if verbose:
         print(f"  IR 已写入: {ll_path} ({len(ir)} 字符)")
 
-    clang = find_clang()
+    # 根据目标架构查找编译器
+    clang = find_clang(target_arch=target_arch)
     if verbose:
         print(f"  使用编译器: {clang}")
 
@@ -748,14 +948,16 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     runtime_c = os.path.join(runtime_dir, 'runtime_typed.c')
     runtime_o = base_path + '_runtime.o'
 
-    opt_flag = f'-O{optimize_level}'
+    # 使用优化级别对应的编译参数
+    opt_flags = get_optimization_flags(optimize_level)
+    arch_flags = get_arch_specific_cflags(target_arch)
     debug_flags = ['-g'] if debug else []
 
     if verbose:
         print("[3/5] 编译 typed 运行时库...")
 
     result = subprocess.run(
-        [clang, '-c', opt_flag, *debug_flags, runtime_c, '-o', runtime_o],
+        [clang, '-c', *opt_flags, *arch_flags, *debug_flags, runtime_c, '-o', runtime_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -767,7 +969,7 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
 
     ir_o = base_path + '.o'
     result = subprocess.run(
-        [clang, '-c', opt_flag, *debug_flags, ll_path, '-o', ir_o],
+        [clang, '-c', *opt_flags, *arch_flags, *debug_flags, ll_path, '-o', ir_o],
         capture_output=True, text=True, encoding='utf-8', errors='replace'
     )
     if result.returncode != 0:
@@ -779,7 +981,7 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     if verbose:
         print(f"[5/5] 链接为可执行文件...")
 
-    link_args = [clang, ir_o, runtime_o, '-o', exe_path]
+    link_args = [clang, *arch_flags, ir_o, runtime_o, '-o', exe_path]
     if debug:
         link_args.append('-g')
     if not sys.platform.startswith('win'):
