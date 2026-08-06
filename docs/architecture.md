@@ -232,19 +232,18 @@ class Symbol:
 
 ### 输入
 ```duan
-《加一》段(数):
+段落 加一 接收 数:
     返回 数 加 1
-。
+结束。
 
 打印(加一(5))
 ```
 
 ### Token流
 ```
-KEYWORD(《) IDENTIFIER(加一) KEYWORD(段) ( 
-IDENTIFIER(数) ) : NEWLINE INDENT
+KEYWORD(段落) IDENTIFIER(加一) KEYWORD(接收) IDENTIFIER(数) : NEWLINE INDENT
 KEYWORD(返回) IDENTIFIER(数) OPERATOR(+) NUMBER(1)
-NEWLINE DEDENT
+NEWLINE KEYWORD(结束) PUNCTUATION(。) NEWLINE DEDENT
 ...
 ```
 

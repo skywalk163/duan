@@ -499,11 +499,12 @@ class AstAdapter:
         )
 
     def _convert_list_comprehension(self, node) -> ast.ListComprehension:
+        expr = getattr(node, 'expression', None) or getattr(node, 'element', None)
         return ast.ListComprehension(
-            element=self.convert(getattr(node, 'element', node.expression)) if hasattr(node, 'element') or hasattr(node, 'expression') else ast.Identifier(name='x'),
+            expression=self.convert(expr),
             variable=getattr(node, 'variable', 'x'),
-            iterable=self.convert(getattr(node, 'iterable', ast.Identifier(name='列表'))),
-            condition=None,
+            iterable=self.convert(getattr(node, 'iterable', None)),
+            condition=self.convert(getattr(node, 'condition', None)),
         )
 
     def _convert_pipeline(self, node) -> ast.FunctionCall:
@@ -569,46 +570,83 @@ class AstAdapter:
         )
 
     def _convert_destructure_assignment(self, node) -> ast.DestructuringAssignment:
-        names = []
-        if hasattr(node, 'names'):
-            names = list(node.names)
+        variables = []
+        if hasattr(node, 'variables'):
+            variables = [str(v) for v in node.variables]
+        elif hasattr(node, 'names'):
+            variables = [str(n) for n in node.names]
         elif hasattr(node, 'targets'):
-            names = [str(t) for t in node.targets]
+            variables = [str(t) for t in node.targets]
         return ast.DestructuringAssignment(
-            names=names,
+            variables=variables,
             value=self.convert(getattr(node, 'value', None)),
         )
 
     def _convert_with_stmt(self, node) -> ast.WithStatement:
         return ast.WithStatement(
-            resource=self.convert(getattr(node, 'resource', None)),
-            alias=getattr(node, 'alias', None),
+            context_expr=self.convert(getattr(node, 'context_expr', None)),
+            variable=getattr(node, 'variable', None),
             body=self._to_list_stmts(getattr(node, 'body', [])),
         )
 
     def _convert_dict_literal(self, node) -> ast.DictLiteral:
-        return ast.DictLiteral(elements=self._convert_list(getattr(node, 'elements', [])))
+        # raw AST 的 DictLiteral.entries 为 (key, value) 元组列表；
+        # **展开 用 (None, expr) 表示，需保留给代码生成器
+        raw_entries = getattr(node, 'entries', None) or getattr(node, 'elements', [])
+        entries = []
+        for pair in raw_entries:
+            if isinstance(pair, (tuple, list)) and len(pair) == 2:
+                key, value = pair
+                entries.append((self.convert(key) if key is not None else None,
+                                self.convert(value)))
+            else:
+                entries.append((None, self.convert(pair)))
+        return ast.DictLiteral(entries=entries)
 
-    def _convert_dict_comprehension(self, node) -> ast.ListComprehension:
-        # 简化：映射为列表推导式占位
-        return ast.ListComprehension(
-            element=self.convert(getattr(node, 'element', ast.Identifier(name='x'))),
+    def _convert_dict_comprehension(self, node) -> ast.DictComprehension:
+        return ast.DictComprehension(
+            key_expr=self.convert(getattr(node, 'key_expr', None)),
+            value_expr=self.convert(getattr(node, 'value_expr', None)),
             variable=getattr(node, 'variable', 'x'),
-            iterable=self.convert(getattr(node, 'iterable', ast.Identifier(name='列表'))),
-            condition=None,
+            iterable=self.convert(getattr(node, 'iterable', None)),
+            condition=self.convert(getattr(node, 'condition', None)),
         )
 
     def _convert_match_stmt(self, node) -> ast.MatchStatement:
         cases = []
         for c in getattr(node, 'cases', []):
-            if hasattr(c, 'pattern'):
-                cases.append(ast.MatchCase(
-                    pattern=str(getattr(c.pattern, 'value', c.pattern)) if c.pattern else '未命名',
-                    body=self._to_list_stmts(getattr(c, 'body', [])),
-                ))
+            cases.append(ast.MatchCase(
+                pattern=self._convert_match_pattern(getattr(c, 'pattern', None)),
+                guard=self.convert(getattr(c, 'guard', None)),
+                body=self._to_list_stmts(getattr(c, 'body', [])),
+            ))
         return ast.MatchStatement(
-            target=self.convert(getattr(node, 'target', None)),
+            subject=self.convert(getattr(node, 'subject', None)),
             cases=cases,
+        )
+
+    def _convert_match_pattern(self, pattern) -> ast.MatchPattern:
+        """将 v3 MatchPattern / 字面量转换为 ast_nodes.MatchPattern"""
+        if pattern is None:
+            return None
+        if isinstance(pattern, str):
+            return ast.MatchPattern(kind='string', value=ast.StringLiteral(pattern))
+        if not hasattr(pattern, 'kind'):
+            # 字面量节点（NumberLiteral 等）兜底
+            return ast.MatchPattern(kind='literal', value=pattern)
+        value = getattr(pattern, 'value', None)
+        if isinstance(value, str):
+            value = ast.StringLiteral(value)
+        else:
+            value = self.convert(value)
+        elements = [self._convert_match_pattern(e)
+                    for e in getattr(pattern, 'elements', [])]
+        return ast.MatchPattern(
+            kind=getattr(pattern, 'kind', 'literal'),
+            value=value,
+            elements=elements,
+            type_name=getattr(pattern, 'type_name', ''),
+            binding=getattr(pattern, 'binding', ''),
         )
 
     def _convert_match_case(self, node) -> ast.MatchCase:
@@ -696,6 +734,10 @@ class DuanCompiler:
             'errors': 错误列表,
         }
         """
+        # 重置错误状态（compile 可被重复调用，避免跨会话累积）
+        self.errors = []
+        self._typed_errors = []
+
         # 1) 词法分析
         tokens = self.tokenize(source)
 
@@ -704,7 +746,6 @@ class DuanCompiler:
 
         # 3) AST 适配
         our_ast = self.adapt(raw_ast)
-
         # 4) 优化（默认开启）
         if optimize:
             our_ast = self.optimize_ast(our_ast)
@@ -809,7 +850,7 @@ class DuanCompiler:
         resolver = ModuleDependencyResolver([root])
         entry_name = entry_path.stem
         try:
-            modules = resolver.resolve_all(entry_name, source)
+            modules = resolver.resolve_all(entry_name, source, str(entry_path.parent))
         except Exception as e:
             return {
                 "success": False,

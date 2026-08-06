@@ -1209,17 +1209,19 @@ class UnifiedCodeGenerator:
         # 字典字面量
         elif is_instance(expr, 'DictLiteral'):
             entries = []
-            if hasattr(expr, 'entries'):
-                for entry in expr.entries:
-                    key = self._generate_expr(entry.key)
-                    value = self._generate_expr(entry.value)
-                    entries.append(f"{key}: {value}")
-            elif hasattr(expr, 'elements'):
-                for e in expr.elements:
-                    if hasattr(e, 'key') and hasattr(e, 'value'):
-                        key = self._generate_expr(e.key)
-                        value = self._generate_expr(e.value)
-                        entries.append(f"{key}: {value}")
+            raw = getattr(expr, 'entries', None) or getattr(expr, 'elements', None) or []
+            for entry in raw:
+                if isinstance(entry, (tuple, list)) and len(entry) == 2:
+                    key, value = entry
+                    if key is None:
+                        # **展开（_convert_dict_literal 以 (None, expr) 表示）
+                        entries.append(f"**{self._generate_expr(value)}")
+                    else:
+                        entries.append(f"{self._generate_expr(key)}: {self._generate_expr(value)}")
+                elif hasattr(entry, 'key') and hasattr(entry, 'value'):
+                    entries.append(f"{self._generate_expr(entry.key)}: {self._generate_expr(entry.value)}")
+                else:
+                    entries.append(self._generate_expr(entry))
             return f"{{{', '.join(entries)}}}"
         
         # 范围表达式：1至10 -> range(1, 11), 1到10步2 -> range(1, 11, 2)

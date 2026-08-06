@@ -134,10 +134,11 @@ class Benchmark:
         print("\n" + "=" * 70)
         print("基准测试汇总")
         print("=" * 70)
-        print(f"{'测试项':<30} {'平均(ms)':<10} {'中位数(ms)':<12} {'标准差':<10}")
+        print(f"{'测试项':<30} {'平均(ms)':<10} {'中位数(ms)':<12} {'吞吐(万 token/s)':<16} {'标准差':<10}")
         print("-" * 70)
         for r in sorted(self.results, key=lambda x: x['avg_ms']):
-            print(f"{r['name']:<30} {r['avg_ms']:<10.3f} {r['med_ms']:<12.3f} {r['stdev']:<10.3f}")
+            tp = f"{r['throughput'] / 10000:8.2f}" if r.get('throughput') else "-"
+            print(f"{r['name']:<30} {r['avg_ms']:<10.3f} {r['med_ms']:<12.3f} {tp:<16} {r['stdev']:<10.3f}")
 
 
 # =============================================================================
@@ -150,6 +151,51 @@ def bench_lexer(bm: Benchmark):
     lexer = Lexer()
     bm.measure("Lexer 词法分析（小文件）", lambda: lexer.tokenize(SAMPLE_CODE), 500)
     bm.measure("Lexer 词法分析（大文件）", lambda: lexer.tokenize(LARGE_SAMPLE_CODE), 200)
+
+
+def bench_lexer_throughput(bm: Benchmark):
+    """词法分析 Token/s 吞吐量基准
+
+    测量单位时间内可处理的 token 数量，验证 Lexer 健壮化后
+    吞吐量不低于修改前水平。输出格式：X.XX 万 token/s。
+    """
+    from lexer import Lexer
+
+    def measure_throughput(name, source, iterations=200):
+        lexer = Lexer()
+        # 预热并统计 token 数
+        tokens = lexer.tokenize(source)
+        token_count = len(tokens)
+
+        for _ in range(3):
+            lexer.tokenize(source)
+
+        times = []
+        for _ in range(iterations):
+            start = time.perf_counter()
+            lexer.tokenize(source)
+            end = time.perf_counter()
+            times.append(end - start)
+
+        avg_sec = statistics.mean(times)
+        throughput = token_count / avg_sec  # token/s
+
+        self = bm
+        self.results.append({
+            'name': name,
+            'avg_ms': avg_sec * 1000,
+            'med_ms': statistics.median(times) * 1000,
+            'min_ms': min(times) * 1000,
+            'max_ms': max(times) * 1000,
+            'stdev': statistics.stdev(times) * 1000 if len(times) > 1 else 0,
+            'iterations': iterations,
+            'token_count': token_count,
+            'throughput': throughput,
+        })
+        print(f"  {name:<30}  avg={avg_sec * 1000:8.3f}ms  吞吐={throughput / 10000:8.2f} 万 token/s  (n={iterations}, tokens={token_count})")
+
+    measure_throughput("Lexer 吞吐（小文件）", SAMPLE_CODE, 500)
+    measure_throughput("Lexer 吞吐（大文件 10x）", LARGE_SAMPLE_CODE * 10, 200)
 
 
 def bench_parser(bm: Benchmark):
@@ -248,6 +294,10 @@ def main():
     print("\n[1/4] 词法分析基准")
     print("-" * 50)
     bench_lexer(bm)
+
+    print("\n[1b/4] 词法分析 Token/s 吞吐量基准")
+    print("-" * 50)
+    bench_lexer_throughput(bm)
 
     print("\n[2/4] 语法解析基准")
     print("-" * 50)

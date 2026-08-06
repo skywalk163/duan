@@ -16,10 +16,15 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'stdlib'))
 
 
 def _has_network(timeout=2):
-    """检查网络连接是否可用（尝试连接 httpbin.org）"""
+    """检查网络连接是否可用（尝试连接 httpbin.org）。
+
+    仅当请求成功且返回 2xx/3xx 状态码时视为网络可用；
+    超时、连接失败或 5xx 错误（如 503）均视为不可用，
+    避免在代理/防火墙环境下因 httpbin 不可达而误判。
+    """
     try:
-        urllib.request.urlopen('https://httpbin.org/get', timeout=timeout)
-        return True
+        with urllib.request.urlopen('https://httpbin.org/get', timeout=timeout) as resp:
+            return 200 <= resp.status < 400
     except (urllib.error.URLError, OSError):
         return False
 
@@ -37,6 +42,10 @@ class TestHTTP客户端Bridge(unittest.TestCase):
 
     @unittest.skipIf(not _has_network(), "无网络连接")
     def test_HTTP获取(self):
+        # skipIf 在模块加载时求值，运行时网络状态可能已变化，
+        # 此处再次检查，网络不可用时优雅跳过而非失败
+        if not _has_network():
+            self.skipTest("网络不可用（httpbin.org 不可达）")
         resp = self.mod.HTTP获取('https://httpbin.org/get')
         self.assertEqual(resp.status, 200)
         self.assertTrue(len(resp.body) > 0)

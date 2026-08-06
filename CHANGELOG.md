@@ -5,6 +5,33 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] - 2026-08-06
+
+### Added
+- **FFI 类型系统补齐**: 内存管理 API（`内存分配`/`内存释放`/`指针偏移`）、系统错误处理（`获取系统错误码`/`设系统错误码`/`获取最后错误`/`设最后错误`）
+- **FFI 创建数组支持类对象**: `创建数组()` 函数扩展支持类/结构体对象参数
+- **测试可信度审计**: 全面审计所有测试用例，T01 期望值核实确认非篡改（符合标准数学优先级），ir_verify 测试修复使用 llvmlite 本地验证
+- **duanpub 桥接测试**: 审计 14 个已桥接包测试真实性，确保每包 ≥3 个真实功能测试，65 个测试通过
+- **CLI 稳定性修复**: `duan run` 和 `duan_unified run` 命令验证通过，输出正确
+
+### Changed
+- **附录清理**: 旧语法残留（`examples/advanced.duan`、`examples/hanoi.duan`、`examples/module_demo.duan` 中 `《》段` 语法统一替换为 `段落 接收` 语法）
+- **文档更新**: `docs/architecture.md` 编译流程示例更新至新语法；`docs/FINAL_SUMMARY.md` 版本信息更新至 v4.2.0（含全部 v4.x 里程碑）
+- **临时脚本清理**: 归档 SSH 部署脚本和历史 fix_dataset 脚本至 `archive/` 目录
+- **.gitignore 完善**: 添加 `.coverage`、`archive/`、`tests/archive/`、`lsp/lsp_protocol.py` 忽略规则
+
+### Fixed
+- **工作区未跟踪文件清理**: 解决 208 个未跟踪文件问题，确保工作区整洁
+- **收集错误文件修复**: 验证 `tests/unit/test_collect_errors.py` 功能正常
+- **FFI 分支覆盖率提升**: 从 32% 提升到 59%，新增 17 个测试用例
+- **parser_expr.py 词法合并修复**: 修复 `n乘阶乘` 等紧凑运算符与标识符的合并问题（通过 `user_definitions` 门控）
+
+### Test
+- 全量回归测试 **1865 通过**，0 失败
+- E2E 测试 **73 通过**，0 失败
+- FFI 测试 **46 通过**，0 失败
+- 核心模块覆盖率：lexer.py 82%、duan_parser_v3.py 72%、code_generator.py 54%
+
 ## [4.2.0] - 2026-08-05
 
 ### Added

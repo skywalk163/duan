@@ -99,8 +99,10 @@ class TestStdlib(unittest.TestCase):
         self.assertEqual(output, '3.14')
     
     def test_import_time_format(self):
-        """从《时间》导入《当前日期》"""
-        code = '从《时间》导入《当前日期》。设 日期 为 当前日期()。打印(字符串长度(日期))。'
+        """从《日期时间》导入时间函数（原「时间」模块已并入日期时间）"""
+        code = ('从《日期时间》导入《当前时间戳》，《格式化时间戳》。'
+                '设 日期串 为 格式化时间戳(当前时间戳(), "%Y-%m-%d")。'
+                '打印(字符串长度(日期串))。')
         output = self.compile_and_run(code)
         self.assertEqual(output, '10')  # YYYY-MM-DD
     
@@ -132,10 +134,10 @@ class TestStdlib(unittest.TestCase):
         self.assertTrue(math_path.exists())
         self.assertIn('数学', str(math_path))
         
-        # 应该能找到 时间 模块
-        time_path = resolver.find_module('时间')
+        # 应该能找到 日期时间 模块（原「时间」模块在 P9 标准库合并中并入）
+        time_path = resolver.find_module('日期时间')
         self.assertTrue(time_path.exists())
-        self.assertIn('时间', str(time_path))
+        self.assertIn('日期时间', str(time_path))
         
         # 不存在模块应抛出异常
         with self.assertRaises(ModuleNotFoundError):
@@ -174,7 +176,7 @@ class TestModuleSystem(unittest.TestCase):
         
         resolver = ModuleResolver()
         resolver.parse_module(resolver.find_module('数学'))
-        resolver.parse_module(resolver.find_module('时间'))
+        resolver.parse_module(resolver.find_module('日期时间'))
         
         # 独立模块，排序无顺序要求
         graph = resolver.build_dependency_graph('数学')

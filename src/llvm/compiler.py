@@ -435,6 +435,70 @@ def verify_ir_with_clang(ll_path: str, clang_path: str = None, verbose: bool = F
     return True
 
 
+def verify_ir_with_llvmlite(ll_path: str, verbose: bool = False) -> bool:
+    """使用 llvmlite 本地验证 LLVM IR 文件的语法和结构正确性
+
+    clang 不可用时的替代方案：调用 llvmlite.binding.parse_assembly + verify()
+    做与 clang -x ir 等价的语法/结构验证，不依赖外部工具链。
+
+    Args:
+        ll_path: .ll 文件路径
+        verbose: 是否输出详细信息
+
+    Returns:
+        True 表示验证通过
+
+    Raises:
+        RuntimeError: llvmlite 未安装或 IR 验证失败
+    """
+    try:
+        import llvmlite.binding as _llvm
+    except ImportError:
+        raise RuntimeError(
+            "llvmlite 未安装，且未找到 clang 编译器，无法验证 IR。\n"
+            "请安装 clang（https://llvm.org）或运行 pip install llvmlite。"
+        )
+
+    if verbose:
+        print("  验证 LLVM IR (llvmlite parse_assembly)...")
+
+    try:
+        with open(ll_path, 'r', encoding='utf-8') as f:
+            ir_text = f.read()
+        module = _llvm.parse_assembly(ir_text)
+        module.verify()
+    except Exception as e:  # noqa: BLE001 - 统一转为 RuntimeError 报告
+        raise RuntimeError(f"LLVM IR 验证失败（llvmlite）:\n{e}") from e
+
+    if verbose:
+        print("  IR 验证通过（llvmlite）")
+    return True
+
+
+def verify_ir(ll_path: str, verbose: bool = False) -> bool:
+    """验证 LLVM IR 文件（优先 clang，回退 llvmlite）
+
+    优先使用 clang 验证；clang 不可用时回退到 llvmlite 本地验证，
+    保证 IR 验证在任何环境下都真实执行（而非跳过）。
+
+    Args:
+        ll_path: .ll 文件路径
+        verbose: 是否输出详细信息
+
+    Returns:
+        True 表示验证通过
+
+    Raises:
+        RuntimeError: 两种验证方式均不可用或验证失败
+    """
+    try:
+        return verify_ir_with_clang(ll_path, verbose=verbose)
+    except RuntimeError as e:
+        if "未找到 clang" in str(e):
+            return verify_ir_with_llvmlite(ll_path, verbose=verbose)
+        raise
+
+
 def find_clang():
     """查找 clang 编译器（支持 MSVC 和 MinGW 两种模式）"""
     import sys as _sys

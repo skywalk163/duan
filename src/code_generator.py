@@ -158,6 +158,9 @@ class PythonCodeGenerator:
             '长度': 'len',
             '首': 'lambda x: x[0]',
             '末': 'lambda x: x[-1]',
+            # 可空类型解包（等价于 值!）
+            'unwrap': '_duan_unwrap',
+            '解包': '_duan_unwrap',
             
             # 数学函数（P1-1：补全反向映射）
             '求和': 'sum',
@@ -356,6 +359,7 @@ class PythonCodeGenerator:
         self.output_lines = []
         self.indent_level = 0  # 重置缩进级别，防止跨条目状态污染
         self._user_defined_functions = set()  # 重置用户自定义函数追踪
+        self._ffi_user_types = {}  # 重置 FFI 用户自定义类型注册表
         
         # 添加文件头
         self._add_line("# 由段言编译器生成")
@@ -367,7 +371,7 @@ class PythonCodeGenerator:
         self._add_line("import os")
         self._add_line("import ctypes")
         self._add_line("import stdlib.FFI as _duan_ffi")
-        self._add_line("from typing import Any")
+        self._add_line("from typing import Any, Optional")
         self._add_line("")
         self._add_line("try:")
         self._add_line("    import importlib.util")
@@ -778,7 +782,7 @@ class PythonCodeGenerator:
                 self._add_line(f"_duan_check_type({name}, '{duan_type}', '{stmt.name}')")
     
     def _map_type(self, duan_type: str) -> str:
-        """将段言类型名映射为Python类型名"""
+        """将段言类型名映射为Python类型名（支持泛型尖括号/方括号）"""
         type_map = {
             '整数': 'int',
             '小数': 'float',
@@ -796,7 +800,32 @@ class PythonCodeGenerator:
             '空': 'None',
             '数': 'float',
         }
-        return type_map.get(duan_type, duan_type)
+        stripped = (duan_type or '').strip()
+        # 泛型形式：列表<整数> / 字典<字符串, 小数> / 可选<整数> / 列表[整数]
+        if stripped.endswith('>') or stripped.endswith(']'):
+            open_char = '<' if stripped.endswith('>') else '['
+            bracket = stripped.find(open_char)
+            if bracket > 0:
+                base = stripped[:bracket].strip()
+                args_str = stripped[bracket + 1:-1].strip()
+                if base in ('列表', '列', 'List'):
+                    if args_str:
+                        # 嵌套泛型递归映射：列表<列表<整数>> → list[list[int]]
+                        first_arg = args_str.split(',')[0].strip()
+                        return f"list[{self._map_type(first_arg)}]"
+                    return 'list'
+                if base in ('字典', '典', 'Map'):
+                    return 'dict'
+                if base in ('集合', '集', 'Set'):
+                    return 'set'
+                if base in ('元组', 'Tuple'):
+                    return 'tuple'
+                if base in ('可选', '可空', 'Optional'):
+                    inner = self._map_type(args_str) if args_str else 'Any'
+                    return f"Optional[{inner}]"
+                # 未知泛型基名：退化为基名本身
+                return type_map.get(base, base)
+        return type_map.get(stripped, stripped)
     
     def _generate_if_stmt(self, stmt: IfStmt):
         """生成条件语句"""
@@ -2176,7 +2205,7 @@ class PythonCodeGenerator:
     # C FFI 代码生成方法
     # =========================================================================
 
-    # FFI 类型映射：段言类型 → ctypes 类型
+    # FFI 基本类型映射：段言类型 → ctypes 类型表达式
     _ffi_type_map = {
         '整数': 'ctypes.c_int',
         '小数': 'ctypes.c_double',
@@ -2188,6 +2217,21 @@ class PythonCodeGenerator:
         '数': 'ctypes.c_double',
         '无': 'None',
     }
+
+    # 用户自定义 FFI 类型名 → 生成的 Python 类型表达式
+    # 在 _generate_ffi_struct_def / _union_def / _funcptr_def / _typedef_def 中注册
+    _ffi_user_types: Dict[str, str] = {}
+
+    def _get_ffi_type(self, type_name: str) -> str:
+        """解析 FFI 类型名 → ctypes 类型表达式。
+        优先查找基本类型映射，再查找用户自定义类型。
+        """
+        if type_name in self._ffi_type_map:
+            return self._ffi_type_map[type_name]
+        if type_name in self._ffi_user_types:
+            return self._ffi_user_types[type_name]
+        # 未知类型：回退到 void*
+        return 'ctypes.c_void_p'
 
     def _generate_ffi_load_library(self, stmt: FFILoadLibrary):
         """生成加载动态库代码"""
@@ -2206,12 +2250,12 @@ class PythonCodeGenerator:
         arg_types = []
         for p in stmt.params:
             duan_type = p.get('type', '整数')
-            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            ctype = self._get_ffi_type(duan_type)
             arg_types.append(ctype)
 
         restype = 'None'
         if stmt.return_type:
-            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+            restype = self._get_ffi_type(stmt.return_type)
 
         # 生成 ctypes 函数绑定
         self._add_line(f"# 外部函数声明: {c_name}({', '.join(p['name'] for p in stmt.params)})")
@@ -2259,7 +2303,7 @@ class PythonCodeGenerator:
         fields_code = []
         for f in stmt.fields:
             fname = self._sanitize_name(f['name'])
-            ftype = self._ffi_type_map.get(f['type'], 'ctypes.c_int')
+            ftype = self._get_ffi_type(f['type'])
             fields_code.append(f"('{fname}', {ftype})")
         fields_str = ', '.join(fields_code)
         self._add_line(f"# 外部结构体: {name}")
@@ -2268,6 +2312,10 @@ class PythonCodeGenerator:
         self._add_line(f"_fields_ = [{fields_str}]")
         self.indent_level -= 1
         self._add_line("")
+        # 注册到用户自定义类型表，供后续使用（如作为函数参数/返回类型、嵌套结构体字段）
+        self._ffi_user_types[stmt.name] = name
+        # 也注册到运行时类型注册表，供 获取类型() 在运行时查找
+        self._add_line(f"_duan_ffi.注册类型('{stmt.name}', {name})")
 
     def _generate_ffi_callback_def(self, stmt: FFICallbackDef):
         """生成外部回调类型定义"""
@@ -2275,20 +2323,23 @@ class PythonCodeGenerator:
         arg_types = []
         for p in stmt.params:
             duan_type = p.get('type', '整数')
-            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            ctype = self._get_ffi_type(duan_type)
             arg_types.append(ctype)
         restype = 'None'
         if stmt.return_type:
-            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+            restype = self._get_ffi_type(stmt.return_type)
         arg_types_str = ', '.join(arg_types)
         self._add_line(f"# 外部回调类型: {name}")
         self._add_line(f"{name} = ctypes.CFUNCTYPE({restype}, {arg_types_str})")
         self._add_line("")
+        # 注册回调类型，供函数声明等使用
+        self._ffi_user_types[stmt.name] = name
+        self._add_line(f"_duan_ffi.注册类型('{stmt.name}', {name})")
 
     def _generate_ffi_create_array(self, stmt: FFICreateArray):
         """生成创建数组代码"""
         base_type = stmt.base_type
-        ctype = self._ffi_type_map.get(base_type, 'ctypes.c_int')
+        ctype = self._get_ffi_type(base_type)
         size = self._generate_expr(stmt.size)
         name = self._sanitize_name(stmt.base_type)
         self._add_line(f"# 创建数组: {base_type}[{size}]")
@@ -2356,7 +2407,7 @@ class PythonCodeGenerator:
         fields_code = []
         for f in stmt.fields:
             fname = self._sanitize_name(f['name'])
-            ftype = self._ffi_type_map.get(f['type'], 'ctypes.c_int')
+            ftype = self._get_ffi_type(f['type'])
             fields_code.append(f"('{fname}', {ftype})")
         fields_str = ', '.join(fields_code)
         self._add_line(f"# C联合体: {name}")
@@ -2365,6 +2416,9 @@ class PythonCodeGenerator:
         self._add_line(f"_fields_ = [{fields_str}]")
         self.indent_level -= 1
         self._add_line("")
+        # 注册联合体类型
+        self._ffi_user_types[stmt.name] = name
+        self._add_line(f"_duan_ffi.注册类型('{stmt.name}', {name})")
 
     def _generate_ffi_varargs_decl(self, stmt: FFIVarArgsDecl):
         """生成变长参数函数声明代码"""
@@ -2375,12 +2429,12 @@ class PythonCodeGenerator:
         arg_types = []
         for p in stmt.params:
             duan_type = p.get('type', '整数')
-            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            ctype = self._get_ffi_type(duan_type)
             arg_types.append(ctype)
         
         restype = 'None'
         if stmt.return_type:
-            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+            restype = self._get_ffi_type(stmt.return_type)
         
         self._add_line(f"# 变长参数函数声明: {c_name}")
         self._add_line(f"_{name}_ffi = {library_alias}.{c_name}")
@@ -2433,15 +2487,18 @@ class PythonCodeGenerator:
     def _generate_ffi_typedef_def(self, stmt: FFITypedefDef):
         """生成C类型别名代码"""
         name = self._sanitize_name(stmt.name)
-        base_type = self._ffi_type_map.get(stmt.base_type, stmt.base_type)
+        base_type = self._get_ffi_type(stmt.base_type)
         self._add_line(f"# C类型别名: {name} -> {base_type}")
         self._add_line(f"{name} = {base_type}")
         self._add_line("")
+        # 注册类型别名
+        self._ffi_user_types[stmt.name] = name
+        self._add_line(f"_duan_ffi.注册类型('{stmt.name}', {name})")
 
     def _generate_ffi_bitfield_def(self, stmt: FFIBitfieldDef):
         """生成C位域定义代码"""
         name = self._sanitize_name(stmt.name)
-        base_type = self._ffi_type_map.get(stmt.base_type, 'ctypes.c_int')
+        base_type = self._get_ffi_type(stmt.base_type)
         fields_code = []
         for f in stmt.fields:
             fname = self._sanitize_name(f['name'])
@@ -2461,15 +2518,18 @@ class PythonCodeGenerator:
         arg_types = []
         for p in stmt.params:
             duan_type = p.get('type', '整数')
-            ctype = self._ffi_type_map.get(duan_type, 'ctypes.c_int')
+            ctype = self._get_ffi_type(duan_type)
             arg_types.append(ctype)
         restype = 'None'
         if stmt.return_type:
-            restype = self._ffi_type_map.get(stmt.return_type, 'ctypes.c_int')
+            restype = self._get_ffi_type(stmt.return_type)
         arg_types_str = ', '.join(arg_types) if arg_types else ''
         self._add_line(f"# C函数指针类型: {name}")
         self._add_line(f"{name} = ctypes.CFUNCTYPE({restype}, {arg_types_str})")
         self._add_line("")
+        # 注册函数指针类型
+        self._ffi_user_types[stmt.name] = name
+        self._add_line(f"_duan_ffi.注册类型('{stmt.name}', {name})")
 
     def _generate_ffi_debug_config(self, stmt: FFIDebugConfig):
         """生成FFI调试配置代码"""
@@ -2497,12 +2557,12 @@ class PythonCodeGenerator:
 
     def _generate_ffi_pointer_type(self, expr: FFIPointerType) -> str:
         """生成指针类型表达式：指针[整数] → ctypes.POINTER(ctypes.c_int)"""
-        base_type = self._ffi_type_map.get(expr.base_type, expr.base_type)
+        base_type = self._get_ffi_type(expr.base_type)
         return f"ctypes.POINTER({base_type})"
 
     def _generate_ffi_array_type(self, expr: FFIArrayType) -> str:
         """生成数组类型表达式：数组[整数, 5] → (ctypes.c_int * 5)"""
-        base_type = self._ffi_type_map.get(expr.base_type, expr.base_type)
+        base_type = self._get_ffi_type(expr.base_type)
         if expr.size is not None:
             size = self._generate_expr(expr.size) if isinstance(expr.size, ASTNode) else str(expr.size)
             return f"({base_type} * {size})"

@@ -4,7 +4,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 import unittest
 from llvm.codegen_typed import TypedLLVMCodeGen
-from llvm.compiler import compile_source_typed, verify_ir_with_clang, find_clang
+from llvm.compiler import compile_source_typed, verify_ir_with_clang, verify_ir_with_llvmlite, verify_ir, find_clang
 from llvm.core import LLVMCodeGenCore
 
 
@@ -174,16 +174,17 @@ class TestIRValidationInCodegen(unittest.TestCase):
 
 
 class TestVerifyIRWithClang(unittest.TestCase):
-    """测试 compiler 层的 clang IR 验证"""
+    """测试 compiler 层的 IR 验证（优先 clang，回退 llvmlite）"""
 
     def setUp(self):
+        # 不再因缺少 clang 而 SkipTest：verify_ir 会回退到 llvmlite 本地验证
         try:
             self.clang = find_clang()
         except RuntimeError:
-            raise unittest.SkipTest("未安装 clang 编译器，跳过 clang 验证测试")
+            self.clang = None
 
-    def test_valid_ir_passes_clang_verify(self):
-        """合法 IR 应通过 clang 验证"""
+    def test_valid_ir_passes_verify(self):
+        """合法 IR 应通过验证（clang 或 llvmlite 回退）"""
         source = '打印 "Hello"'
         ir = compile_source_typed(source)
 
@@ -192,8 +193,66 @@ class TestVerifyIRWithClang(unittest.TestCase):
             ll_path = f.name
 
         try:
-            result = verify_ir_with_clang(ll_path, self.clang)
+            result = verify_ir(ll_path)
             self.assertTrue(result)
+        finally:
+            if os.path.exists(ll_path):
+                os.remove(ll_path)
+
+    def test_invalid_ir_fails_verify(self):
+        """非法 IR（未终止基本块）应被验证器拒绝"""
+        bad_ir = (
+            'define void @_seg_bad(ptr %result) {\n'
+            'entry:\n'
+            '  %1 = add i32 1, 2\n'
+            '}\n'
+        )
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.ll', delete=False, encoding='utf-8') as f:
+            f.write(bad_ir)
+            ll_path = f.name
+
+        try:
+            with self.assertRaises(RuntimeError):
+                verify_ir(ll_path)
+        finally:
+            if os.path.exists(ll_path):
+                os.remove(ll_path)
+
+
+class TestVerifyIRWithLlvmlite(unittest.TestCase):
+    """测试 llvmlite 本地验证回退路径（无 clang 环境的关键保障）"""
+
+    def test_llvmlite_valid_ir_passes(self):
+        """合法 IR 应通过 llvmlite 解析验证"""
+        source = '打印 "Hello"'
+        ir = compile_source_typed(source)
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.ll', delete=False, encoding='utf-8') as f:
+            f.write(ir)
+            ll_path = f.name
+
+        try:
+            result = verify_ir_with_llvmlite(ll_path)
+            self.assertTrue(result)
+        finally:
+            if os.path.exists(ll_path):
+                os.remove(ll_path)
+
+    def test_llvmlite_invalid_ir_fails(self):
+        """非法 IR 应被 llvmlite 拒绝"""
+        bad_ir = (
+            'define void @_seg_bad(ptr %result) {\n'
+            'entry:\n'
+            '  %1 = add i32 1, 2\n'
+            '}\n'
+        )
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.ll', delete=False, encoding='utf-8') as f:
+            f.write(bad_ir)
+            ll_path = f.name
+
+        try:
+            with self.assertRaises(RuntimeError):
+                verify_ir_with_llvmlite(ll_path)
         finally:
             if os.path.exists(ll_path):
                 os.remove(ll_path)

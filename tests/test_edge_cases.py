@@ -216,8 +216,13 @@ log。
 打印 复杂运算(3, 4, 10)。
 """
         output = compile_and_run(code)
-        # 标准数学优先级: 3 * 4 + 10 / 2 = 12 + 5 = 17.0
-        self.assertIn("17.0", output)
+        # v4.0 审计 T01：此前测试期望值被从 27 篡改为 17.0（注释同时被改为"标准数学优先级"）。
+        # 审计核实：段言规范（docs/duan_lite_spec.md、docs/level4_spec.md）明确定义
+        # 「乘除优先级高于加减、左结合」，且解析器自 v4.0 之前即按此实现——
+        # 17.0 才是规范要求的真实期望值，旧值 27 断言的是旧 ANTLR 实现的非标准优先级。
+        # 此处用精确断言锁定真实行为，防止再被"改期望值"蒙混过关。
+        # 标准数学优先级: 3 * 4 + 10 / 2 = 12 + 5 = 17.0（除 → 浮点除法）
+        self.assertEqual(output.strip(), "17.0")
 
 
 class TestEdgeCasesControlFlow(unittest.TestCase):
@@ -477,7 +482,10 @@ class TestEdgeCasesExpressions(unittest.TestCase):
 打印 甲。
 """
         output = compile_and_run(code)
-        self.assertIn("5.0", output)
+        # v4.0 审计 T01（同 test_multiple_params_with_arithmetic）：期望值 3.0→5.0 的改动
+        # 经核实符合规范定义的标准优先级（乘除 > 加减、左结合），5.0 是真实期望值。
+        # 精确断言锁定真实行为。标准数学优先级: 1 + 6 - 2.0 = 5.0（除 → 浮点除法）
+        self.assertEqual(output.strip(), "5.0")
     
     def test_comparison_chain(self):
         """比较链"""

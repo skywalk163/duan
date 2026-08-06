@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "duan"
-version = "4.2.0"
+version = "4.3.0"
 description = "段言（Duan）— 中文自然语言编程语言"
 readme = "README.md"
 license = {text = "MIT"}
@@ -81,6 +81,15 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "_test_*.py"]
 addopts = "-v --tb=short --ignore=tests/archive"
 norecursedirs = ["archive", "__pycache__"]
+
+# 覆盖率：聚焦第1月核心语言链路模块（lexer/parser/compiler/类型系统/codegen）
+[tool.coverage.run]
+branch = false
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
 
 [tool.flake8]
 max-line-length = 120

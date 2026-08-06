@@ -826,3 +826,1001 @@ class TestTypeErrorInference:
     def test_error_with_line(self):
         err = TypeErrorInference('错误', line=42)
         assert '42' in str(err)
+
+
+# =============================================================================
+# 10. 泛型尖括号语法（D08 后续 3.2.2 类型系统增强）
+# =============================================================================
+
+class TestGenericAngleBracketParsing:
+    """TypeParser 泛型尖括号语法：列表<整数> / 字典<字符串, 小数> / 可选<整数>"""
+
+    def setup_method(self):
+        self.parser = TypeParser()
+
+    def test_list_angle(self):
+        """列表<整数> → ListType(数)"""
+        t = self.parser.parse('列表<整数>')
+        assert t._type_id == 8  # TYPE_ID_LIST
+        assert t.element_type._type_id == TYPE_NUMBER._type_id
+
+    def test_dict_angle_comma(self):
+        """字典<字符串, 小数> → DictType(串, 数)"""
+        t = self.parser.parse('字典<字符串, 小数>')
+        assert t._type_id == 9  # TYPE_ID_DICT
+        assert t.key_type._type_id == TYPE_STRING._type_id
+        assert t.value_type._type_id == TYPE_NUMBER._type_id
+
+    def test_dict_angle_no_space(self):
+        """字典<字符串,小数> 无空格逗号"""
+        t = self.parser.parse('字典<字符串,小数>')
+        assert t._type_id == 9
+        assert t.key_type._type_id == TYPE_STRING._type_id
+        assert t.value_type._type_id == TYPE_NUMBER._type_id
+
+    def test_optional_angle(self):
+        """可选<整数> → OptionalTypeWrapper(数)"""
+        t = self.parser.parse('可选<整数>')
+        assert isinstance(t, OptionalTypeWrapper)
+        assert t.inner_type._type_id == TYPE_NUMBER._type_id
+
+    def test_optional_angle_可空(self):
+        """可空<串> → OptionalTypeWrapper(串)"""
+        t = self.parser.parse('可空<串>')
+        assert isinstance(t, OptionalTypeWrapper)
+        assert t.inner_type._type_id == TYPE_STRING._type_id
+
+    def test_nested_generic(self):
+        """嵌套泛型：列表<列表<整数>>"""
+        t = self.parser.parse('列表<列表<整数>>')
+        assert t._type_id == 8
+        assert t.element_type._type_id == 8  # 内层仍是列表
+        assert t.element_type.element_type._type_id == TYPE_NUMBER._type_id
+
+    def test_nested_dict_value(self):
+        """字典<字符串, 列表<整数>>"""
+        t = self.parser.parse('字典<字符串, 列表<整数>>')
+        assert t._type_id == 9
+        assert t.value_type._type_id == 8  # 值是列表
+        assert t.value_type.element_type._type_id == TYPE_NUMBER._type_id
+
+    def test_square_bracket_still_works(self):
+        """方括号形式不回归：列表[整数]"""
+        t = self.parser.parse('列表[整数]')
+        assert t._type_id == 8
+        assert t.element_type._type_id == TYPE_NUMBER._type_id
+
+
+class TestGenericTypeCodegen:
+    """泛型注解的完整管线：解析 → 类型推断 → 代码生成 → 执行"""
+
+    SRC = '''
+段落 处理列表 接收 数据: 列表<整数>:
+    返回 列表长度(数据)
+
+段落 主 接收:
+    设 数据: 列表<整数> 为 [1, 2, 3]
+    设 映射 为 字典<字符串, 小数> = {}
+    设 可选值 为 可选<整数> = 空
+    打印('泛型OK', 处理列表(数据), 可选值)
+    返回 0
+主()
+'''
+
+    @staticmethod
+    def _compile(src):
+        from duan_parser_v3 import DuanParser
+        from code_generator import PythonCodeGenerator
+        parser = DuanParser()
+        module = parser.parse(src)
+        assert getattr(parser, 'errors', []) == [], getattr(parser, 'errors', [])
+        return PythonCodeGenerator().generate(module)
+
+    def test_parse_no_errors(self):
+        from duan_parser_v3 import DuanParser
+        parser = DuanParser()
+        parser.parse(self.SRC)
+        assert getattr(parser, 'errors', []) == []
+
+    def test_codegen_valid_python(self):
+        py = self._compile(self.SRC)
+        # 泛型注解必须映射为 Python 合法类型，而非原样输出 < >
+        assert '列表<' not in py
+        assert 'list[int]' in py or 'list[float]' in py
+        compile(py, '<duan-generics>', 'exec')
+
+    def test_execute_success(self):
+        py = self._compile(self.SRC)
+        ns = {}
+        exec(py, ns)
+
+    def test_optional_null_assignment_no_error(self):
+        """可选<整数> 赋值为空：空安全检查不报错"""
+        src = '''
+段落 主 接收:
+    设 可选值 为 可选<整数> = 空
+    打印(可选值)
+主()
+'''
+        from duan_parser_v3 import DuanParser
+        from code_generator import PythonCodeGenerator
+        parser = DuanParser()
+        module = parser.parse(src)
+        assert getattr(parser, 'errors', []) == []
+        py = PythonCodeGenerator().generate(module)
+        ns = {}
+        exec(py, ns)
+
+
+class TestGenericTypeInference:
+    """泛型注解的类型推断：可声明、可推断、可传递"""
+
+    @staticmethod
+    def _infer_src(src):
+        from compiler import DuanCompiler
+        c = DuanCompiler()
+        result = c.compile(src)
+        return result
+
+    def test_paragraph_signature(self):
+        """段落参数 列表<整数> → 函数类型 (列表[数]) -> 数"""
+        src = '''
+段落 处理列表 接收 数据: 列表<整数>:
+    返回 列表长度(数据)
+
+段落 主 接收:
+    设 数据: 列表<整数> 为 [1, 2, 3]
+    处理列表(数据)
+主()
+'''
+        result = self._infer_src(src)
+        assert result['errors'] == [], result['errors']
+        inf = result['inferencer']
+        sym = inf.symbol_table.lookup('处理列表')
+        assert sym is not None
+        ft = sym.data_type
+        assert ft._type_id == 12  # TYPE_ID_FUNCTION
+        assert len(ft.param_types) == 1
+        assert ft.param_types[0]._type_id == 8  # 列表
+        assert ft.param_types[0].element_type._type_id == TYPE_NUMBER._type_id
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_optional_type_inferred(self):
+        """可选<整数> 推断为 OptionalTypeWrapper（经段落返回类型传播）"""
+        src = '''
+段落 主 接收:
+    设 可选值 为 可选<整数> = 空
+    返回 可选值
+主()
+'''
+        result = self._infer_src(src)
+        assert result['errors'] == [], result['errors']
+        inf = result['inferencer']
+        sym = inf.symbol_table.lookup('主')
+        assert sym is not None
+        ft = sym.data_type
+        assert ft._type_id == 12  # TYPE_ID_FUNCTION
+        assert isinstance(ft.return_type, OptionalTypeWrapper)
+        assert ft.return_type.inner_type._type_id == TYPE_NUMBER._type_id
+
+    def test_non_nullable_null_rejected(self):
+        """整数 赋值为空 → 空安全错误"""
+        src = '''
+段落 主 接收:
+    设 值 为 整数 = 空
+    打印(值)
+主()
+'''
+        result = self._infer_src(src)
+        assert any('空安全' in e for e in result['errors']), result['errors']
+
+    def test_generic_flow_through_call(self):
+        """泛型注解在调用链中传递：列表<整数> 传入后返回长度"""
+        src = '''
+段落 处理列表 接收 数据: 列表<整数>:
+    返回 列表长度(数据)
+
+段落 包装 接收 数据: 列表<整数>:
+    返回 处理列表(数据)
+
+段落 主 接收:
+    设 数据: 列表<整数> 为 [1, 2, 3]
+    打印(包装(数据))
+主()
+'''
+        result = self._infer_src(src)
+        assert result['errors'] == [], result['errors']
+
+
+# =============================================================================
+# 11. 可空类型 unwrap 系统（3.2.2：安全解包、空值传播）
+# =============================================================================
+
+class TestNullableUnwrap:
+    """可选<整数> 安全解包：值! / unwrap() / 判空比较 / 空值传播"""
+
+    @staticmethod
+    def _run(src, expect_errors=0):
+        from compiler import DuanCompiler
+        from duan_parser_v3 import DuanParser
+        from code_generator import PythonCodeGenerator
+        c = DuanCompiler()
+        result = c.compile(src)
+        errors = result['errors']
+        if expect_errors:
+            assert len(errors) >= expect_errors, errors
+            return None
+        assert errors == [], errors
+        m = DuanParser().parse(src)
+        py = PythonCodeGenerator().generate(m)
+        ns = {}
+        exec(py, ns)
+
+    def test_unwrap_bang(self):
+        """值! 解包后参与运算"""
+        self._run('''
+段落 主 接收:
+    设 x 为 可选<整数> = 5
+    设 y 为 x! 加 1
+    打印(y)
+主()
+''')
+
+    def test_unwrap_function_form(self):
+        """unwrap(值) 函数形式解包"""
+        self._run('''
+段落 主 接收:
+    设 x 为 可选<整数> = 7
+    设 y 为 unwrap(x) 加 1
+    打印(y)
+主()
+''')
+
+    def test_unwrap_null_raises_assert(self):
+        """空值! 解包 → 运行时断言失败"""
+        src = '''
+段落 主 接收:
+    设 x 为 可选<整数> = 空
+    设 y 为 x! 加 1
+    打印(y)
+主()
+'''
+        # 编译应无类型错误；运行时尝试解包空值应失败
+        from compiler import DuanCompiler
+        from duan_parser_v3 import DuanParser
+        from code_generator import PythonCodeGenerator
+        c = DuanCompiler()
+        assert c.compile(src)['errors'] == []
+        py = PythonCodeGenerator().generate(DuanParser().parse(src))
+        try:
+            exec(py, {})
+        except AssertionError:
+            return
+        raise AssertionError("空值解包应触发断言失败")
+
+    def test_null_compare_等于(self):
+        """可选值 == 空 判空合法"""
+        self._run('''
+段落 取非空 接收 v: 可选<整数>:
+    如果 v 等于 空：
+        返回 0
+    返回 v!
+段落 主 接收:
+    打印(取非空(空))
+    打印(取非空(9))
+主()
+''')
+
+    def test_null_compare_不等于(self):
+        """可选值 != 空 判空合法"""
+        self._run('''
+段落 主 接收:
+    设 x 为 可选<整数> = 3
+    如果 x 不等于 空：
+        打印(x!)
+    否则：
+        打印('空')
+主()
+''')
+
+    def test_null_compare_value(self):
+        """判空+解包模式：空→0，非空→原值"""
+        self._run('''
+段落 取非空 接收 v: 可选<整数>:
+    设 结果 为 0
+    如果 v 不等于 空：
+        设 结果 为 v!
+    返回 结果
+段落 主 接收:
+    打印(取非空(空))
+    打印(取非空(9))
+主()
+''')
+
+    def test_optional_param_accepts_null(self):
+        """可空形参可接收 空 与普通值"""
+        self._run('''
+段落 打印可选 接收 v: 可选<整数>:
+    打印(v)
+段落 主 接收:
+    打印可选(空)
+    打印可选(3)
+主()
+''')
+
+    def test_optional_flows_between_vars(self):
+        """空值传播：可选值赋给另一可选变量"""
+        self._run('''
+段落 主 接收:
+    设 x 为 可选<整数> = 空
+    设 y 为 可选<整数> = x
+    打印(y)
+主()
+''')
+
+    def test_unwrapped_operation_rejected(self):
+        """未解包参与运算 → 类型错误"""
+        self._run('''
+段落 主 接收:
+    设 x 为 可选<整数> = 5
+    设 y 为 x 加 1
+    打印(y)
+主()
+''', expect_errors=1)
+
+    def test_unwrapped_argument_rejected(self):
+        """未解包传给非可空参数 → 类型错误"""
+        self._run('''
+段落 双倍 接收 n: 整数:
+    返回 n 乘 2
+段落 主 接收:
+    设 x 为 可选<整数> = 4
+    打印(双倍(x))
+主()
+''', expect_errors=1)
+
+    def test_optional_in_condition_rejected(self):
+        """可选值直接作条件 → 类型错误（须显式判空）"""
+        self._run('''
+段落 主 接收:
+    设 x 为 可选<整数> = 空
+    如果 x：
+        打印('真')
+    否则：
+        打印('假')
+主()
+''', expect_errors=1)
+
+    def test_optional_assign_non_null(self):
+        """可选<整数> = 5 合法（unify 可选与内部类型兼容）"""
+        self._run('''
+段落 主 接收:
+    设 x 为 可选<整数> = 5
+    打印(x!)
+主()
+''')
+
+    def test_nested_optional_list(self):
+        """列表<可选<整数>> 嵌套泛型"""
+        self._run('''
+段落 主 接收:
+    设 数据 为 列表<可选<整数>> = [1, 空, 3]
+    打印(列表长度(数据))
+    设 首值 为 数据[0]!
+    打印(首值)
+主()
+''')
+
+    def test_unify_optional_with_inner(self):
+        """unify(可选<数>, 数) 成功（可空兼容合一）"""
+        from type_system import unify, OptionalTypeWrapper, NumberType, TypeSubstitution
+        opt = OptionalTypeWrapper(NumberType())
+        subs = unify(opt, NumberType())
+        assert isinstance(subs, TypeSubstitution)
+
+    def test_compiler_errors_reset_across_compile(self):
+        """DuanCompiler 重复 compile 不累积上次错误"""
+        from compiler import DuanCompiler
+        c = DuanCompiler()
+        bad = '''
+段落 主 接收:
+    设 x 为 可选<整数> = 5
+    设 y 为 x 加 1
+    打印(y)
+主()
+'''
+        good = '''
+段落 主 接收:
+    打印('OK')
+主()
+'''
+        c.compile(bad)
+        good_result = c.compile(good)
+        assert good_result['errors'] == [], good_result['errors']
+
+
+# =============================================================================
+# 12. 类型场景集成测试（3.2.2：类型检查器 + 推断引擎，覆盖 50+ 类型场景）
+# =============================================================================
+
+class _TypeScenarioBase:
+    """类型场景集成测试基类：真实段言源码 → DuanCompiler 编译 → 推断/执行断言"""
+
+    @staticmethod
+    def _compile(src):
+        from compiler import DuanCompiler
+        c = DuanCompiler()
+        return c.compile(src)
+
+    @staticmethod
+    def _exec(src):
+        from duan_parser_v3 import DuanParser
+        from code_generator import PythonCodeGenerator
+        py = PythonCodeGenerator().generate(DuanParser().parse(src))
+        ns = {}
+        exec(py, ns)
+
+    def _ok(self, src):
+        """编译无错误且可执行"""
+        r = self._compile(src)
+        assert r['errors'] == [], r['errors']
+        self._exec(src)
+
+    def _err(self, src, keyword):
+        """编译应报含 keyword 的类型错误"""
+        r = self._compile(src)
+        assert any(keyword in str(e) for e in r['errors']), r['errors']
+
+    def _sig(self, src, seg_name):
+        """返回段落推断的函数类型（模块级符号）"""
+        r = self._compile(src)
+        assert r['errors'] == [], r['errors']
+        sym = r['inferencer'].symbol_table.lookup(seg_name)
+        assert sym is not None, f"未找到段落 {seg_name}"
+        return sym.data_type
+
+
+class TestTypeScenarioBasic(_TypeScenarioBase):
+    """基本类型推断场景"""
+
+    def test_integer_literal_type(self):
+        ft = self._sig('''
+段落 取数 接收:
+    返回 42
+段落 主 接收:
+    打印(取数())
+主()
+''', '取数')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_float_literal_type(self):
+        ft = self._sig('''
+段落 取数 接收:
+    返回 3.14
+段落 主 接收:
+    打印(取数())
+主()
+''', '取数')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_string_literal_type(self):
+        ft = self._sig('''
+段落 取串 接收:
+    返回 '你好'
+段落 主 接收:
+    打印(取串())
+主()
+''', '取串')
+        assert ft.return_type._type_id == TYPE_STRING._type_id
+
+    def test_boolean_literal_type(self):
+        ft = self._sig('''
+段落 取布尔 接收:
+    返回 真
+段落 主 接收:
+    打印(取布尔())
+主()
+''', '取布尔')
+        assert ft.return_type._type_id == TYPE_BOOLEAN._type_id
+
+    def test_null_literal_type(self):
+        ft = self._sig('''
+段落 取空 接收:
+    返回 空
+段落 主 接收:
+    打印(取空())
+主()
+''', '取空')
+        assert ft.return_type._type_id == TYPE_NULL._type_id
+
+    def test_arithmetic_result_type(self):
+        ft = self._sig('''
+段落 计算 接收:
+    返回 1 加 2 乘 3
+段落 主 接收:
+    打印(计算())
+主()
+''', '计算')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_string_concat_type(self):
+        ft = self._sig('''
+段落 拼接 接收:
+    返回 'a' 加 'b'
+段落 主 接收:
+    打印(拼接())
+主()
+''', '拼接')
+        assert ft.return_type._type_id == TYPE_STRING._type_id
+
+    def test_compare_result_boolean(self):
+        ft = self._sig('''
+段落 比较 接收:
+    返回 5 大于 3
+段落 主 接收:
+    打印(比较())
+主()
+''', '比较')
+        assert ft.return_type._type_id == TYPE_BOOLEAN._type_id
+
+    def test_annotation_mismatch_rejected(self):
+        self._err('''
+段落 主 接收:
+    设 x 为 整数 = '字符串'
+    打印(x)
+主()
+''', '类型不匹配')
+
+    def test_variable_annotation_ok(self):
+        self._ok('''
+段落 主 接收:
+    设 x 为 整数 = 10
+    打印(x)
+主()
+''')
+
+
+class TestTypeScenarioComposite(_TypeScenarioBase):
+    """复合类型推断场景"""
+
+    def test_list_literal_type(self):
+        ft = self._sig('''
+段落 构建 接收:
+    设 数据 为 [1, 2, 3]
+    返回 数据
+段落 主 接收:
+    打印(构建())
+主()
+''', '构建')
+        assert ft.return_type._type_id == 8  # 列表
+        assert ft.return_type.element_type._type_id == TYPE_NUMBER._type_id
+
+    def test_list_string_type(self):
+        ft = self._sig('''
+段落 构建 接收:
+    设 数据 为 ['a', 'b']
+    返回 数据
+段落 主 接收:
+    打印(构建())
+主()
+''', '构建')
+        assert ft.return_type._type_id == 8
+        assert ft.return_type.element_type._type_id == TYPE_STRING._type_id
+
+    def test_empty_list_type(self):
+        ft = self._sig('''
+段落 构建 接收:
+    设 数据 为 []
+    返回 数据
+段落 主 接收:
+    打印(构建())
+主()
+''', '构建')
+        assert ft.return_type._type_id == 8
+
+    def test_list_index_type(self):
+        ft = self._sig('''
+段落 取元素 接收:
+    设 数据 为 [10, 20, 30]
+    返回 数据[1]
+段落 主 接收:
+    打印(取元素())
+主()
+''', '取元素')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_list_append_ok(self):
+        self._ok('''
+段落 主 接收:
+    设 数据 为 [1, 2]
+    设 数据 为 数据 加 [3]
+    打印(列表长度(数据))
+主()
+''')
+
+    def test_list_length_number(self):
+        ft = self._sig('''
+段落 取长 接收:
+    设 数据 为 [1, 2, 3]
+    返回 列表长度(数据)
+段落 主 接收:
+    打印(取长())
+主()
+''', '取长')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_dict_literal_ok(self):
+        self._ok('''
+段落 主 接收:
+    设 映射 为 {'a': 1, 'b': 2}
+    打印(映射['a'])
+主()
+''')
+
+    def test_dict_generic_annotation(self):
+        ft = self._sig('''
+段落 建映射 接收:
+    设 映射: 字典<字符串, 整数> 为 {}
+    返回 映射
+段落 主 接收:
+    打印(建映射())
+主()
+''', '建映射')
+        assert ft.return_type._type_id == 9  # 字典
+
+    def test_list_generic_annotation(self):
+        ft = self._sig('''
+段落 建列表 接收:
+    设 数据: 列表<串> 为 ['x']
+    返回 数据
+段落 主 接收:
+    打印(建列表())
+主()
+''', '建列表')
+        assert ft.return_type._type_id == 8
+        assert ft.return_type.element_type._type_id == TYPE_STRING._type_id
+
+    def test_list_mismatch_rejected(self):
+        self._err('''
+段落 主 接收:
+    设 x: 列表<整数> 为 ['str']
+    打印(x)
+主()
+''', '类型不匹配')
+
+
+class TestTypeScenarioSegment(_TypeScenarioBase):
+    """段落/函数类型推断场景"""
+
+    def test_param_annotation_signature(self):
+        ft = self._sig('''
+段落 双倍 接收 n: 整数:
+    返回 n 乘 2
+段落 主 接收:
+    打印(双倍(4))
+主()
+''', '双倍')
+        assert ft._type_id == 12  # 函数类型
+        assert len(ft.param_types) == 1
+        assert ft.param_types[0]._type_id == TYPE_NUMBER._type_id
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_return_annotation(self):
+        ft = self._sig('''
+段落 取串 接收 -> 串:
+    返回 'abc'
+段落 主 接收:
+    打印(取串())
+主()
+''', '取串')
+        assert ft.return_type._type_id == TYPE_STRING._type_id
+
+    def test_inferred_return_no_annotation(self):
+        ft = self._sig('''
+段落 取数 接收:
+    返回 7
+段落 主 接收:
+    打印(取数())
+主()
+''', '取数')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_multi_return_unified(self):
+        ft = self._sig('''
+段落 选择 接收 标记: 布尔:
+    如果 标记：
+        返回 1
+    返回 2
+段落 主 接收:
+    打印(选择(真))
+主()
+''', '选择')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_recursion(self):
+        ft = self._sig('''
+段落 阶乘 接收 n: 整数:
+    如果 n 小于等于 1：
+        返回 1
+    返回 n 乘 阶乘(n 减 1)
+段落 主 接收:
+    打印(阶乘(5))
+主()
+''', '阶乘')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+    def test_wrong_arity_rejected(self):
+        self._err('''
+段落 双参 接收 a, b:
+    返回 a 加 b
+段落 主 接收:
+    打印(双参(1))
+主()
+''', '参数')
+
+    def test_wrong_param_type_rejected(self):
+        self._err('''
+段落 双倍 接收 n: 整数:
+    返回 n 乘 2
+段落 主 接收:
+    打印(双倍('abc'))
+主()
+''', '类型不匹配')
+
+    def test_wrong_return_type_rejected(self):
+        self._err('''
+段落 坏 接收 -> 整数:
+    返回 'str'
+段落 主 接收:
+    打印(坏())
+主()
+''', '返回类型不匹配')
+
+    def test_no_return_is_null(self):
+        ft = self._sig('''
+段落 执行任务 接收:
+    打印('hi')
+段落 主 接收:
+    执行任务()
+主()
+''', '执行任务')
+        assert ft.return_type._type_id == TYPE_NULL._type_id
+
+    def test_nested_call_flow(self):
+        self._ok('''
+段落 内层 接收 n: 整数:
+    返回 n 加 1
+段落 外层 接收 n: 整数:
+    返回 内层(n) 乘 2
+段落 主 接收:
+    打印(外层(3))
+主()
+''')
+
+    def test_void_segment_callable(self):
+        self._ok('''
+段落 问候 接收:
+    打印('你好')
+段落 主 接收:
+    问候()
+    问候()
+主()
+''')
+
+
+class TestTypeScenarioControlFlow(_TypeScenarioBase):
+    """控制流类型推断场景"""
+
+    def test_if_compare_condition(self):
+        self._ok('''
+段落 主 接收:
+    如果 5 大于 3：
+        打印('大')
+    否则：
+        打印('小')
+主()
+''')
+
+    def test_if_boolean_var_condition(self):
+        self._ok('''
+段落 主 接收:
+    设 标记 为 真
+    如果 标记：
+        打印('真')
+主()
+''')
+
+    def test_elseif_chain(self):
+        ft = self._sig('''
+段落 分级 接收 n: 整数:
+    如果 n 大于 90：
+        返回 'A'
+    否则若 n 大于 80：
+        返回 'B'
+    否则：
+        返回 'C'
+段落 主 接收:
+    打印(分级(85))
+主()
+''', '分级')
+        assert ft.return_type._type_id == TYPE_STRING._type_id
+
+    def test_while_loop(self):
+        self._ok('''
+段落 求和 接收 n: 整数:
+    设 结果 为 0
+    设 i 为 1
+    当 i 小于等于 n：
+        设 结果 为 结果 加 i
+        设 i 为 i 加 1
+    返回 结果
+段落 主 接收:
+    打印(求和(10))
+主()
+''')
+
+    def test_foreach_loop(self):
+        self._ok('''
+段落 求和 接收 数据: 列表<整数>:
+    设 结果 为 0
+    遍历 元素 于 数据：
+        设 结果 为 结果 加 元素
+    返回 结果
+段落 主 接收:
+    打印(求和([1, 2, 3]))
+主()
+''')
+
+    def test_loop_return_type(self):
+        ft = self._sig('''
+段落 求和 接收 n: 整数:
+    设 结果 为 0
+    设 i 为 1
+    当 i 小于等于 n：
+        设 结果 为 结果 加 i
+        设 i 为 i 加 1
+    返回 结果
+段落 主 接收:
+    打印(求和(10))
+主()
+''', '求和')
+        assert ft.return_type._type_id == TYPE_NUMBER._type_id
+
+
+class TestTypeScenarioClass(_TypeScenarioBase):
+    """类类型推断场景"""
+
+    SRC_COUNTER = '''
+类 计数器：
+    属性 当前。
+    构造 接收 初值：
+        己当前 为 初值
+    段落 增加：
+        己当前 为 己当前 加 1
+    段落 读取：
+        返回 己当前
+段落 主 接收:
+    设 计数 为 新建 计数器(5)
+    计数.增加()
+    计数.增加()
+    打印(计数.读取())
+主()
+'''
+
+    def test_class_instantiation(self):
+        self._ok(self.SRC_COUNTER)
+
+    def test_class_type_symbol(self):
+        r = self._compile(self.SRC_COUNTER)
+        sym = r['inferencer'].symbol_table.lookup('计数器')
+        assert sym is not None
+        assert sym.data_type.class_name == '计数器'
+
+    def test_method_call_result(self):
+        self._ok('''
+类 计算器：
+    段落 双倍 接收 n: 整数：
+        返回 n 乘 2
+段落 主 接收:
+    设 工具 为 新建 计算器()
+    打印(工具.双倍(21))
+主()
+''')
+
+    def test_inheritance(self):
+        self._ok('''
+类 动物：
+    属性 名称。
+    构造 接收 名字：
+        己名称 为 名字
+    段落 叫声：
+        返回 '...'
+类 狗 继承 动物：
+    段落 叫声：
+        返回 '汪汪'
+段落 主 接收:
+    设 狗子 为 新建 狗('旺财')
+    打印(狗子.叫声())
+主()
+''')
+
+    def test_static_attribute(self):
+        self._ok('''
+类 工具：
+    静态 属性 版本 等于 '1.0'
+段落 主 接收:
+    打印(工具.版本)
+主()
+''')
+
+    def test_class_field_annotation(self):
+        self._ok('''
+类 人：
+    属性 姓名。
+    构造 接收 名字: 串：
+        己姓名 为 名字
+段落 主 接收:
+    设 某人 为 新建 人('张三')
+    打印(某人.姓名)
+主()
+''')
+
+
+class TestTypeScenarioChecker(_TypeScenarioBase):
+    """类型检查器配置分级场景（TypeChecker 独立路径）"""
+
+    @staticmethod
+    def _make_var_body(annotated=False):
+        from ast_nodes_v3 import VarDecl, NumberLiteral
+        return [VarDecl('未注解变量', NumberLiteral(1), type_annotation='整数' if annotated else None)]
+
+    def test_none_level_skips(self):
+        from type_checker import TypeChecker, TypeCheckerConfig
+        from core.config import TypeCheckLevel
+        seg = _make_segment('段落一', self._make_var_body())
+        checker = TypeChecker(TypeCheckerConfig(check_level=TypeCheckLevel.NONE))
+        assert checker.check(_make_module(seg), inferencer=None) == []
+
+    def test_variable_level_warns(self):
+        from type_checker import TypeChecker, TypeCheckerConfig, TypeErrorSeverity
+        from core.config import TypeCheckLevel, SegmentTypeMode
+        seg = _make_segment('段落一', self._make_var_body())
+        config = TypeCheckerConfig(check_level=TypeCheckLevel.VARIABLE,
+                                   default_segment_mode=SegmentTypeMode.LOOSE)
+        results = TypeChecker(config).check(_make_module(seg), inferencer=None)
+        warnings = [r for r in results if r.severity == TypeErrorSeverity.WARNING]
+        assert len(warnings) == 1
+
+    def test_variable_level_annotated_no_warn(self):
+        from type_checker import TypeChecker, TypeCheckerConfig, TypeErrorSeverity
+        from core.config import TypeCheckLevel, SegmentTypeMode
+        seg = _make_segment('段落一', self._make_var_body(annotated=True))
+        config = TypeCheckerConfig(check_level=TypeCheckLevel.VARIABLE,
+                                   default_segment_mode=SegmentTypeMode.LOOSE)
+        results = TypeChecker(config).check(_make_module(seg), inferencer=None)
+        warnings = [r for r in results if r.severity == TypeErrorSeverity.WARNING]
+        assert warnings == []
+
+    def test_signature_level_no_variable_check(self):
+        from type_checker import TypeChecker, TypeCheckerConfig, TypeErrorSeverity
+        from core.config import TypeCheckLevel, SegmentTypeMode
+        seg = _make_segment('段落一', self._make_var_body())
+        config = TypeCheckerConfig(check_level=TypeCheckLevel.SIGNATURE,
+                                   default_segment_mode=SegmentTypeMode.LOOSE)
+        results = TypeChecker(config).check(_make_module(seg), inferencer=None)
+        var_warnings = [r for r in results
+                        if r.severity == TypeErrorSeverity.WARNING and '未注解变量' in r.message]
+        assert var_warnings == []
+
+    def test_file_directive_parse(self):
+        from type_checker import _extract_type_directives
+        source = '# 类型检查级别: 签名\n段落 主 接收:\n    打印(1)\n'
+        directives = _extract_type_directives(source)
+        assert '类型检查级别' in directives  # 能提取到类型指令
+        assert directives['类型检查级别'] == '签名'
+
+    def test_check_level_ordering(self):
+        from core.config import TypeCheckLevel
+        assert TypeCheckLevel.NONE.value < TypeCheckLevel.SIGNATURE.value
+        assert TypeCheckLevel.SIGNATURE.value < TypeCheckLevel.VARIABLE.value
+        assert TypeCheckLevel.VARIABLE.value < TypeCheckLevel.EXPRESSION.value

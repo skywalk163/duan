@@ -560,7 +560,9 @@ class ParserExprMixin:
                         if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET,
                                              TokenType.NEWLINE, TokenType.DEDENT, TokenType.INDENT):
                             break
-                        if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:
+                        # 三元条件表达式「如果 ... 那么 ... 否则 ...」的起始关键字不能作为参数终止符，
+                        # 否则「打印 如果 条件 那么 A 否则 B」会被截断为 打印 然后 如果 被当作语句
+                        if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE and next_tok.value != '如果':
                             break
                         # 收集完整表达式（支持嵌套函数调用、比较和逻辑运算符）
                         arg = self._parse_logical_expr()
@@ -1384,17 +1386,27 @@ class ParserExprMixin:
                 format_spec = expr_text[colon_idx+1:].strip()
             else:
                 expr_part = expr_text
-            if not re.match(r'^[\u4e00-\u9fa5a-zA-Z_][\u4e00-\u9fa5a-zA-Z0-9_.\[\]"\'\u3010\u3011]*$', expr_part):
+            if re.match(r'^[\u4e00-\u9fa5a-zA-Z_][\u4e00-\u9fa5a-zA-Z0-9_.\[\]"\'\u3010\u3011]*$', expr_part):
+                # 简单标识符：{甲}、{对象.属性}、{列表[0]}
+                if m.start() > last_end:
+                    parts.append(value[last_end:m.start()])
+                if format_spec:
+                    parts.append((Identifier(expr_part), format_spec))
+                else:
+                    parts.append(Identifier(expr_part))
+                last_end = m.end()
+                continue
+            # 表达式插值：{甲 乘 甲}、{平方(甲)} — 子解析验证并生成表达式节点
+            expr_node = self._try_parse_interp_expr(expr_part)
+            if expr_node is None:
                 has_invalid = True
                 break
-            # 插值前的普通文本
             if m.start() > last_end:
                 parts.append(value[last_end:m.start()])
-            # 插值表达式（作为标识符），如果有格式说明符则存储为元组
             if format_spec:
-                parts.append((Identifier(expr_part), format_spec))
+                parts.append((expr_node, format_spec))
             else:
-                parts.append(Identifier(expr_part))
+                parts.append(expr_node)
             last_end = m.end()
 
         # 如果有无效的插值模式，整个字符串不作为插值处理
@@ -1406,11 +1418,33 @@ class ParserExprMixin:
             parts.append(value[last_end:])
 
         # 如果只有普通文本（没有真正的插值），返回 None
-        has_expr = any(isinstance(p, (Identifier, tuple)) for p in parts)
+        has_expr = any(not isinstance(p, str) for p in parts)
         if not has_expr:
             return None
 
         return StringInterpolation(parts)
+
+    def _try_parse_interp_expr(self, expr_text: str):
+        """尝试将插值内容作为段言表达式解析；成功返回 ASTNode，失败返回 None"""
+        import re
+        # 快速拒绝模板字符/特殊符号（如 {%原始%}、反引号、反斜杠），不视为插值
+        if re.search(r'[%\`\\]', expr_text):
+            return None
+        try:
+            from lexer import Lexer
+            from duan_parser_v3 import DuanParser
+            sub_lexer = Lexer()
+            sub_tokens = sub_lexer.tokenize(expr_text)
+            sub_parser = DuanParser()
+            sub_parser.tokens = sub_tokens
+            sub_parser.pos = 0
+            node = sub_parser._parse_expr()
+            # 必须消费完所有 token（容错末尾 EOF token），避免接受残句如 {甲 乘}
+            if node is not None and sub_parser.pos >= len(sub_tokens) - 1:
+                return node
+        except Exception:
+            pass
+        return None
 
 
     def _parse_c_anonymous_function(self) -> ASTNode:

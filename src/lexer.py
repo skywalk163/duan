@@ -1335,7 +1335,9 @@ class Lexer:
                             # 单字 compound_safe 关键字：直接跳过
                             skip_kw = True
                         elif sub_kw in IDENTIFIER_SAFE_KEYWORDS:
-                            # 标识符安全关键字（如"函数"、"输出"）：是复合标识符的一部分，跳过
+                            # 标识符安全关键字（如"函数"、"输出"）：是复合标识符的一部分，跳过。
+                            # 注：此处不检查 scan_pos——词首的 VERB_ARITY 动词（如"输出格式"中的
+                            # "输出"）已在第一层 1264 行判定为复合词前缀，应整体并入标识符
                             skip_kw = True
                         
                         if not skip_kw:
@@ -1348,6 +1350,14 @@ class Lexer:
                     # 有内嵌关键字，分段输出
                     scan_pos = 0
                     while scan_pos < len(full_identifier):
+                        # 当前剩余串整体是 stdlib 函数名（如"阶乘"）时，作为整体标识符输出，
+                        # 防止"数乘阶乘"被误拆为 数 乘 阶 乘（D08：嵌入式拆分不破坏已知函数名）
+                        if full_identifier in STDLIB_VERB_ARITY and full_identifier not in VERB_ARITY:
+                            tokens.append(Token(TokenType.IDENTIFIER, full_identifier, line, current_col))
+                            consumed += len(full_identifier)
+                            current_col += len(full_identifier)
+                            full_identifier = ''
+                            break
                         abs_pos = i + consumed + scan_pos
                         sub_kw, sub_len = self._match_keyword(source, abs_pos)
                         if sub_kw and sub_kw not in user_definitions:

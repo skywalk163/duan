@@ -258,3 +258,13 @@ ollama_model/Modelfile.v7_*
 
 # 迁移工具脚本
 tools/migrate_cstyle.py
+
+# 覆盖率数据
+.coverage
+
+# 归档的旧脚本（git 历史已保留，不再跟踪）
+archive/
+tests/archive/
+
+# LSP 协议生成的 Python 文件
+lsp/lsp_protocol.py
