@@ -63,6 +63,9 @@ class TestHTTP客户端Bridge(unittest.TestCase):
 
     @unittest.skipIf(not _has_network(), "无网络连接")
     def test_获取JSON(self):
+        # skipIf 在模块加载时求值，运行时网络状态可能已变化
+        if not _has_network():
+            self.skipTest("网络不可用（httpbin.org 不可达）")
         data = self.mod.获取JSON('https://httpbin.org/get')
         self.assertIsNotNone(data)
         self.assertIn('url', data)

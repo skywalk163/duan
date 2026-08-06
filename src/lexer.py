@@ -1063,6 +1063,10 @@ class Lexer:
                     k += 1
                 j = k
 
+            # 收集尾随的下划线（如 __迭代__ 末尾的 _）
+            while j < n and source[j] == '_':
+                j += 1
+
             word = source[i:j]
             if word in ALL_KEYWORDS:
                 tokens.append(_Token(_TokenType.KEYWORD, word, line, col))

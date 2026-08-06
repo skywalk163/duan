@@ -310,8 +310,8 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '类':
             return self._parse_class_definition()
 
-        # 接口定义：接口 接口名
-        if tok.type == TokenType.KEYWORD and tok.value == '接口':
+        # 接口定义：接口/协议 接口名
+        if tok.type == TokenType.KEYWORD and tok.value in ('接口', '协议'):
             return self._parse_interface_definition()
 
         # 模式匹配：匹配
@@ -2726,8 +2726,8 @@ class ParserStmtMixin:
             if depth == 0 and tok.type == TokenType.IDENTIFIER and tok.value == '结束':
                 break
 
-            # 类/接口定义（在body中遇到的，作为嵌套处理）- 仅在 depth==0 时停止
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('类', '接口'):
+            # 类/接口/协议定义（在body中遇到的，作为嵌套处理）- 仅在 depth==0 时停止
+            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('类', '接口', '协议'):
                 break
 
             # 跳过孤立的句号（块结束后的可选终止符）
@@ -3542,18 +3542,22 @@ class ParserStmtMixin:
 
     def _parse_interface_definition(self) -> InterfaceDefinition:
         """解析接口定义
-        
+
         语法：
-        接口 名称：
+        接口/协议 名称：
           段落 方法名 参数 参数名 返回 类型。
           段落 方法名(参数) 返回 类型。
 
         或带继承：
-        接口 名称 继承 父接口1, 父接口2：
+        接口/协议 名称 继承 父接口1, 父接口2：
           ...
         """
-        # 接口
-        self._consume(TokenType.KEYWORD, '接口')
+        # 接口/协议（支持 '接口' 和 '协议' 关键字）
+        trait_kw = self._current()
+        if trait_kw and trait_kw.type == TokenType.KEYWORD and trait_kw.value in ('接口', '协议'):
+            self._consume(TokenType.KEYWORD, trait_kw.value)
+        else:
+            self._error(f"期望'接口'或'协议'，但得到 {trait_kw.type if trait_kw else '输入结束'}")
 
         # 接口名（可能由多个token组成，与类名类似）
         name_parts = []
@@ -3614,6 +3618,11 @@ class ParserStmtMixin:
                     self._consume(TokenType.DEDENT)  # 消耗这个 DEDENT
                     break
 
+                # 跳过空行
+                if tok.type == TokenType.NEWLINE:
+                    self._consume(TokenType.NEWLINE)
+                    continue
+
                 # 方法签名：函数/段落 方法名 接收 参数名 返回 类型
                 if tok.type == TokenType.KEYWORD and tok.value in ('函数', '段落'):
                     sig = self._parse_method_signature()
@@ -3649,11 +3658,19 @@ class ParserStmtMixin:
             self._error(f"期望'函数'（或兼容写法'段落'），但得到'{tok.value if tok else '输入结束'}'",
                         tok.line if tok else 0, tok.col if tok else 0)
 
-        # 方法名
-        name_tok = self._current()
-        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-            name = self._consume().value
-        else:
+        # 方法名（可能由多个token组成，如"从JSON"被拆为从+JSON）
+        name_parts = []
+        while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            # 遇到LPAREN、返回、PERIOD、句号等停止
+            if self._current().type == TokenType.LPAREN:
+                break
+            if self._current().type == TokenType.KEYWORD and self._current().value == '返回':
+                break
+            if self._current().type in (TokenType.PERIOD, TokenType.COLON):
+                break
+            name_parts.append(self._consume().value)
+        name = ''.join(name_parts)
+        if not name:
             self._error(f"期望方法名")
 
         # 参数
@@ -3950,7 +3967,7 @@ class ParserStmtMixin:
         guard = None
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value in ('若', '如果'):
             self._consume(TokenType.KEYWORD)
-            guard = self._parse_comparison()
+            guard = self._parse_expr()
 
         # 冒号
         if self._match(TokenType.COLON):

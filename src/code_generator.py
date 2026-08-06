@@ -110,6 +110,26 @@ class PythonCodeGenerator:
             '日期时间': 'datetime',
         }
         
+        # 异常名映射（中文→Python）
+        self.exception_name_map = {
+            '迭代停止': 'StopIteration',
+            '值错误': 'ValueError',
+            '类型错误': 'TypeError',
+            '索引错误': 'IndexError',
+            '键错误': 'KeyError',
+            '属性错误': 'AttributeError',
+            '导入错误': 'ImportError',
+            '零除错误': 'ZeroDivisionError',
+            '文件错误': 'FileNotFoundError',
+            '运行时错误': 'RuntimeError',
+            '溢出错误': 'OverflowError',
+            '递归错误': 'RecursionError',
+            '内存错误': 'MemoryError',
+            '系统错误': 'SystemError',
+            '断言错误': 'AssertionError',
+            '停止迭代': 'StopIteration',
+        }
+        
         # 运算符映射
         self.operator_map = {
             '+': '+',
@@ -1083,6 +1103,15 @@ class PythonCodeGenerator:
             # 裸抛出：重新抛出当前异常
             self._add_line("raise")
             return
+        # 检查是否抛出已知中文异常名（如 迭代停止 → StopIteration）
+        if isinstance(stmt.value, Identifier) and stmt.value.name in self.exception_name_map:
+            py_exc_name = self.exception_name_map[stmt.value.name]
+            from_part = ""
+            if stmt.from_expr:
+                from_val = self._generate_expr(stmt.from_expr)
+                from_part = f" from {from_val}"
+            self._add_line(f"raise {py_exc_name}(){from_part}")
+            return
         value = self._generate_expr(stmt.value)
         # 确保抛出的是合法异常对象（Python 3 不允许 raise 字符串）
         from_part = ""
@@ -1334,6 +1363,22 @@ class PythonCodeGenerator:
             self._add_line("pass")
         self.indent_level -= 1
     
+    _TYPE_NAME_MAP = {
+        '整数': 'int', '整数型': 'int', '整型': 'int',
+        '小数': 'float', '浮数': 'float', '浮点数': 'float', '浮点': 'float',
+        '文本': 'str', '串': 'str', '字符串': 'str',
+        '列表': 'list', '列': 'list', '数组': 'list',
+        '字典': 'dict', '典': 'dict', '词典': 'dict', '映射': 'dict',
+        '集合': 'set', '集': 'set',
+        '布尔': 'bool', '布尔值': 'bool',
+        '空': 'None', '空值': 'None',
+        '任意': 'object', '任意类型': 'object',
+    }
+
+    def _sanitize_type_name(self, name: str) -> str:
+        """将段言类型名转换为Python类型名"""
+        return self._TYPE_NAME_MAP.get(name, self._sanitize_name(name))
+
     def _generate_match_pattern(self, pattern: MatchPattern) -> str:
         """生成匹配模式"""
         if pattern.kind == 'wildcard':
@@ -1353,7 +1398,7 @@ class PythonCodeGenerator:
             elements = [self._generate_match_pattern(e) for e in pattern.elements]
             return f"[{', '.join(elements)}]"
         elif pattern.kind == 'type_check':
-            type_name = self._sanitize_name(pattern.type_name)
+            type_name = self._sanitize_type_name(pattern.type_name)
             binding = self._sanitize_name(pattern.binding)
             return f"{type_name}() as {binding}"
         return '_'
@@ -1425,6 +1470,17 @@ class PythonCodeGenerator:
         is_ctor = getattr(method, 'is_constructor', False) or method_name == '构造'
         if is_ctor:
             method_name = '__init__'
+
+        # 迭代器协议方法名映射
+        if method_name == '__迭代__':
+            method_name = '__iter__'
+        elif method_name == '__下一项__':
+            method_name = '__next__'
+        # 上下文管理器协议方法名映射
+        elif method_name == '__进入__':
+            method_name = '__enter__'
+        elif method_name == '__退出__':
+            method_name = '__exit__'
 
         # 静态方法不需要 self 参数
         is_static = getattr(method, 'is_static', False)

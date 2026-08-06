@@ -14,8 +14,8 @@ theme:
     primary: indigo
     accent: indigo
   font:
-    text: 思源黑体
-    code: 思源黑体
+    text: Noto Sans SC
+    code: Noto Sans SC
   features:
     - navigation.instant
     - navigation.tracking
@@ -33,9 +33,6 @@ theme:
 plugins:
   - search:
       lang: zh
-  - git-revision-date-localized:
-      enable_creation_date: true
-  - awesome-pages
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -52,7 +49,7 @@ markdown_extensions:
       custom_checkbox: true
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python:name:material.extensions.emoji.to_svg
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
   - admonition
   - attr_list
   - md_in_html
@@ -72,11 +69,13 @@ nav:
       - 标准库: stdlib.md
       - 案例: examples.md
 
-  - 进阶:
+  - 语言特性:
       - 类系统设计: class_system_design.md
-      - LLVM 后端: llvm_backend_design.md
+      - trait/协议系统: interface-design.md
+      - 模式匹配: interface-plan.md
+      - 泛型与类型: superpowers/specs/2026-07-01-level6-type-annotation-design.md
       - 模块系统: 模块系统与包管理.md
-      - 模式匹配: interface-design.md
+      - FFI 设计: ffi.md
       - 完整规范: 段言-完整规范文档.md
 
   - 开发指南:
@@ -89,6 +88,7 @@ nav:
       - 工具总览: tools.md
       - REPL 设计: REPL_DESIGN.md
       - 引导策略: BOOTSTRAP_STRATEGY.md
+      - LLVM 后端: llvm_backend_design.md
 
   - 性能与优化:
       - 性能优化: PERFORMANCE_OPTIMIZATION.md
@@ -96,10 +96,17 @@ nav:
       - 文件 I/O 报告: FILE_IO_REPORT.md
       - 模块系统验证: MODULE_SYSTEM_VERIFICATION.md
 
-  - 变更记录:
+  - 项目计划:
+      - 三个月计划: 三个月工作计划_2026Q3Q4.md
       - 进度报告: PROGRESS_REPORT.md
+
+  - 变更记录:
       - 语言扩展: LANGUAGE_EXTENSIONS.md
-      - 发布检查: RELEASE_CHECKLIST.md
+      - 语法变更:
+          - v3.1: 统一语法规范_v3.1.md
+          - v3.2: 统一语法规范_v3.2.md
+          - v3.4: 语法变更_v3.4.md
+          - v3.5: 语法变更_v3.5.md
       - 最终总结: FINAL_SUMMARY.md
 
 extra:

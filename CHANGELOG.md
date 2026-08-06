@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-08-06
+
+### Added
+- **trait/协议系统**: `协议` 关键字作为 `接口` 别名，支持接口定义、继承、多态，生成 `ABC` + `@abstractmethod` 代码
+- **模式匹配增强**: 支持守卫条件（`若 条件`）、嵌套模式（列表嵌套）、绑定变量、类型检查模式（`整数 甲`）
+- **迭代器协议**: `__迭代__` → `__iter__`、`__下一项__` → `__next__` 方法名映射，自定义类型可被 `遍历` 循环使用
+- **上下文管理器**: `使用 表达式 为 变量：` 语法，支持 `__进入__` / `__退出__` 方法映射到 `__enter__` / `__exit__`
+- **异常名映射**: 内置中文异常名（`迭代停止` → `StopIteration` 等 16 个）自动映射到 Python 异常
+- **duanpub 生态扩展**: 53 个桥接模块，109 个包元数据索引
+- **框架库**: 单元测试框架、日志系统、配置管理、HTTP 服务端
+- **开发者工具**: LSP 深度集成（诊断/自动补全/悬停信息）、调试适配器（DAP 协议）、多文件 Web Playground
+- **文档站**: MkDocs 文档站搭建（Material 主题），`mkdocs.yml` 导航配置，GitHub Pages 自动部署工作流
+
+### Changed
+- **版本号**: 4.3.0 → 5.0.0（正式发布版本）
+- **文档导航重构**: 新增「语言特性」「项目计划」「语法变更」分类，移除过时章节
+
+### Fixed
+- **迭代器协议测试修复**: `抛出 迭代停止` 自动映射为 `raise StopIteration()`
+- **上下文管理器方法名映射**: `__进入__` → `__enter__`、`__退出__` → `__exit__`
+
+### Test
+- 全量回归测试 **1888 通过**，0 失败
+- E2E 测试 **73 通过**，0 失败
+- 迭代器协议测试 **5 通过**，0 失败
+- 上下文管理器测试 **6 通过**，0 失败
+- trait/协议系统测试 **8 通过**，0 失败
+- 模式匹配增强测试 **10 通过**，0 失败
+
 ## [4.3.0] - 2026-08-06
 
 ### Added

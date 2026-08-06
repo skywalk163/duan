@@ -114,6 +114,11 @@ class ParserExprMixin:
                 break
             if tok.type == TokenType.KEYWORD and tok.value in self.OPERATOR_VERBS:
                 op = self._consume().value
+                # 处理"大于 等于"和"小于 等于"（空格分隔的两关键字，如"年龄 大于 等于 18"）
+                if op in ('大于', '小于') and self._current() and \
+                   self._current().type == TokenType.KEYWORD and self._current().value == '等于':
+                    self._consume()  # 消耗"等于"
+                    op = '大于等于' if op == '大于' else '小于等于'
                 right = self._parse_add_expr()
                 left = BinaryOp(self.COMPARISON_OP_MAP.get(op, op), left, right)
             elif tok.type == TokenType.LESS:

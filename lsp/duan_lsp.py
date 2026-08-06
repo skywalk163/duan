@@ -14,9 +14,9 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from lexer import Lexer
-from duan_parser_v3 import DuanParser
-from keywords import ALL_KEYWORDS, VERB_ARITY
+from lexer import Lexer, LexerError
+from duan_parser_v3 import DuanParser, ParseError
+from keywords import ALL_KEYWORDS, VERB_ARITY, STDLIB_VERB_ARITY, BUILTIN_TYPES
 
 
 # =============================================================================
@@ -395,7 +395,8 @@ class DuanLanguageServer:
             'textDocumentSync': 1,  # Full sync
             'completionProvider': {
                 'resolveProvider': True,
-                'triggerCharacters': [' ', '设', '定', '打', '定', '导', '类', '接', '返', '当', '遍', '如']
+                'triggerCharacters': [' ', '设', '定', '打', '定', '导', '类', '接', '返', '当', '遍', '如',
+                                      '（', '(', '。', '.', '，', ',', '：', ':']
             },
             'hoverProvider': True,
             'definitionProvider': True,
@@ -410,6 +411,10 @@ class DuanLanguageServer:
             'diagnosticProvider': {
                 'interFileDependencies': False,
                 'workspaceDiagnostics': False
+            },
+            'documentHighlightProvider': True,
+            'signatureHelpProvider': {
+                'triggerCharacters': ['（', '(', '，', ',']
             }
         }
         
@@ -422,6 +427,7 @@ class DuanLanguageServer:
             'textDocument/didClose': self._handle_did_close,
             'textDocument/didSave': self._handle_did_save,
             'textDocument/completion': self._handle_completion,
+            'completionItem/resolve': self._handle_completion_resolve,
             'textDocument/hover': self._handle_hover,
             'textDocument/definition': self._handle_definition,
             'textDocument/references': self._handle_references,
@@ -430,6 +436,8 @@ class DuanLanguageServer:
             'textDocument/rangeFormatting': self._handle_range_formatting,
             'textDocument/rename': self._handle_rename,
             'textDocument/codeAction': self._handle_code_action,
+            'textDocument/documentHighlight': self._handle_document_highlight,
+            'textDocument/signatureHelp': self._handle_signature_help,
         }
         
         handler = handlers.get(method)
@@ -535,12 +543,53 @@ class DuanLanguageServer:
         # 动词元数补全
         for verb, arity in sorted(VERB_ARITY.items()):
             if not prefix or verb.startswith(prefix):
+                detail = f'动词 (元数: {arity})'
+                params_str = ''
+                if arity > 0:
+                    params_str = ' '.join(['参数' + str(i+1) for i in range(arity)])
+                elif arity < 0:
+                    params_str = '参数...'
                 completions.append({
                     'label': verb,
                     'kind': 15,  # Snippet
-                    'detail': f'动词 (元数: {arity})',
+                    'detail': detail,
                     'sortText': f'2_{verb}',
-                    'filterText': verb
+                    'filterText': verb,
+                    'insertText': f'{verb} $0' if arity == 0 else verb,
+                    'data': {
+                        'type': 'verb',
+                        'name': verb,
+                        'arity': arity,
+                        'params': params_str
+                    }
+                })
+        
+        # Stdlib 函数补全（从 STDLIB_VERB_ARITY 获取）
+        for func_name, arity in sorted(STDLIB_VERB_ARITY.items()):
+            if not prefix or func_name.startswith(prefix):
+                arity_str = f'元数: {arity}' if arity >= 0 else '可变参数'
+                completions.append({
+                    'label': func_name,
+                    'kind': 3,  # Function
+                    'detail': f'内置函数 ({arity_str})',
+                    'sortText': f'4_{func_name}',
+                    'filterText': func_name,
+                    'data': {
+                        'type': 'stdlib',
+                        'name': func_name,
+                        'arity': arity
+                    }
+                })
+        
+        # 内置类型补全
+        for t in sorted(BUILTIN_TYPES):
+            if not prefix or t.startswith(prefix):
+                completions.append({
+                    'label': t,
+                    'kind': 22,  # TypeParameter
+                    'detail': '内置类型',
+                    'sortText': f'5_{t}',
+                    'filterText': t
                 })
         
         # 本地变量/函数补全
@@ -560,14 +609,160 @@ class DuanLanguageServer:
                         'label': name,
                         'kind': kind,
                         'detail': detail,
-                        'sortText': f'3_{name}',
+                        'sortText': f'6_{name}',
                         'filterText': name
                     })
+        
+        # Snippet 补全（常用模式）
+        snippets = [
+            {
+                'label': '段落模板',
+                'kind': 15,  # Snippet
+                'detail': '段落定义模板',
+                'sortText': '0_段落模板',
+                'insertText': '段落 ${1:段名} 接收 ${2:参数}：\n\t$0\n结束。',
+                'insertTextFormat': 2,  # SnippetTextFormat
+            },
+            {
+                'label': '如果模板',
+                'kind': 15,
+                'detail': '如果条件语句模板',
+                'sortText': '0_如果模板',
+                'insertText': '如果 ${1:条件} 那么：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '遍历模板',
+                'kind': 15,
+                'detail': '遍历循环模板',
+                'sortText': '0_遍历模板',
+                'insertText': '遍历 ${1:变量} 于 ${2:列表}：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '当模板',
+                'kind': 15,
+                'detail': '当循环模板',
+                'sortText': '0_当模板',
+                'insertText': '当 ${1:条件}：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '类模板',
+                'kind': 15,
+                'detail': '类定义模板',
+                'sortText': '0_类模板',
+                'insertText': '类 ${1:类名}：\n\t构造 ${2:参数}：\n\t\t$0\n\t结束。\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '尝试模板',
+                'kind': 15,
+                'detail': '异常处理模板',
+                'sortText': '0_尝试模板',
+                'insertText': '尝试：\n\t$0\n捕获 ${1:异常}：\n\t\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '定义变量',
+                'kind': 15,
+                'detail': '定义变量模板',
+                'sortText': '0_定义变量',
+                'insertText': '定义 ${1:变量名} 等于 ${2:值}。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '匹配模板',
+                'kind': 15,
+                'detail': '模式匹配模板',
+                'sortText': '0_匹配模板',
+                'insertText': '匹配 ${1:表达式}：\n情况 ${2:模式}：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+        ]
+        completions.extend(snippets)
         
         return {
             'isIncomplete': False,
             'items': completions
         }
+    
+    def _handle_completion_resolve(self, params: Dict) -> Dict:
+        """处理补全项解析（返回参数详细信息）"""
+        item = params
+        data = item.get('data', {})
+        item_type = data.get('type', '')
+        name = data.get('name', '')
+        
+        if item_type == 'verb':
+            arity = data.get('arity', 0)
+            if arity > 0:
+                params_detail = ' '.join([f'参数{i+1}' for i in range(arity)])
+                item['detail'] = f'动词: {name} ({params_detail})'
+            elif arity < 0:
+                item['detail'] = f'动词: {name} (可变参数)'
+            else:
+                item['detail'] = f'动词: {name} (无参数)'
+        elif item_type == 'stdlib':
+            arity = data.get('arity', 0)
+            # 为 stdlib 函数提供更详细的文档
+            stdlib_docs = {
+                '读取文件': '读取文件内容\n\n参数: path (文件路径)\n返回: 文件内容字符串',
+                '写入文件': '写入文件内容\n\n参数: path (文件路径), content (内容)',
+                '追加文件': '追加内容到文件\n\n参数: path (文件路径), content (追加内容)',
+                '文件存在': '检查文件是否存在\n\n参数: path (文件路径)\n返回: 布尔值',
+                '目录存在': '检查目录是否存在\n\n参数: path (目录路径)\n返回: 布尔值',
+                '路径存在': '检查路径是否存在\n\n参数: path (路径)\n返回: 布尔值',
+                '创建目录': '创建目录\n\n参数: path (目录路径)',
+                '删除文件': '删除文件\n\n参数: path (文件路径)',
+                '删除目录': '删除空目录\n\n参数: path (目录路径)',
+                '列出目录': '列出目录内容\n\n参数: path (目录路径)\n返回: 文件名列表',
+                '绝对路径': '获取绝对路径\n\n参数: path (路径)\n返回: 绝对路径字符串',
+                '连接路径': '连接多个路径\n\n参数: *paths (路径片段)\n返回: 连接后的路径',
+                '环境变量': '获取环境变量\n\n参数: name (变量名), default (默认值)\n返回: 变量值或默认值',
+                '退出程序': '退出程序\n\n参数: code (退出码，默认0)',
+                '当前目录': '获取当前工作目录\n\n返回: 路径字符串',
+                '切换目录': '切换工作目录\n\n参数: path (目录路径)',
+                '执行命令': '执行系统命令\n\n参数: command (命令字符串)\n返回: 退出码',
+                '读取行': '从标准输入读取一行\n\n返回: 读取的字符串',
+                '写入输出': '向标准输出写入文本\n\n参数: text (要写入的文本)',
+                '打印输出': '向标准输出打印文本并换行\n\n参数: text (要打印的文本)',
+                '解析JSON': '解析 JSON 字符串\n\n参数: text (JSON 字符串)\n返回: 段言值',
+                '序列化JSON': '将值序列化为 JSON 字符串\n\n参数: value (值), 缩进 (可选)',
+                '转整数': '将字符串转换为整数\n\n参数: text (字符串)\n返回: 整数',
+                '转浮点': '将字符串转换为浮点数\n\n参数: text (字符串)\n返回: 浮点数',
+                '转字符串': '将值转换为字符串\n\n参数: value (任意值)\n返回: 字符串',
+                '字符串长度': '获取字符串长度\n\n参数: text (字符串)\n返回: 整数',
+                '分割字符串': '分割字符串\n\n参数: text (字符串), separator (分隔符)',
+                '连接字符串': '连接字符串列表\n\n参数: parts (列表), separator (分隔符)',
+                '替换字符串': '替换字符串\n\n参数: text (原串), old (旧串), new (新串)',
+                '去除空白': '去除首尾空白\n\n参数: text (字符串)\n返回: 处理后的字符串',
+                '随机整数': '生成随机整数\n\n参数: 最小 (包含), 最大 (包含)\n返回: 随机整数',
+                '随机浮点': '生成 [0.0, 1.0) 随机浮点数\n\n返回: 随机浮点数',
+                '随机选择': '从列表中随机选择元素\n\n参数: 列表\n返回: 选中的元素',
+                '阶乘': '计算 n 的阶乘\n\n参数: n (非负整数)\n返回: n!',
+                '平均数': '计算列表平均值\n\n参数: 数据 (数值列表)\n返回: 平均值',
+                '中位数': '计算列表中位数\n\n参数: 数据 (数值列表)\n返回: 中位数',
+                '求和': '计算列表和\n\n参数: 数据 (数值列表)\n返回: 总和',
+                '圆周率': '返回圆周率 π\n\n返回: 3.14159...',
+                '自然常数': '返回自然常数 e\n\n返回: 2.71828...',
+            }
+            if name in stdlib_docs:
+                item['documentation'] = {'kind': 'markdown', 'value': f'**{name}**\n\n{stdlib_docs[name]}'}
+            else:
+                item['detail'] = f'内置函数: {name}'
+        elif item_type == 'keyword':
+            kw_docs = {
+                '定义': '定义变量：定义 变量名 等于 值。',
+                '如果': '条件语句：如果 条件 那么：...结束。',
+                '遍历': '遍历循环：遍历 变量 于 列表：...结束。',
+                '返回': '返回语句：返回 表达式。',
+                '段落': '段落（函数）定义：段落 段名 接收 参数：...结束。',
+            }
+            if name in kw_docs:
+                item['documentation'] = {'kind': 'markdown', 'value': kw_docs[name]}
+        
+        return item
     
     def _handle_hover(self, params: Dict) -> Optional[Dict]:
         """处理悬停请求"""
@@ -604,13 +799,92 @@ class DuanLanguageServer:
         # 构造悬停内容
         contents = []
         
+        # 关键字用法提示
+        kw_hints = {
+            '定义': '`定义` 用于声明变量：\n\n```段言\n定义 变量名 等于 值。\n```',
+            '设': '`设` 用于变量赋值：\n\n```段言\n设 变量名 为 值。\n```',
+            '如果': '`如果` 用于条件判断：\n\n```段言\n如果 条件 那么：\n    代码\n结束。\n```',
+            '若': '`若` 是 `如果` 的简写：\n\n```段言\n若 条件 则：\n    代码\n结束。\n```',
+            '那么': '`那么` 是 `if` 语句的 then 分支标记，与 `如果` 搭配使用。',
+            '否则': '`否则` 是条件语句的 else 分支，与 `如果` 搭配使用。',
+            '否则若': '`否则若` 是条件语句的 elif 分支，用于多条件判断。',
+            '遍历': '`遍历` 用于循环迭代：\n\n```段言\n遍历 变量 于 列表：\n    代码\n结束。\n```',
+            '当': '`当` 用于条件循环：\n\n```段言\n当 条件：\n    代码\n结束。\n```',
+            '返回': '`返回` 用于从函数中返回值：\n\n```段言\n返回 表达式。\n```',
+            '跳出': '`跳出` 用于跳出当前循环。',
+            '跳过': '`跳过` 用于跳过本次循环迭代，继续下一次。',
+            '段落': '`段落` 用于定义函数：\n\n```段言\n段落 段名 接收 参数：\n    代码\n结束。\n```',
+            '函数': '`函数` 用于定义函数（与 `段落` 同义）：\n\n```段言\n函数 函数名 接收 参数：\n    代码\n结束。\n```',
+            '类': '`类` 用于定义类：\n\n```段言\n类 类名：\n    属性 变量。\n    构造 参数：\n        代码\n    结束。\n结束。\n```',
+            '接口': '`接口` 用于定义接口：\n\n```段言\n接口 接口名：\n    ...\n结束。\n```',
+            '尝试': '`尝试` 用于异常处理：\n\n```段言\n尝试：\n    代码\n捕获 异常：\n    处理\n结束。\n```',
+            '抛出': '`抛出` 用于抛出异常：\n\n```段言\n抛出 异常对象。\n```',
+            '导入': '`导入` 用于导入模块：\n\n```段言\n导入 模块名。\n```',
+            '匹配': '`匹配` 用于模式匹配：\n\n```段言\n匹配 表达式：\n情况 模式：\n    代码\n结束。\n```',
+            '异步': '`异步` 用于定义异步函数：\n\n```段言\n异步 段落 段名 接收 参数：\n    ...\n结束。\n```',
+            '等待': '`等待` 用于等待异步操作完成：\n\n```段言\n等待 异步调用。\n```',
+            '真': '布尔值 `真`（True）。',
+            '假': '布尔值 `假`（False）。',
+            '空': '空值 `空`（None）。',
+        }
+        
         # 检查是否是关键字
         if word in ALL_KEYWORDS:
-            contents.append(f"**关键字**: `{word}`")
+            if word in kw_hints:
+                contents.append(f"**关键字**: `{word}`\n\n{kw_hints[word]}")
+            else:
+                contents.append(f"**关键字**: `{word}`")
         
         # 检查是否是动词
         if word in VERB_ARITY:
-            contents.append(f"**动词**: `{word}` (元数: {VERB_ARITY[word]})")
+            arity = VERB_ARITY[word]
+            arity_desc = '无参数' if arity == 0 else f'{arity} 个参数' if arity > 0 else '可变参数'
+            contents.append(f"**动词**: `{word}` (元数: {arity}, {arity_desc})")
+        
+        # 检查是否是 stdlib 函数
+        if word in STDLIB_VERB_ARITY:
+            stdlib_docs = {
+                '读取文件': '读取文件内容\n\n参数: `path` (文件路径)\n返回: 文件内容字符串\n\n**示例**:\n```段言\n内容 = 读取文件("test.txt")\n```',
+                '写入文件': '写入文件内容\n\n参数: `path` (文件路径), `content` (内容)\n\n**示例**:\n```段言\n写入文件("test.txt", "你好")\n```',
+                '文件存在': '检查文件是否存在\n\n参数: `path` (文件路径)\n返回: 布尔值',
+                '目录存在': '检查目录是否存在\n\n参数: `path` (目录路径)\n返回: 布尔值',
+                '路径存在': '检查路径是否存在\n\n参数: `path` (路径)\n返回: 布尔值',
+                '创建目录': '创建目录（自动创建父目录）\n\n参数: `path` (目录路径)',
+                '删除文件': '删除文件\n\n参数: `path` (文件路径)',
+                '列出目录': '列出目录内容\n\n参数: `path` (目录路径, 默认当前目录)\n返回: 文件名列表',
+                '绝对路径': '获取绝对路径\n\n参数: `path` (路径)\n返回: 绝对路径字符串',
+                '连接路径': '连接多个路径\n\n参数: `*paths` (路径片段)\n返回: 连接后的路径',
+                '环境变量': '获取环境变量\n\n参数: `name` (变量名), `default` (默认值)\n返回: 变量值或默认值',
+                '退出程序': '退出程序\n\n参数: `code` (退出码, 默认0)',
+                '当前目录': '获取当前工作目录\n\n返回: 路径字符串',
+                '切换目录': '切换工作目录\n\n参数: `path` (目录路径)',
+                '执行命令': '执行系统命令\n\n参数: `command` (命令字符串)\n返回: 退出码',
+                '读取行': '从标准输入读取一行\n\n返回: 读取的字符串（不含换行符）',
+                '打印输出': '向标准输出打印文本并换行\n\n参数: `text` (要打印的文本)',
+                '解析JSON': '解析 JSON 字符串\n\n参数: `text` (JSON 字符串)\n返回: 段言值',
+                '序列化JSON': '将值序列化为 JSON 字符串\n\n参数: `value` (值), `缩进` (可选)\n返回: JSON 字符串',
+                '转整数': '将字符串转换为整数\n\n参数: `text` (字符串)\n返回: 整数',
+                '转浮点': '将字符串转换为浮点数\n\n参数: `text` (字符串)\n返回: 浮点数',
+                '转字符串': '将值转换为字符串\n\n参数: `value` (任意值)\n返回: 字符串',
+                '字符串长度': '获取字符串长度\n\n参数: `text` (字符串)\n返回: 整数',
+                '分割字符串': '分割字符串\n\n参数: `text` (字符串), `separator` (分隔符, 可选)',
+                '连接字符串': '连接字符串列表\n\n参数: `parts` (列表), `separator` (分隔符, 默认空串)',
+                '替换字符串': '替换字符串\n\n参数: `text` (原串), `old` (旧串), `new` (新串)',
+                '去除空白': '去除首尾空白\n\n参数: `text` (字符串)\n返回: 处理后的字符串',
+                '随机整数': '生成范围内的随机整数\n\n参数: `最小` (包含), `最大` (包含)\n返回: 随机整数',
+                '随机浮点': '生成 [0.0, 1.0) 范围内的随机浮点数\n\n返回: 随机浮点数',
+                '随机选择': '从列表中随机选择一个元素\n\n参数: `列表` (源列表)\n返回: 选中的元素，空列表返回空',
+                '阶乘': '计算 n 的阶乘\n\n参数: `n` (非负整数)\n返回: n!',
+                '平均数': '计算列表的平均值\n\n参数: `数据` (数值列表)\n返回: 平均值',
+                '中位数': '计算列表的中位数\n\n参数: `数据` (数值列表)\n返回: 中位数',
+                '求和': '计算列表中所有数值的和\n\n参数: `数据` (数值列表)\n返回: 总和',
+                '圆周率': '返回圆周率 π 的近似值\n\n返回: 3.141592653589793',
+                '自然常数': '返回自然常数 e 的近似值\n\n返回: 2.718281828459045',
+            }
+            arity = STDLIB_VERB_ARITY[word]
+            arity_desc = '无参数' if arity == 0 else f'{arity} 个参数' if arity > 0 else '可变参数'
+            doc_text = stdlib_docs.get(word, '标准库函数')
+            contents.append(f"**内置函数**: `{word}`\n\n{arity_desc}\n\n{doc_text}")
         
         # 检查是否是本地定义
         if doc.uri in self.doc_manager.definitions:
@@ -618,18 +892,53 @@ class DuanLanguageServer:
             if info:
                 if info['type'] == '函数':
                     params_str = ', '.join(info['params'])
-                    contents.append(f"**函数**: `{word}({params_str})`")
+                    # 获取参数类型信息
+                    typed_params = []
+                    for p in info['params']:
+                        ptype = '任意'
+                        if doc.uri in self.doc_manager.type_info:
+                            ptype = self.doc_manager.type_info[doc.uri].get(p, '任意')
+                        typed_params.append(f"{p}: {ptype}")
+                    typed_params_str = ', '.join(typed_params)
+                    contents.append(f"**函数**: `{word}({typed_params_str})`\n\n定义于第 {info['line'] + 1} 行")
 
             if word in self.doc_manager.definitions[doc.uri]:
                 def_info = self.doc_manager.definitions[doc.uri][word]
                 def_line = def_info['range']['start']['line'] + 1
-                contents.append(f"定义于第 {def_line} 行")
+                # 检查是否是变量定义
+                is_var = word not in {k.replace('__info', '') for k in self.doc_manager.definitions[doc.uri] if k.endswith('__info')}
+                if is_var and word not in ALL_KEYWORDS and word not in VERB_ARITY:
+                    if not info:  # 不是函数时
+                        contents.append(f"定义于第 {def_line} 行")
 
         # 类型信息
         if doc.uri in self.doc_manager.type_info:
             t = self.doc_manager.type_info[doc.uri].get(word)
             if t:
-                contents.append(f"**类型**: `{t}`")
+                # 避免重复添加类型信息
+                has_type = any(f'类型' in c for c in contents)
+                if not has_type:
+                    contents.append(f"**类型**: `{t}`")
+        
+        # 内置类型提示
+        if word in BUILTIN_TYPES:
+            type_docs = {
+                '数': '通用数值类型，包含整数和浮点数。',
+                '整数': '整数类型，如 1, 42, -3。',
+                '浮数': '浮点数类型，如 3.14, -0.5。',
+                '小数': '浮点数类型的别名。',
+                '串': '字符串类型的别名。',
+                '文本': '字符串类型，如 "你好", \'段言\'。',
+                '列': '列表类型的别名。',
+                '列表': '列表类型，有序集合，如 [1, 2, 3]。',
+                '典': '字典类型的别名。',
+                '字典': '字典类型，键值对集合，如 {"a": 1}。',
+                '布尔': '布尔值类型，取值为真或假。',
+                '空': '空类型，表示没有值。',
+                '任意': '任意类型，可接受任何值。',
+            }
+            if word in type_docs:
+                contents.append(f"**内置类型**: `{word}`\n\n{type_docs[word]}")
         
         if not contents:
             return None
@@ -637,12 +946,180 @@ class DuanLanguageServer:
         return {
             'contents': {
                 'kind': 'markdown',
-                'value': '\n\n'.join(contents)
+                'value': '\n\n---\n\n'.join(contents)
             },
             'range': {
                 'start': {'line': line, 'character': start},
                 'end': {'line': line, 'character': end}
             }
+        }
+    
+    def _handle_document_highlight(self, params: Dict) -> List[Dict]:
+        """处理文档高亮请求，高亮光标位置处符号的所有出现"""
+        doc = self.doc_manager.get_document(params.get('textDocument', {}).get('uri', ''))
+        if not doc:
+            return []
+        
+        position = params.get('position', {})
+        line = position.get('line', 0)
+        character = position.get('character', 0)
+        
+        # 获取光标位置的词
+        line_text = doc.get_line(line)
+        start = character
+        end = character
+        
+        while start > 0:
+            ch = line_text[start - 1]
+            if ch.isalnum() or '\u4e00' <= ch <= '\u9fff':
+                start -= 1
+            else:
+                break
+        while end < len(line_text):
+            ch = line_text[end]
+            if ch.isalnum() or '\u4e00' <= ch <= '\u9fff':
+                end += 1
+            else:
+                break
+        
+        word = line_text[start:end]
+        if not word:
+            return []
+        
+        # 查找所有出现
+        highlights = []
+        for i, ln in enumerate(doc.lines):
+            pos = 0
+            while True:
+                idx = ln.find(word, pos)
+                if idx == -1:
+                    break
+                # 检查是否是完整词
+                before_ok = idx == 0 or not (
+                    ln[idx - 1].isalnum() or '\u4e00' <= ln[idx - 1] <= '\u9fff'
+                )
+                after_ok = idx + len(word) >= len(ln) or not (
+                    ln[idx + len(word)].isalnum() or
+                    '\u4e00' <= ln[idx + len(word)] <= '\u9fff'
+                )
+                if before_ok and after_ok:
+                    highlights.append({
+                        'range': {
+                            'start': {'line': i, 'character': idx},
+                            'end': {'line': i, 'character': idx + len(word)}
+                        }
+                    })
+                pos = idx + len(word)
+        
+        return highlights
+    
+    def _handle_signature_help(self, params: Dict) -> Optional[Dict]:
+        """处理签名帮助请求，显示函数调用时的参数信息"""
+        doc = self.doc_manager.get_document(params.get('textDocument', {}).get('uri', ''))
+        if not doc:
+            return None
+        
+        position = params.get('position', {})
+        line = position.get('line', 0)
+        character = position.get('character', 0)
+        
+        # 获取当前行文本
+        line_text = doc.get_line(line)
+        
+        # 向前查找函数调用括号
+        # 找到光标前的 '(' 或 '（' 位置
+        paren_pos = -1
+        depth = 0
+        for i in range(character - 1, -1, -1):
+            ch = line_text[i]
+            if ch in ('(', '（'):
+                if depth == 0:
+                    paren_pos = i
+                    break
+                depth += 1
+            elif ch in (')', '）'):
+                depth -= 1
+        
+        if paren_pos == -1:
+            return None
+        
+        # 从括号位置向前提取函数名
+        func_start = paren_pos - 1
+        while func_start >= 0:
+            ch = line_text[func_start]
+            if ch.isalnum() or '\u4e00' <= ch <= '\u9fff':
+                func_start -= 1
+            else:
+                break
+        func_name = line_text[func_start + 1:paren_pos]
+        
+        if not func_name:
+            return None
+        
+        # 计算当前参数索引（按逗号分割）
+        arg_text = line_text[paren_pos + 1:character]
+        arg_index = 0
+        if arg_text.strip():
+            arg_index = 1  # 至少有一个参数开始输入
+            for ch in arg_text:
+                if ch in ('，', ','):
+                    arg_index += 1
+        # 如果光标在逗号后面，参数索引加1
+        if arg_index > 0 and character > 0 and line_text[character - 1] in ('，', ','):
+            arg_index += 1
+        if arg_index > 0:
+            arg_index -= 1  # 转为0-based
+        
+        signatures = []
+        active_parameter = 0
+        
+        # 检查是否是 stdlib 函数
+        if func_name in STDLIB_VERB_ARITY:
+            arity = STDLIB_VERB_ARITY[func_name]
+            if arity >= 0:
+                params_list = []
+                for i in range(arity):
+                    params_list.append(f'参数{i+1}')
+                params_str = ', '.join(params_list)
+                signatures.append({
+                    'label': f'{func_name}({params_str})',
+                    'parameters': [{'label': p} for p in params_list]
+                })
+                active_parameter = min(arg_index, arity - 1) if arity > 0 else 0
+        
+        # 检查是否是动词
+        if func_name in VERB_ARITY:
+            arity = VERB_ARITY[func_name]
+            if arity >= 0:
+                params_list = []
+                for i in range(arity):
+                    params_list.append(f'参数{i+1}')
+                params_str = ', '.join(params_list)
+                signatures.append({
+                    'label': f'{func_name}({params_str})',
+                    'parameters': [{'label': p} for p in params_list]
+                })
+                active_parameter = min(arg_index, arity - 1) if arity > 0 else 0
+        
+        # 检查是否是本地定义的函数
+        if doc.uri in self.doc_manager.definitions:
+            info = self.doc_manager.definitions[doc.uri].get(func_name + '__info')
+            if info and info.get('type') == '函数':
+                params_list = info.get('params', [])
+                params_str = ', '.join(params_list)
+                signatures.append({
+                    'label': f'{func_name}({params_str})',
+                    'parameters': [{'label': p} for p in params_list]
+                })
+                active_parameter = min(arg_index, len(params_list) - 1) if params_list else 0
+        
+        if not signatures:
+            return None
+        
+        return {
+            'signatures': signatures,
+            'activeSignature': 0,
+            'activeParameter': active_parameter
         }
     
     def _handle_definition(self, params: Dict) -> Optional[Dict]:
@@ -1061,6 +1538,87 @@ class DuanLanguageServer:
 
         return diagnostics
 
+    def _diagnose(self, uri: str, text: str) -> List[Dict]:
+        """诊断文档，使用 Lexer + Parser 收集语法错误，返回诊断列表"""
+        diagnostics = []
+        try:
+            lexer = Lexer()
+            try:
+                tokens = lexer.tokenize(text)
+            except LexerError as e:
+                diagnostics.append({
+                    'range': {
+                        'start': {'line': max(0, e.line - 1), 'character': max(0, e.col - 1)},
+                        'end': {'line': max(0, e.line - 1), 'character': max(0, e.col)},
+                    },
+                    'severity': 1,
+                    'source': 'duan',
+                    'message': f'词法错误: {e.message if hasattr(e, "message") else str(e)}',
+                })
+                return diagnostics
+            except Exception as e:
+                diagnostics.append({
+                    'range': {
+                        'start': {'line': 0, 'character': 0},
+                        'end': {'line': 0, 'character': 1},
+                    },
+                    'severity': 1,
+                    'source': 'duan',
+                    'message': f'词法分析错误: {str(e)}',
+                })
+                return diagnostics
+
+            parser = DuanParser()
+            try:
+                ast = parser.parse(text)
+            except ParseError as e:
+                line = max(0, e.line - 1)
+                col = max(0, e.col - 1)
+                end_col = col + 1
+                if e.token_value:
+                    end_col = col + len(str(e.token_value))
+                diagnostics.append({
+                    'range': {
+                        'start': {'line': line, 'character': col},
+                        'end': {'line': line, 'character': end_col},
+                    },
+                    'severity': 1,
+                    'source': 'duan',
+                    'message': e.message if hasattr(e, 'message') else str(e),
+                })
+            except Exception as e:
+                diagnostics.append({
+                    'range': {
+                        'start': {'line': 0, 'character': 0},
+                        'end': {'line': 0, 'character': 1},
+                    },
+                    'severity': 1,
+                    'source': 'duan',
+                    'message': f'解析错误: {str(e)}',
+                })
+        except Exception as e:
+            diagnostics.append({
+                'range': {
+                    'start': {'line': 0, 'character': 0},
+                    'end': {'line': 0, 'character': 1},
+                },
+                'severity': 1,
+                'source': 'duan',
+                'message': f'诊断错误: {str(e)}',
+            })
+        return diagnostics
+
+    def _publish_diagnostics_with_lexer_parser(self, uri: str, text: str):
+        """使用 Lexer + Parser 诊断并发布通知"""
+        diagnostics = self._diagnose(uri, text)
+        notification = lsp_notification('textDocument/publishDiagnostics', {
+            'uri': uri,
+            'diagnostics': diagnostics
+        })
+        if not hasattr(self, '_pending_notifications'):
+            self._pending_notifications = []
+        self._pending_notifications.append(notification)
+
 
 def create_language_server():
     """创建 LSP 服务器"""
@@ -1071,70 +1629,90 @@ def create_language_server():
 # Stdio LSP 服务器入口
 # =============================================================================
 
-def run_stdio_server():
-    """通过 stdio 运行 LSP 服务器"""
-    import sys
-    
+def main():
+    """启动 LSP 服务器（独立入口）"""
     server = DuanLanguageServer()
-    request_id = None
-    
-    def send_message(message: Dict):
-        """发送 LSP 消息"""
-        content = json.dumps(message, ensure_ascii=False)
-        content_bytes = content.encode('utf-8')
-        sys.stdout.write(f'Content-Length: {len(content_bytes)}\r\n\r\n')
-        sys.stdout.buffer.write(content_bytes)
-        sys.stdout.flush()
-    
-    def read_message() -> Optional[Dict]:
-        """读取 LSP 消息"""
-        # 读取 headers
-        headers = {}
-        while True:
-            line = sys.stdin.readline()
-            if not line:
-                return None
-            line = line.strip()
-            if not line:
-                break
-            if ':' in line:
-                key, value = line.split(':', 1)
-                headers[key.strip().lower()] = value.strip()
-        
-        # 读取 content
-        content_length = int(headers.get('content-length', '0'))
-        if content_length <= 0:
-            return None
-        
-        content = sys.stdin.buffer.read(content_length).decode('utf-8')
-        return json.loads(content)
+    buffer = ''
+    content_length = 0
     
     while True:
-        message = read_message()
-        if message is None:
-            break
+        # Read headers
+        while '\r\n\r\n' not in buffer:
+            chunk = sys.stdin.buffer.read(4096)
+            if not chunk:
+                return
+            buffer += chunk.decode('utf-8', errors='replace')
         
-        method = message.get('method')
-        params = message.get('params', {})
-        msg_id = message.get('id')
+        # Parse Content-Length
+        header, _, buffer = buffer.partition('\r\n\r\n')
+        for line in header.split('\r\n'):
+            if line.lower().startswith('content-length:'):
+                content_length = int(line.split(':')[1].strip())
         
-        if method == 'exit':
-            break
+        # Read content
+        while len(buffer) < content_length:
+            chunk = sys.stdin.buffer.read(4096)
+            if not chunk:
+                return
+            buffer += chunk.decode('utf-8', errors='replace')
         
-        if method == 'shutdown':
-            if msg_id is not None:
-                send_message(lsp_response(msg_id, None))
-            continue
+        content = buffer[:content_length]
+        buffer = buffer[content_length:]
         
-        result = server.handle_request(method, params, msg_id)
-        
-        if result is not None and msg_id is not None:
-            send_message(result)
-        
-        # 发送待处理的通知
-        for notification in server.get_pending_notifications():
-            send_message(notification)
+        try:
+            message = json.loads(content)
+            method = message.get('method')
+            params = message.get('params')
+            msg_id = message.get('id')
+            
+            if method == 'exit':
+                return
+            
+            if method == 'shutdown':
+                if msg_id is not None:
+                    response = json.dumps({'jsonrpc': '2.0', 'id': msg_id, 'result': None}, ensure_ascii=False)
+                    response_bytes = response.encode('utf-8')
+                    sys.stdout.write(f'Content-Length: {len(response_bytes)}\r\n\r\n')
+                    sys.stdout.buffer.write(response_bytes)
+                    sys.stdout.flush()
+                continue
+            
+            if method:
+                result = server.handle_request(method, params, msg_id)
+                if result is not None:
+                    response = json.dumps({'jsonrpc': '2.0', 'id': msg_id, 'result': result}, ensure_ascii=False)
+                    response_bytes = response.encode('utf-8')
+                    sys.stdout.write(f'Content-Length: {len(response_bytes)}\r\n\r\n')
+                    sys.stdout.buffer.write(response_bytes)
+                    sys.stdout.flush()
+            
+            # Send pending notifications
+            for notification in server.get_pending_notifications():
+                notification_json = json.dumps(notification, ensure_ascii=False)
+                notification_bytes = notification_json.encode('utf-8')
+                sys.stdout.write(f'Content-Length: {len(notification_bytes)}\r\n\r\n')
+                sys.stdout.buffer.write(notification_bytes)
+                sys.stdout.flush()
+        except Exception as e:
+            error_response = json.dumps({
+                'jsonrpc': '2.0',
+                'id': msg_id if 'msg_id' in locals() else None,
+                'error': {'code': -32603, 'message': str(e)}
+            }, ensure_ascii=False)
+            error_bytes = error_response.encode('utf-8')
+            sys.stdout.write(f'Content-Length: {len(error_bytes)}\r\n\r\n')
+            sys.stdout.buffer.write(error_bytes)
+            sys.stdout.flush()
+
+
+# =============================================================================
+# Stdio LSP 服务器入口
+# =============================================================================
+
+def run_stdio_server():
+    """通过 stdio 运行 LSP 服务器（兼容别名）"""
+    main()
 
 
 if __name__ == '__main__':
-    run_stdio_server()
+    main()

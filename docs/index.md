@@ -39,9 +39,9 @@ pip install duan
 
 算力不足时让 AI 帮你写段言代码：
 
-- [LoRA 微调指南](../tools/ai_copilot/README_LoRA7B.md) — Qwen3-8B / Qwen3.5-2B 微调训练
-- [ERNIE 微调指南](../tools/ai_copilot/README_SFT.md) — ERNIE-4.5-0.3B 轻量级翻译器
+- [LoRA 微调指南](superpowers/plans/2026-07-01-level6-type-annotation.md) — Qwen 模型微调训练
+- [ERNIE 微调指南](superpowers/specs/2026-07-01-level5-module-exception-design.md) — ERNIE 轻量级翻译器
 
 ## 版本
 
-当前版本：**v4.0**
+当前版本：**v5.0.0-dev**
