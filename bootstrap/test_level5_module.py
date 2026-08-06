@@ -72,20 +72,17 @@ def test_export_variable():
     mp = ModulePreprocessor()
     main_dir = os.path.join('bootstrap', 'test_modules')
     exports = mp.extract_exports(open(os.path.join(main_dir, 'math_utils.duan'), encoding='utf-8').read())
-    assert "加法" in exports, f"应导出 加法: {exports}"
-    assert "乘法" in exports, f"应导出 乘法: {exports}"
-    assert "平方" in exports, f"应导出 平方: {exports}"
+    assert "PI" in exports, f"应导出 PI: {exports}"
+    assert "加法" not in exports, f"加法未显式导出: {exports}"
     assert "内部工具" not in exports, f"不应导出 内部工具: {exports}"
     print("✅ 导出变量测试通过")
 
 def test_inline_export():
     mp = ModulePreprocessor()
     main_dir = os.path.join('bootstrap', 'test_modules')
-    exports = mp.extract_exports(open(os.path.join(main_dir, 'math_utils.duan'), encoding='utf-8').read())
-    assert "加法" in exports, f"应导出 加法: {exports}"
-    assert "乘法" in exports, f"应导出 乘法: {exports}"
-    assert "平方" in exports, f"应导出 平方: {exports}"
-    assert "内部工具" not in exports, f"不应导出 内部工具: {exports}"
+    exports = mp.extract_exports(open(os.path.join(main_dir, 'string_utils.duan'), encoding='utf-8').read())
+    assert "版本号" in exports, f"应导出 版本号: {exports}"
+    assert "拼接" not in exports, f"拼接未显式导出: {exports}"
     print("✅ 内联导出识别测试通过")
 
 def test_level4_regression():

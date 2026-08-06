@@ -801,9 +801,9 @@ class UnifiedCodeGenerator:
         if isinstance(module_name, str):
             module_name = module_name.replace('《', '').replace('》', '')
         # 模块名映射：段言标准库模块 → Python 模块
-        # 注意：数学、时间、编码、正则等有独立 stdlib 中文模块，保持原名映射
-        # 只有 Python 原生模块名不同时才需要映射
-        module_map = {'JSON': 'json', '系统': 'sys', '操作系统': 'os'}
+        # 注意：有独立 stdlib 实现（含中文函数名）的模块不要映射到 Python 标准库
+        # 只有 Python 原生模块名不同且函数名也相同时才需要映射
+        module_map = {'系统': 'sys', '操作系统': 'os'}
         names = getattr(stmt, 'names', None) or getattr(stmt, 'symbols', None)
         if names:
             names_list = []

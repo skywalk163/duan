@@ -1162,51 +1162,52 @@ class TypeInferencer:
         if stmt is None:
             return TYPE_NULL
 
-        if stmt._ast_type_id == AST_TYPE_ID_VARIABLE_DECLARATION:
+        ast_type_id = getattr(stmt, '_ast_type_id', 0)
+        if ast_type_id == AST_TYPE_ID_VARIABLE_DECLARATION:
             return self._infer_var_decl(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_ASSIGNMENT:
+        elif ast_type_id == AST_TYPE_ID_ASSIGNMENT:
             return self._infer_assignment(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_IF_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_IF_STATEMENT:
             return self._infer_if_stmt(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_FOREACH_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_FOREACH_STATEMENT:
             return self._infer_foreach_stmt(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_WHILE_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_WHILE_STATEMENT:
             return self._infer_while_stmt(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_RETURN_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_RETURN_STATEMENT:
             return self._infer_return_stmt(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_MATCH_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_MATCH_STATEMENT:
             return self._infer_match_stmt(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_EXPRESSION_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_EXPRESSION_STATEMENT:
             return self._infer_expr(stmt.expression)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_PRINT_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_PRINT_STATEMENT:
             if hasattr(stmt, 'value') and stmt.value is not None:
                 self._infer_expr(stmt.value)
             return TYPE_NULL
 
-        elif stmt._ast_type_id == AST_TYPE_ID_THROW_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_THROW_STATEMENT:
             if hasattr(stmt, 'value') and stmt.value is not None:
                 self._infer_expr(stmt.value)
             return TYPE_NULL
 
-        elif stmt._ast_type_id == AST_TYPE_ID_FUNCTION_CALL:
+        elif ast_type_id == AST_TYPE_ID_FUNCTION_CALL:
             return self._infer_expr(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_SEGMENT_DEFINITION:
+        elif ast_type_id == AST_TYPE_ID_SEGMENT_DEFINITION:
             self._infer_segment(stmt)
             return TYPE_NULL
 
-        elif stmt._ast_type_id == AST_TYPE_ID_DEFER_STATEMENT:
+        elif ast_type_id == AST_TYPE_ID_DEFER_STATEMENT:
             return self._infer_defer_stmt(stmt)
 
-        elif stmt._ast_type_id == AST_TYPE_ID_ASYNC_SCOPE:
+        elif ast_type_id == AST_TYPE_ID_ASYNC_SCOPE:
             return self._infer_async_scope(stmt)
 
         return TYPE_NULL
@@ -1293,7 +1294,8 @@ class TypeInferencer:
         """推断赋值语句"""
         value_type = self._infer_expr(stmt.value)
 
-        if stmt.target._ast_type_id == AST_TYPE_ID_IDENTIFIER:
+        target_type_id = getattr(stmt.target, '_ast_type_id', 0)
+        if target_type_id == AST_TYPE_ID_IDENTIFIER:
             target_name = stmt.target.name
             symbol = self.symbol_table.lookup(target_name)
             if symbol:
@@ -1317,7 +1319,7 @@ class TypeInferencer:
             self.type_cache[id(stmt)] = value_type
             return value_type
 
-        elif stmt.target._ast_type_id == AST_TYPE_ID_PROPERTY_ACCESS:
+        elif target_type_id == AST_TYPE_ID_PROPERTY_ACCESS:
             self._infer_expr(stmt.target)
             self.type_cache[id(stmt)] = value_type
             return value_type
@@ -1497,19 +1499,20 @@ class TypeInferencer:
             return self.type_cache[id(expr)]
 
         result_type: Type = TYPE_UNKNOWN
+        ast_type_id = getattr(expr, '_ast_type_id', 0)
 
         # 字面量
-        if expr._ast_type_id == AST_TYPE_ID_NUMBER_LITERAL:
+        if ast_type_id == AST_TYPE_ID_NUMBER_LITERAL:
             result_type = TYPE_NUMBER
-        elif expr._ast_type_id == AST_TYPE_ID_STRING_LITERAL:
+        elif ast_type_id == AST_TYPE_ID_STRING_LITERAL:
             result_type = TYPE_STRING
-        elif expr._ast_type_id == AST_TYPE_ID_BOOLEAN_LITERAL:
+        elif ast_type_id == AST_TYPE_ID_BOOLEAN_LITERAL:
             result_type = TYPE_BOOLEAN
-        elif expr._ast_type_id == AST_TYPE_ID_NULL_LITERAL:
+        elif ast_type_id == AST_TYPE_ID_NULL_LITERAL:
             result_type = TYPE_NULL
 
         # 解包表达式：值! 或 unwrap(值)
-        elif expr._ast_type_id == AST_TYPE_ID_UNWRAP_EXPRESSION:
+        elif ast_type_id == AST_TYPE_ID_UNWRAP_EXPRESSION:
             inner_type = self._infer_expr(expr.value)
             if isinstance(inner_type, OptionalTypeWrapper):
                 result_type = inner_type.inner_type
@@ -1521,7 +1524,7 @@ class TypeInferencer:
             return result_type
 
         # 标识符
-        elif expr._ast_type_id == AST_TYPE_ID_IDENTIFIER:
+        elif ast_type_id == AST_TYPE_ID_IDENTIFIER:
             # 特殊处理：'空'、'None' 等是「可空的底类型」，被推断为 NullType
             if expr.name in ('None', '空', 'null', 'NULL'):
                 result_type = TYPE_NULL
@@ -1539,7 +1542,7 @@ class TypeInferencer:
                     result_type = TYPE_UNKNOWN
 
         # 二元运算
-        elif expr._ast_type_id == AST_TYPE_ID_BINARY_OP:
+        elif ast_type_id == AST_TYPE_ID_BINARY_OP:
             left_type = self._infer_expr(expr.left)
             right_type = self._infer_expr(expr.right)
             op = expr.operator
@@ -1627,7 +1630,7 @@ class TypeInferencer:
                 result_type = TYPE_UNKNOWN
 
         # 一元运算
-        elif expr._ast_type_id == AST_TYPE_ID_UNARY_OP:
+        elif ast_type_id == AST_TYPE_ID_UNARY_OP:
             operand_type = self._infer_expr(expr.operand)
             if expr.operator in ('非', 'not', '!'):
                 result_type = TYPE_BOOLEAN if isinstance(operand_type, BooleanType) else TYPE_UNKNOWN
@@ -1637,11 +1640,11 @@ class TypeInferencer:
                 result_type = operand_type
 
         # 函数调用 / 段落调用
-        elif expr._ast_type_id == AST_TYPE_ID_FUNCTION_CALL:
+        elif ast_type_id == AST_TYPE_ID_FUNCTION_CALL:
             result_type = self._infer_function_call(expr)
 
         # 属性访问（支持泛型类实例方法查找）
-        elif expr._ast_type_id == AST_TYPE_ID_PROPERTY_ACCESS:
+        elif ast_type_id == AST_TYPE_ID_PROPERTY_ACCESS:
             obj_type = self._infer_expr(expr.obj)
             property_name = expr.property_name
 
@@ -1679,7 +1682,7 @@ class TypeInferencer:
             result_type = TYPE_UNKNOWN
 
         # 索引访问
-        elif expr._ast_type_id == AST_TYPE_ID_INDEX_ACCESS:
+        elif ast_type_id == AST_TYPE_ID_INDEX_ACCESS:
             obj_type = self._infer_expr(expr.obj)
             index_type = self._infer_expr(expr.index)
 
@@ -1697,7 +1700,7 @@ class TypeInferencer:
                 result_type = TYPE_UNKNOWN
 
         # 列表字面量（支持泛型元素类型推断）
-        elif expr._ast_type_id == AST_TYPE_ID_LIST_LITERAL:
+        elif ast_type_id == AST_TYPE_ID_LIST_LITERAL:
             element_types = [self._infer_expr(e) for e in expr.elements]
             if element_types:
                 # 尝试合一所有元素类型
@@ -1718,7 +1721,7 @@ class TypeInferencer:
                 result_type = ListType(TYPE_UNKNOWN)
 
         # 字典字面量
-        elif expr._ast_type_id == AST_TYPE_ID_DICT_LITERAL:
+        elif ast_type_id == AST_TYPE_ID_DICT_LITERAL:
             key_types = []
             val_types = []
             for entry in expr.entries:
@@ -1757,7 +1760,7 @@ class TypeInferencer:
             result_type = DictType(key_type, val_type)
 
         # 类实例化（支持泛型类 + 类型参数推断）
-        elif expr._ast_type_id == AST_TYPE_ID_NEW_EXPRESSION:
+        elif ast_type_id == AST_TYPE_ID_NEW_EXPRESSION:
             arg_types = [self._infer_expr(a) for a in expr.arguments]
             class_name = expr.class_name
 
@@ -1825,10 +1828,10 @@ class TypeInferencer:
                 else:
                     result_type = ClassType(class_name)
 
-        elif expr._ast_type_id == AST_TYPE_ID_SELF_REFERENCE:
+        elif ast_type_id == AST_TYPE_ID_SELF_REFERENCE:
             result_type = TYPE_ANY
 
-        elif expr._ast_type_id == AST_TYPE_ID_LIST_COMPREHENSION:
+        elif ast_type_id == AST_TYPE_ID_LIST_COMPREHENSION:
             iter_type = self._infer_expr(expr.iterable)
             self.symbol_table.enter_scope()
             if isinstance(iter_type, ListType):
@@ -1846,16 +1849,16 @@ class TypeInferencer:
             self.symbol_table.exit_scope()
             result_type = ListType(elem_type)
 
-        elif expr._ast_type_id == AST_TYPE_ID_LAMBDA_EXPRESSION:
+        elif ast_type_id == AST_TYPE_ID_LAMBDA_EXPRESSION:
             result_type = self._infer_lambda(expr)
 
-        elif expr._ast_type_id == AST_TYPE_ID_STRING_INTERPOLATION:
+        elif ast_type_id == AST_TYPE_ID_STRING_INTERPOLATION:
             for part in expr.parts:
                 if not isinstance(part, str):
                     self._infer_expr(part)
             result_type = TYPE_STRING
 
-        elif expr._ast_type_id == AST_TYPE_ID_CONDITIONAL_EXPRESSION:
+        elif ast_type_id == AST_TYPE_ID_CONDITIONAL_EXPRESSION:
             cond_type = self._infer_expr(expr.condition)
             if not isinstance(cond_type, (BooleanType, AnyType, UnknownType)):
                 self._add_error(f"条件表达式类型应为布尔，实际为 {cond_type}", node=expr)
@@ -1870,13 +1873,13 @@ class TypeInferencer:
             else:
                 result_type = then_type
 
-        elif expr._ast_type_id == AST_TYPE_ID_PIPE_EXPRESSION:
+        elif ast_type_id == AST_TYPE_ID_PIPE_EXPRESSION:
             cur_type = TYPE_UNKNOWN
             for sub_expr in expr.expressions:
                 cur_type = self._infer_expr(sub_expr)
             result_type = cur_type
 
-        elif expr._ast_type_id == AST_TYPE_ID_AWAIT_EXPRESSION:
+        elif ast_type_id == AST_TYPE_ID_AWAIT_EXPRESSION:
             inner_type = self._infer_expr(expr.expression)
             if isinstance(inner_type, FutureType):
                 result_type = inner_type.inner_type
@@ -1937,7 +1940,8 @@ class TypeInferencer:
 
         # 获取函数名
         func_name = None
-        if expr.name._ast_type_id == AST_TYPE_ID_IDENTIFIER:
+        name_type_id = getattr(expr.name, '_ast_type_id', 0)
+        if name_type_id == AST_TYPE_ID_IDENTIFIER:
             func_name = expr.name.name
         elif hasattr(expr.name, 'name'):
             func_name = expr.name.name

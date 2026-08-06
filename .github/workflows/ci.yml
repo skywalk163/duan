@@ -166,3 +166,66 @@ jobs:
         with:
           name: dist
           path: dist/
+
+  # ── 跨平台可执行文件构建 ──────────────────────────────────
+  build-exe:
+    runs-on: ${{ matrix.os }}
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        python-version: ["3.12"]
+        include:
+          - os: windows-latest
+            exe-suffix: ".exe"
+            artifact-name: duan6-windows-x64
+          - os: ubuntu-latest
+            exe-suffix: ""
+            artifact-name: duan6-linux-x64
+          - os: macos-latest
+            exe-suffix: ""
+            artifact-name: duan6-macos-x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: Build executable with PyInstaller
+        run: |
+          python build_exe.py --name duan6
+
+      - name: Verify executable (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x dist/duan6${{ matrix.exe-suffix }}
+          file dist/duan6${{ matrix.exe-suffix }}
+          ./dist/duan6${{ matrix.exe-suffix }} --help
+          ./dist/duan6${{ matrix.exe-suffix }} --test
+
+      - name: Verify executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -c "
+          import subprocess
+          r = subprocess.run(['dist\\duan6.exe', '--help'], capture_output=True, text=True, encoding='gbk')
+          print('--help 返回码:', r.returncode)
+          r = subprocess.run(['dist\\duan6.exe', '--test'], capture_output=True, text=True, encoding='gbk')
+          print('--test 返回码:', r.returncode)
+          print('--test 输出:', r.stdout[:200])
+          "
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: dist/duan6${{ matrix.exe-suffix }}

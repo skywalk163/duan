@@ -176,8 +176,15 @@ class TestIRValidationInCodegen(unittest.TestCase):
 class TestVerifyIRWithClang(unittest.TestCase):
     """测试 compiler 层的 clang IR 验证"""
 
+    clang = None
+    try:
+        clang = find_clang()
+    except RuntimeError:
+        pass
+
     def setUp(self):
-        self.clang = find_clang()
+        if self.clang is None:
+            self.skipTest("clang 编译器未安装，跳过此测试")
 
     def test_valid_ir_passes_clang_verify(self):
         """合法 IR 应通过 clang 验证"""

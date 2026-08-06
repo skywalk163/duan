@@ -108,9 +108,8 @@ class PythonCodeGenerator:
         }
         
         # 模块名映射（中文到Python模块）
+        # 注意：有独立 stdlib 实现（含中文函数名）的模块不要映射到 Python 标准库
         self.module_name_map = {
-            'JSON': 'json',
-            '日期时间': 'datetime',
         }
         
         # 运算符映射

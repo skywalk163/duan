@@ -3,8 +3,12 @@ import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'antlrparser'))
 
-from duan_visitor import DuanParser
-from code_generator_unified import UnifiedCodeGenerator
+try:
+    from duan_visitor import DuanParser
+    from code_generator_unified import UnifiedCodeGenerator
+except ImportError:
+    import pytest
+    pytest.skip("ANTLR parser not available (missing generated DuanLangParser module)", allow_module_level=True)
 
 
 def run_duan(code):

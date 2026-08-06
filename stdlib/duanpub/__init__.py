@@ -141,12 +141,10 @@ def list_packages(category: str = None, priority: str = None) -> list[str]:
 # 这些包已有 Python 实现，导入时直接路由到 stdlib
 _STDLIB_BRIDGE = {
     '文件系统':   '文件系统',     # stdlib/文件系统.py
-    'JSON':       'json',         # Python 标准库 json
-    'CSV':        'csv',          # Python 标准库 csv
-    '正则表达式': 're',           # Python 标准库 re
-    '日期时间':   'datetime',     # Python 标准库 datetime
-    '数学运算':   'math',         # Python 标准库 math
-    '加密':       'hashlib',      # Python 标准库 hashlib（部分）
+    'JSON':       'JSON',         # stdlib/JSON.py（含中文函数名）
+    'CSV':        'csv',          # Python 标准库 csv（无中文函数名，直接透传）
+    '正则表达式': '正则表达式',   # stdlib/正则表达式.py（含中文函数名）
+    '日期时间':   '日期时间',     # stdlib/日期时间.py（含中文函数名）
 }
 
 

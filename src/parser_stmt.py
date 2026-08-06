@@ -4279,7 +4279,7 @@ class ParserStmtMixin:
             
             while self._current():
                 ptok = self._current()
-                if ptok.type == TokenType.KEYWORD and ptok.value == '返回' or tok.value == '返':
+                if ptok.type == TokenType.KEYWORD and (ptok.value == '返回' or ptok.value == '返'):
                     break
                 if ptok.type == TokenType.PERIOD:
                     break
@@ -4599,7 +4599,7 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '接收')
             while self._current():
                 ptok = self._current()
-                if ptok.type == TokenType.KEYWORD and ptok.value == '返回' or tok.value == '返':
+                if ptok.type == TokenType.KEYWORD and (ptok.value == '返回' or ptok.value == '返'):
                     break
                 if ptok.type == TokenType.PERIOD:
                     break
@@ -4679,11 +4679,20 @@ class ParserStmtMixin:
     def _parse_ffi_preprocessor_def(self) -> FFIPreprocessorDef:
         """解析C预处理器宏：外部 宏 名称 为 值"""
         self._consume(TokenType.KEYWORD, '宏')
-        name_tok = self._current()
-        if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-            name = self._consume().value
-        else:
-            self._error(f"期望宏名，但得到 {name_tok.type if name_tok else '输入结束'}")
+        
+        # 宏名可能由多个 token 组成（如"最大连接"被拆分为"最大连"+关键字"接"）
+        name_parts = []
+        while self._current():
+            tok = self._current()
+            if tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                if tok.value == '为':
+                    break
+                name_parts.append(self._consume().value)
+            else:
+                break
+        if not name_parts:
+            self._error(f"期望宏名，但得到 {self._current().type if self._current() else '输入结束'}")
+        name = ''.join(name_parts)
         
         value = ""
         if self._match(TokenType.KEYWORD, '为'):
