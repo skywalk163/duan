@@ -458,6 +458,8 @@ def main():
         
         pkg_build_parser = pkg_sub.add_parser('build', help='编译项目中的 .duan 文件为 .py')
         pkg_build_parser.add_argument('--dir', default='.', help='项目目录（默认: 当前目录）')
+        pkg_build_parser.add_argument('--incremental', action='store_true', help='使用增量编译（仅编译变更文件）')
+        pkg_build_parser.add_argument('--force', '-f', action='store_true', help='强制全量编译（忽略增量缓存）')
         
         args = parser.parse_args()
         
@@ -504,7 +506,20 @@ def main():
             if args.pkg_command == 'init':
                 return cli.pkg_init(args.name)
             elif args.pkg_command == 'build':
-                return cli.pkg_build(args.dir)
+                if getattr(args, 'incremental', False):
+                    try:
+                        from incremental_build import incremental_build_cli
+                        result = incremental_build_cli(
+                            project_dir=args.dir,
+                            force=getattr(args, 'force', False),
+                            verbose=True
+                        )
+                        return 0 if result == 0 else 1
+                    except ImportError as e:
+                        print(f"❌ 增量编译模块不可用: {e}", file=sys.stderr)
+                        return 1
+                else:
+                    return cli.pkg_build(args.dir)
     
     else:
         # 默认模式：编译并运行
@@ -528,7 +543,7 @@ def main():
         parser.add_argument('-o', '--output', help='输出文件路径')
         parser.add_argument('--run', action='store_true', help='编译并运行')
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
-        parser.add_argument('--version', action='version', version='段言 v5.1.0')
+        parser.add_argument('--version', action='version', version='段言 v5.5.0')
         
         args = parser.parse_args()
         

@@ -559,6 +559,211 @@ class ZipDownloader:
 
 
 # ===========================================================================
+# 语义化版本比较
+# ===========================================================================
+
+class Version:
+    """语义化版本号比较工具，支持 >=1.0.0 格式的版本号。"""
+
+    @staticmethod
+    def parse(version_str: str) -> tuple:
+        """将版本字符串解析为可比较的元组 (major, minor, patch, pre_release)"""
+        if not version_str:
+            return (0, 0, 0, 0)
+        parts = version_str.replace('-', '.').split('.')
+        result = []
+        for part in parts:
+            try:
+                result.append(int(part))
+            except ValueError:
+                # 预发布标签如 alpha, beta, rc
+                result.append(0)
+        while len(result) < 3:
+            result.append(0)
+        # 第4个元素用于预发布版本比较
+        is_pre = 'alpha' in version_str.lower() or 'beta' in version_str.lower() or 'rc' in version_str.lower()
+        result.append(1 if is_pre else 999)
+        return tuple(result[:4])
+
+    @staticmethod
+    def compare(v1: str, v2: str) -> int:
+        """比较两个版本号。返回 -1 如果 v1 < v2, 0 如果相等, 1 如果 v1 > v2"""
+        t1 = Version.parse(v1)
+        t2 = Version.parse(v2)
+        if t1 > t2:
+            return 1
+        if t1 < t2:
+            return -1
+        return 0
+
+    @staticmethod
+    def satisfies(version: str, constraint: str) -> bool:
+        """检查版本是否满足约束（如 >=1.0.0, ^1.0.0, ~1.0.0）"""
+        constraint = constraint.strip()
+        if constraint.startswith('>='):
+            return Version.compare(version, constraint[2:]) >= 0
+        elif constraint.startswith('>'):
+            return Version.compare(version, constraint[1:]) > 0
+        elif constraint.startswith('<='):
+            return Version.compare(version, constraint[2:]) <= 0
+        elif constraint.startswith('<'):
+            return Version.compare(version, constraint[1:]) < 0
+        elif constraint.startswith('^'):
+            # ^1.2.3 表示 >=1.2.3 <2.0.0
+            base = constraint[1:]
+            parts = base.split('.')
+            major = parts[0] if parts else '0'
+            next_major = str(int(major) + 1) if major.isdigit() else '*'
+            return Version.compare(version, base) >= 0 and Version.compare(version, f'{next_major}.0.0') < 0
+        elif constraint.startswith('~'):
+            # ~1.2.3 表示 >=1.2.3 <1.3.0
+            base = constraint[1:]
+            parts = base.split('.')
+            if len(parts) >= 2:
+                minor = parts[1]
+                next_minor = str(int(minor) + 1) if minor.isdigit() else '*'
+                return Version.compare(version, base) >= 0 and Version.compare(version, f'{parts[0]}.{next_minor}.0') < 0
+            return Version.compare(version, base) >= 0
+        elif constraint.startswith('=') or constraint.startswith('=='):
+            return Version.compare(version, constraint.lstrip('=')) == 0
+        else:
+            # 精确匹配
+            return Version.compare(version, constraint) == 0
+
+
+# ===========================================================================
+# 依赖解析器
+# ===========================================================================
+
+class DependencyResolver:
+    """解析包依赖关系，支持拓扑排序和自动安装。"""
+
+    @staticmethod
+    def parse_duan_json(project_root: Path) -> Dict[str, str]:
+        """从 duan.json 读取依赖配置"""
+        json_path = project_root / 'duan.json'
+        if not json_path.exists():
+            return {}
+        try:
+            data = json.loads(json_path.read_text(encoding='utf-8'))
+            return data.get('dependencies', {})
+        except Exception:
+            return {}
+
+    @staticmethod
+    def parse_package_toml(project_root: Path) -> Dict[str, str]:
+        """从 package.toml 读取依赖配置"""
+        from package_manager import TomlParser
+        toml_path = project_root / 'package.toml'
+        if not toml_path.exists():
+            return {}
+        try:
+            data = TomlParser().parse(toml_path.read_text(encoding='utf-8'))
+            deps = data.get('dependencies', {}) or {}
+            normalized = {}
+            for key, val in deps.items():
+                if isinstance(val, dict):
+                    normalized[key] = str(val.get('version', '*'))
+                else:
+                    normalized[key] = str(val)
+            return normalized
+        except Exception:
+            return {}
+
+    @staticmethod
+    def get_all_dependencies(project_root: Path) -> Dict[str, str]:
+        """从 duan.json 或 package.toml 中获取所有依赖"""
+        deps = DependencyResolver.parse_duan_json(project_root)
+        if not deps:
+            deps = DependencyResolver.parse_package_toml(project_root)
+        return deps
+
+    @staticmethod
+    def topological_sort(packages: Dict[str, List[str]]) -> List[str]:
+        """对依赖关系进行拓扑排序。packages: {name: [dep1, dep2, ...]}"""
+        visited = set()
+        temp_mark = set()
+        result = []
+
+        def visit(name: str):
+            if name in temp_mark:
+                raise ValueError(f"检测到循环依赖: {name}")
+            if name in visited:
+                return
+            temp_mark.add(name)
+            for dep in packages.get(name, []):
+                visit(dep)
+            temp_mark.discard(name)
+            visited.add(name)
+            result.append(name)
+
+        for name in packages:
+            if name not in visited:
+                visit(name)
+
+        return result
+
+
+# ===========================================================================
+# Lock 文件管理
+# ===========================================================================
+
+LOCK_FILE_NAME = 'duan.lock'
+
+
+class LockFile:
+    """管理 duan.lock 文件，用于可重现安装。"""
+
+    @classmethod
+    def load(cls, project_root: Path) -> Dict:
+        """加载 lock 文件"""
+        lock_path = project_root / LOCK_FILE_NAME
+        if not lock_path.exists():
+            return {}
+        try:
+            return json.loads(lock_path.read_text(encoding='utf-8'))
+        except Exception:
+            return {}
+
+    @classmethod
+    def save(cls, project_root: Path, packages: Dict[str, Dict]) -> bool:
+        """保存 lock 文件"""
+        lock_path = project_root / LOCK_FILE_NAME
+        lock_data = {
+            "version": "1.0",
+            "packages": packages,
+            "updated_at": time.strftime('%Y-%m-%dT%H:%M:%S')
+        }
+        try:
+            lock_path.write_text(
+                json.dumps(lock_data, ensure_ascii=False, indent=2),
+                encoding='utf-8'
+            )
+            return True
+        except Exception:
+            return False
+
+    @classmethod
+    def get_installed_versions(cls, project_root: Path) -> Dict[str, str]:
+        """从 lock 文件获取已安装包版本"""
+        data = cls.load(project_root)
+        packages = data.get('packages', {})
+        return {name: info.get('version', '?') for name, info in packages.items()}
+
+    @classmethod
+    def update_package(cls, project_root: Path, name: str, version: str, info: Dict = None):
+        """更新 lock 文件中单个包的信息"""
+        data = cls.load(project_root)
+        if 'packages' not in data:
+            data['packages'] = {}
+        data['packages'][name] = info or {
+            'version': version,
+            'installed_at': time.strftime('%Y-%m-%dT%H:%M:%S')
+        }
+        cls.save(project_root, data['packages'])
+
+
+# ===========================================================================
 # 包安装器
 # ===========================================================================
 
@@ -977,6 +1182,423 @@ class PackageInstaller:
             pass
 
     # ------------------------------------------------------------------
+    # 已安装包版本查询
+    # ------------------------------------------------------------------
+
+    def _get_installed_version(self, package_name: str) -> Optional[str]:
+        """获取已安装包的版本号"""
+        pkg_dir = self._packages_dir / package_name
+        if not pkg_dir.exists():
+            return None
+        pkg_toml = pkg_dir / 'package.toml'
+        if pkg_toml.exists():
+            try:
+                from package_manager import TomlParser
+                data = TomlParser().parse(pkg_toml.read_text(encoding='utf-8'))
+                return data.get('package', {}).get('version', None)
+            except Exception:
+                pass
+        # 从 lock 文件获取
+        lock_versions = LockFile.get_installed_versions(self.project_root)
+        return lock_versions.get(package_name)
+
+    def _get_registry_version(self, package_name: str) -> Optional[str]:
+        """从注册表中获取包的最新版本号"""
+        packages = self._registry.get('packages', {})
+        info = packages.get(package_name)
+        if info:
+            return info.get('version', None)
+        return None
+
+    # ------------------------------------------------------------------
+    # 更新
+    # ------------------------------------------------------------------
+
+    def update_package(self, package_name: str) -> bool:
+        """更新指定包到最新版本"""
+        pkg_dir = self._packages_dir / package_name
+        if not pkg_dir.exists():
+            print(f"错误: 段件 '{package_name}' 未安装")
+            return False
+
+        current_version = self._get_installed_version(package_name)
+        latest_version = self._get_registry_version(package_name)
+
+        if not latest_version:
+            print(f"错误: 未在注册表中找到段件 '{package_name}'")
+            return False
+
+        if current_version and Version.compare(latest_version, current_version) <= 0:
+            print(f"段件 '{package_name}' 已是最新版本 (v{current_version})")
+            return True
+
+        print(f"正在更新: {package_name}")
+        print(f"  当前版本: v{current_version or '?'}")
+        print(f"  最新版本: v{latest_version}")
+
+        # 备份旧版本
+        backup_dir = self._cache_dir / f"{package_name}.bak"
+        try:
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir)
+            shutil.copytree(str(pkg_dir), str(backup_dir))
+        except Exception:
+            pass
+
+        # 卸载旧版本
+        shutil.rmtree(pkg_dir)
+
+        # 安装新版本
+        success = self.install(package_name)
+        if success:
+            print(f"✅ 更新成功: {package_name} v{current_version or '?'} -> v{latest_version}")
+            LockFile.update_package(self.project_root, package_name, latest_version)
+            # 清理备份
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir, ignore_errors=True)
+            return True
+        else:
+            print(f"❌ 更新失败，正在回滚...")
+            # 回滚
+            if backup_dir.exists():
+                if pkg_dir.exists():
+                    shutil.rmtree(pkg_dir)
+                shutil.copytree(str(backup_dir), str(pkg_dir))
+                shutil.rmtree(backup_dir)
+                print(f"已回滚到 v{current_version or '?'}")
+            return False
+
+    def update_all(self) -> int:
+        """更新所有已安装的包，返回更新的数量"""
+        installed = self.list_installed()
+        if not installed:
+            print("(没有已安装的段件)")
+            return 0
+
+        updated = 0
+        for pkg in installed:
+            name = pkg['name']
+            current = pkg['version']
+            latest = self._get_registry_version(name)
+
+            if not latest:
+                print(f"  跳过 {name}: 未在注册表中找到")
+                continue
+
+            if current != '?' and Version.compare(latest, current) <= 0:
+                print(f"  {name} v{current} 已是最新")
+                continue
+
+            print(f"  → 更新 {name}: v{current} -> v{latest}")
+            if self.update_package(name):
+                updated += 1
+
+        print(f"\n共更新 {updated} 个段件")
+        return updated
+
+    def check_updates(self) -> List[Dict]:
+        """检查可用更新，返回需要更新的包列表"""
+        installed = self.list_installed()
+        updates = []
+
+        for pkg in installed:
+            name = pkg['name']
+            current = pkg['version']
+            latest = self._get_registry_version(name)
+
+            if not latest:
+                continue
+
+            if current == '?' or Version.compare(latest, current) > 0:
+                updates.append({
+                    'name': name,
+                    'current_version': current,
+                    'latest_version': latest
+                })
+
+        return updates
+
+    # ------------------------------------------------------------------
+    # 依赖安装
+    # ------------------------------------------------------------------
+
+    def install_with_deps(self, package_name: str) -> bool:
+        """安装包及其依赖"""
+        packages = self._registry.get('packages', {})
+        info = packages.get(package_name)
+
+        if not info:
+            return self.install(package_name)
+
+        # 构建依赖图
+        dep_graph = {}
+        to_install = [package_name]
+        visited = set()
+
+        while to_install:
+            current = to_install.pop(0)
+            if current in visited:
+                continue
+            visited.add(current)
+
+            pkg_info = packages.get(current)
+            if not pkg_info:
+                continue
+
+            deps = pkg_info.get('dependencies', [])
+            if isinstance(deps, list):
+                dep_graph[current] = deps
+                for d in deps:
+                    if d not in visited:
+                        to_install.append(d)
+            elif isinstance(deps, dict):
+                dep_graph[current] = list(deps.keys())
+                for d in deps:
+                    if d not in visited:
+                        to_install.append(d)
+            else:
+                dep_graph[current] = []
+
+        try:
+            order = DependencyResolver.topological_sort(dep_graph)
+        except ValueError as e:
+            print(f"错误: {e}")
+            return False
+
+        print(f"检测到依赖安装顺序: {' -> '.join(order)}")
+        success = True
+        for name in order:
+            pkg_dir = self._packages_dir / name
+            if pkg_dir.exists():
+                continue
+            print(f"  安装依赖: {name}")
+            if not self.install(name):
+                print(f"  警告: 依赖 '{name}' 安装失败")
+                success = False
+
+        return success
+
+    # ------------------------------------------------------------------
+    # Lock 文件
+    # ------------------------------------------------------------------
+
+    def _update_lock_file(self, package_name: str, version: str):
+        """安装后更新 lock 文件"""
+        data = LockFile.load(self.project_root)
+        if 'packages' not in data:
+            data['packages'] = {}
+        data['packages'][package_name] = {
+            'version': version,
+            'installed_at': time.strftime('%Y-%m-%dT%H:%M:%S')
+        }
+        LockFile.save(self.project_root, data['packages'])
+
+    # ------------------------------------------------------------------
+    # 发布
+    # ------------------------------------------------------------------
+
+    def publish(self, package_dir: str) -> bool:
+        """打包并发布段件到本地索引
+
+        Args:
+            package_dir: 段件项目目录路径
+
+        Returns:
+            是否成功
+        """
+        src_path = Path(package_dir).resolve()
+        if not src_path.exists():
+            print(f"错误: 路径不存在: {package_dir}")
+            return False
+
+        # 验证包结构
+        is_valid, errors = self._validate_package(src_path)
+        if not is_valid:
+            print("错误: 段件验证失败:")
+            for err in errors:
+                print(f"  - {err}")
+            return False
+
+        # 读取包信息
+        pkg_info = self._read_package_info(src_path)
+        if not pkg_info:
+            return False
+
+        name = pkg_info.get('name', src_path.name)
+        version = pkg_info.get('version', '0.1.0')
+
+        print(f"正在发布段件: {name} v{version}")
+        print(f"  路径: {src_path}")
+
+        # 复制到本地注册表索引
+        local_index_dir = self._cache_dir / 'local_registry'
+        local_index_dir.mkdir(parents=True, exist_ok=True)
+
+        # 更新本地索引
+        index_path = local_index_dir / 'index.json'
+        if index_path.exists():
+            try:
+                index = json.loads(index_path.read_text(encoding='utf-8'))
+            except Exception:
+                index = {'packages': {}}
+        else:
+            index = {'packages': {}}
+
+        if 'packages' not in index:
+            index['packages'] = {}
+
+        # 添加或更新条目
+        index['packages'][name] = {
+            'name': name,
+            'version': version,
+            'description': pkg_info.get('description', ''),
+            'author': pkg_info.get('author', ''),
+            'path': str(src_path),
+            'keywords': pkg_info.get('keywords', []),
+            'dependencies': pkg_info.get('dependencies', []),
+            'published_at': time.strftime('%Y-%m-%dT%H:%M:%S')
+        }
+
+        index_path.write_text(
+            json.dumps(index, ensure_ascii=False, indent=2),
+            encoding='utf-8'
+        )
+
+        # 复制包文件到本地注册表
+        local_pkg_dir = local_index_dir / name
+        if local_pkg_dir.exists():
+            shutil.rmtree(local_pkg_dir)
+        shutil.copytree(str(src_path), str(local_pkg_dir))
+
+        print(f"✅ 段件 '{name}' v{version} 已发布到本地索引")
+        print(f"  本地索引: {local_index_dir}")
+        print()
+        print("安装方式:")
+        print(f"  duan install {name}")
+        print(f"  (本地索引会自动加载)")
+        return True
+
+    def _validate_package(self, package_dir: Path) -> Tuple[bool, List[str]]:
+        """验证段件包的完整性"""
+        errors = []
+
+        # 检查目录结构
+        if not package_dir.is_dir():
+            errors.append("路径不是目录")
+            return False, errors
+
+        # 检查配置文件的多种格式
+        has_toml = (package_dir / 'package.toml').exists()
+        has_json = (package_dir / 'duan.json').exists()
+
+        if not has_toml and not has_json:
+            errors.append("缺少配置文件: 需要 package.toml 或 duan.json")
+
+        # 读取并验证配置
+        if has_toml:
+            config_valid, config_errors = self._validate_toml_config(package_dir / 'package.toml')
+            errors.extend(config_errors)
+        elif has_json:
+            config_valid, config_errors = self._validate_json_config(package_dir / 'duan.json')
+            errors.extend(config_errors)
+
+        # 检查是否有 .duan 源文件
+        duan_files = list(package_dir.glob('*.duan'))
+        if not duan_files:
+            errors.append("缺少 .duan 源文件")
+
+        # 检查入口文件（如果配置中指定了 entry）
+        if has_toml:
+            try:
+                from package_manager import TomlParser
+                data = TomlParser().parse((package_dir / 'package.toml').read_text(encoding='utf-8'))
+                entry = data.get('package', {}).get('entry', '')
+                if entry and not (package_dir / entry).exists():
+                    errors.append(f"入口文件不存在: {entry}")
+            except Exception:
+                pass
+
+        return len(errors) == 0, errors
+
+    def _validate_toml_config(self, config_path: Path) -> Tuple[bool, List[str]]:
+        """验证 package.toml 配置"""
+        errors = []
+        try:
+            from package_manager import TomlParser
+            data = TomlParser().parse(config_path.read_text(encoding='utf-8'))
+            pkg = data.get('package', {})
+            if not pkg.get('name'):
+                errors.append("package.toml: [package] name 字段不能为空")
+            if not pkg.get('version'):
+                errors.append("package.toml: [package] version 字段不能为空")
+        except Exception as e:
+            errors.append(f"package.toml 解析失败: {e}")
+        return len(errors) == 0, errors
+
+    def _validate_json_config(self, config_path: Path) -> Tuple[bool, List[str]]:
+        """验证 duan.json 配置"""
+        errors = []
+        try:
+            data = json.loads(config_path.read_text(encoding='utf-8'))
+            if not data.get('name'):
+                errors.append("duan.json: name 字段不能为空")
+            if not data.get('version'):
+                errors.append("duan.json: version 字段不能为空")
+        except json.JSONDecodeError as e:
+            errors.append(f"duan.json 解析失败: {e}")
+        except Exception as e:
+            errors.append(f"读取 duan.json 失败: {e}")
+        return len(errors) == 0, errors
+
+    def _read_package_info(self, package_dir: Path) -> Optional[Dict]:
+        """读取包信息"""
+        toml_path = package_dir / 'package.toml'
+        json_path = package_dir / 'duan.json'
+
+        if toml_path.exists():
+            try:
+                from package_manager import TomlParser
+                data = TomlParser().parse(toml_path.read_text(encoding='utf-8'))
+                pkg = data.get('package', {})
+                deps = data.get('dependencies', {}) or {}
+                return {
+                    'name': pkg.get('name', ''),
+                    'version': pkg.get('version', '0.1.0'),
+                    'description': pkg.get('description', ''),
+                    'author': pkg.get('author', ''),
+                    'keywords': pkg.get('keywords', []),
+                    'dependencies': list(deps.keys()) if isinstance(deps, dict) else [],
+                }
+            except Exception as e:
+                print(f"错误: 读取 package.toml 失败: {e}")
+                return None
+
+        if json_path.exists():
+            try:
+                data = json.loads(json_path.read_text(encoding='utf-8'))
+                return {
+                    'name': data.get('name', ''),
+                    'version': data.get('version', '0.1.0'),
+                    'description': data.get('description', ''),
+                    'author': data.get('author', ''),
+                    'keywords': data.get('keywords', []),
+                    'dependencies': data.get('dependencies', []),
+                }
+            except Exception as e:
+                print(f"错误: 读取 duan.json 失败: {e}")
+                return None
+
+        # 从目录名推导
+        return {
+            'name': package_dir.name,
+            'version': '0.1.0',
+            'description': '',
+            'author': '',
+            'keywords': [],
+            'dependencies': [],
+        }
+
+    # ------------------------------------------------------------------
     # 工具
     # ------------------------------------------------------------------
 
@@ -1028,6 +1650,10 @@ def run_install(args):
         installer.install_from_path(args.path)
         return
 
+    if args.with_deps and args.package:
+        installer.install_with_deps(args.package)
+        return
+
     if args.package:
         installer.install(args.package)
         return
@@ -1059,6 +1685,67 @@ def run_install(args):
     print("  duan install --path ./my-package")
     print("  duan install --search 网络")
     print("  duan install --list")
+    print("  duan install --with-deps 标准数学扩展")
+
+
+def run_update(args):
+    """运行更新命令"""
+    project_root = Path(args.project or '.').resolve()
+    installer = PackageInstaller(project_root=project_root)
+
+    if args.check:
+        _cmd_check_updates(installer)
+        return
+
+    if args.all:
+        installer.update_all()
+        return
+
+    if args.package:
+        installer.update_package(args.package)
+        return
+
+    # 默认：显示帮助
+    print("用法: duan pkg update <段件名> [选项]")
+    print()
+    print("选项:")
+    print("  <段件名>            更新指定段件")
+    print("  --all               更新所有已安装段件")
+    print("  --check             检查可用更新（不安装）")
+    print("  -p, --project <目录> 指定项目目录")
+    print()
+    print("示例:")
+    print("  duan pkg update 标准数学扩展")
+    print("  duan pkg update --all")
+    print("  duan pkg update --check")
+
+
+def _cmd_check_updates(installer: PackageInstaller):
+    """检查可用更新"""
+    updates = installer.check_updates()
+    if not updates:
+        print("所有段件已是最新版本")
+        return
+
+    print("可用更新:")
+    print("-" * 60)
+    for pkg in updates:
+        print(f"  {pkg['name']:<20} v{pkg['current_version']:<8} → v{pkg['latest_version']}")
+    print("-" * 60)
+    print(f"共 {len(updates)} 个段件可更新")
+
+
+def run_publish(args):
+    """运行发布命令"""
+    project_root = Path(args.project or '.').resolve()
+    installer = PackageInstaller(project_root=project_root)
+
+    if args.path:
+        installer.publish(args.path)
+        return
+
+    # 默认发布当前目录
+    installer.publish(str(project_root))
 
 
 def _cmd_list(installer: PackageInstaller):
@@ -1128,8 +1815,8 @@ def _cmd_update_registry(installer: PackageInstaller):
         print(f"更新失败: {e}")
 
 
-def run_publish(args):
-    """发布段件 — 生成段件库条目并显示 PR 提交指引"""
+def run_publish_legacy(args):
+    """发布段件（旧版）— 生成段件库条目并显示 PR 提交指引"""
     project_root = Path(args.project or '.').resolve()
     toml_path = project_root / 'package.toml'
 

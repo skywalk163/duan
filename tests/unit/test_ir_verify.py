@@ -7,6 +7,18 @@ from llvm.codegen_typed import TypedLLVMCodeGen
 from llvm.compiler import compile_source_typed, verify_ir_with_clang, verify_ir_with_llvmlite, verify_ir, find_clang
 from llvm.core import LLVMCodeGenCore
 
+# 检查 IR 验证环境是否可用（clang 或 llvmlite 至少一个）
+_has_ir_verify = False
+try:
+    find_clang()
+    _has_ir_verify = True
+except RuntimeError:
+    try:
+        import llvmlite.binding  # noqa: F401
+        _has_ir_verify = True
+    except ImportError:
+        pass
+
 
 class TestVerifyFunction(unittest.TestCase):
     """测试 _verify_function 结构化验证"""
@@ -173,6 +185,7 @@ class TestIRValidationInCodegen(unittest.TestCase):
         self.assertTrue(len(ir) > 0)
 
 
+@unittest.skipIf(not _has_ir_verify, "需要 clang 或 llvmlite 来验证 IR")
 class TestVerifyIRWithClang(unittest.TestCase):
     """测试 compiler 层的 IR 验证（优先 clang，回退 llvmlite）"""
 
@@ -219,6 +232,7 @@ class TestVerifyIRWithClang(unittest.TestCase):
                 os.remove(ll_path)
 
 
+@unittest.skipIf(not _has_ir_verify, "需要 clang 或 llvmlite 来验证 IR")
 class TestVerifyIRWithLlvmlite(unittest.TestCase):
     """测试 llvmlite 本地验证回退路径（无 clang 环境的关键保障）"""
 

@@ -10,6 +10,9 @@
 from typing import List, Optional, Dict, Any, Tuple
 from pathlib import Path
 import os
+import hashlib
+import threading
+import time
 
 from lexer import Lexer, LexerError
 from tokens import Token, TokenType
@@ -30,6 +33,144 @@ OPTIMIZERS = [
 ]
 
 
+# =============================================================================
+# 编译器缓存系统（v5.2.0）
+# 三级缓存：词法分析 → AST 解析 → 代码生成
+# 使用内容哈希（SHA256）确保缓存一致性
+# =============================================================================
+
+class CompilerCache:
+    """编译器缓存：三级缓存 + 自动失效
+
+    缓存级别：
+      1. 词法分析缓存 (_token_cache): source_hash → List[Token]
+      2. AST 解析缓存 (_ast_cache): source_hash → v3_ast.Module
+      3. 代码生成缓存 (_codegen_cache): source_hash → str
+
+    所有缓存键使用源文件内容的 SHA256 哈希，确保内容变更时缓存自动失效。
+    """
+
+    def __init__(self, max_size: int = 100):
+        self._token_cache: Dict[str, List[Token]] = {}
+        self._ast_cache: Dict[str, Any] = {}
+        self._codegen_cache: Dict[str, str] = {}
+        self._max_size = max_size
+        self._lock = threading.Lock()
+        self._stats = {'hits': 0, 'misses': 0, 'evictions': 0}
+
+    @staticmethod
+    def content_hash(content: str) -> str:
+        """计算源文件内容的 SHA256 哈希"""
+        return hashlib.sha256(content.encode('utf-8')).hexdigest()
+
+    @staticmethod
+    def file_hash(file_path: str) -> str:
+        """计算文件内容的 SHA256 哈希"""
+        with open(file_path, 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+
+    # ---- 词法分析缓存 ----
+
+    def get_token_cache(self, source_hash: str) -> Optional[List[Token]]:
+        """获取缓存的词法分析结果"""
+        with self._lock:
+            result = self._token_cache.get(source_hash)
+            if result is not None:
+                self._stats['hits'] += 1
+            else:
+                self._stats['misses'] += 1
+            return result
+
+    def set_token_cache(self, source_hash: str, tokens: List[Token]) -> None:
+        """设置词法分析缓存"""
+        with self._lock:
+            self._evict_if_needed(self._token_cache)
+            self._token_cache[source_hash] = tokens
+
+    # ---- AST 解析缓存 ----
+
+    def get_ast_cache(self, source_hash: str) -> Optional[Any]:
+        """获取缓存的 AST 解析结果"""
+        with self._lock:
+            result = self._ast_cache.get(source_hash)
+            if result is not None:
+                self._stats['hits'] += 1
+            else:
+                self._stats['misses'] += 1
+            return result
+
+    def set_ast_cache(self, source_hash: str, ast_module: Any) -> None:
+        """设置 AST 解析缓存"""
+        with self._lock:
+            self._evict_if_needed(self._ast_cache)
+            self._ast_cache[source_hash] = ast_module
+
+    # ---- 代码生成缓存 ----
+
+    def get_codegen_cache(self, source_hash: str) -> Optional[str]:
+        """获取缓存的代码生成结果"""
+        with self._lock:
+            result = self._codegen_cache.get(source_hash)
+            if result is not None:
+                self._stats['hits'] += 1
+            else:
+                self._stats['misses'] += 1
+            return result
+
+    def set_codegen_cache(self, source_hash: str, code: str) -> None:
+        """设置代码生成缓存"""
+        with self._lock:
+            self._evict_if_needed(self._codegen_cache)
+            self._codegen_cache[source_hash] = code
+
+    # ---- 缓存管理 ----
+
+    def _evict_if_needed(self, cache: Dict) -> None:
+        """如果缓存超过最大大小，执行 LRU 淘汰"""
+        if len(cache) >= self._max_size:
+            # 淘汰前 1/4 的条目（简单实现）
+            keys = list(cache.keys())
+            for k in keys[:len(keys) // 4]:
+                del cache[k]
+            self._stats['evictions'] += len(keys) // 4
+
+    def clear(self) -> None:
+        """清空所有缓存"""
+        with self._lock:
+            self._token_cache.clear()
+            self._ast_cache.clear()
+            self._codegen_cache.clear()
+
+    def clear_codegen(self) -> None:
+        """仅清空代码生成缓存（源文件变更时最常用）"""
+        with self._lock:
+            self._codegen_cache.clear()
+
+    def get_stats(self) -> Dict[str, Any]:
+        """获取缓存统计信息"""
+        with self._lock:
+            return {
+                'token_cache_size': len(self._token_cache),
+                'ast_cache_size': len(self._ast_cache),
+                'codegen_cache_size': len(self._codegen_cache),
+                'hits': self._stats['hits'],
+                'misses': self._stats['misses'],
+                'evictions': self._stats['evictions'],
+                'hit_rate': self._stats['hits'] / max(self._stats['hits'] + self._stats['misses'], 1),
+            }
+
+    def invalidate_source(self, source_hash: str) -> None:
+        """使指定源文件的所有缓存失效"""
+        with self._lock:
+            self._token_cache.pop(source_hash, None)
+            self._ast_cache.pop(source_hash, None)
+            self._codegen_cache.pop(source_hash, None)
+
+
+# 全局缓存实例（单例）
+_compiler_cache = CompilerCache()
+
+# 向后兼容：旧的 _compile_cache 字典仍然保留
 _compile_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 
 
@@ -722,7 +863,7 @@ class DuanCompiler:
     # ------------------------------------------------------------------
     # 核心入口
     # ------------------------------------------------------------------
-    def compile(self, source: str, optimize: bool = True) -> Dict[str, Any]:
+    def compile(self, source: str, optimize: bool = True, use_cache: bool = True) -> Dict[str, Any]:
         """完整编译流程。返回字典：
 
         {
@@ -733,16 +874,35 @@ class DuanCompiler:
             'inferencer': TypeInferencer（含类型标注信息）,
             'errors': 错误列表,
         }
+
+        支持三级缓存优化（use_cache=True 时启用）：
+        - 词法分析缓存：相同源内容跳过重复词法分析
+        - AST 解析缓存：相同源内容跳过重复语法解析
         """
         # 重置错误状态（compile 可被重复调用，避免跨会话累积）
         self.errors = []
         self._typed_errors = []
 
-        # 1) 词法分析
-        tokens = self.tokenize(source)
+        # 计算源内容哈希（用于缓存检索）
+        source_hash = _compiler_cache.content_hash(source) if use_cache else None
 
-        # 2) 语法解析（原始 v3 AST）
-        raw_ast = self.parse_raw(source)
+        # 1) 词法分析（使用缓存）
+        if use_cache and source_hash:
+            tokens = _compiler_cache.get_token_cache(source_hash)
+            if tokens is None:
+                tokens = self.tokenize(source)
+                _compiler_cache.set_token_cache(source_hash, tokens)
+        else:
+            tokens = self.tokenize(source)
+
+        # 2) 语法解析（原始 v3 AST，使用缓存）
+        if use_cache and source_hash:
+            raw_ast = _compiler_cache.get_ast_cache(source_hash)
+            if raw_ast is None:
+                raw_ast = self.parse_raw(source)
+                _compiler_cache.set_ast_cache(source_hash, raw_ast)
+        else:
+            raw_ast = self.parse_raw(source)
 
         # 3) AST 适配
         our_ast = self.adapt(raw_ast)
@@ -1154,6 +1314,7 @@ def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
     abs_path = os.path.abspath(file_path)
     mtime = os.path.getmtime(abs_path)
 
+    # 使用新的三级缓存（内容哈希）
     if use_cache and cache_key in _compile_cache:
         cached_mtime, cached_result = _compile_cache[cache_key]
         if cached_mtime == mtime:
@@ -1163,7 +1324,7 @@ def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
         source = f.read()
 
     compiler = DuanCompiler()
-    result = compiler.compile(source)
+    result = compiler.compile(source, use_cache=use_cache)
 
     if use_cache:
         _compile_cache[cache_key] = (mtime, result)

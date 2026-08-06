@@ -17,10 +17,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'antlrparser'))
 # 添加 src 路径（用于 UnifiedCodeGenerator）
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from antlr4 import *
-
 # 检查 ANTLR 解析器是否可用
 try:
+    from antlr4 import *
     from DuanLangLexer import DuanLangLexer
     from DuanLangParser import DuanLangParser as AntlrDuanLangParser
     from duan_visitor import DuanLangASTBuilder

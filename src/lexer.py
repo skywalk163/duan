@@ -139,6 +139,9 @@ _ALL_KEYWORDS_BY_LENGTH: Dict[int, frozenset] = {}
 _MAX_KEYWORD_LEN = 0
 _ALL_MAX_KEYWORD_LEN = 0
 
+# 关键字起始字符集合（用于快速跳过不匹配的位置）
+_KEYWORD_START_CHARS: frozenset = frozenset()
+
 for kw in ALL_KEYWORDS:
     length = len(kw)
     if length not in _KEYWORDS_BY_LENGTH:
@@ -154,6 +157,9 @@ for kw in _ALL_KEYWORDS_WITH_VERBS:
     _ALL_KEYWORDS_BY_LENGTH[length] = _ALL_KEYWORDS_BY_LENGTH[length] | {kw}
     if length > _ALL_MAX_KEYWORD_LEN:
         _ALL_MAX_KEYWORD_LEN = length
+
+# 构建关键字起始字符集合（用于快速跳过不匹配的位置）
+_KEYWORD_START_CHARS = frozenset({kw[0] for kw in _ALL_KEYWORDS_WITH_VERBS if kw})
 
 # 中文数字集合（模块级）
 _SIMPLE_CHINESE_NUMBERS = frozenset({
@@ -629,10 +635,15 @@ class Lexer:
         _kw_by_len = _ALL_KEYWORDS_BY_LENGTH
         _max_len = _ALL_MAX_KEYWORD_LEN
         _compound_safe = self.compound_safe_single_keywords
+        _start_chars = _KEYWORD_START_CHARS
         
         # 缓存 text_len 避免重复计算
         if text_len is None:
             text_len = len(text)
+        
+        # 快速路径：如果当前字符不能起始任何关键字，直接返回
+        if pos < text_len and text[pos] not in _start_chars:
+            return None, 0
         
         max_possible = min(_max_len, text_len - pos)
         
@@ -1528,18 +1539,32 @@ class Lexer:
         用于避免将用户定义的标识符错误拆分为关键字
         """
         definitions = set()
-        i = 0
         n = len(source)
         _is_han = _is_han_fast
         _is_space_tab = _is_ascii_space_tab
+
+        # 使用 str.find() 跳跃到关键位置，避免逐字符扫描
+        # 搜索目标：'《' (段落/类/方法定义), '设' (变量定义), '定义' (变量定义), '函数', '段落' (函数定义)
+        search_targets = ('《', '设', '定', '函', '段')
+        i = 0
 
         # 安全计数器（防止意外死循环）
         _scan_safety = 0
 
         while i < n:
             _scan_safety += 1
-            if _scan_safety > 1000000:
+            if _scan_safety > 100000:
                 raise RuntimeError(f"_scan_user_definitions 超出安全上限 ({_scan_safety}次迭代), i={i}, n={n}")
+
+            # 找到下一个目标字符的最近位置
+            next_pos = n
+            for target in search_targets:
+                p = source.find(target, i)
+                if p != -1 and p < next_pos:
+                    next_pos = p
+            if next_pos >= n:
+                break
+            i = next_pos
 
             # 查找段落定义：《段名》段 或 《类名》类 或 《方法名》方法(参数)
             if source[i] == '《':

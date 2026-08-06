@@ -15,8 +15,16 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 from lexer import Lexer, LexerError
-from duan_parser_v3 import DuanParser, ParseError
+from duan_parser_v3 import DuanParser, ParseError, ASTNode
 from keywords import ALL_KEYWORDS, VERB_ARITY, STDLIB_VERB_ARITY, BUILTIN_TYPES
+
+# 尝试导入 duanpub 包索引
+_DUANPUB_PACKAGES = []
+try:
+    from stdlib.duanpub.__index__ import PACKAGES as _DUANPUB_PKG_MAP
+    _DUANPUB_PACKAGES = sorted(_DUANPUB_PKG_MAP.keys())
+except ImportError:
+    pass
 
 
 # =============================================================================
@@ -182,13 +190,10 @@ class DocumentManager:
     def _analyze_document(self, doc: Document):
         """分析文档，提取符号、定义和类型信息"""
         try:
-            lexer = Lexer()
-            tokens = lexer.tokenize(doc.text)
-
             parser = DuanParser()
-            ast = parser.parse_tokens(tokens)
+            ast = parser.parse(doc.text)
 
-            self.symbols[doc.uri] = self._extract_symbols(ast)
+            self.symbols[doc.uri] = self._extract_symbols(ast, doc)
             self.definitions[doc.uri] = self._extract_definitions(ast, doc)
 
             # 类型推断
@@ -203,69 +208,116 @@ class DocumentManager:
         except Exception:
             pass
 
+    # ------------------------------------------------------------------
+    # AST 遍历辅助
+    # ------------------------------------------------------------------
+
+    _AST_CHILD_ATTRS = {
+        'Module':      ('statements',),
+        'VarDecl':     ('value',),
+        'IfStmt':      ('condition', 'then_body', 'else_body'),
+        'ForeachStmt': ('iterable', 'body'),
+        'WhileStmt':   ('condition', 'body'),
+        'Paragraph':   ('body',),
+        'ReturnStmt':  ('value',),
+        'ThrowStmt':   ('value',),
+        'BinaryOp':    ('left', 'right'),
+        'UnaryOp':     ('operand',),
+        'Pipeline':    ('stages',),
+        'ClassDefinition': ('attributes', 'methods'),
+        'MethodDefinition': ('body',),
+        'TryStmt':     ('try_body', 'catch_clauses', 'catch_body', 'finally_body'),
+        'MatchStmt':   ('subject', 'cases'),
+        'MatchCase':   ('body',),
+        'WithStmt':    ('context_expr', 'body'),
+        'LambdaExpression': ('body',),
+        'DestructuringAssignment': ('value',),
+        'CompoundAssignment': ('value',),
+        'IndexedAssignment': ('index', 'value'),
+        'SelfAssignment': ('value',),
+        'ConditionalExpression': ('condition', 'then_expr', 'else_expr'),
+        'MemberAccess': ('obj',),
+        'IndexAccess':  ('obj', 'index'),
+        'ListLiteral':  ('elements',),
+        'TupleLiteral': ('elements',),
+        'DictLiteral':  ('entries',),
+        'ListComprehension': ('iterable', 'expression', 'condition'),
+        'SetComprehension':  ('iterable', 'expression', 'condition'),
+        'DictComprehension': ('iterable', 'key_expr', 'value_expr', 'condition'),
+        'ClassInstantiation': ('args',),
+        'FunctionCallExpr': ('callee', 'args'),
+        'ParagraphCall': ('args',),
+        'DecoratorDefinition': ('paragraph',),
+    }
+
+    def _walk_ast(self, node, callback):
+        """遍历 AST 节点树，对每个节点调用 callback(node)"""
+        if node is None:
+            return
+        callback(node)
+        node_type = type(node).__name__
+        for attr_name in self._AST_CHILD_ATTRS.get(node_type, ()):
+            try:
+                child = getattr(node, attr_name, None)
+                if child is None:
+                    continue
+                if isinstance(child, list):
+                    for item in child:
+                        if isinstance(item, ASTNode):
+                            self._walk_ast(item, callback)
+                elif isinstance(child, ASTNode):
+                    self._walk_ast(child, callback)
+            except Exception:
+                pass
+
     def _extract_type_info(self, ast, inferencer) -> Dict:
         """提取变量/函数的类型信息"""
         info = {}
 
-        def walk(node):
-            if node is None:
-                return
+        def collect(node):
             node_type = type(node).__name__
             name = getattr(node, 'name', None)
-            if name and node_type in ('VarDecl', 'VariableDeclaration', 'VarDef',
-                                       'FuncDef', 'FunctionDef', 'SegmentDefinition',
-                                       'Paragraph'):
-                # 检查类型标注
+            if name and node_type in ('VarDecl', 'Paragraph', 'ClassDefinition', 'MethodDefinition',
+                                       'AttributeDeclaration'):
                 ta = getattr(node, 'type_annotation', None)
                 if ta:
                     info[str(name)] = str(ta)
                 else:
-                    # 尝试从推断器获取
-                    value = getattr(node, 'value', None)
-                    if value and inferencer:
-                        inferred = inferencer.type_cache.get(id(value))
-                        if inferred:
-                            info[str(name)] = str(inferred)
+                    if node_type == 'VarDecl':
+                        value = getattr(node, 'value', None)
+                        if value and inferencer:
+                            inferred = inferencer.type_cache.get(id(value))
+                            if inferred:
+                                info[str(name)] = str(inferred)
 
-            for child_name in dir(node):
-                if child_name.startswith('_'):
-                    continue
-                try:
-                    child = getattr(node, child_name)
-                    if isinstance(child, list):
-                        for item in child:
-                            if hasattr(item, '__class__') and hasattr(item, '__dict__'):
-                                walk(item)
-                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and hasattr(child, 'line'):
-                        walk(child)
-                except Exception:
-                    pass
-
-        walk(ast)
+        self._walk_ast(ast, collect)
         return info
-    
-    def _extract_symbols(self, ast) -> List[Dict]:
+
+    def _extract_symbols(self, ast, doc) -> List[Dict]:
         """提取文档符号"""
         symbols = []
-        
-        def walk(node):
-            if node is None:
-                return
-                
+
+        def collect(node):
             node_type = type(node).__name__
-            
+            if node_type not in ('Paragraph', 'ClassDefinition', 'MethodDefinition', 'VarDecl',
+                                  'AttributeDeclaration', 'InterfaceDefinition'):
+                return
+
             line = getattr(node, 'line', 1) - 1
+            name = getattr(node, 'name', '?')
             col = getattr(node, 'col', 0)
-            
-            if node_type == 'FuncDef':
-                name = getattr(node, 'name', '?')
+
+            if node_type == 'Paragraph':
                 params = getattr(node, 'params', [])
                 param_strs = []
                 for p in params:
-                    pname = getattr(p, 'name', '?') if hasattr(p, 'name') else str(p)
-                    param_strs.append(pname)
+                    if isinstance(p, dict):
+                        param_strs.append(p.get('name', '?'))
+                    elif hasattr(p, 'name'):
+                        param_strs.append(p.name)
+                    else:
+                        param_strs.append(str(p))
                 detail = f"({', '.join(param_strs)})"
-                
                 symbols.append({
                     'name': name,
                     'kind': 12,  # Function
@@ -279,8 +331,7 @@ class DocumentManager:
                         'end': {'line': line, 'character': col + len(name)}
                     }
                 })
-            elif node_type == 'ClassDef':
-                name = getattr(node, 'name', '?')
+            elif node_type == 'ClassDefinition':
                 symbols.append({
                     'name': name,
                     'kind': 5,  # Class
@@ -294,8 +345,24 @@ class DocumentManager:
                         'end': {'line': line, 'character': col + len(name)}
                     }
                 })
-            elif node_type == 'VarDef':
-                name = getattr(node, 'name', '?')
+            elif node_type == 'MethodDefinition':
+                params = getattr(node, 'parameters', [])
+                param_strs = [p.name if hasattr(p, 'name') else str(p) for p in params]
+                detail = f"({', '.join(param_strs)})"
+                symbols.append({
+                    'name': name,
+                    'kind': 12,  # Function
+                    'detail': detail,
+                    'range': {
+                        'start': {'line': line, 'character': col},
+                        'end': {'line': line, 'character': col + len(name)}
+                    },
+                    'selectionRange': {
+                        'start': {'line': line, 'character': col},
+                        'end': {'line': line, 'character': col + len(name)}
+                    }
+                })
+            elif node_type == 'VarDecl':
                 symbols.append({
                     'name': name,
                     'kind': 6,  # Variable
@@ -309,76 +376,104 @@ class DocumentManager:
                         'end': {'line': line, 'character': col + len(name)}
                     }
                 })
-            
-            for child_name in dir(node):
-                if child_name.startswith('_'):
-                    continue
-                try:
-                    child = getattr(node, child_name)
-                    if isinstance(child, list):
-                        for item in child:
-                            if hasattr(item, '__class__') and hasattr(item, '__dict__'):
-                                walk(item)
-                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and hasattr(child, 'line'):
-                        walk(child)
-                except Exception:
-                    pass
+            elif node_type == 'AttributeDeclaration':
+                symbols.append({
+                    'name': name,
+                    'kind': 6,  # Variable
+                    'detail': '属性',
+                    'range': {
+                        'start': {'line': line, 'character': col},
+                        'end': {'line': line, 'character': col + len(name)}
+                    },
+                    'selectionRange': {
+                        'start': {'line': line, 'character': col},
+                        'end': {'line': line, 'character': col + len(name)}
+                    }
+                })
+            elif node_type == 'InterfaceDefinition':
+                symbols.append({
+                    'name': name,
+                    'kind': 5,  # Class
+                    'detail': '接口',
+                    'range': {
+                        'start': {'line': line, 'character': col},
+                        'end': {'line': line, 'character': col + len(name)}
+                    },
+                    'selectionRange': {
+                        'start': {'line': line, 'character': col},
+                        'end': {'line': line, 'character': col + len(name)}
+                    }
+                })
 
-        walk(ast)
+        self._walk_ast(ast, collect)
         return symbols
-    
+
     def _extract_definitions(self, ast, doc) -> Dict:
-        """提取定义"""
+        """提取定义位置，供跳转定义使用"""
         definitions = {}
-        
-        def walk(node):
-            if node is None:
-                return
-                
+
+        def collect(node):
             node_type = type(node).__name__
+            if node_type not in ('Paragraph', 'ClassDefinition', 'MethodDefinition', 'VarDecl',
+                                  'AttributeDeclaration', 'InterfaceDefinition'):
+                return
+
             line = getattr(node, 'line', 1) - 1
             col = getattr(node, 'col', 0)
-            
-            if node_type in ('VarDef', 'FuncDef', 'ClassDef', 'MethodDef'):
-                name = getattr(node, 'name', None)
-                if name:
-                    definitions[name] = {
-                        'uri': doc.uri,
-                        'range': {
-                            'start': {'line': line, 'character': col},
-                            'end': {'line': line, 'character': col + len(str(name))}
-                        }
-                    }
-                    
-                    # 额外保存节点信息用于悬停
-                    if node_type == 'FuncDef':
-                        params = getattr(node, 'params', [])
-                        param_strs = []
-                        for p in params:
-                            pname = getattr(p, 'name', '?') if hasattr(p, 'name') else str(p)
-                            param_strs.append(pname)
-                        definitions[name + '__info'] = {
-                            'type': '函数',
-                            'params': param_strs,
-                            'line': line,
-                            'col': col
-                        }
-            
-            for child_name in dir(node):
-                if child_name.startswith('_'):
-                    continue
-                try:
-                    child = getattr(node, child_name)
-                    if isinstance(child, list):
-                        for item in child:
-                            if hasattr(item, '__class__') and hasattr(item, '__dict__'):
-                                walk(item)
-                    elif hasattr(child, '__class__') and hasattr(child, '__dict__') and hasattr(child, 'line'):
-                        walk(child)
-                except Exception:
-                    pass
+            name = getattr(node, 'name', None)
+            if not name:
+                return
 
-        walk(ast)
+            definitions[name] = {
+                'uri': doc.uri,
+                'range': {
+                    'start': {'line': line, 'character': col},
+                    'end': {'line': line, 'character': col + len(str(name))}
+                }
+            }
+
+            # 额外保存节点信息用于悬停
+            if node_type == 'Paragraph':
+                params = getattr(node, 'params', [])
+                param_strs = []
+                for p in params:
+                    if isinstance(p, dict):
+                        param_strs.append(p.get('name', '?'))
+                    elif hasattr(p, 'name'):
+                        param_strs.append(p.name)
+                    else:
+                        param_strs.append(str(p))
+                definitions[name + '__info'] = {
+                    'type': '函数',
+                    'params': param_strs,
+                    'line': line,
+                    'col': col
+                }
+            elif node_type == 'MethodDefinition':
+                params = getattr(node, 'parameters', [])
+                param_strs = [p.name if hasattr(p, 'name') else str(p) for p in params]
+                definitions[name + '__info'] = {
+                    'type': '函数',
+                    'params': param_strs,
+                    'line': line,
+                    'col': col
+                }
+            elif node_type == 'ClassDefinition':
+                definitions[name + '__info'] = {
+                    'type': '类',
+                    'params': [],
+                    'line': line,
+                    'col': col
+                }
+            elif node_type == 'VarDecl':
+                definitions[name + '__info'] = {
+                    'type': '变量',
+                    'params': [],
+                    'line': line,
+                    'col': col
+                }
+
+        self._walk_ast(ast, collect)
         return definitions
 
 
@@ -478,7 +573,7 @@ class DuanLanguageServer:
         return None
 
     def _handle_completion(self, params: Dict) -> Dict:
-        """处理代码补全"""
+        """处理代码补全 - 智能上下文感知补全"""
         doc = self.doc_manager.get_document(params.get('textDocument', {}).get('uri', ''))
         if not doc:
             return {'isIncomplete': False, 'items': []}
@@ -499,9 +594,83 @@ class DuanLanguageServer:
                 break
         prefix = line_text[start:character]
         
+        # 获取光标前的上下文文本（用于上下文感知）
+        before_cursor = line_text[:start].strip()
+        # 判断上下文类型
+        context_type = 'normal'
+        if before_cursor.endswith('设') or before_cursor.endswith('设 '):
+            context_type = 'after_set'
+        elif before_cursor.endswith('定义') or before_cursor.endswith('定义 '):
+            context_type = 'after_define'
+        elif before_cursor.endswith('导入') or before_cursor.endswith('导入 '):
+            context_type = 'after_import'
+        elif before_cursor.endswith('返回') or before_cursor.endswith('返回 '):
+            context_type = 'after_return'
+        elif before_cursor.endswith('等待') or before_cursor.endswith('等待 '):
+            context_type = 'after_await'
+        elif before_cursor.endswith('新建') or before_cursor.endswith('新建 '):
+            context_type = 'after_new'
+        elif before_cursor.endswith('抛出') or before_cursor.endswith('抛出 '):
+            context_type = 'after_throw'
+        
         completions = []
         
-        # 关键字补全
+        # ====== 上下文感知补全 ======
+        if context_type == 'after_import':
+            # 导入上下文：建议模块名和 duanpub 包名
+            modules = ['标准库', '文件系统', 'JSON', 'CSV', 'HTTP', 'Socket', '数学', '正则表达式',
+                       '字符串处理', '日期时间', '线程', '系统信息', '日志系统', '配置管理']
+            for mod_name in sorted(modules):
+                if not prefix or mod_name.startswith(prefix):
+                    completions.append({
+                        'label': mod_name,
+                        'kind': 9,  # Module
+                        'detail': '模块',
+                        'sortText': f'1_{mod_name}',
+                        'filterText': mod_name,
+                    })
+            # duanpub 包名
+            for pkg_name in _DUANPUB_PACKAGES:
+                if not prefix or pkg_name.startswith(prefix):
+                    completions.append({
+                        'label': pkg_name,
+                        'kind': 9,
+                        'detail': 'duanpub 包',
+                        'sortText': f'1_{pkg_name}',
+                        'filterText': pkg_name,
+                    })
+            return {'isIncomplete': False, 'items': completions}
+        
+        elif context_type == 'after_set':
+            # 设 上下文：建议变量名
+            if doc.uri in self.doc_manager.definitions:
+                for name in sorted(self.doc_manager.definitions[doc.uri].keys()):
+                    if name.endswith('__info'):
+                        continue
+                    if not prefix or name.startswith(prefix):
+                        completions.append({
+                            'label': name,
+                            'kind': 6,
+                            'detail': '变量',
+                            'sortText': f'1_{name}',
+                            'filterText': name,
+                        })
+            return {'isIncomplete': False, 'items': completions}
+        
+        elif context_type == 'after_return':
+            # 返回上下文：建议表达式
+            completions.append({
+                'label': '真', 'kind': 14, 'detail': '布尔值', 'sortText': '1_真', 'filterText': '真'
+            })
+            completions.append({
+                'label': '假', 'kind': 14, 'detail': '布尔值', 'sortText': '1_假', 'filterText': '假'
+            })
+            completions.append({
+                'label': '空', 'kind': 14, 'detail': '空值', 'sortText': '1_空', 'filterText': '空'
+            })
+            return {'isIncomplete': False, 'items': completions}
+        
+        # ====== 关键字补全 ======
         for kw in sorted(ALL_KEYWORDS):
             if not prefix or kw.startswith(prefix):
                 # 关键字文档
@@ -519,14 +688,38 @@ class DuanLanguageServer:
                     '跳出': '跳出循环：跳出。',
                     '跳过': '跳过本次迭代：跳过。',
                     '段落': '段落（函数）定义：段落 段名 接收 参数：...结束。',
+                    '函数': '函数定义：函数 函数名 接收 参数：...结束。',
                     '类': '类定义：类 类名：...结束。',
                     '接口': '接口定义：接口 接口名：...结束。',
                     '尝试': '异常处理：尝试：...捕获 异常：...结束。',
+                    '捕获': '捕获异常：捕获 异常类型 为 变量：...',
+                    '最终': '最终执行块：最终：...',
                     '抛出': '抛出异常：抛出 异常对象。',
                     '导入': '导入模块：导入 模块名。',
                     '匹配': '模式匹配：匹配 表达式：情况 模式：...结束。',
+                    '情况': '匹配分支：情况 模式：...',
                     '异步': '异步函数定义：异步 段落 段名...',
                     '等待': '等待异步操作：等待 异步调用。',
+                    '使用': '上下文管理器：使用 资源 为 变量：...',
+                    '遍历': '遍历循环：遍历 变量 于 列表：...结束。',
+                    '当': '当循环：当 条件：...结束。',
+                    '从': '从模块导入：从 模块名 导入 名称。',
+                    '导出': '导出语句：导出 名称。',
+                    '属性': '类属性声明：属性 名称。',
+                    '构造': '构造函数：构造 参数：...结束。',
+                    '继承': '类继承：类 类名 继承 父类：...',
+                    '实现': '实现接口：类 类名 实现 接口名：...',
+                    '协议': '协议定义：协议 协议名：...结束。',
+                    '私属性': '私有属性声明。',
+                    '私段落': '私有方法声明。',
+                    '私有': '访问控制：私有成员。',
+                    '公有': '访问控制：公有成员。',
+                    '保护': '访问控制：保护成员。',
+                    '静态': '静态方法修饰符。',
+                    '抽象': '抽象方法修饰符。',
+                    '真': '布尔值：真 (True)',
+                    '假': '布尔值：假 (False)',
+                    '空': '空值：空 (None)',
                 }
                 item = {
                     'label': kw,
@@ -540,7 +733,7 @@ class DuanLanguageServer:
                     item['documentation'] = {'kind': 'markdown', 'value': kw_docs[kw]}
                 completions.append(item)
         
-        # 动词元数补全
+        # ====== 动词元数补全 ======
         for verb, arity in sorted(VERB_ARITY.items()):
             if not prefix or verb.startswith(prefix):
                 detail = f'动词 (元数: {arity})'
@@ -564,7 +757,7 @@ class DuanLanguageServer:
                     }
                 })
         
-        # Stdlib 函数补全（从 STDLIB_VERB_ARITY 获取）
+        # ====== Stdlib 函数补全 ======
         for func_name, arity in sorted(STDLIB_VERB_ARITY.items()):
             if not prefix or func_name.startswith(prefix):
                 arity_str = f'元数: {arity}' if arity >= 0 else '可变参数'
@@ -581,7 +774,7 @@ class DuanLanguageServer:
                     }
                 })
         
-        # 内置类型补全
+        # ====== 内置类型补全 ======
         for t in sorted(BUILTIN_TYPES):
             if not prefix or t.startswith(prefix):
                 completions.append({
@@ -592,7 +785,7 @@ class DuanLanguageServer:
                     'filterText': t
                 })
         
-        # 本地变量/函数补全
+        # ====== 本地变量/函数补全 ======
         if doc.uri in self.doc_manager.definitions:
             for name in sorted(self.doc_manager.definitions[doc.uri].keys()):
                 if name.endswith('__info'):
@@ -613,13 +806,28 @@ class DuanLanguageServer:
                         'filterText': name
                     })
         
-        # Snippet 补全（常用模式）
+        # ====== duanpub 包名补全 ======
+        for pkg_name in _DUANPUB_PACKAGES:
+            if not prefix or pkg_name.startswith(prefix):
+                completions.append({
+                    'label': pkg_name,
+                    'kind': 9,  # Module
+                    'detail': 'duanpub 包',
+                    'sortText': f'7_{pkg_name}',
+                    'filterText': pkg_name,
+                    'data': {
+                        'type': 'duanpub',
+                        'name': pkg_name,
+                    }
+                })
+        
+        # ====== Snippet 补全（常用模式，sortText 为 3_ 排在关键字和动词之后）======
         snippets = [
             {
                 'label': '段落模板',
                 'kind': 15,  # Snippet
                 'detail': '段落定义模板',
-                'sortText': '0_段落模板',
+                'sortText': '3_段落模板',
                 'insertText': '段落 ${1:段名} 接收 ${2:参数}：\n\t$0\n结束。',
                 'insertTextFormat': 2,  # SnippetTextFormat
             },
@@ -627,15 +835,23 @@ class DuanLanguageServer:
                 'label': '如果模板',
                 'kind': 15,
                 'detail': '如果条件语句模板',
-                'sortText': '0_如果模板',
+                'sortText': '3_如果模板',
                 'insertText': '如果 ${1:条件} 那么：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '如果否则模板',
+                'kind': 15,
+                'detail': '如果-否则条件语句模板',
+                'sortText': '3_如果否则模板',
+                'insertText': '如果 ${1:条件} 那么：\n\t${2:代码}\n否则：\n\t${3:代码}\n结束。',
                 'insertTextFormat': 2,
             },
             {
                 'label': '遍历模板',
                 'kind': 15,
                 'detail': '遍历循环模板',
-                'sortText': '0_遍历模板',
+                'sortText': '3_遍历模板',
                 'insertText': '遍历 ${1:变量} 于 ${2:列表}：\n\t$0\n结束。',
                 'insertTextFormat': 2,
             },
@@ -643,7 +859,7 @@ class DuanLanguageServer:
                 'label': '当模板',
                 'kind': 15,
                 'detail': '当循环模板',
-                'sortText': '0_当模板',
+                'sortText': '3_当模板',
                 'insertText': '当 ${1:条件}：\n\t$0\n结束。',
                 'insertTextFormat': 2,
             },
@@ -651,32 +867,80 @@ class DuanLanguageServer:
                 'label': '类模板',
                 'kind': 15,
                 'detail': '类定义模板',
-                'sortText': '0_类模板',
-                'insertText': '类 ${1:类名}：\n\t构造 ${2:参数}：\n\t\t$0\n\t结束。\n结束。',
+                'sortText': '3_类模板',
+                'insertText': '类 ${1:类名}：\n\t属性 ${2:属性名}。\n\t构造 ${3:参数}：\n\t\t$0\n\t结束。\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '函数模板',
+                'kind': 15,
+                'detail': '函数定义模板',
+                'sortText': '3_函数模板',
+                'insertText': '函数 ${1:函数名} 接收 ${2:参数}：\n\t$0\n结束。',
                 'insertTextFormat': 2,
             },
             {
                 'label': '尝试模板',
                 'kind': 15,
                 'detail': '异常处理模板',
-                'sortText': '0_尝试模板',
+                'sortText': '3_尝试模板',
                 'insertText': '尝试：\n\t$0\n捕获 ${1:异常}：\n\t\n结束。',
                 'insertTextFormat': 2,
             },
             {
-                'label': '定义变量',
+                'label': '尝试最终模板',
                 'kind': 15,
-                'detail': '定义变量模板',
-                'sortText': '0_定义变量',
-                'insertText': '定义 ${1:变量名} 等于 ${2:值}。',
+                'detail': '异常处理模板（含 finally）',
+                'sortText': '3_尝试最终模板',
+                'insertText': '尝试：\n\t$0\n捕获 ${1:异常}：\n\t\n最终：\n\t\n结束。',
                 'insertTextFormat': 2,
             },
             {
                 'label': '匹配模板',
                 'kind': 15,
                 'detail': '模式匹配模板',
-                'sortText': '0_匹配模板',
+                'sortText': '3_匹配模板',
                 'insertText': '匹配 ${1:表达式}：\n情况 ${2:模式}：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '定义变量',
+                'kind': 15,
+                'detail': '定义变量模板',
+                'sortText': '3_定义变量',
+                'insertText': '定义 ${1:变量名} 等于 ${2:值}。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '异步段落模板',
+                'kind': 15,
+                'detail': '异步段落定义模板',
+                'sortText': '3_异步段落模板',
+                'insertText': '异步 段落 ${1:段名} 接收 ${2:参数}：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '使用模板',
+                'kind': 15,
+                'detail': '上下文管理器模板',
+                'sortText': '3_使用模板',
+                'insertText': '使用 ${1:资源} 为 ${2:变量}：\n\t$0\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '接口模板',
+                'kind': 15,
+                'detail': '接口定义模板',
+                'sortText': '3_接口模板',
+                'insertText': '接口 ${1:接口名}：\n\t段落 ${2:方法名} 接收 ${3:参数}。\n结束。',
+                'insertTextFormat': 2,
+            },
+            {
+                'label': '遍历范围模板',
+                'kind': 15,
+                'detail': '遍历范围循环模板',
+                'sortText': '3_遍历范围模板',
+                'insertText': '遍历 ${1:变量} 于 ${2:起始} 至 ${3:结束}：\n\t$0\n结束。',
                 'insertTextFormat': 2,
             },
         ]
@@ -911,14 +1175,44 @@ class DuanLanguageServer:
                     if not info:  # 不是函数时
                         contents.append(f"定义于第 {def_line} 行")
 
-        # 类型信息
+        # 类型信息（从缓存获取）
+        type_str = None
         if doc.uri in self.doc_manager.type_info:
-            t = self.doc_manager.type_info[doc.uri].get(word)
-            if t:
-                # 避免重复添加类型信息
-                has_type = any(f'类型' in c for c in contents)
-                if not has_type:
-                    contents.append(f"**类型**: `{t}`")
+            type_str = self.doc_manager.type_info[doc.uri].get(word)
+
+        # 如果缓存中没有类型信息，尝试从 AST 解析
+        if type_str is None:
+            try:
+                parser = DuanParser()
+                ast = parser.parse(doc.text)
+                
+                def find_type(node):
+                    nonlocal type_str
+                    if type_str:
+                        return
+                    node_type = type(node).__name__
+                    name = getattr(node, 'name', None)
+                    if name == word:
+                        if node_type == 'VarDecl':
+                            ta = getattr(node, 'type_annotation', None)
+                            if ta:
+                                type_str = str(ta)
+                        elif node_type == 'Paragraph':
+                            return_type = getattr(node, 'return_type', None)
+                            params = getattr(node, 'params', [])
+                            if return_type or params:
+                                type_str = '函数'
+                        elif node_type == 'ClassDefinition':
+                            type_str = '类'
+                
+                self.doc_manager._walk_ast(ast, find_type)
+            except Exception:
+                pass
+
+        if type_str:
+            has_type = any('类型' in c for c in contents)
+            if not has_type:
+                contents.append(f"**类型**: `{type_str}`")
         
         # 内置类型提示
         if word in BUILTIN_TYPES:
@@ -1151,11 +1445,45 @@ class DuanLanguageServer:
                 break
         
         word = line_text[start:end]
+        if not word:
+            return None
         
-        # 查找定义
+        # 1. 优先从已缓存的 definitions 中查找
         if doc.uri in self.doc_manager.definitions:
             if word in self.doc_manager.definitions[doc.uri]:
                 return self.doc_manager.definitions[doc.uri][word]
+        
+        # 2. 尝试解析 AST 作为 fallback 查找定义
+        try:
+            parser = DuanParser()
+            ast = parser.parse(doc.text)
+            found = None
+
+            def search(node):
+                nonlocal found
+                if found:
+                    return
+                node_type = type(node).__name__
+                name = getattr(node, 'name', None)
+                if name == word and node_type in ('VarDecl', 'Paragraph', 'ClassDefinition',
+                                                   'MethodDefinition', 'AttributeDeclaration',
+                                                   'InterfaceDefinition'):
+                    lineno = getattr(node, 'line', 1) - 1
+                    col = getattr(node, 'col', 0)
+                    found = {
+                        'uri': doc.uri,
+                        'range': {
+                            'start': {'line': lineno, 'character': col},
+                            'end': {'line': lineno, 'character': col + len(str(name))}
+                        }
+                    }
+                    return
+
+            self.doc_manager._walk_ast(ast, search)
+            if found:
+                return found
+        except Exception:
+            pass
         
         return None
     
@@ -1253,7 +1581,7 @@ class DuanLanguageServer:
 
     def _format_document(self, text: str, tab_size: int, insert_spaces: bool,
                          start_line: int = None, end_line: int = None) -> List[Dict]:
-        """格式化文档内容"""
+        """格式化文档内容 — AST 结构感知格式化"""
         indent = ' ' * tab_size if insert_spaces else '\t'
         lines = text.split('\n')
         total_lines = len(lines)
@@ -1263,33 +1591,44 @@ class DuanLanguageServer:
         if end_line is None:
             end_line = total_lines - 1
 
-        # 计算缩进级别
+        # 1. 先尝试用 AST 计算每行的缩进级别
+        indent_map = self._compute_indent_from_ast(text, lines)
+
+        # 2. 逐行格式化
         formatted_lines = list(lines)
-        indent_level = 0
-
         for i in range(start_line, end_line + 1):
-            line = lines[i].strip()
+            raw = lines[i]
+            stripped = raw.strip()
 
-            if not line:
+            if not stripped:
+                # 保留空行
                 continue
 
-            # 减少缩进：结束、否则、否则若、捕获、最终
-            decrease_keywords = ['结束', '否则', '否则若', '捕获', '最终']
-            for kw in decrease_keywords:
-                if line.startswith(kw):
-                    indent_level = max(0, indent_level - 1)
-                    break
+            # 注释行：保留原有缩进
+            if stripped.startswith('#'):
+                # 保持注释在所在缩进位置
+                existing_indent = len(raw) - len(raw.lstrip())
+                formatted_lines[i] = indent * (existing_indent // tab_size) + stripped
+                continue
 
-            # 应用缩进
-            formatted_lines[i] = indent * indent_level + line
+            # 使用 AST 计算的缩进级别，如果不可用则回退到启发式
+            level = indent_map.get(i)
+            if level is None:
+                level = self._heuristic_indent_level(stripped, lines, i)
 
-            # 增加缩进：如果...那么、遍历...、当...、段落...、类...、尝试...、匹配...
-            if any(line.endswith(kw) for kw in ['：', ':']):
-                if any(line.startswith(kw) for kw in
-                       ['如果', '若', '遍历', '当', '段落', '类', '接口', '尝试', '匹配', '否则', '否则若', '捕获']):
-                    indent_level += 1
-                elif any(kw in line for kw in ['接收', '构造']):
-                    indent_level += 1
+            formatted_lines[i] = indent * level + stripped
+
+        # 3. 在操作符周围添加空格（仅对非注释、非空行）
+        for i in range(start_line, end_line + 1):
+            raw = formatted_lines[i]
+            stripped = raw.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            # 去掉缩进再处理，然后重新加回缩进
+            indent_str = raw[:len(raw) - len(raw.lstrip())]
+            cleaned = self._add_operator_spacing(stripped)
+            if cleaned != stripped:
+                formatted_lines[i] = indent_str + cleaned
 
         new_text = '\n'.join(formatted_lines)
 
@@ -1303,6 +1642,143 @@ class DuanLanguageServer:
             },
             'newText': '\n'.join(formatted_lines[start_line:end_line + 1])
         }]
+
+    def _compute_indent_from_ast(self, text: str, lines: list) -> Dict[int, int]:
+        """通过 AST 计算每行应有的缩进级别"""
+        indent_map = {}
+        try:
+            parser = DuanParser()
+            ast = parser.parse(text)
+
+            def visit(node, parent_indent=0):
+                node_type = type(node).__name__
+                lineno = getattr(node, 'line', 1) - 1
+                if lineno < 0 or lineno >= len(lines):
+                    return
+
+                # 块级节点，其子节点应缩进
+                if node_type in ('Module', 'IfStmt', 'ForeachStmt', 'WhileStmt',
+                                  'Paragraph', 'ClassDefinition', 'MethodDefinition',
+                                  'TryStmt', 'MatchStmt', 'MatchCase', 'WithStmt',
+                                  'ElseBody', 'CatchBody', 'FinallyBody'):
+                    indent_map[lineno] = parent_indent
+
+                    # 获取子节点列表
+                    body_attrs = []
+                    if node_type == 'Module':
+                        body_attrs = [('statements', 0)]
+                    elif node_type == 'Paragraph':
+                        body_attrs = [('body', parent_indent + 1)]
+                    elif node_type == 'ClassDefinition':
+                        body_attrs = [('attributes', parent_indent + 1), ('methods', parent_indent + 1)]
+                    elif node_type == 'MethodDefinition':
+                        body_attrs = [('body', parent_indent + 1)]
+                    elif node_type == 'IfStmt':
+                        body_attrs = [('then_body', parent_indent + 1), ('else_body', parent_indent + 1)]
+                    elif node_type == 'ForeachStmt':
+                        body_attrs = [('body', parent_indent + 1)]
+                    elif node_type == 'WhileStmt':
+                        body_attrs = [('body', parent_indent + 1)]
+                    elif node_type == 'TryStmt':
+                        body_attrs = [('try_body', parent_indent + 1), ('catch_body', parent_indent + 1),
+                                       ('finally_body', parent_indent + 1)]
+                    elif node_type == 'MatchStmt':
+                        body_attrs = [('cases', parent_indent + 1)]
+                    elif node_type == 'MatchCase':
+                        body_attrs = [('body', parent_indent + 1)]
+                    elif node_type == 'WithStmt':
+                        body_attrs = [('body', parent_indent + 1)]
+
+                    for attr_name, child_indent in body_attrs:
+                        children = getattr(node, attr_name, None)
+                        if children is None:
+                            continue
+                        if not isinstance(children, list):
+                            children = [children]
+                        for child in children:
+                            if isinstance(child, ASTNode):
+                                visit(child, child_indent)
+                else:
+                    indent_map[lineno] = parent_indent
+
+            visit(ast, 0)
+        except Exception:
+            pass
+        return indent_map
+
+    def _heuristic_indent_level(self, stripped: str, lines: list, idx: int) -> int:
+        """启发式计算缩进级别（AST 不可用时回退）"""
+        level = 0
+        for j in range(idx):
+            prev = lines[j].strip()
+            if not prev:
+                continue
+            # 减少缩进关键字
+            if any(prev.startswith(kw) for kw in ['结束', '否则', '否则若', '捕获', '最终',
+                                                     '情况', '结束嵌入']):
+                level = max(0, level - 1)
+            # 增加缩进
+            if any(prev.endswith(kw) for kw in ['：', ':']):
+                if any(prev.startswith(kw) for kw in
+                       ['如果', '若', '遍历', '当', '段落', '函数', '类', '接口',
+                        '尝试', '匹配', '否则', '否则若', '捕获', '使用']):
+                    level += 1
+                elif any(kw in prev for kw in ['接收', '构造']):
+                    level += 1
+        return level
+
+    def _add_operator_spacing(self, line: str) -> str:
+        """在操作符周围添加一致的空格"""
+        # 跳过字符串字面量
+        in_string = False
+        string_char = None
+        result = []
+        i = 0
+        while i < len(line):
+            ch = line[i]
+            # 处理字符串
+            if ch in ('"', "'", '「'):
+                if not in_string:
+                    in_string = True
+                    string_char = ch
+                elif ch == string_char:
+                    in_string = False
+                result.append(ch)
+                i += 1
+                continue
+            if in_string:
+                result.append(ch)
+                i += 1
+                continue
+
+            # 处理中文引号
+            if ch in ('"', '」'):
+                result.append(ch)
+                i += 1
+                continue
+
+            # 运算符
+            if ch in ('=', '＋', '－', '×', '÷', '＋', '－', '×', '÷'):
+                # 跳过已经有一侧空格的
+                if i > 0 and line[i - 1].isspace() and i + 1 < len(line) and line[i + 1].isspace():
+                    result.append(ch)
+                else:
+                    result.append(f' {ch} ')
+                i += 1
+                continue
+
+            # 逗号后加空格
+            if ch in ('，', ',', '、'):
+                result.append(ch)
+                if i + 1 < len(line) and not line[i + 1].isspace() and line[i + 1] not in ('）', ')', '】'):
+                    result.append(' ')
+                i += 1
+                continue
+
+            result.append(ch)
+            i += 1
+
+        return ''.join(result)
 
     def _handle_rename(self, params: Dict) -> Optional[Dict]:
         """处理重命名请求"""
@@ -1409,7 +1885,7 @@ class DuanLanguageServer:
                         'changes': {
                             uri: [{
                                 'range': d_range,
-                                'newText': f'定义 {msg.split("'")[1] if "'" in msg else "变量"} 等于 空。\n'
+                                'newText': '定义 {} 等于 空。\n'.format(msg.split("'")[1] if "'" in msg else "变量")
                             }]
                         }
                     }

@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.5.0] - 2026-08-07
+
+### Added
+- **AI 工具链 2.0**: 数据集 v10 扩展至 2745 条（新增 2015 条，覆盖 LLVM 异常/异步/框架库/包管理/增量编译），上下文感知智能代码补全，文档注释自动生成工具
+- **duanpub 包管理器增强**: `duan pkg update` 更新命令（单包/全部/检查更新），语义化版本比较（`>=1.0.0`/`^1.0.0`/`~1.0.0`），`DependencyResolver` 依赖拓扑排序自动安装，`duan.lock` 锁定文件支持可重现安装，`duan pkg publish` 发布命令（含包结构验证）
+- **LSP 完整实现**: AST 感知的符号提取（段落/类/方法/变量/属性/接口），重写 `_handle_definition` 支持 AST 回退解析，增强 `_handle_hover` 返回类型信息，重写 `_format_document` 实现 AST 结构感知缩进和操作符空格规范化，修复 4 处关键 bug（ASTNode 未导入/parse_tokens 不存在/__slots__ 节点遍历/符号提取错误），26 个 LSP 测试全部通过
+
+### Changed
+- **版本号同步**: pyproject.toml、cli/duan.py、cli/duan_unified.py 全部更新至 v5.5.0
+- **全量回归测试**: 1903 passed, 48 skipped, 0 failures
+
+## [5.2.0] - 2026-08-07
+
+### Added
+- **LLVM 异常处理运行时**: 完整 try-catch-finally 支持，使用 setjmp/longjmp 实现异常展开，支持异常类型匹配与传播，13 个异常场景测试全部通过
+- **LLVM async/await 运行时**: 协程状态机生成，事件循环运行时（C 语言），await 正确挂起/恢复，11 个异步场景测试全部通过
+- **编译器三级缓存系统**: 词法分析缓存（Token 级）、AST 解析缓存、代码生成缓存，基于 SHA256 内容哈希确保缓存一致性，重复编译加速 10x+，线程安全 LRU 淘汰策略
+- **增量编译系统**: 基于 mtime + SHA256 的文件变更检测，依赖图追踪（利用 module_resolver 现有依赖图），BFS 下游依赖链自动重编译，`duan pkg build --incremental` CLI 支持，持久化构建缓存（`.duan_build_cache.json`）
+- **编译器管线性能优化**: Lexer 吞吐量提升 23%（8.68 万→10.68 万 token/s），关键字起始字符快速跳过检查，`_scan_user_definitions` 使用 `str.find()` 跳跃扫描，Parser 解析速度提升 11%
+
+### Fixed
+- **全部 24 个测试失败修复**: 0 failures / 0 errors 全量回归测试通过
+- **LSP f-string Python 3.10 兼容**: 修复 f-string 语法错误，使用 `str.format()` 替代
+
+### Changed
+- **版本号同步**: pyproject.toml、cli/duan.py、docs 全部更新至 v5.2.0
+- **性能基准数据**: 完整管线（小文件）7.1ms → 6.5ms（-8.6%），大文件 12.3ms → 11.2ms（-8.4%）
+
 ## [5.1.0] - 2026-08-07
 
 ### Added

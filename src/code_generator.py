@@ -334,6 +334,11 @@ class PythonCodeGenerator:
             '时间戳': '_duan_builtin.时间戳',
             '格式化时间': '_duan_builtin.格式化时间',
 
+            # 随机数
+            '随机整数': '_duan_builtin.随机整数',
+            '随机浮点': '_duan_builtin.随机浮点',
+            '随机选择': '_duan_builtin.随机选择',
+
             # C FFI 指针/数组/错误处理
             '取地址': '_duan_ffi.取地址',
             '解引用': '_duan_ffi.解引用',
@@ -390,7 +395,6 @@ class PythonCodeGenerator:
         self._add_line("import sys")
         self._add_line("import os")
         self._add_line("import ctypes")
-        self._add_line("import stdlib.FFI as _duan_ffi")
         self._add_line("from typing import Any, Optional")
         self._add_line("")
         self._add_line("try:")
@@ -416,6 +420,12 @@ class PythonCodeGenerator:
         self._add_line("")
         self._add_line("if _duan_stdlib and _duan_stdlib not in sys.path:")
         self._add_line("    sys.path.insert(0, _duan_stdlib)")
+        self._add_line("if _duan_stdlib:")
+        self._add_line("    _duan_parent = os.path.dirname(_duan_stdlib)")
+        self._add_line("    if _duan_parent not in sys.path:")
+        self._add_line("        sys.path.insert(0, _duan_parent)")
+        self._add_line("")
+        self._add_line("import stdlib.FFI as _duan_ffi")
         self._add_line("")
         self._add_line("if importlib:")
         self._add_line("    try:")

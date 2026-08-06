@@ -30,6 +30,14 @@ E2E_EXCLUDED = {
     'bootstrap_lexer.duan',
     'test_turing.duan',
     'test_para.duan',
+    # 新示例项目（需交互式输入或复杂运行环境）
+    'todo_app/main.duan',
+    'blog_app/main.duan',
+    'data_pipeline/pipeline.duan',
+    'games/snake.duan',
+    'games/guess_number.duan',
+    'algorithms/sorting.duan',
+    'algorithms/data_structures.duan',
 }
 
 EXAMPLES_DIR = REPO_ROOT / 'examples'

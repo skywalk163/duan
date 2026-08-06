@@ -124,6 +124,10 @@ class UnifiedCodeGenerator:
             # 时间操作
             '时间戳': '_duan_builtin.时间戳',
             '格式化时间': '_duan_builtin.格式化时间',
+            # 随机数
+            '随机整数': '_duan_builtin.随机整数',
+            '随机浮点': '_duan_builtin.随机浮点',
+            '随机选择': '_duan_builtin.随机选择',
             # 系统操作动词
             '环境变量': '_duan_builtin.环境变量',
             '设置环境变量': '_duan_builtin.设置环境变量',
@@ -248,6 +252,10 @@ class UnifiedCodeGenerator:
         self._add_line("")
         self._add_line("if os.path.isdir(_duan_stdlib) and _duan_stdlib not in sys.path:")
         self._add_line("    sys.path.insert(0, _duan_stdlib)")
+        self._add_line("if os.path.isdir(_duan_stdlib):")
+        self._add_line("    _duan_parent = os.path.dirname(_duan_stdlib)")
+        self._add_line("    if _duan_parent not in sys.path:")
+        self._add_line("        sys.path.insert(0, _duan_parent)")
         self._add_line("")
         self._add_line("if importlib:")
         self._add_line("    try:")

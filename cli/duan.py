@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
 
-VERSION = '段言编译器 v5.1.0'
+VERSION = '段言编译器 v5.5.0'
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -674,7 +674,7 @@ def cmd_pkg_list(args):
 
 
 def cmd_pkg(args):
-    """包管理子命令（统一入口：init/build/run/native/search/info/list）"""
+    """包管理子命令（统一入口：init/build/run/native/search/info/list/update/publish）"""
     pkg_command = getattr(args, 'pkg_command', None)
 
     # 搜索/信息/列表命令直接处理
@@ -686,6 +686,12 @@ def cmd_pkg(args):
         return
     elif pkg_command == 'list':
         cmd_pkg_list(args)
+        return
+    elif pkg_command == 'update':
+        cmd_pkg_update(args)
+        return
+    elif pkg_command == 'publish':
+        cmd_pkg_publish(args)
         return
 
     # 其余命令需要 PackageManager
@@ -717,19 +723,37 @@ def cmd_pkg(args):
             sys.exit(1)
 
     elif args.pkg_command == 'build':
-        pm = PackageManager(project_root=project_root)
-        result = pm.build_project()
-        if result.get('success'):
-            print(f"✅ 构建成功")
-            print(f"   入口: {result.get('entry', '')}")
-            order = result.get('order', [])
-            if order:
-                print(f"   模块拓扑顺序: {' -> '.join(order)}")
+        if getattr(args, 'incremental', False):
+            # 增量编译
+            try:
+                from incremental_build import incremental_build_cli
+                result = incremental_build_cli(
+                    project_dir=project_root,
+                    force=getattr(args, 'force', False),
+                    verbose=True
+                )
+                if result == 0:
+                    print(f"✅ 增量构建成功")
+                else:
+                    print(f"❌ 增量构建失败", file=sys.stderr)
+                    sys.exit(1)
+            except ImportError as e:
+                print(f"❌ 增量编译模块不可用: {e}", file=sys.stderr)
+                sys.exit(1)
         else:
-            print("❌ 构建失败:", file=sys.stderr)
-            for err in result.get('errors', []):
-                print(f"   - {err}", file=sys.stderr)
-            sys.exit(1)
+            pm = PackageManager(project_root=project_root)
+            result = pm.build_project()
+            if result.get('success'):
+                print(f"✅ 构建成功")
+                print(f"   入口: {result.get('entry', '')}")
+                order = result.get('order', [])
+                if order:
+                    print(f"   模块拓扑顺序: {' -> '.join(order)}")
+            else:
+                print("❌ 构建失败:", file=sys.stderr)
+                for err in result.get('errors', []):
+                    print(f"   - {err}", file=sys.stderr)
+                sys.exit(1)
 
     elif args.pkg_command == 'run':
         pm = PackageManager(project_root=project_root)
@@ -799,6 +823,18 @@ def cmd_install(args):
 
 def cmd_publish(args):
     """发布段言段件"""
+    from package_installer import run_publish
+    run_publish(args)
+
+
+def cmd_pkg_update(args):
+    """更新段言段件"""
+    from package_installer import run_update
+    run_update(args)
+
+
+def cmd_pkg_publish(args):
+    """发布段言段件（pkg 子命令）"""
     from package_installer import run_publish
     run_publish(args)
 
@@ -1072,14 +1108,16 @@ def main():
                         default='default', help='项目模板（默认: default）')
 
     # ── pkg ──
-    pkg_p = subparsers.add_parser('pkg', help='包管理（init/build/run/native/search/info/list）')
+    pkg_p = subparsers.add_parser('pkg', help='包管理（init/build/run/native/search/info/list/update/publish）')
     pkg_p.add_argument('--project', '-p', default='.', help='项目根目录（默认: 当前目录）')
     pkg_sub = pkg_p.add_subparsers(dest='pkg_command', help='包管理子命令')
 
     pkg_init = pkg_sub.add_parser('init', help='初始化新包（创建 package.toml 与 主.duan）')
     pkg_init.add_argument('name', nargs='?', default=None, help='包名（默认: 目录名）')
 
-    pkg_sub.add_parser('build', help='编译整个项目')
+    pkg_build = pkg_sub.add_parser('build', help='编译整个项目')
+    pkg_build.add_argument('--incremental', action='store_true', help='使用增量编译（仅编译变更文件）')
+    pkg_build.add_argument('--force', '-f', action='store_true', help='强制全量编译（忽略增量缓存）')
 
     pkg_sub.add_parser('run', help='运行项目入口')
 
@@ -1099,6 +1137,16 @@ def main():
     pkg_list = pkg_sub.add_parser('list', help='列出 duanpub 包')
     pkg_list.add_argument('--category', '-c', default=None, help='按分类筛选（dev/net/database/security/language 等）')
     pkg_list.add_argument('--priority', '-p', default=None, choices=['P0', 'P1', 'P2'], help='按优先级筛选')
+
+    # ── pkg update ──
+    pkg_update = pkg_sub.add_parser('update', help='更新段件到最新版本')
+    pkg_update.add_argument('package', nargs='?', default=None, help='段件名（默认空）')
+    pkg_update.add_argument('--all', '-a', action='store_true', help='更新所有已安装段件')
+    pkg_update.add_argument('--check', '-c', action='store_true', help='检查可用更新，不安装')
+
+    # ── pkg publish ──
+    pkg_publish = pkg_sub.add_parser('publish', help='发布段件到本地索引')
+    pkg_publish.add_argument('--path', default=None, help='段件项目路径（默认: 当前目录）')
 
     # ── ai ──
     ai_p = subparsers.add_parser('ai', help='AI Copilot 辅助工具（算力不足场景下的段言代码生成）')
@@ -1172,10 +1220,12 @@ def main():
     install_p.add_argument('--uninstall', default=None, help='卸载段件')
     install_p.add_argument('--update-registry', action='store_true', help='从远程更新本地段件库缓存')
     install_p.add_argument('--registry-url', default=None, help='远程段件库 URL')
+    install_p.add_argument('--with-deps', action='store_true', help='自动安装依赖')
     install_p.add_argument('-p', '--project', default='.', help='项目目录')
 
     # ── publish ──
-    publish_p = subparsers.add_parser('publish', help='发布段件（生成段件库条目并显示 PR 指引）')
+    publish_p = subparsers.add_parser('publish', help='发布段件到本地索引')
+    publish_p.add_argument('--path', default=None, help='段件项目路径（默认: 当前目录）')
     publish_p.add_argument('-p', '--project', default='.', help='项目目录')
 
     # ── repl ──
