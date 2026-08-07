@@ -2178,7 +2178,8 @@
 
 <h1 id="api">标准库模块 API<a class="headerlink" href="#api" title="Permanent link">&para;</a></h1>
 <blockquote>
-<p>自动从 stdlib/ 目录提取的模块 API 参考。</p>
+<p><strong>版本：</strong> v6.0
+自动从 stdlib/ 目录提取的模块 API 参考。涵盖 70+ 标准库模块，包括 HTTP 服务端、异步运行时、单元测试框架等 v6.0 新增模块。</p>
 </blockquote>
 <hr />
 <h2 id="_1">模块列表<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
@@ -2192,131 +2193,311 @@
 <tbody>
 <tr>
 <td><a href="builtins/">内置函数</a></td>
-<td>标准库模块</td>
+<td>内置函数（打印、类型转换、字符串操作、列表/字典操作等）</td>
 </tr>
 <tr>
-<td><a href="CSV%E8%AF%BB%E5%86%99%E5%99%A8/">CSV 读写</a></td>
-<td>标准库模块</td>
+<td><a href="HTTP%E6%9C%8D%E5%8A%A1%E7%AB%AF/">HTTP 服务端</a></td>
+<td>HTTP 服务器：路由、中间件、静态文件、CORS、Web 应用</td>
 </tr>
 <tr>
-<td><a href="FFI/">FFI 外部函数接口</a></td>
-<td>标准库模块</td>
+<td><a href="HTTP%E5%AE%A2%E6%88%B7%E7%AB%AF/">HTTP 客户端</a></td>
+<td>HTTP 客户端：GET/POST 请求、会话管理、Cookie</td>
+</tr>
+<tr>
+<td><a href="%E5%BC%82%E6%AD%A5%E8%BF%90%E8%A1%8C%E6%97%B6/">异步运行时</a></td>
+<td>异步编程：Future/Promise、事件循环、定时器、协程调度</td>
+</tr>
+<tr>
+<td><a href="%E5%8D%95%E5%85%83%E6%B5%8B%E8%AF%95%E6%A1%86%E6%9E%B6/">单元测试框架</a></td>
+<td>测试框架：断言、Mock、参数化测试、基准测试</td>
 </tr>
 <tr>
 <td><a href="JSON/">JSON 解析与序列化</a></td>
-<td>标准库模块</td>
+<td>JSON 解析、序列化、Schema 验证、JSON Pointer</td>
+</tr>
+<tr>
+<td><a href="CSV%E8%AF%BB%E5%86%99%E5%99%A8/">CSV 读写</a></td>
+<td>CSV 文件读写、流式解析</td>
+</tr>
+<tr>
+<td><a href="FFI/">FFI 外部函数接口</a></td>
+<td>C 语言外部函数接口</td>
+</tr>
+<tr>
+<td><a href="Socket/">Socket</a></td>
+<td>TCP/UDP 套接字通信</td>
+</tr>
+<tr>
+<td><a href="SQLite/">SQLite</a></td>
+<td>SQLite 数据库操作</td>
+</tr>
+<tr>
+<td><a href="URL%E8%A7%A3%E6%9E%90/">URL 解析</a></td>
+<td>URL 解析、构建、编码</td>
 </tr>
 <tr>
 <td><a href="%E4%B8%AD%E6%96%87%E6%96%87%E6%9C%AC/">中文文本处理</a></td>
-<td>标准库模块</td>
+<td>中文文本处理工具</td>
 </tr>
 <tr>
 <td><a href="%E4%B8%B4%E6%97%B6%E6%96%87%E4%BB%B6/">临时文件</a></td>
-<td>标准库模块</td>
+<td>临时文件和目录管理</td>
 </tr>
 <tr>
 <td><a href="%E5%8A%A0%E5%AF%86/">加密解密</a></td>
-<td>标准库模块</td>
+<td>加密解密：AES、RSA</td>
 </tr>
 <tr>
-<td><a href="%E5%8E%86%E6%B3%95/">历法工具</a></td>
-<td>标准库模块</td>
+<td><a href="%E5%8A%A0%E5%AF%86%E7%AE%97%E6%B3%95/">加密算法</a></td>
+<td>加密算法集合</td>
 </tr>
 <tr>
-<td><a href="%E5%8F%82%E6%95%B0%E8%A7%A3%E6%9E%90/">命令行参数解析</a></td>
-<td>标准库模块</td>
+<td><a href="%E5%AF%86%E7%A0%81%E5%93%88%E5%B8%8C/">密码哈希</a></td>
+<td>bcrypt/scrypt 密码哈希</td>
 </tr>
 <tr>
 <td><a href="%E5%93%88%E5%B8%8C/">哈希计算</a></td>
-<td>标准库模块</td>
+<td>MD5/SHA1/SHA256/SHA512 哈希</td>
+</tr>
+<tr>
+<td><a href="%E5%8E%8B%E7%BC%A9%E7%AE%97%E6%B3%95/">压缩算法</a></td>
+<td>gzip/zlib/lz4/zstd 压缩</td>
+</tr>
+<tr>
+<td><a href="%E4%BA%8C%E8%BF%9B%E5%88%B6%E7%BC%96%E7%A0%81/">二进制编码</a></td>
+<td>Base64/Base32/Hex 编码</td>
+</tr>
+<tr>
+<td><a href="%E5%8E%86%E6%B3%95/">历法工具</a></td>
+<td>历法计算工具</td>
+</tr>
+<tr>
+<td><a href="%E5%8F%82%E6%95%B0%E8%A7%A3%E6%9E%90/">命令行参数解析</a></td>
+<td>命令行参数解析</td>
 </tr>
 <tr>
 <td><a href="%E5%A4%96%E9%83%A8%E5%91%BD%E4%BB%A4/">外部命令执行</a></td>
-<td>标准库模块</td>
+<td>系统命令执行</td>
 </tr>
 <tr>
 <td><a href="%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%A4%84%E7%90%86/">字符串处理</a></td>
-<td>标准库模块</td>
+<td>字符串操作：分割、拼接、替换、查找</td>
 </tr>
 <tr>
 <td><a href="%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%B7%A5%E5%85%B7/">字符串工具</a></td>
-<td>标准库模块</td>
+<td>字符串增强工具</td>
 </tr>
 <tr>
 <td><a href="%E5%AD%97%E7%AC%A6%E4%B8%B2%E5%B8%B8%E9%87%8F/">字符串常量</a></td>
-<td>标准库模块</td>
+<td>字符串常量定义</td>
 </tr>
 <tr>
 <td><a href="%E5%AF%B9%E8%B1%A1%E6%B1%A0%E7%BC%93%E5%AD%98/">对象池与缓存</a></td>
-<td>标准库模块</td>
+<td>对象池和缓存管理</td>
 </tr>
 <tr>
 <td><a href="%E6%8E%92%E7%89%88/">排版与美化</a></td>
-<td>标准库模块</td>
+<td>文本排版美化</td>
 </tr>
 <tr>
 <td><a href="%E6%95%B0%E5%AD%A6/">数学运算</a></td>
-<td>标准库模块</td>
+<td>数学函数：三角函数、统计、阶乘</td>
+</tr>
+<tr>
+<td><a href="%E6%95%B0%E5%AD%A6%E8%BF%90%E7%AE%97/">数学运算</a></td>
+<td>数学运算模块</td>
+</tr>
+<tr>
+<td><a href="%E6%95%B0%E5%80%BC%E8%AE%A1%E7%AE%97/">数值计算</a></td>
+<td>数值计算：向量、矩阵、线性代数</td>
 </tr>
 <tr>
 <td><a href="%E6%95%B0%E6%8D%AE%E7%BB%93%E6%9E%84/">数据结构</a></td>
-<td>标准库模块</td>
+<td>数据结构：栈、队列、树、图</td>
 </tr>
 <tr>
 <td><a href="%E6%96%87%E4%BB%B6%E5%8C%B9%E9%85%8D/">文件匹配</a></td>
-<td>标准库模块</td>
+<td>文件 Glob 模式匹配</td>
 </tr>
 <tr>
 <td><a href="%E6%96%87%E4%BB%B6%E7%B3%BB%E7%BB%9F/">文件系统</a></td>
-<td>标准库模块</td>
+<td>文件读写、目录操作</td>
+</tr>
+<tr>
+<td><a href="%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0/">文件上传</a></td>
+<td>文件上传处理</td>
 </tr>
 <tr>
 <td><a href="%E6%96%AD%E8%A8%80%E5%B7%A5%E5%85%B7/">断言测试</a></td>
-<td>标准库模块</td>
+<td>断言工具</td>
 </tr>
 <tr>
 <td><a href="%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F%E5%A2%9E%E5%BC%BA/">日志系统</a></td>
-<td>标准库模块</td>
+<td>结构化日志系统</td>
+</tr>
+<tr>
+<td><a href="%E6%97%A5%E5%BF%97%E7%B3%BB%E7%BB%9F/">日志系统</a></td>
+<td>日志系统</td>
 </tr>
 <tr>
 <td><a href="%E6%97%A5%E6%9C%9F%E6%97%B6%E9%97%B4/">日期时间</a></td>
-<td>标准库模块</td>
+<td>日期时间操作</td>
+</tr>
+<tr>
+<td><a href="%E6%97%A5%E6%9C%9F%E5%BA%8F%E5%88%97/">日期序列</a></td>
+<td>日期序列：时间戳、时区、日期范围</td>
 </tr>
 <tr>
 <td><a href="%E6%97%B6%E9%97%B4%E7%AE%A1%E7%90%86/">时间管理</a></td>
-<td>标准库模块</td>
+<td>计时器、休眠</td>
 </tr>
 <tr>
 <td><a href="%E6%AD%A3%E5%88%99%E8%A1%A8%E8%BE%BE%E5%BC%8F/">正则表达式</a></td>
-<td>标准库模块</td>
+<td>正则表达式匹配</td>
 </tr>
 <tr>
 <td><a href="%E7%B3%BB%E7%BB%9F%E6%8E%A5%E5%8F%A3/">系统接口</a></td>
-<td>标准库模块</td>
+<td>系统接口：环境变量、命令行参数、退出</td>
 </tr>
 <tr>
 <td><a href="%E7%BC%96%E7%A0%81/">编码工具</a></td>
-<td>标准库模块</td>
+<td>编码工具</td>
 </tr>
 <tr>
 <td><a href="%E7%BC%96%E7%A0%81%E8%A7%A3%E7%A0%81/">编码解码</a></td>
-<td>标准库模块</td>
+<td>Base64/URL 编码解码</td>
 </tr>
 <tr>
 <td><a href="%E8%A3%85%E9%A5%B0%E5%99%A8/">装饰器</a></td>
-<td>标准库模块</td>
+<td>装饰器：缓存、重试、计时、日志</td>
 </tr>
 <tr>
 <td><a href="%E9%9B%86%E5%90%88/">集合操作</a></td>
-<td>标准库模块</td>
+<td>集合操作：并集、交集、差集</td>
 </tr>
 <tr>
 <td><a href="%E9%9B%86%E5%90%88%E5%B7%A5%E5%85%B7/">集合工具</a></td>
-<td>标准库模块</td>
+<td>集合增强工具</td>
 </tr>
 <tr>
 <td><a href="%E9%9B%86%E5%90%88%E6%93%8D%E4%BD%9C/">集合操作</a></td>
-<td>标准库模块</td>
+<td>集合操作模块</td>
+</tr>
+<tr>
+<td><a href="%E5%8D%8F%E7%A8%8B/">协程</a></td>
+<td>协程库：调度、通道、生成器</td>
+</tr>
+<tr>
+<td><a href="%E5%B9%B6%E8%A1%8C%E8%AE%A1%E7%AE%97/">并行计算</a></td>
+<td>并行计算：线程池、任务并行</td>
+</tr>
+<tr>
+<td><a href="%E6%B6%88%E6%81%AF%E9%98%9F%E5%88%97/">消息队列</a></td>
+<td>消息队列系统</td>
+</tr>
+<tr>
+<td><a href="%E4%BB%BB%E5%8A%A1%E9%98%9F%E5%88%97/">任务队列</a></td>
+<td>任务队列调度</td>
+</tr>
+<tr>
+<td><a href="%E8%B7%AF%E5%BE%84%E5%A4%84%E7%90%86/">路径处理</a></td>
+<td>跨平台路径操作</td>
+</tr>
+<tr>
+<td><a href="%E7%BD%91%E7%BB%9C%E5%B7%A5%E5%85%B7/">网络工具</a></td>
+<td>网络工具：IP 处理、端口扫描</td>
+</tr>
+<tr>
+<td><a href="%E7%BC%93%E5%AD%98%E7%B3%BB%E7%BB%9F/">缓存系统</a></td>
+<td>多级缓存系统</td>
+</tr>
+<tr>
+<td><a href="%E8%BF%9E%E6%8E%A5%E6%B1%A0/">连接池</a></td>
+<td>数据库连接池</td>
+</tr>
+<tr>
+<td><a href="%E8%BF%9B%E7%A8%8B%E7%AE%A1%E7%90%86/">进程管理</a></td>
+<td>进程管理</td>
+</tr>
+<tr>
+<td><a href="%E7%BA%BF%E7%A8%8B/">线程</a></td>
+<td>线程管理</td>
+</tr>
+<tr>
+<td><a href="%E7%B3%BB%E7%BB%9F%E4%BF%A1%E6%81%AF/">系统信息</a></td>
+<td>系统信息获取</td>
+</tr>
+<tr>
+<td><a href="%E6%8E%92%E5%BA%8F%E4%B8%8E%E6%90%9C%E7%B4%A2/">排序与搜索</a></td>
+<td>排序与搜索算法</td>
+</tr>
+<tr>
+<td><a href="%E6%80%A7%E8%83%BD%E5%88%86%E6%9E%90/">性能分析</a></td>
+<td>性能分析工具</td>
+</tr>
+<tr>
+<td><a href="%E6%A8%A1%E6%9D%BF%E6%B8%B2%E6%9F%93/">模板渲染</a></td>
+<td>模板引擎</td>
+</tr>
+<tr>
+<td><a href="%E6%95%B0%E6%8D%AE%E5%AF%BC%E5%85%A5%E5%AF%BC%E5%87%BA/">数据导入导出</a></td>
+<td>多种格式数据导入导出</td>
+</tr>
+<tr>
+<td><a href="%E7%BB%9F%E8%AE%A1%E5%88%86%E6%9E%90/">统计分析</a></td>
+<td>统计分析工具</td>
+</tr>
+<tr>
+<td><a href="%E9%94%99%E8%AF%AF%E5%A4%84%E7%90%86/">错误处理</a></td>
+<td>错误链、Result 类型</td>
+</tr>
+<tr>
+<td><a href="%E9%9A%8F%E6%9C%BA%E6%95%B0/">随机数</a></td>
+<td>随机数生成</td>
+</tr>
+<tr>
+<td><a href="%E9%9B%86%E5%90%88%E6%89%A9%E5%B1%95/">集合扩展</a></td>
+<td>集合扩展操作</td>
+</tr>
+<tr>
+<td><a href="%E8%BF%AD%E4%BB%A3%E5%99%A8%E5%B7%A5%E5%85%B7/">迭代器工具</a></td>
+<td>懒迭代器工具</td>
+</tr>
+<tr>
+<td><a href="%E7%B1%BB%E5%9E%8B%E5%B7%A5%E5%85%B7/">类型工具</a></td>
+<td>运行时类型检查</td>
+</tr>
+<tr>
+<td><a href="%E7%AE%97%E6%B3%95%E5%B7%A5%E5%85%B7/">算法工具</a></td>
+<td>算法工具集合</td>
+</tr>
+<tr>
+<td><a href="%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F/">环境变量</a></td>
+<td>环境变量管理</td>
+</tr>
+<tr>
+<td><a href="%E9%85%8D%E7%BD%AE%E7%AE%A1%E7%90%86/">配置管理</a></td>
+<td>配置管理</td>
+</tr>
+<tr>
+<td><a href="%E4%BA%8B%E4%BB%B6%E9%A9%B1%E5%8A%A8/">事件驱动</a></td>
+<td>事件驱动编程</td>
+</tr>
+<tr>
+<td><a href="%E8%AF%81%E4%B9%A6/">证书</a></td>
+<td>X.509 证书管理</td>
+</tr>
+<tr>
+<td><a href="%E9%82%AE%E4%BB%B6/">邮件</a></td>
+<td>SMTP 邮件发送</td>
+</tr>
+<tr>
+<td><a href="%E6%95%B0%E6%8D%AE%E5%AF%BC%E5%85%A5%E5%AF%BC%E5%87%BA/">数据导入导出</a></td>
+<td>数据导入导出</td>
+</tr>
+<tr>
+<td><a href="%E6%95%B0%E5%80%BC%E8%AE%A1%E7%AE%97/">数值计算</a></td>
+<td>数值计算</td>
 </tr>
 </tbody>
 </table>

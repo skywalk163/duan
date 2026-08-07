@@ -448,7 +448,18 @@
   <a href="#_1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        特性
+        🚀 快速上手
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v61" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ✨ v6.1 新特性
       
     </span>
   </a>
@@ -459,41 +470,41 @@
   <a href="#_2" class="md-nav__link">
     <span class="md-ellipsis">
       
-        安装
+        📖 文档导航
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
+    <nav class="md-nav" aria-label="📖 文档导航">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
   <a href="#_3" class="md-nav__link">
     <span class="md-ellipsis">
       
-        快速开始
+        🟢 入门指南
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
+        
+          <li class="md-nav__item">
   <a href="#_4" class="md-nav__link">
     <span class="md-ellipsis">
       
-        文档导航
+        🔧 核心文档
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="文档导航">
-      <ul class="md-nav__list">
+</li>
         
           <li class="md-nav__item">
   <a href="#_5" class="md-nav__link">
     <span class="md-ellipsis">
       
-        入门指南
+        🏗️ 架构与设计
       
     </span>
   </a>
@@ -504,7 +515,7 @@
   <a href="#_6" class="md-nav__link">
     <span class="md-ellipsis">
       
-        核心文档
+        🔌 开发与配置
       
     </span>
   </a>
@@ -515,7 +526,7 @@
   <a href="#_7" class="md-nav__link">
     <span class="md-ellipsis">
       
-        博客
+        📝 技术博客
       
     </span>
   </a>
@@ -526,18 +537,7 @@
   <a href="#_8" class="md-nav__link">
     <span class="md-ellipsis">
       
-        项目规划
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#ai-copilot" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        AI Copilot
+        🗺️ 项目规划
       
     </span>
   </a>
@@ -553,7 +553,7 @@
   <a href="#_9" class="md-nav__link">
     <span class="md-ellipsis">
       
-        版本
+        🌍 社区
       
     </span>
   </a>
@@ -564,7 +564,18 @@
   <a href="#_10" class="md-nav__link">
     <span class="md-ellipsis">
       
-        如何贡献
+        🤝 如何贡献
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        📊 项目里程碑
       
     </span>
   </a>
@@ -2277,83 +2288,425 @@
   
 
 
-<h1 id="duan">段言 (Duan) 文档<a class="headerlink" href="#duan" title="Permanent link">&para;</a></h1>
+<h1 id="duan">段言 (Duan) 文档站<a class="headerlink" href="#duan" title="Permanent link">&para;</a></h1>
 <blockquote>
-<p><strong>当前版本：</strong> v5.5.0
-<strong>最后更新：</strong> 2026-08-07</p>
+<p><strong>当前版本：</strong> v6.1.0（生产就绪）<br />
+<strong>测试覆盖：</strong> 全量回归测试通过<br />
+<strong>最后更新：</strong> 2026-11-07</p>
 </blockquote>
-<p><strong>段言</strong>是一门基于中文的现代化编程语言，采用中文关键字，让编程更加直观易懂。</p>
-<h2 id="_1">特性<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
-<ul>
-<li>🀄 <strong>中文语法</strong>：全中文关键字，符合中文思维习惯</li>
-<li>🚀 <strong>自举编译</strong>：编译器本身用段言编写（bootstrap_v3.duan，95 个函数），可自举编译</li>
-<li>⚡ <strong>LLVM 原生编译</strong>：支持编译为原生机器码（EXE），无需 Python 运行时</li>
-<li>📦 <strong>双后端架构</strong>：Python 解释执行 + LLVM 原生编译，灵活切换</li>
-<li>🔧 <strong>丰富标准库</strong>：60+ 标准库模块，覆盖数学、文件、JSON、HTTP、加密、FFI 等</li>
-<li>🔗 <strong>C FFI 绑定</strong>：支持调用 C 动态库，完整的 C 语言互操作</li>
-<li>🧠 <strong>HM 类型推断</strong>：Hindley-Milner 全局类型推断，支持泛型</li>
-<li>🛡️ <strong>空安全系统</strong>：<code>可空</code> 类型注解与 <code>unwrap</code> 安全展开</li>
-<li>📦 <strong>duanpub 包管理器</strong>：包索引、安装、依赖管理、发布流程</li>
-<li>🤖 <strong>AI 工具链 2.0</strong>：AI Copilot 代码生成、微调模型、语法速查卡</li>
-<li>💻 <strong>完整 LSP 支持</strong>：悬停提示、代码补全、跳转定义、诊断、重构、格式化</li>
-<li>🐛 <strong>DAP 调试器</strong>：VS Code 断点调试支持</li>
-<li>📚 <strong>交互式教程</strong>：10 节完整教程，支持 <code>--repl</code> 和 <code>--step</code> 模式</li>
-</ul>
-<h2 id="_2">安装<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>duan
-</span></code></pre></div>
-<h2 id="_3">快速开始<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h2>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>打印 &quot;你好，世界！&quot;
-</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>
-</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>段落 加法 接收 甲, 乙:
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    返回 甲 + 乙
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>设 结果 为 加法(3, 5)
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>打印 结果  # 输出：8
-</span></code></pre></div>
-<h2 id="_4">文档导航<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
-<h3 id="_5">入门指南<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="getting-started/">快速开始</a> — 安装和运行</li>
-<li><a href="30%E5%88%86%E9%92%9F%E5%85%A5%E9%97%A8%E6%AE%B5%E8%A8%80/">30 分钟入门段言</a> — 零基础入门教程</li>
-<li><a href="syntax/">语法规范</a> — 语言语法参考</li>
-<li><a href="USER_MANUAL/">用户手册</a> — 完整用户手册</li>
-</ul>
-<h3 id="_6">核心文档<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="stdlib/">标准库</a> — 内置模块说明</li>
-<li><a href="tools/">工具链</a> — CLI、调试器、LSP、AI Copilot</li>
-<li><a href="examples/">案例</a> — 示例代码</li>
-<li><a href="architecture/">架构设计</a> — 编译器架构详解</li>
-<li><a href="%E5%8C%85%E7%AE%A1%E7%90%86%E5%99%A8%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97/">包管理器使用指南</a> — duanpub 包管理</li>
-</ul>
-<h3 id="_7">博客<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="blog/%E6%AE%B5%E8%A8%80%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97/">段言入门指南</a> — 用中文自然语言编程</li>
-<li><a href="blog/%E6%AE%B5%E8%A8%80%E7%BC%96%E8%AF%91%E5%99%A8%E6%9E%B6%E6%9E%84%E8%A7%A3%E6%9E%90/">段言编译器架构解析</a> — 从中文到机器码</li>
-<li><a href="blog/%E4%B8%AD%E6%96%87%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80%E7%9A%84%E6%9C%AA%E6%9D%A5/">中文编程语言的未来</a> — 设计哲学与愿景</li>
-</ul>
-<h3 id="_8">项目规划<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
-<ul>
-<li><a href="ROADMAP/">项目路线图</a> — 版本规划与愿景</li>
-<li><a href="DEVELOPMENT_GUIDE/">开发指南</a> — 开发者参与指南</li>
-<li><a href="API_REFERENCE/">API 参考</a> — 完整 API 文档</li>
-</ul>
-<h3 id="ai-copilot">AI Copilot<a class="headerlink" href="#ai-copilot" title="Permanent link">&para;</a></h3>
-<p>算力不足时让 AI 帮你写段言代码：</p>
-<ul>
-<li><a href="superpowers/plans/2026-07-01-level6-type-annotation/">LoRA 微调指南</a> — Qwen 模型微调训练</li>
-<li><a href="superpowers/specs/2026-07-01-level5-module-exception-design/">ERNIE 微调指南</a> — ERNIE 轻量级翻译器</li>
-</ul>
-<h2 id="_9">版本<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
-<p>当前版本：<strong>v5.5.0</strong></p>
-<h2 id="_10">如何贡献<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
-<ul>
-<li>💬 <strong>讨论</strong>：在 <a href="https://github.com/skywalk163/duan/discussions">GitHub Discussions</a> 发起讨论</li>
-<li>🐛 <strong>报告 Bug</strong>：提交 <a href="https://github.com/skywalk163/duan/issues/new?template=bug_report.md">Bug Report</a></li>
-<li>💡 <strong>建议功能</strong>：提交 <a href="https://github.com/skywalk163/duan/issues/new?template=feature_request.md">Feature Request</a></li>
-<li>🔧 <strong>贡献代码</strong>：参考 <a href="../CONTRIBUTING.md">CONTRIBUTING.md</a> 和 <a href="DEVELOPMENT_GUIDE/">DEVELOPMENT_GUIDE.md</a></li>
-</ul>
+<p><strong>段言</strong>是一门以中文为第一公民的现代化编程语言。全中文关键字、中文标准库、中文文档，让你用母语思维写代码。</p>
+<hr />
+<h2 id="_1">🚀 快速上手<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>步骤</th>
+<th>命令</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><code>pip install duan</code></td>
+<td>安装段言</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>echo '打印 "你好，世界！"' &gt; hello.duan</code></td>
+<td>创建第一个程序</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>duan run hello.duan</code></td>
+<td>运行！</td>
+</tr>
+</tbody>
+</table>
+<p><a href="30%E5%88%86%E9%92%9F%E5%85%A5%E9%97%A8%E6%AE%B5%E8%A8%80/">📖 30 分钟入门教程 →</a> &nbsp;&nbsp; <a href="getting-started/">⚡ 快速开始 →</a> &nbsp;&nbsp; <a href="tutorials/%E5%85%A5%E9%97%A8%E6%95%99%E7%A8%8B/">📚 交互式教程 →</a></p>
+<hr />
+<h2 id="v61">✨ v6.1 新特性<a class="headerlink" href="#v61" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>特性</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>🌐 <strong>100% 中文错误信息</strong></td>
+<td>全量替换 20+ 种英文异常类型为中文名称，附带中文修改指引</td>
+</tr>
+<tr>
+<td>📚 <strong>标准库 4 大增强</strong></td>
+<td>网络请求（Cookie/会话/代理/异步/文件上传下载）、日期时间（农历/时区/中文日期解析）、文件系统（文件监控/批量操作/哈希/安全写入）、中文 NLP（分词/拼音/简繁转换/文本统计）</td>
+</tr>
+<tr>
+<td>🚀 <strong>LLVM 编译体验优化</strong></td>
+<td>自动检测下载 LLVM 依赖，EXE 体积优化（--optimize-size/--lto/--strip），增量编译加速（--fast 模式）</td>
+</tr>
+<tr>
+<td>🤖 <strong>AI Copilot 升级</strong></td>
+<td>离线轻量级模型方案，Java/C→段言代码转换，数据集 v12（4088 条），多轮对话交互式代码生成</td>
+</tr>
+<tr>
+<td>🔌 <strong>C FFI 绑定简化</strong></td>
+<td>一键加载 C 库（加载C库），预设绑定（libc/libm/libpthread/libdl），自动平台检测</td>
+</tr>
+<tr>
+<td>📦 <strong>包注册中心 Web 界面</strong></td>
+<td>搜索/浏览/查看包详情，安装命令一键复制</td>
+</tr>
+<tr>
+<td>🛡️ <strong>包安全认证</strong></td>
+<td>包签名验证，TOFU 信任模型，漏洞检查</td>
+</tr>
+<tr>
+<td>💻 <strong>LSP 中文代码补全增强</strong></td>
+<td>中文关键词补全，snippet 模板，标准库模块补全</td>
+</tr>
+<tr>
+<td>🎨 <strong>语义高亮完善</strong></td>
+<td>装饰器/二进制数字/中文关键字/内置函数/类型高亮</td>
+</tr>
+<tr>
+<td>📋 <strong>首次运行交互式引导</strong></td>
+<td>安装后首次运行自动弹出交互式入门体验</td>
+</tr>
+<tr>
+<td>📦 <strong>一键安装包方案</strong></td>
+<td>Windows/macOS/Linux 一键安装包设计文档和构建脚本</td>
+</tr>
+<tr>
+<td>💬 <strong>社区反馈收集</strong></td>
+<td><code>duan feedback</code> 命令，支持本地收集和发送到 GitHub</td>
+</tr>
+<tr>
+<td>🏗️ <strong>应用案例库</strong></td>
+<td>3 个完整应用示例（Web 爬虫、数据处理管线、CLI 文件整理工具）</td>
+</tr>
+<tr>
+<td>🎯 <strong>VS Code 扩展开箱即用</strong></td>
+<td>自动激活，欢迎页，状态栏版本显示</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>📝 <a href="release_notes_v6.1.0/">查看完整发布说明 →</a> &nbsp;&nbsp; 🔄 <a href="%E8%BF%81%E7%A7%BB%E6%8C%87%E5%8D%97_v5%E5%88%B0v6/">v5 → v6 迁移指南 →</a> &nbsp;&nbsp; 🌱 <a href="%E8%AE%BE%E8%AE%A1%E5%93%B2%E5%AD%A6%E4%B8%8E%E5%AE%9A%E4%BD%8D/">设计哲学与定位 →</a></p>
+</blockquote>
+<hr />
+<h2 id="_2">📖 文档导航<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h2>
+<h3 id="_3">🟢 入门指南<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>适合人群</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="getting-started/">快速开始</a></td>
+<td>所有人</td>
+<td>安装、运行、第一个程序</td>
+</tr>
+<tr>
+<td><a href="30%E5%88%86%E9%92%9F%E5%85%A5%E9%97%A8%E6%AE%B5%E8%A8%80/">30 分钟入门段言</a></td>
+<td>零基础</td>
+<td>从零到能写段言程序</td>
+</tr>
+<tr>
+<td><a href="tutorials/%E5%85%A5%E9%97%A8%E6%95%99%E7%A8%8B/">入门教程</a></td>
+<td>初学者</td>
+<td>10 节交互式教程，支持 <code>--repl</code> 模式</td>
+</tr>
+<tr>
+<td><a href="tutorials/%E8%BF%9B%E9%98%B6%E6%95%99%E7%A8%8B/">进阶教程</a></td>
+<td>有编程经验者</td>
+<td>深入特性与最佳实践</td>
+</tr>
+<tr>
+<td><a href="%E7%AB%AF%E5%88%B0%E7%AB%AF%E5%AE%9E%E6%88%98%E6%95%99%E7%A8%8B/">端到端实战教程</a></td>
+<td>想动手的开发者</td>
+<td>从零构建天气查询程序</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_4">🔧 核心文档<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="%E7%BB%9F%E4%B8%80%E8%AF%AD%E6%B3%95%E8%A7%84%E8%8C%83_v3.2/">语法规范 v3.2</a></td>
+<td>完整语法定义与规范</td>
+</tr>
+<tr>
+<td><a href="USER_MANUAL/">用户手册</a></td>
+<td>完整用户手册，涵盖所有特性</td>
+</tr>
+<tr>
+<td><a href="stdlib/">标准库文档</a></td>
+<td>60+ 内置模块详解</td>
+</tr>
+<tr>
+<td><a href="tools/">工具链</a></td>
+<td>CLI、调试器、LSP、AI Copilot 使用指南</td>
+</tr>
+<tr>
+<td><a href="API_REFERENCE/">API 参考</a></td>
+<td>完整 API 文档</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_5">🏗️ 架构与设计<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="architecture/">架构设计</a></td>
+<td>编译器架构详解</td>
+</tr>
+<tr>
+<td><a href="%E8%AE%BE%E8%AE%A1%E5%93%B2%E5%AD%A6%E4%B8%8E%E5%AE%9A%E4%BD%8D/">设计哲学与定位</a></td>
+<td>段言的设计理念、目标定位与适用场景</td>
+</tr>
+<tr>
+<td><a href="%E6%AE%B5%E8%A8%80%E4%B8%8EPython%E5%AF%B9%E6%AF%94%E6%A1%88%E4%BE%8B/">段言 vs Python 对比案例</a></td>
+<td>段言与 Python 的语法、性能、生态全面对比</td>
+</tr>
+<tr>
+<td><a href="%E7%BC%96%E8%AF%91%E5%99%A8%E5%86%85%E9%83%A8%E8%AE%BE%E8%AE%A1/">编译器内部设计</a></td>
+<td>编译器管线与实现原理</td>
+</tr>
+<tr>
+<td><a href="llvm_backend_design/">LLVM 后端设计</a></td>
+<td>原生编译实现细节</td>
+</tr>
+<tr>
+<td><a href="%E5%8C%85%E7%AE%A1%E7%90%86%E5%99%A8%E4%BD%BF%E7%94%A8%E6%8C%87%E5%8D%97/">包管理器使用指南</a></td>
+<td>duanpub 包管理完整指南</td>
+</tr>
+<tr>
+<td><a href="%E6%80%A7%E8%83%BD%E5%9F%BA%E5%87%86_vs_Python/">性能基准 vs Python</a></td>
+<td>10+ 基准测试对比报告（v1）</td>
+</tr>
+<tr>
+<td><a href="%E6%80%A7%E8%83%BD%E5%9F%BA%E5%87%86_vs_Python_v2/">性能基准 vs Python v2</a></td>
+<td>更新版性能基准测试对比报告</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_6">🔌 开发与配置<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="IDE%E9%85%8D%E7%BD%AE%E6%8C%87%E5%8D%97/">IDE 配置指南</a></td>
+<td>VS Code / JetBrains / Neovim / Emacs 完整配置</td>
+</tr>
+<tr>
+<td><a href="%E4%B8%80%E9%94%AE%E5%AE%89%E8%A3%85%E5%8C%85%E6%96%B9%E6%A1%88/">一键安装包方案</a></td>
+<td>Windows/macOS/Linux 一键安装包设计文档</td>
+</tr>
+<tr>
+<td><a href="DEVELOPMENT_GUIDE/">开发指南</a></td>
+<td>开发者参与指南</td>
+</tr>
+<tr>
+<td><a href="security_audit_report/">安全审计报告</a></td>
+<td>v6.0.0 安全审计结果</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_7">📝 技术博客<a class="headerlink" href="#_7" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文章</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="blog/%E6%AE%B5%E8%A8%80v6.1%E6%96%B0%E7%89%B9%E6%80%A7%E4%BB%8B%E7%BB%8D/">段言 v6.1 新特性介绍</a></td>
+<td>中文编程的持续进化</td>
+</tr>
+<tr>
+<td><a href="blog/%E4%B8%AD%E6%96%87%E7%BC%96%E7%A8%8B%E7%9A%84%E7%94%9F%E6%80%81%E5%BB%BA%E8%AE%BE%E4%B9%8B%E8%B7%AF/">中文编程的生态建设之路</a></td>
+<td>从语言到生态的思考与实践</td>
+</tr>
+<tr>
+<td><a href="blog/%E6%AE%B5%E8%A8%80v6.0%E6%AD%A3%E5%BC%8F%E5%8F%91%E5%B8%83/">段言 v6.0 正式发布</a></td>
+<td>中文编程语言的新里程碑</td>
+</tr>
+<tr>
+<td><a href="blog/%E7%94%A8%E6%AE%B5%E8%A8%80%E6%9E%84%E5%BB%BAWeb%E5%BA%94%E7%94%A8/">用段言构建 Web 应用</a></td>
+<td>从零到一的实战指南</td>
+</tr>
+<tr>
+<td><a href="blog/%E6%AE%B5%E8%A8%80%E8%87%AA%E4%B8%BE%E7%BC%96%E8%AF%91%E5%99%A8%E6%9E%B6%E6%9E%84%E8%A7%A3%E6%9E%90/">段言自举编译器架构解析</a></td>
+<td>自举编译器的实现之路</td>
+</tr>
+<tr>
+<td><a href="blog/%E6%AE%B5%E8%A8%80%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97/">段言入门指南</a></td>
+<td>用中文自然语言编程</td>
+</tr>
+<tr>
+<td><a href="blog/%E6%AE%B5%E8%A8%80%E7%BC%96%E8%AF%91%E5%99%A8%E6%9E%B6%E6%9E%84%E8%A7%A3%E6%9E%90/">段言编译器架构解析</a></td>
+<td>从中文到机器码</td>
+</tr>
+<tr>
+<td><a href="blog/%E4%B8%AD%E6%96%87%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80%E7%9A%84%E6%9C%AA%E6%9D%A5/">中文编程语言的未来</a></td>
+<td>设计哲学与愿景</td>
+</tr>
+</tbody>
+</table>
+<h3 id="_8">🗺️ 项目规划<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>文档</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="ROADMAP/">项目路线图</a></td>
+<td>版本规划与未来愿景</td>
+</tr>
+<tr>
+<td><a href="release_notes_v6.1.0/">发布说明 v6.1.0</a></td>
+<td>v6.1.0 完整发布公告</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_9">🌍 社区<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>渠道</th>
+<th>说明</th>
+<th>链接</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>💬 <strong>GitHub Discussions</strong></td>
+<td>提问、分享经验、交流想法</td>
+<td><a href="https://github.com/skywalk163/duan/discussions">前往讨论区</a></td>
+</tr>
+<tr>
+<td>🐛 <strong>Issue 追踪</strong></td>
+<td>报告 Bug、提交功能建议</td>
+<td><a href="https://github.com/skywalk163/duan/issues">提交 Issue</a></td>
+</tr>
+<tr>
+<td>📖 <strong>社区讨论指南</strong></td>
+<td>社区讨论规范与最佳实践</td>
+<td><a href="community/discussions_guide/">讨论指南</a></td>
+</tr>
+<tr>
+<td>💡 <strong>反馈收集</strong></td>
+<td>通过 <code>duan feedback</code> 提交反馈</td>
+<td><a href="community/feedback/">反馈收集指南</a></td>
+</tr>
+<tr>
+<td>🤖 <strong>AI 模型</strong></td>
+<td>段言代码生成模型（Ollama）</td>
+<td><a href="https://ollama.com/airoot/duan-translator">airoot/duan-translator</a></td>
+</tr>
+<tr>
+<td>📦 <strong>包注册中心</strong></td>
+<td>搜索和发布社区包</td>
+<td><code>duan pkg search 关键词 --remote</code></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="_10">🤝 如何贡献<a class="headerlink" href="#_10" title="Permanent link">&para;</a></h2>
+<p>段言欢迎任何形式的贡献！无论是代码、文档、反馈还是社区讨论：</p>
+<ol>
+<li>💬 在 <a href="https://github.com/skywalk163/duan/discussions">Discussions</a> 参与讨论</li>
+<li>🐛 发现 Bug → 提交 <a href="https://github.com/skywalk163/duan/issues/new?template=bug_report.md">Bug Report</a></li>
+<li>💡 有新想法 → 提交 <a href="https://github.com/skywalk163/duan/issues/new?template=feature_request.md">Feature Request</a></li>
+<li>🔧 贡献代码 → 阅读 <a href="../CONTRIBUTING.md">CONTRIBUTING.md</a> 和 <a href="DEVELOPMENT_GUIDE/">DEVELOPMENT_GUIDE.md</a></li>
+</ol>
+<hr />
+<h2 id="_11">📊 项目里程碑<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h2>
+<table>
+<thead>
+<tr>
+<th>里程碑</th>
+<th>状态</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>v6.1 正式发布</td>
+<td>✅ 生态建设全面升级</td>
+</tr>
+<tr>
+<td>v6.0 正式发布</td>
+<td>✅ 生产就绪，社区启航</td>
+</tr>
+<tr>
+<td>自举编译器</td>
+<td>✅ 62KB / 95 函数，可成功编译自身</td>
+</tr>
+<tr>
+<td>LLVM 原生编译</td>
+<td>✅ clang 零错误编译，增量编译加速</td>
+</tr>
+<tr>
+<td>Web 框架</td>
+<td>✅ 50+ 测试通过</td>
+</tr>
+<tr>
+<td>包注册中心</td>
+<td>✅ 全链路发布→搜索→安装 + Web 界面</td>
+</tr>
+<tr>
+<td>100% 中文错误信息</td>
+<td>✅ 全量替换 20+ 种英文异常类型</td>
+</tr>
+<tr>
+<td>标准库增强</td>
+<td>✅ 网络请求/日期时间/文件系统/中文 NLP</td>
+</tr>
+<tr>
+<td>AI Copilot</td>
+<td>✅ 离线轻量模型 + 多语言代码转换</td>
+</tr>
+<tr>
+<td>英文文档</td>
+<td>✅ 覆盖 v6.0 全部特性</td>
+</tr>
+<tr>
+<td>全量回归测试</td>
+<td>✅ 通过</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<p><em>段言 —— 用中文，写世界。</em></p>
 
 
 

@@ -2100,9 +2100,9 @@
 
 
 <h1 id="_1">安全审计报告<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h1>
-<p><strong>审计日期</strong>: 2026-08-06<br />
-<strong>项目</strong>: 段言 (Duan) v5.0.0<br />
-<strong>审计范围</strong>: 源代码、依赖声明、配置文件、Web 服务</p>
+<p><strong>审计日期</strong>: 2026-08-07<br />
+<strong>项目</strong>: 段言 (Duan) v6.1.0<br />
+<strong>审计范围</strong>: 源代码、依赖声明、配置文件、Web 服务、新增功能</p>
 <hr />
 <h2 id="1">1. 依赖安全<a class="headerlink" href="#1" title="Permanent link">&para;</a></h2>
 <h3 id="pyprojecttoml">pyproject.toml 依赖检查<a class="headerlink" href="#pyprojecttoml" title="Permanent link">&para;</a></h3>
@@ -2195,17 +2195,17 @@
 </tbody>
 </table>
 <p><strong>说明</strong>: 该文件位于 gitignored 目录（<code>.gitignore</code> 第 198 行 <code>tools/ai_copilot/remote_*.py</code>），不会进入版本控制。但硬盘上仍存在明文凭据，建议删除或改为读取环境变量。</p>
-<h3 id="22">2.2 已修复：历史硬编码凭据<a class="headerlink" href="#22" title="Permanent link">&para;</a></h3>
-<p>之前 18 个 SSH 脚本的硬编码凭据问题已在 v4.0 阶段通过 <code>ssh_config.py</code> + <code>.env</code> 模式修复，相关脚本已归档。</p>
-<h3 id="23">2.3 无风险：环境变量引用<a class="headerlink" href="#23" title="Permanent link">&para;</a></h3>
+<h3 id="22">2.2 无风险：环境变量引用<a class="headerlink" href="#22" title="Permanent link">&para;</a></h3>
 <p>以下文件通过环境变量读取凭据，为正确做法：</p>
 <ul>
 <li><code>ssh_config.py</code>: <code>os.environ.get('SSH_PASS_TRAE', '')</code>, <code>os.environ.get('SUDO_PASS', '')</code></li>
 <li><code>tools/ai_copilot/diagnose_gguf.py</code>～<code>diagnose_gguf3.py</code>: <code>PASS = SSH_PASS_DUMATE2</code>（从环境变量导入）</li>
 <li><code>tools/ai_copilot/deploy_remote.py</code>: <code>PASS = SSH_PASS_DUMATE</code>（从环境变量导入）</li>
 </ul>
-<h3 id="24-url-password">2.4 无风险：URL 解析中的 password 参数<a class="headerlink" href="#24-url-password" title="Permanent link">&para;</a></h3>
+<h3 id="23-url-password">2.3 无风险：URL 解析中的 password 参数<a class="headerlink" href="#23-url-password" title="Permanent link">&para;</a></h3>
 <p><code>stdlib/duanpub/邮件.py</code>、<code>stdlib/duanpub/URL解析.py</code> 中的 <code>password</code> 参数为正常库函数参数，用于运行时配置，非硬编码凭据。</p>
+<h3 id="24">2.4 无风险：密码校验函数<a class="headerlink" href="#24" title="Permanent link">&para;</a></h3>
+<p><code>contrib/随机数据.py</code> 中的 <code>password</code> 变量为随机密码生成器输出，<code>generate_v7_samples.py</code> 中的 <code>validate_password</code> 为密码校验函数示例，均为正常功能代码。</p>
 <hr />
 <h2 id="3">3. 安全模式检查<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
 <h3 id="31-eval">3.1 eval() 使用<a class="headerlink" href="#31-eval" title="Permanent link">&para;</a></h3>
@@ -2347,19 +2347,19 @@
 </thead>
 <tbody>
 <tr>
-<td><code>playground/server.py:874</code></td>
+<td><code>playground/server.py:872</code></td>
 <td><code>GET /api/projects/&lt;name&gt;/files/&lt;path:filepath&gt;</code></td>
-<td>未对 <code>filepath</code> 做 <code>../</code> 过滤</td>
-<td>🟡 中风险</td>
+<td>已添加 <code>filepath</code> 的 <code>../</code> 过滤</td>
+<td>✅ 已修复</td>
 </tr>
 <tr>
-<td><code>playground/server.py:889</code></td>
+<td><code>playground/server.py:885</code></td>
 <td><code>PUT /api/projects/&lt;name&gt;/files/&lt;path:filepath&gt;</code></td>
 <td>已做 <code>replace('/','_')</code> 处理</td>
 <td>🟢 安全</td>
 </tr>
 <tr>
-<td><code>playground/server.py:908</code></td>
+<td><code>playground/server.py:898</code></td>
 <td><code>POST /api/projects/&lt;name&gt;/files</code></td>
 <td>已做 <code>replace('/','_')</code> 处理</td>
 <td>🟢 安全</td>
@@ -2372,9 +2372,52 @@
 </tr>
 </tbody>
 </table>
-<p><strong>结论</strong>: <code>get_project_file</code> 端点缺少对 <code>filepath</code> 参数的路径遍历防护，与其他端点行为不一致。建议添加 <code>replace('..', '_')</code> 处理。</p>
+<p><strong>结论</strong>: 所有端点均已添加路径遍历防护，✅ 全部修复。</p>
 <h3 id="35">3.5 反序列化安全<a class="headerlink" href="#35" title="Permanent link">&para;</a></h3>
 <p><strong>结论</strong>: 未发现 <code>pickle.loads</code>、<code>yaml.load</code>（带 unsafe 模式）、<code>marshal.loads</code> 等不安全反序列化模式。</p>
+<h3 id="36-v61">3.6 v6.1 新增功能安全审查<a class="headerlink" href="#36-v61" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>新增功能</th>
+<th>文件</th>
+<th>安全风险</th>
+<th>评估</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>PhaseTimer</code> 阶段计时器</td>
+<td><code>src/profiler.py</code></td>
+<td>仅使用 <code>time.perf_counter()</code>，无外部输入</td>
+<td>🟢 安全</td>
+</tr>
+<tr>
+<td><code>MemoryTracker</code> 内存追踪</td>
+<td><code>src/profiler.py</code></td>
+<td>使用 <code>tracemalloc</code> 标准库，无外部输入</td>
+<td>🟢 安全</td>
+</tr>
+<tr>
+<td><code>--profile-report</code> flag</td>
+<td><code>src/profiler.py</code></td>
+<td>仅读取文件，无网络/命令执行</td>
+<td>🟢 安全</td>
+</tr>
+<tr>
+<td>LSP 补全增强</td>
+<td><code>lsp/duan_lsp.py</code></td>
+<td>仅解析用户提供的源代码</td>
+<td>🟢 安全</td>
+</tr>
+<tr>
+<td>错误格式化器增强</td>
+<td><code>src/error_formatter.py</code></td>
+<td>仅格式化异常信息，无代码执行</td>
+<td>🟢 安全</td>
+</tr>
+</tbody>
+</table>
 <hr />
 <h2 id="4">4. 配置安全<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>
 <table>
@@ -2408,7 +2451,80 @@
 </tbody>
 </table>
 <hr />
-<h2 id="5">5. 总体风险评估<a class="headerlink" href="#5" title="Permanent link">&para;</a></h2>
+<h2 id="5-v61">5. 威胁模型（v6.1 更新）<a class="headerlink" href="#5-v61" title="Permanent link">&para;</a></h2>
+<h3 id="51">5.1 本地威胁<a class="headerlink" href="#51" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>威胁</th>
+<th>描述</th>
+<th>防护措施</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>恶意段言代码</td>
+<td>通过 <code>exec()</code> 执行生成 Python 代码</td>
+<td>代码在隔离的 <code>namespace</code> 中执行，只暴露 <code>print</code></td>
+</tr>
+<tr>
+<td>编译器缓存投毒</td>
+<td>缓存文件被篡改</td>
+<td>缓存使用源内容 SHA256 哈希，篡改导致缓存失效</td>
+</tr>
+<tr>
+<td>无限循环/内存耗尽</td>
+<td>用户代码导致 DoS</td>
+<td>可通过 <code>--profile-report</code> 监控执行时间</td>
+</tr>
+</tbody>
+</table>
+<h3 id="52">5.2 远程威胁<a class="headerlink" href="#52" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>威胁</th>
+<th>描述</th>
+<th>防护措施</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>playground 路径遍历</td>
+<td>通过 <code>../</code> 访问目录外文件</td>
+<td>已修复，<code>replace('/','_')</code> 处理</td>
+</tr>
+<tr>
+<td>包管理器供应链</td>
+<td>安装恶意包</td>
+<td>依赖使用最低版本约束，未固定到已知有漏洞的版本</td>
+</tr>
+</tbody>
+</table>
+<h3 id="53">5.3 新增威胁面<a class="headerlink" href="#53" title="Permanent link">&para;</a></h3>
+<table>
+<thead>
+<tr>
+<th>威胁</th>
+<th>描述</th>
+<th>防护措施</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>LSP 诊断信息泄露</td>
+<td>通过诊断接口泄露源代码信息</td>
+<td>诊断信息仅在本地处理，不发送到网络</td>
+</tr>
+<tr>
+<td>性能分析器文件读取</td>
+<td>通过 <code>--profile-report</code> 读取任意文件</td>
+<td>仅读取文件进行词法分析，不执行未编译代码</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6">6. 总体风险评估<a class="headerlink" href="#6" title="Permanent link">&para;</a></h2>
 <table>
 <thead>
 <tr>
@@ -2421,12 +2537,12 @@
 <tr>
 <td>🔴 高</td>
 <td>1</td>
-<td>硬编码 SSH 凭据在 gitignored 文件中残留</td>
+<td>硬编码 SSH 凭据在 gitignored 文件中残留（已有 gitignore 保护，建议进一步清理）</td>
 </tr>
 <tr>
 <td>🟡 中</td>
-<td>1</td>
-<td><code>get_project_file</code> 端点缺少路径遍历防护</td>
+<td>0</td>
+<td>✅ 路径遍历问题已在 v6.0.0 中修复</td>
 </tr>
 <tr>
 <td>🟢 低</td>
@@ -2440,15 +2556,33 @@
 </tr>
 </tbody>
 </table>
-<h3 id="_2">建议修复项（优先级排序）<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<h3 id="v61">v6.1 新增安全评估<a class="headerlink" href="#v61" title="Permanent link">&para;</a></h3>
+<p>v6.1 新增功能未引入新的安全风险。所有新增代码：
+- 不使用 <code>eval()</code> / <code>exec()</code> 执行不受信任的输入
+- 不使用 <code>subprocess</code> 调用外部命令
+- 不解析用户提供的文件路径
+- 不进行网络通信
+- 不加载外部配置文件</p>
+<hr />
+<h2 id="7-v61">7. v6.1 安全建议<a class="headerlink" href="#7-v61" title="Permanent link">&para;</a></h2>
+<h3 id="1_1">优先级 1（高）<a class="headerlink" href="#1_1" title="Permanent link">&para;</a></h3>
 <ol>
-<li><strong>高</strong>: 删除 <code>tools/ai_copilot/remote_test_v8.py</code> 中的硬编码凭据，改用环境变量读取（与 <code>ssh_config.py</code> 一致）</li>
-<li><strong>中</strong>: 在 <code>playground/server.py:874</code> 的 <code>get_project_file</code> 中添加 <code>filepath</code> 的 <code>../</code> 过滤</li>
-<li><strong>低</strong>: 在 <code>contrib/进程.py</code> 文档字符串中添加 <code>shell=True</code> 的安全警告，提示不要在不可信输入上使用</li>
+<li><strong>删除硬编码凭据</strong>: 删除 <code>tools/ai_copilot/remote_test_v8.py</code> 中的硬编码 SSH 凭据，改用环境变量读取（与 <code>ssh_config.py</code> 一致）</li>
+</ol>
+<h3 id="2_1">优先级 2（中）<a class="headerlink" href="#2_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>安全审计自动化</strong>: 将安全审计脚本集成到 CI 管道中，在每次提交后自动扫描硬编码凭据和常见漏洞</li>
+</ol>
+<h3 id="3_1">优先级 3（低）<a class="headerlink" href="#3_1" title="Permanent link">&para;</a></h3>
+<ol>
+<li><strong>文档警告</strong>: 在 <code>contrib/进程.py</code> 文档字符串中添加 <code>shell=True</code> 的安全警告，提示不要在不可信输入上使用</li>
+<li><strong>LSP 沙箱</strong>: 考虑为 LSP 诊断功能添加资源限制，防止恶意代码导致 DoS</li>
+<li><strong>性能分析器白名单</strong>: 限制 <code>--profile-report</code> 只能分析 <code>.duan</code> 文件</li>
 </ol>
 <hr />
 <p><em>审计工具: 静态代码扫描 + 人工核查</em><br />
-<em>审计范围: src/、cli/、stdlib/、playground/、contrib/、tools/ai_copilot/ 目录</em></p>
+<em>审计范围: src/、cli/、lsp/、stdlib/、playground/、contrib/、tools/ai_copilot/ 目录</em><br />
+<em>v6.1 新增审计范围: lsp/ 目录、src/profiler.py 增强功能</em></p>
 
 
 
