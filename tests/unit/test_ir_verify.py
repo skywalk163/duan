@@ -9,15 +9,19 @@ from llvm.core import LLVMCodeGenCore
 
 # 检查 IR 验证环境是否可用（clang 或 llvmlite 至少一个）
 _has_ir_verify = False
+_has_llvmlite = False
 try:
     find_clang()
     _has_ir_verify = True
 except RuntimeError:
-    try:
-        import llvmlite.binding  # noqa: F401
-        _has_ir_verify = True
-    except ImportError:
-        pass
+    pass
+
+try:
+    import llvmlite.binding  # noqa: F401
+    _has_ir_verify = True
+    _has_llvmlite = True
+except ImportError:
+    pass
 
 
 class TestVerifyFunction(unittest.TestCase):
@@ -232,7 +236,7 @@ class TestVerifyIRWithClang(unittest.TestCase):
                 os.remove(ll_path)
 
 
-@unittest.skipIf(not _has_ir_verify, "需要 clang 或 llvmlite 来验证 IR")
+@unittest.skipIf(not _has_llvmlite, "需要 llvmlite 包来验证 IR（pip install llvmlite）")
 class TestVerifyIRWithLlvmlite(unittest.TestCase):
     """测试 llvmlite 本地验证回退路径（无 clang 环境的关键保障）"""
 
