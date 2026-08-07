@@ -803,14 +803,18 @@ description = ""
 
         return path_deps
 
-    def build_project_native(self, output_path: str = None, verbose: bool = False) -> str:
+    def build_project_native(self, output_path: str = None, verbose: bool = False,
+                             target: str = None) -> str:
         """使用 LLVM 后端编译项目为原生可执行文件。
 
         自动解析 path 依赖，收集所有模块源码，编译合并为单一可执行文件。
+        支持 --target 参数指定目标平台（macos/linux/windows/auto）。
 
         Args:
             output_path: 输出路径
             verbose: 是否输出详细信息
+            target: 目标平台（'macos'/'linux'/'windows'/'auto'/'None'），
+                    None 或 'auto' 表示自动检测当前平台
 
         Returns:
             可执行文件路径
@@ -870,9 +874,26 @@ description = ""
 
         # 使用 LLVM 后端编译
         sys.path.insert(0, str(Path(__file__).resolve().parent))
-        from llvm.compiler import compile_modules_typed, find_clang
+        from llvm.compiler import LLVMCompiler, find_clang
         import subprocess as _sp
 
+        # 解析目标平台
+        if target and target != 'auto':
+            # 使用 LLVMCompiler 处理跨平台编译
+            compiler = LLVMCompiler(verbose=verbose)
+            target_platform = compiler.resolve_target_platform(target)
+            if verbose:
+                print(f"[PackageManager] 目标平台: {target_platform} (target={target})")
+            # 跨平台编译直接使用 LLVMCompiler.compile
+            # （注意：cross-compilation 需要对应的交叉编译器）
+            exe_path = compiler.compile(
+                str(entry_path),
+                output_path=output_path,
+                target=target,
+            )
+            return exe_path
+
+        # 自动检测平台（默认行为）
         ir = compile_modules_typed(sources, main_module=main_name, verbose=verbose)
 
         base_path = output_path or str(entry_path).replace('.duan', '')

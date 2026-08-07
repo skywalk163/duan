@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.2.1] - 2026-08-07
+
+### Added
+- **CLI 全中文别名**: 新增 `duan 运行`、`duan 编译`、`duan 语法检查`、`duan 项目构建`、`duan 原生编译`、`duan 交互式`、`duan 调试`、`duan 新建项目` 等 10 个中文别名，保留英文命令兼容性
+- **全中文语义化报错升级**: 40+ 种错误类型中文名映射，每个错误附带中文引导式修复建议 + 段言代码示例
+- **自然语言弹性语法适配**: 新增 `ElasticSyntaxPreprocessor`，支持 30+ 条口语化→标准语法映射（"如果...的话"、"要是"、"每当"等）
+- **中文专属单位原生支持**: 新增 `ChineseUnitParser`，支持 7 大类 30+ 种中文单位（货币/时间/距离/重量/容量/数据/速率）
+- **LSP 语言服务器完善**: 增强上下文感知补全（6 个新上下文类型），40+ 内置函数补全，跨文档定义查找
+- **Python↔段言双向互译**: 新增 `translator.py`，支持 `duan ai translate --to-duan` 和 `duan ai translate --to-python` 双向翻译
+- **中文场景专属标准库 5 模块**: 中文分词、农历工具、身份证校验、拼音转换、手机号校验
+- **全中文包管理生态**: 内置注册表新增 5 个中文包（中文分词/农历/身份证/拼音/手机号）
+- **全平台原生编译扩展**: 新增 MacOS、Linux 原生可执行文件编译支持
+- **三级类型检查增强**: 新增中文变量名语义类型推断（90+ 模式映射），类型命名约定检查
+- **自举编译器进度评估**: 新增 `bootstrap_progress.py`，81.8% 自举完成度（27/33 功能点）
+- **全链路测试补充**: 新增 `test_self_host_bootstrap.py`，64 个测试覆盖自举编译器 5 个层级
+- **实战示例库扩充**: 新增中文爬虫、猜数字游戏、文件批量重命名、待办事项 API 四个完整示例
+- **全中文贡献体系**: 重写 CONTRIBUTING.md，全中文 10 章节贡献指南
+
+### Changed
+- **版本号**: 6.2.0 → 6.2.1
+- **类型检查器**: 前缀匹配仅对长度 >= 2 的模式生效，避免单字误匹配
+
+### Test
+- 全量回归测试: 2564 passed, 53 skipped, 0 failures
+
 ## [6.2.0] - 2026-11-07
 
 ### Added

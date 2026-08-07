@@ -1,669 +1,447 @@
-# 贡献指南
+# 欢迎为段言做贡献！🎉
 
-感谢您对段言（Duan）编程语言的关注！我们欢迎各种形式的贡献，包括但不限于：
+你好！感谢你对段言（Duan）编程语言的关注。无论你是经验丰富的开发者，还是刚刚开始学习编程的新手，我们都热忱欢迎你为段言贡献力量。
 
-- 提交 Bug 报告
-- 提出新功能建议
-- 改进文档
-- 提交代码修复
-- 添加新的标准库模块
-- 改进编译器性能
-- 撰写技术博客
-- 参与社区讨论和答疑
+段言是一门**中文编程语言**，我们的社区也秉承中文友善的理念。这份指南完全用中文编写，希望能帮助每一位中文开发者轻松上手，参与到开源贡献中来。
 
----
+## 你可以贡献什么？
 
-## 目录
-
-1. [行为准则](#行为准则)
-2. [开发环境搭建](#开发环境搭建)
-3. [代码规范](#代码规范)
-4. [开发流程](#开发流程)
-5. [分支管理](#分支管理)
-6. [PR 提交流程](#pr-提交流程)
-7. [PR 检查清单](#pr-检查清单)
-8. [提交信息规范](#提交信息规范)
-9. [测试要求](#测试要求)
-10. [文档要求](#文档要求)
-11. [发布流程](#发布流程)
-12. [获取帮助](#获取帮助)
+- 🐛 **报告 Bug** — 发现编译器或工具的问题，告诉我们
+- 💡 **提出建议** — 你有好的想法？我们洗耳恭听
+- 📖 **改进文档** — 修正错别字、补充说明、写教程
+- 💻 **提交代码** — 修复 Bug、新增功能、优化性能
+- 📦 **贡献标准库** — 给段言添加更多实用的功能模块
+- ✍️ **写博客** — 分享你使用段言的经验和心得
+- 🗣 **参与讨论** — 帮助其他新手解答问题
 
 ---
 
-## 行为准则
+## 快速开始
 
-- **尊重他人**：保持尊重和友善的沟通方式，接纳不同背景和水平的贡献者
-- **建设性反馈**：接受建设性的批评和反馈，关注问题本身，而非人身攻击
-- **包容开放**：维护包容、开放的社区氛围，欢迎所有水平的开发者
-- **协作精神**：优先考虑项目整体利益，乐于分享知识和经验
-- **禁止行为**：不欢迎任何形式的骚扰、歧视、人身攻击和不当言论
+### 第一步：Fork 项目
 
----
+访问段言仓库：https://github.com/skywalk163/duan
 
-## 开发环境搭建
+点击页面右上角的 **Fork** 按钮，把项目复制一份到你的 GitHub 账号下。
 
-### 前置要求
+### 第二步：克隆到本地
 
-- **Python 3.10 或更高版本**（推荐 Python 3.12）
-- **Git**（版本 2.30+）
-- **VS Code**（推荐，安装段言扩展可获得语法高亮和 LSP 支持）
-- **可选**：LLVM/Clang（用于 LLVM 后端编译，版本 14+）
-
-### 快速开始
+打开终端，运行以下命令：
 
 ```bash
-# 1. Fork 仓库
-#    访问 https://github.com/skywalk163/duan 点击 Fork
-
-# 2. 克隆你的 fork
+# 把你 fork 的仓库克隆到本地
 git clone https://github.com/你的用户名/duan.git
 cd duan
 
-# 3. 添加 upstream 远程仓库
+# 添加上游仓库（原项目），方便同步最新代码
 git remote add upstream https://github.com/skywalk163/duan.git
+```
 
-# 4. 安装开发依赖
-pip install -e .[dev]
+> 💡 把 `你的用户名` 替换成你的 GitHub 用户名。
 
-# 5. 安装测试依赖
-pip install pytest pytest-cov pytest-xdist
+---
 
-# 6. 验证安装
-python -m cli.duan --version
-python -m cli.duan run examples/hello.duan
+## 开发环境配置
+
+段言的编译器是用 Python 写的，所以配置起来很简单。
+
+### 你需要准备
+
+| 工具 | 版本要求 | 说明 |
+|------|----------|------|
+| **Python** | 3.10 或更高（推荐 3.12） | 段言编译器运行的基础 |
+| **Git** | 2.30 以上 | 版本管理 |
+| **VS Code**（可选） | 最新版 | 推荐安装段言扩展，获得语法高亮和代码提示 |
+| **LLVM/Clang**（可选） | 14+ | 如果你要用 LLVM 后端编译 |
+
+### 安装步骤
+
+```bash
+# 1. 进入项目目录
+cd duan
+
+# 2. 创建虚拟环境（推荐）
+python -m venv venv
+
+# 3. 激活虚拟环境
+# Windows 系统：
+venv\Scripts\activate
+# macOS / Linux 系统：
+# source venv/bin/activate
+
+# 4. 安装项目依赖
+pip install -e .
+pip install antlr4-tools antlr4-python3-runtime
+
+# 5. 安装测试工具（可选，开发时推荐）
+pip install pytest pytest-cov
 ```
 
 ### 验证安装成功
 
 ```bash
+# 查看版本号
+python -m cli.duan --version
+
 # 运行一个简单的段言程序
-echo '打印 "你好，段言！"' > test.duan
-duan run test.duan
-# 输出：你好，段言！
+python -m cli.duan run examples/hello.duan
+
+# 输出应该是：你好，世界！
 ```
 
-### 运行测试
+如果看到输出了"你好，世界！"，恭喜你，开发环境配置成功！🎉
+
+---
+
+## 项目结构
+
+了解项目结构，能帮你快速找到需要修改的代码。
+
+```
+duan/
+├── src/                  # 核心编译器源码
+│   ├── lexer.py          # 词法分析器（把代码拆成单词）
+│   ├── parser_core.py    # 语法分析器核心（把单词拼成语法树）
+│   ├── parser_expr.py    # 表达式解析
+│   ├── parser_stmt.py    # 语句解析
+│   ├── compiler.py       # 编译器主入口
+│   ├── code_generator.py # 代码生成器
+│   ├── type_checker.py   # 类型检查器
+│   ├── type_system.py    # 类型系统定义
+│   ├── ast_nodes.py      # 抽象语法树节点定义
+│   ├── tokens.py         # 词法单元定义
+│   ├── keywords.py       # 关键字定义
+│   ├── formatter.py      # 代码格式化工具
+│   ├── module_resolver.py # 模块解析器
+│   └── ...
+│
+├── cli/                  # 命令行工具
+│   ├── duan.py           # 主命令行入口
+│   ├── duan_unified.py   # 统一命令行接口
+│   └── tutorial.py       # 交互式教程
+│
+├── stdlib/               # 标准库（Python 实现）
+│   ├── 文件系统.py       # 文件操作
+│   ├── JSON.py           # JSON 解析
+│   ├── 正则表达式.py     # 正则匹配
+│   ├── 日期时间.py       # 日期时间处理
+│   ├── 数学.py           # 数学计算
+│   ├── ...               # 更多标准库模块
+│   └── duanpub/          # duanpub 桥接模块
+│
+├── tests/                # 测试目录
+│   ├── unit/             # 单元测试
+│   ├── integration/      # 集成测试
+│   ├── e2e/              # 端到端测试
+│   ├── run_tests.py      # 测试运行脚本
+│   └── ...
+│
+├── docs/                 # 文档
+│   ├── api/              # API 参考文档
+│   ├── blog/             # 技术博客
+│   ├── tutorials/        # 教程
+│   └── ...
+│
+├── examples/             # 示例代码
+│   ├── hello.duan        # Hello World
+│   ├── basic.duan        # 基础语法示例
+│   ├── web_crawler/      # 网页爬虫示例
+│   ├── games/            # 游戏示例
+│   └── ...
+│
+├── bootstrap/            # 自举编译器（用段言写的编译器）
+│   ├── lexer.duan        # 词法分析器（段言版）
+│   ├── parser.duan       # 语法分析器（段言版）
+│   ├── compiler.duan     # 编译器（段言版）
+│   └── ...
+│
+├── antlrparser/          # ANTLR 解析器（另一种解析方式）
+│   ├── DuanLangLexer.g4  # ANTLR 词法规则
+│   ├── DuanLangParser.g4 # ANTLR 语法规则
+│   ├── duan_interpreter.py # 解释器
+│   └── ...
+│
+├── contrib/              # 社区贡献模块
+│   ├── HTTP服务端.duan   # HTTP 服务端
+│   ├── HTTP客户端.duan   # HTTP 客户端
+│   └── ...
+│
+├── tools/                # 开发工具
+│   ├── repl.py           # 交互式 REPL
+│   ├── doc_site.py       # 文档站点构建
+│   └── ...
+│
+├── pyproject.toml        # Python 项目配置
+└── README.md             # 项目介绍
+```
+
+### 各目录简要说明
+
+| 目录 | 作用 | 适合谁修改 |
+|------|------|------------|
+| `src/` | 核心编译器，包含词法、语法、语义分析、代码生成 | 有编译器开发经验 |
+| `cli/` | 命令行工具，用户和编译器交互的窗口 | 有 Python 命令行经验 |
+| `stdlib/` | 标准库，段言内置功能的 Python 实现 | 有 Python 开发经验 |
+| `tests/` | 测试用例，保证代码质量的重要防线 | 任何水平的开发者 |
+| `docs/` | 文档和教程，帮助用户学习段言 | 喜欢写作的开发者 |
+| `examples/` | 示例代码，展示段言的实际应用 | 想分享段言使用技巧 |
+| `bootstrap/` | 自举编译器，用段言本身编写的编译器 | 熟悉段言语法的开发者 |
+| `contrib/` | 社区贡献的实用模块 | 想贡献新功能的开发者 |
+
+---
+
+## 如何贡献代码
+
+### 第一步：选择一个任务
+
+如果你是第一次贡献，可以看看有没有这些标签的任务：
+
+- **`good first issue`**（适合新手的任务）— 最适合你的起点
+- **`help wanted`**（寻求帮助）— 项目需要帮助的任务
+- **`documentation`**（文档相关）— 从文档开始最轻松
+- **`bug`**（Bug 修复）— 修复问题
+
+在对应的 Issue 下留言说"我想认领这个任务"，就可以开始动手了。
+
+### 第二步：创建分支
 
 ```bash
-# 运行所有测试
+# 先同步最新的代码
+git checkout main
+git pull upstream main
+
+# 创建你的功能分支
+git checkout -b feature/你的功能名称
+# 或
+git checkout -b fix/你要修复的问题
+# 或
+git checkout -b docs/你要更新的文档
+```
+
+### 第三步：编写代码
+
+写代码的时候，请记住下面几点：
+
+- **保持改动范围集中** — 一个分支只解决一个问题
+- **遵循代码规范**（见下文）
+- **如果是修复 Bug**，先写一个能复现 Bug 的测试用例
+- **多写注释**，用中文注释说明你的思路
+
+### 第四步：运行测试
+
+```bash
+# 运行所有测试，确保没有破坏现有的功能
 python -m pytest tests/
 
-# 使用多核加速
-python -m pytest tests/ -n auto
-
-# 运行单元测试
-python -m pytest tests/unit/
-
-# 运行集成测试
-python -m pytest tests/integration/
-
-# 运行端到端测试
-python -m pytest tests/e2e/
-
-# 带覆盖率报告
-python -m pytest tests/ --cov=src --cov-report=html
-
-# 运行特定测试文件
+# 只运行你修改相关的测试
 python -m pytest tests/unit/test_lexer.py -v
 
-# 运行匹配特定名称的测试
-python -m pytest tests/ -k "test_parser"
+# 运行测试时显示详细输出
+python -m pytest tests/ -v
 ```
 
-### 其他开发工具
+确保所有测试都通过了再提交。
+
+### 第五步：提交 Pull Request
 
 ```bash
-# 交互式 REPL
-duan repl
+# 提交你的代码
+git add 你修改的文件
+git commit -m "feat: 简单说明你做了什么"
 
-# 启动交互式教程
-duan tutorial
-
-# 查看 AST
-duan ast examples/hello.duan
-
-# 查看 Token 流
-duan tokens examples/hello.duan
-
-# 编译为 Python 代码
-duan compile examples/hello.duan
-
-# LLVM 编译（需要 LLVM/Clang）
-duan compile examples/hello.duan --backend llvm-typed
+# 推送到你的 GitHub 仓库
+git push origin feature/你的功能名称
 ```
+
+然后去 GitHub 上你的仓库页面，点击 **Compare & pull request** 按钮，填写 PR 信息：
+
+- **标题**：简洁说明你的变更
+- **内容**：描述你做了什么、为什么这么做、如何测试的
+- **关联 Issue**：在描述中写上 `Closes #123`（123 是 Issue 编号）
+
+之后就等着维护者审查你的代码吧！如果审查者有修改建议，在你的本地修改后推送即可，PR 会自动更新。
 
 ---
 
 ## 代码规范
 
-### Python 代码规范
-
-段言的编译器基础设施使用 Python 编写，遵循以下规范：
-
-- 遵循 [PEP 8](https://www.python.org/dev/peps/pep-0008/) 编码规范
-- 使用 **4 空格缩进**（不使用 Tab）
-- 行长度不超过 **100 字符**
-- 使用有意义的变量名和函数名
-- 函数和类必须包含文档字符串（docstring）
-- 类型注解：所有函数参数和返回值应包含类型注解
-
-```python
-# 好的示例
-def calculate_sum(numbers: list[int]) -> int:
-    """计算列表中所有数字的和。
-
-    Args:
-        numbers: 整数列表
-
-    Returns:
-        所有数字的和
-    """
-    return sum(numbers)
-```
-
 ### 段言代码规范
 
-段言代码遵循 v6.0 语法规范：
+段言代码使用 v6.0 语法，请遵循以下规范：
 
-- 使用 `设 变量 为 值` 的赋值语法（避免使用 `令 变量 = 值` 等旧语法）
-- 使用 `段落 名称 接收 参数:` 定义函数（避免使用 `函数 名称(参数):`）
-- 使用 `遍历 项 于 列表:` 进行遍历（注意使用 `于` 而非 `在`）
-- 使用中文关键字：`如果`/`否则`/`当`/`遍历`/`类`/`构造`/`己`
-- 使用 4 空格缩进
-- 在关键字和标识符之间保留空格：`设 甲 为 10`（而非 `设甲 为10`）
-- 使用 `：`（中文冒号）结束语句块头部
-- 使用 `。`（中文句号）结束语句（可选，但建议保持一致）
+| 项目 | 规范 |
+|------|------|
+| 变量声明 | 使用 `设 变量名 为 值` |
+| 函数定义 | 使用 `段落 函数名 接收 参数1, 参数2:` |
+| 条件判断 | 使用 `如果` / `否则若` / `否则` |
+| 循环 | 使用 `遍历 项 于 列表:` 或 `当 条件:` |
+| 缩进 | 4 个空格（不要用 Tab） |
+| 语句结尾 | 建议使用 `。`（中文句号）结尾 |
+| 冒号 | 使用 `：`（中文冒号）结束语句块头部 |
+
+示例：
 
 ```段言
 # 推荐的段言代码风格
 设 姓名 为 "段言"
 
 段落 问候 接收 名字:
-    打印("你好，" + 名字 + "！")
+  打印("你好，" + 名字 + "！")
 
 遍历 数字 于 1 到 5:
-    如果 数字 % 2 等于 0:
-        打印(数字 + "是偶数")
-    否则:
-        打印(数字 + "是奇数")
+  如果 数字 % 2 等于 0:
+    打印(数字 + "是偶数")
+  否则:
+    打印(数字 + "是奇数")
 ```
 
 ### 命名规范
 
-| 类型 | 规范 | 示例 |
-|------|------|------|
+| 类型 | 推荐方式 | 示例 |
+|------|----------|------|
 | 变量名 | 中文或英文，小写开头 | `姓名`, `user_name` |
-| 函数/段落名 | 中文或英文，动词开头 | `获取用户`, `calculate_sum` |
-| 类名 | 中文或英文，大写开头 | `用户管理`, `UserManager` |
+| 函数名 | 中文或英文，动词开头 | `获取用户`, `calculateSum` |
 | 常量 | 全大写 | `MAX_COUNT`, `π` |
-| 私有成员 | 下划线开头 | `_内部变量` |
-| 文件名 | 中文或英文，小写 | `数据层.duan`, `main.duan` |
-| 包名 | 中文或英文，简短 | `文件系统`, `JSON` |
+| 文件名 | 中文或英文，小写 | `主.duan`, `main.duan` |
 
-### 格式化规范
+### 注释规范
 
-- 段言代码：使用 `duan fmt` 命令自动格式化代码
-- Python 代码：使用 `black` 和 `isort` 格式化
+- 使用 `#` 开头写注释
+- 重要逻辑步骤前加注释说明
+- 尽量用中文写注释，方便其他中文开发者理解
+- 不要写显而易见的注释，比如 `# 加1` 这种
 
-```bash
-# 格式化段言代码
-duan fmt myfile.duan
+### 测试规范
 
-# 格式化 Python 代码
-pip install black isort
-black src/ tests/
-isort src/ tests/
+- 所有新功能必须包含测试用例
+- Bug 修复必须包含回归测试（确保 Bug 不会再次出现）
+- 测试文件放在 `tests/` 目录下
+- 测试命名：`test_模块名_功能.py`
+
+---
+
+## 如何报告问题
+
+发现了 Bug？或者有什么建议？请提交 Issue。
+
+### 提交 Issue 的模板
+
+在 [Issues 页面](https://github.com/skywalk163/duan/issues) 点击 **New Issue**，请尽量包含以下信息：
+
+**Bug 报告模板：**
+
+```
+## 描述问题
+请清晰简洁地描述这个 Bug 是什么。
+
+## 复现步骤
+1. 执行命令：`duan run xxx.duan`
+2. 输入：...
+3. 看到错误：...
+
+## 期望行为
+你期望看到什么结果？
+
+## 实际行为
+实际发生了什么？（请附上错误信息截图）
+
+## 环境信息
+- 操作系统：Windows 10 / macOS 14 / Ubuntu 22.04
+- Python 版本：3.12
+- 段言版本：v6.2.0
+
+## 补充信息
+其他你觉得有用的信息。
 ```
 
-### 文件组织规范
+**功能建议模板：**
 
 ```
-模块名.duan          # 主模块文件
-模块名/              # 包目录
-├── __init__.duan    # 包初始化
-├── 子模块1.duan     # 子模块
-└── 子模块2.duan
+## 建议内容
+清晰描述你希望添加的功能。
+
+## 使用场景
+这个功能在什么场景下有用？请举例说明。
+
+## 实现思路（可选）
+如果你有实现思路，可以写在这里。
 ```
 
 ---
 
-## 开发流程
+## 如何贡献文档
 
-### 标准的贡献流程
+文档是项目的重要组成部分，好的文档能帮助更多人学习和使用段言。
 
-```
-1. 选择任务
-    │
-    ▼
-2. 创建 Issue（描述你要解决的问题）
-    │
-    ▼
-3. 同步最新代码
-    │
-    ▼
-4. 创建功能分支
-    │
-    ▼
-5. 编写代码（遵循代码规范）
-    │
-    ▼
-6. 编写/更新测试
-    │
-    ▼
-7. 本地运行测试（确保全部通过）
-    │
-    ▼
-8. 提交代码（遵循提交信息规范）
-    │
-    ▼
-9. 推送到你的 Fork
-    │
-    ▼
-10. 创建 Pull Request
-    │
-    ▼
-11. 代码审查（根据需要修改）
-    │
-    ▼
-12. 合并 PR
-```
+你可以这样贡献文档：
 
-### 详细步骤说明
+1. **修正错误** — 发现文档中有错别字、语法错误或过时的内容，直接修改
+2. **补充说明** — 某个功能说明不够详细？补充更多例子和解释
+3. **写教程** — 分享你使用段言的经验，教别人做有趣的事情
+4. **翻译文档** — 帮助把中文文档翻译成英文，或把英文文档翻译成中文
 
-#### 步骤 1：选择任务
+文档目录在 `docs/` 下，使用 Markdown 格式编写。
 
-- 查看 [Issue 列表](https://github.com/skywalk163/duan/issues)，寻找标注 `good first issue` 或 `help wanted` 标签的任务
-- 在 Issue 下留言表示你想认领该任务
-- 如果你是新手，建议从文档改进或简单 Bug 修复开始
-
-#### 步骤 2：同步最新代码
+本地预览文档：
 
 ```bash
-# 确保你的 main 分支是最新的
-git checkout main
-git pull upstream main
-git push origin main
-```
-
-#### 步骤 3：创建功能分支
-
-```bash
-# 从最新的 main 创建分支
-git checkout -b feature/你的功能名称
-# 或
-git checkout -b fix/你的修复名称
-# 或
-git checkout -b docs/你的文档更新名称
-```
-
-#### 步骤 4：编写代码
-
-- 遵循[代码规范](#代码规范)中的要求
-- 保持改动范围聚焦，一个 PR 解决一个问题
-- 如果是修复 Bug，先编写复现测试用例
-
-#### 步骤 5：运行测试
-
-```bash
-# 运行所有测试确保不破坏现有功能
-python -m pytest tests/
-
-# 运行变更相关的测试
-python -m pytest tests/unit/test_lexer.py -v
-```
-
----
-
-## 分支管理
-
-### 分支策略
-
-- `main` — **稳定发布分支**，仅通过 PR 合并，始终保持可发布状态
-- `develop` — **开发分支**，日常开发的基础，包含最新功能
-- `feature/*` — **功能分支**，从 `develop` 创建，合并回 `develop`
-- `fix/*` — **修复分支**，从 `develop` 创建，合并回 `develop`
-- `docs/*` — **文档分支**，从 `develop` 创建，合并回 `develop`
-- `release/*` — **发布分支**，从 `develop` 创建，合并到 `main` 和 `develop`
-
-### 分支命名示例
-
-```
-feature/添加类型推断系统
-feature/实现模式匹配
-fix/修复列表越界错误
-fix/修复JSON解析编码问题
-docs/更新API文档
-docs/添加Web框架教程
-release/v6.1.0
-```
-
-### 保持分支同步
-
-```bash
-# 定期从 develop 同步更新
-git checkout feature/你的功能
-git pull upstream develop
-# 解决冲突后
-git push origin feature/你的功能
-```
-
----
-
-## PR 提交流程
-
-### 创建 PR 前的准备
-
-1. **确保所有测试通过**：`python -m pytest tests/`
-2. **确保代码格式正确**：Python 代码使用 `black`，段言代码使用 `duan fmt`
-3. **确保文档已更新**：新增功能需要更新对应文档
-4. **确保 CHANGELOG.md 已更新**：在 `[Unreleased]` 部分添加变更记录
-
-### 提交 PR
-
-1. 访问 [duan 仓库](https://github.com/skywalk163/duan)
-2. 点击 "New Pull Request"
-3. 选择你的 fork 和分支
-4. 填写 PR 模板，包含：
-   - **变更描述**：清晰描述变更内容和动机
-   - **关联 Issue**：使用 `Closes #123` 格式关联 Issue
-   - **变更类型**：选择对应的变更类型
-   - **测试说明**：描述测试方法和结果
-5. 点击 "Create Pull Request"
-
-### 代码审查
-
-- PR 创建后，维护者会进行审查
-- 审查者可能会提出修改建议，请及时响应
-- 修改后推送新 commit，PR 会自动更新
-- 至少需要 **1 位维护者** 批准后方可合并
-
-### PR 合并后的清理
-
-```bash
-# 切回 main 分支并更新
-git checkout main
-git pull upstream main
-
-# 删除本地功能分支
-git branch -d feature/你的功能
-
-# 删除远程功能分支
-git push origin --delete feature/你的功能
-```
-
----
-
-## PR 检查清单
-
-提交 PR 前，请逐项检查：
-
-- [ ] **代码规范**：代码符合项目代码规范
-- [ ] **测试通过**：所有现有测试通过，无新增失败
-- [ ] **测试覆盖**：新增代码有对应的测试覆盖
-  - Bug 修复：包含回归测试
-  - 新功能：包含单元测试
-- [ ] **文档更新**：相关文档已更新（如需要）
-- [ ] **CHANGELOG 更新**：CHANGELOG.md 已更新
-- [ ] **无调试代码**：无遗留的调试代码或 `print` 语句
-- [ ] **无冲突**：分支已与目标分支同步，无冲突
-- [ ] **Commit 规范**：提交信息遵循 Conventional Commits 规范
-- [ ] **单一职责**：一个 PR 只解决一个问题
-- [ ] **本地验证**：代码在本地环境中测试通过
-
----
-
-## 提交信息规范
-
-遵循 [Conventional Commits](https://www.conventionalcommits.org/) 规范：
-
-```
-<类型>: <简短描述>
-
-<详细描述（可选）>
-
-<关联 Issue（可选）>
-```
-
-### 类型说明
-
-| 类型 | 说明 | 示例 |
-|------|------|------|
-| `feat` | 新功能 | `feat: 添加模式匹配支持` |
-| `fix` | Bug 修复 | `fix: 修复列表越界访问错误` |
-| `docs` | 文档变更 | `docs: 更新 API 参考文档` |
-| `style` | 代码格式调整 | `style: 格式化 parser_core.py` |
-| `refactor` | 代码重构 | `refactor: 重构词法分析器架构` |
-| `test` | 测试相关 | `test: 添加异常处理测试用例` |
-| `chore` | 构建/工具链变更 | `chore: 更新 pytest 配置` |
-| `perf` | 性能优化 | `perf: 优化词法分析器吞吐量 24%` |
-
-### 提交信息示例
-
-```
-feat: 添加结构化模式匹配
-
-实现 `匹配`/`模式` 语法，支持：
-- 类型匹配模式（`整数 甲`、`字符串 乙`）
-- 列表模式（`[整数 甲, 整数 乙]`）
-- 字典模式（`{"name": 字符串 名}`）
-- 守卫条件（`若 条件`）
-- 通配符模式（`_`）
-
-Closes #156
-```
-
-```
-fix: 修复 JSON 解析时中文编码错误
-
-当 JSON 字符串包含中文 Unicode 转义序列时，
-解析器会错误地截断字符串。已修复转义序列处理逻辑。
-
-Fixes #142
-```
-
----
-
-## 测试要求
-
-### 基本原则
-
-- 所有新功能**必须**包含测试用例
-- Bug 修复**必须**包含回归测试
-- 测试覆盖率**不低于 80%**
-- 测试文件放在 `tests/` 目录下，按类别分目录
-- 测试命名：`test_<模块名>_<功能>.py`
-
-### 测试类型
-
-| 类型 | 目录 | 说明 |
-|------|------|------|
-| **单元测试** | `tests/unit/` | 测试单个模块/函数，隔离外部依赖 |
-| **集成测试** | `tests/integration/` | 测试模块间交互和协作 |
-| **端到端测试** | `tests/e2e/` | 测试完整编译-执行流程 |
-
-### 编写测试
-
-```python
-# tests/unit/test_lexer.py 示例
-import pytest
-from src.lexer import Lexer
-
-class TestLexer:
-    def test_中文关键字识别(self):
-        """测试中文关键字是否能正确识别"""
-        lexer = Lexer("设 变量 为 10")
-        tokens = lexer.tokenize()
-        assert tokens[0].type == "KEYWORD"
-        assert tokens[0].value == "设"
-
-    def test_字符串字面量(self):
-        """测试字符串字面量解析"""
-        lexer = Lexer('打印 "你好"')
-        tokens = lexer.tokenize()
-        assert tokens[1].type == "STRING"
-        assert tokens[1].value == "你好"
-```
-
-### 段言语言测试
-
-```段言
-# tests/final_test.duan 示例
-导入 断言工具。
-
-段落 测试加法:
-    设 结果 为 1 + 2
-    断言相等(结果, 3, "1 + 2 应该等于 3")
-
-段落 测试列表:
-    设 列表 为 [1, 2, 3]
-    列表.追加(4)
-    断言相等(列表长度(列表), 4, "列表长度应该为 4")
-
-测试加法()
-测试列表()
-打印("所有测试通过！")
-```
-
-### 运行测试的最佳实践
-
-```bash
-# 开发时频繁运行相关测试
-python -m pytest tests/unit/test_lexer.py -v --tb=short
-
-# 提交前运行完整测试套件
-python -m pytest tests/ -x  # -x 在第一个失败时停止
-
-# 生成覆盖率报告
-python -m pytest tests/ --cov=src --cov-report=term-missing
-```
-
----
-
-## 文档要求
-
-### 文档规范
-
-- 所有公开 API **必须**有文档字符串
-- 功能变更**必须**更新对应文档
-- 文档使用 **Markdown** 格式
-- 代码示例**必须**使用 **v6.0 语法**
-- 文档更新后运行 `mkdocs build` 验证无错误
-- 文档中的路径使用相对路径
-
-### 文档位置
-
-| 目录 | 内容 |
-|------|------|
-| `docs/` | MkDocs 文档站，包含入门指南、语法规范、教程等 |
-| `docs/api/` | API 参考文档，通过 `tools/gen_api_docs.py` 自动生成 |
-| `docs/blog/` | 技术博客文章 |
-| `docs/community/` | 社区相关文档 |
-| `docs/en/` | 英文文档 |
-| `docs/tutorials/` | 交互式教程 |
-
-### 文档字符串格式
-
-```python
-def 函数名(参数1: str, 参数2: int) -> bool:
-    """函数简短描述。
-
-    函数详细描述，说明函数的功能、行为和注意事项。
-
-    Args:
-        参数1: 参数1的描述
-        参数2: 参数2的描述
-
-    Returns:
-        返回值的描述
-
-    Raises:
-        异常类型: 异常触发条件
-
-    Examples:
-        ```段言
-        设 结果 为 函数名("test", 42)
-        ```
-    """
-```
-
-### 构建文档站
-
-```bash
-# 安装文档构建工具
 pip install mkdocs mkdocs-material
-
-# 本地预览
 mkdocs serve
-
-# 构建静态站点
-mkdocs build
-
-# 部署到 GitHub Pages
-mkdocs gh-deploy
 ```
 
----
-
-## 发布流程
-
-1. **创建发布分支**：从 `develop` 创建 `release/vX.Y.Z` 分支
-2. **更新版本号**：更新 `pyproject.toml`、`cli/duan.py` 等文件的版本号
-3. **更新 CHANGELOG**：将 `[Unreleased]` 改为 `[X.Y.Z] - 日期`
-4. **运行完整测试套件**：确保所有测试通过
-5. **构建文档**：`mkdocs build` 确保文档构建成功
-6. **创建 PR**：将 `release/vX.Y.Z` 合并到 `main` 和 `develop`
-7. **打 Tag**：在 `main` 上打版本 Tag
-8. **发布**：
-   - PyPI 发布：`python -m build && python -m twine upload dist/*`
-   - VS Code Marketplace 发布
-   - GitHub Release 创建
-9. **发布公告**：在 GitHub Discussions 和社区渠道发布更新公告
+然后在浏览器打开 http://127.0.0.1:8000 即可预览。
 
 ---
 
-## 获取帮助
+## 如何贡献示例
 
-如果在贡献过程中遇到问题，可以通过以下渠道获取帮助：
+想展示段言的某个好用功能？欢迎贡献示例代码！
 
-### 文档
+示例放在 `examples/` 目录下，请遵循以下规则：
 
-- [项目文档站](https://skywalk163.github.io/duan/)
-- [开发指南](docs/DEVELOPMENT_GUIDE.md)
-- [API 参考](docs/API_REFERENCE.md)
+1. 每个示例放在独立的子目录中
+2. 主文件命名为 `主.duan`
+3. 附带 `README.md` 说明文档
+4. 代码要有中文注释
+5. README 要包含：
+   - 功能介绍
+   - 使用方法（运行命令）
+   - 涉及的语言特性
 
-### 社区渠道
-
-- **GitHub Issues**：报告 Bug 和功能建议
-- **GitHub Discussions**：一般讨论、提问和技术交流
-  - [一般讨论](https://github.com/skywalk163/duan/discussions/categories/general)
-  - [问题求助](https://github.com/skywalk163/duan/discussions/categories/help)
-  - [功能建议](https://github.com/skywalk163/duan/discussions/categories/ideas)
-  - [展示分享](https://github.com/skywalk163/duan/discussions/categories/showcase)
-
-### 常见问题
-
-**Q: 我是一个新手，如何开始贡献？**
-A: 建议从标注 `good first issue` 标签的任务开始，这些任务通常比较简单。你也可以从文档改进开始，比如修正错别字、改进示例代码等。
-
-**Q: 我不确定某个功能是否属于 Bug，应该怎么办？**
-A: 可以在 Discussions 中先发起讨论，或者创建一个 Issue 并标注为 `question` 标签。
-
-**Q: 我的 PR 被要求修改，但我不确定如何修改？**
-A: 在 PR 评论中提问，审查者会提供更详细的指导。你也可以在 Discussions 中寻求帮助。
-
-**Q: 如何设置 LLVM 开发环境？**
-A: 安装 LLVM 14+ 和 Clang，确保 `clang` 命令在 PATH 中。详细信息请参考[开发指南](docs/DEVELOPMENT_GUIDE.md)。
+可以参考已有的示例，比如 `examples/web_crawler/` 或 `examples/data_pipeline/`。
 
 ---
 
-## 再次感谢
+## 社区交流渠道
 
-再次感谢您对段言的关注和贡献！无论您贡献的是代码、文档、测试还是社区讨论，每一份贡献都让段言变得更好。
+遇到问题想找人聊聊？这里有一些渠道：
 
-让我们携手，共同推动中文编程语言的发展！🚀
+| 渠道 | 地址 | 说明 |
+|------|------|------|
+| **GitHub Issues** | https://github.com/skywalk163/duan/issues | 报告 Bug 和提功能建议 |
+| **GitHub Discussions** | https://github.com/skywalk163/duan/discussions | 一般讨论、提问、分享 |
+| **文档站** | https://skywalk163.github.io/duan/ | 查看完整的文档和教程 |
+| **微信群** | 请关注项目 README 中的二维码 | 实时交流，快速响应 |
+
+### 交流建议
+
+- 提问前先搜索一下，看是否已经有答案
+- 描述问题时尽量详细，附上代码和错误信息
+- 保持友善和尊重的态度，我们欢迎所有水平的开发者
+- 如果发现别人问的问题你会回答，伸出援手吧！
 
 ---
 
-> 段言项目地址：[https://github.com/skywalk163/duan](https://github.com/skywalk163/duan)
-> 文档站：[https://skywalk163.github.io/duan/](https://skywalk163.github.io/duan/)
-> 许可证：MIT
+## 写在最后
+
+每一份贡献都让段言变得更好，无论你贡献的是代码、文档、测试还是社区讨论，我们都衷心感谢你！
+
+还记得吗？段言是一门**中文编程语言**，我们的社区也应该是中文开发者最温暖的家。不要因为自己"不够厉害"就不敢参与，每个专家都曾经是新手。勇敢地迈出第一步吧！
+
+让我们一起，用中文编程，让编程变得更简单、更有趣！🚀
+
+---
+
+> **段言项目地址**：https://github.com/skywalk163/duan
+> **文档站**：https://skywalk163.github.io/duan/
+> **许可证**：MIT

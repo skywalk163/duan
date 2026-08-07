@@ -505,6 +505,7 @@ class TestTypeCheckerWithAnnotations:
         results = checker.check(module, inferencer=None)
 
         warnings = [r for r in results if r.severity == TypeErrorSeverity.WARNING]
+        # 仅有"无注解"变量产生警告（"有注解"已有类型标注且不触发语义推断）
         assert len(warnings) == 1
         assert '无注解' in warnings[0].message
 

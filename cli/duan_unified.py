@@ -466,6 +466,53 @@ if __name__ == "__main__":
         print(f"\n[摘要] 成功: {success_count}/{len(duan_files)}")
         return 0 if success_count > 0 else 1
 
+    def syntax_check(self, source_file: str) -> int:
+        """检查文件语法是否正确"""
+        try:
+            with open(source_file, 'r', encoding='utf-8') as f:
+                source = f.read()
+
+            # 尝试 src 后端解析
+            try:
+                from duan_parser_v3 import DuanParser
+                parser = DuanParser()
+                module = parser.parse(source)
+                if module is None:
+                    print("[语法错误] 解析失败", file=sys.stderr)
+                    return 1
+                if hasattr(parser, 'errors') and parser.errors:
+                    for error in parser.errors:
+                        print(error, file=sys.stderr)
+                    return 1
+                print("[通过] 语法检查通过")
+                return 0
+            except ImportError:
+                pass
+
+            # 尝试 ANTLR 后端解析
+            try:
+                from antlr4 import InputStream, CommonTokenStream
+                from DuanLangLexer import DuanLangLexer
+                from DuanLangParser import DuanLangParser
+                from duan_visitor import DuanLangASTBuilder
+
+                input_stream = InputStream(source)
+                lexer = DuanLangLexer(input_stream)
+                tokens = CommonTokenStream(lexer)
+                parser = DuanLangParser(tokens)
+                tree = parser.program()
+                if parser.getNumberOfSyntaxErrors() > 0:
+                    print("[语法错误] 存在语法错误", file=sys.stderr)
+                    return 1
+                print("[通过] 语法检查通过")
+                return 0
+            except ImportError:
+                print("[错误] 无可用解析后端", file=sys.stderr)
+                return 1
+        except Exception as e:
+            print(f"[错误] 语法检查失败: {e}", file=sys.stderr)
+            return 1
+
     def show_ast(self, source: str, backend: str = 'antlr') -> int:
         """显示AST结构"""
         if backend == 'antlr':
@@ -516,10 +563,33 @@ if __name__ == "__main__":
 
 def main():
     """主函数"""
+    # 中文别名映射表
+    _cn_alias_map = {
+        '运行': 'run',
+        '编译': 'compile',
+        '语法检查': 'check',
+        '项目构建': 'pkg build',
+        '原生编译': 'compile --target llvm',
+        '交互式': 'repl',
+        '调试': 'debug',
+        '新建项目': 'pkg init',
+        '版本': '--version',
+        '帮助': '--help',
+    }
+
+    # 检查并转换中文别名
+    if len(sys.argv) > 1 and sys.argv[1] in _cn_alias_map:
+        mapped = _cn_alias_map[sys.argv[1]]
+        mapped_parts = mapped.split()
+        # 替换 sys.argv[1] 为映射后的英文命令
+        # 例如 'duan 项目构建' → 'duan pkg build'
+        # 例如 'duan 版本' → 'duan --version'
+        sys.argv[1:2] = mapped_parts
+
     cli = DuanUnifiedCLI()
     
     # 检查是否是子命令模式
-    if len(sys.argv) > 1 and sys.argv[1] in ['run', 'compile', 'repl', 'debug', 'pkg']:
+    if len(sys.argv) > 1 and sys.argv[1] in ['run', 'compile', 'repl', 'debug', 'pkg', 'check']:
         # 子命令模式
         parser = argparse.ArgumentParser(description='段言（Duan）编程语言编译器')
         subparsers = parser.add_subparsers(dest='command', help='子命令')
@@ -534,8 +604,8 @@ def main():
         compile_parser.add_argument('-o', '--output', help='输出文件路径')
         compile_parser.add_argument('--backend', choices=['antlr', 'src'], default='src',
                                    help='选择编译后端（默认：src）')
-        compile_parser.add_argument('--target', choices=['py', 'js', 'wasm'], default='py',
-                                   help='目标代码（默认：py）')
+        compile_parser.add_argument('--target', choices=['py', 'js', 'wasm', 'llvm'], default='py',
+                                   help='目标代码（默认：py，llvm 生成 LLVM IR）')
         
         # repl 子命令
         subparsers.add_parser('repl', help='启动交互式REPL')
@@ -543,6 +613,12 @@ def main():
         # debug 子命令
         debug_parser = subparsers.add_parser('debug', help='启动调试REPL')
         debug_parser.add_argument('file', nargs='?', help='要调试的文件路径（可选）')
+        
+        # check 子命令
+        check_parser = subparsers.add_parser('check', help='语法检查')
+        check_parser.add_argument('file', help='源文件路径')
+        check_parser.add_argument('--backend', choices=['antlr', 'src'], default='src',
+                                  help='选择解析后端（默认：src）')
         
         # pkg 子命令
         pkg_parser = subparsers.add_parser('pkg', help='项目管理（init/build）')
@@ -595,6 +671,12 @@ def main():
             else:
                 return cli.start_debug_repl()
         
+        elif args.command == 'check':
+            if not os.path.exists(args.file):
+                print(f"[错误] 文件不存在: {args.file}", file=sys.stderr)
+                return 1
+            return cli.syntax_check(args.file)
+        
         elif args.command == 'pkg':
             if not getattr(args, 'pkg_command', None):
                 pkg_parser.print_help()
@@ -641,7 +723,7 @@ def main():
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
         parser.add_argument('--welcome', action='store_true',
                            help='显示首次运行欢迎引导')
-        parser.add_argument('--version', action='version', version='段言 v6.2.0')
+        parser.add_argument('--version', action='version', version='段言 v6.2.1')
         
         args = parser.parse_args()
         

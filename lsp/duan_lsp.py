@@ -74,6 +74,9 @@ LSP_METHODS = {
     
     # 语义令牌
     'textDocument/semanticTokens/full': 'textDocument/semanticTokens/full',
+    
+    # LSP 3.17+ 拉取式诊断
+    'textDocument/diagnostic': 'textDocument/diagnostic',
 }
 
 
@@ -541,6 +544,7 @@ class DuanLanguageServer:
             'completionItem/resolve': self._handle_completion_resolve,
             'textDocument/hover': self._handle_hover,
             'textDocument/definition': self._handle_definition,
+            'textDocument/goToDefinition': self._handle_definition,
             'textDocument/references': self._handle_references,
             'textDocument/documentSymbol': self._handle_document_symbol,
             'textDocument/formatting': self._handle_formatting,
@@ -550,6 +554,7 @@ class DuanLanguageServer:
             'textDocument/documentHighlight': self._handle_document_highlight,
             'textDocument/signatureHelp': self._handle_signature_help,
             'textDocument/semanticTokens/full': self._handle_semantic_tokens_full,
+            'textDocument/diagnostic': self._handle_document_diagnostic,
         }
         
         handler = handlers.get(method)
@@ -629,6 +634,18 @@ class DuanLanguageServer:
             context_type = 'after_new'
         elif before_cursor.endswith('抛出') or before_cursor.endswith('抛出 '):
             context_type = 'after_throw'
+        elif before_cursor.endswith('类') or before_cursor.endswith('类 '):
+            context_type = 'after_class'
+        elif before_cursor.endswith('段落') or before_cursor.endswith('段落 '):
+            context_type = 'after_paragraph'
+        elif before_cursor.endswith('从') or before_cursor.endswith('从 '):
+            context_type = 'after_from'
+        elif before_cursor.endswith('使用') or before_cursor.endswith('使用 '):
+            context_type = 'after_with'
+        elif before_cursor.endswith('捕获') or before_cursor.endswith('捕获 '):
+            context_type = 'after_catch'
+        elif before_cursor.endswith('匹配') or before_cursor.endswith('匹配 '):
+            context_type = 'after_match'
         
         completions = []
         
@@ -684,6 +701,66 @@ class DuanLanguageServer:
             })
             completions.append({
                 'label': '空', 'kind': 14, 'detail': '空值', 'sortText': '1_空', 'filterText': '空'
+            })
+            return {'isIncomplete': False, 'items': completions}
+        
+        elif context_type == 'after_class':
+            # 类上下文：建议继承关键字和类模板
+            completions.append({
+                'label': '继承', 'kind': 14, 'detail': '类继承', 'sortText': '1_继承', 'filterText': '继承'
+            })
+            completions.append({
+                'label': '实现', 'kind': 14, 'detail': '实现接口', 'sortText': '1_实现', 'filterText': '实现'
+            })
+            return {'isIncomplete': False, 'items': completions}
+
+        elif context_type == 'after_paragraph':
+            # 段落上下文：建议函数名和接收关键字
+            completions.append({
+                'label': '接收', 'kind': 14, 'detail': '段落参数', 'sortText': '1_接收', 'filterText': '接收'
+            })
+            return {'isIncomplete': False, 'items': completions}
+
+        elif context_type == 'after_from':
+            # 从...导入上下文：建议模块名
+            modules = ['标准库', 'JSON', 'CSV', 'HTTP', '正则表达式', '日期时间', '数学', '线程', '系统信息', '字符串处理']
+            for mod_name in sorted(modules):
+                if not prefix or mod_name.startswith(prefix):
+                    completions.append({
+                        'label': mod_name,
+                        'kind': 9,  # Module
+                        'detail': '模块',
+                        'sortText': f'1_{mod_name}',
+                        'filterText': mod_name,
+                    })
+            return {'isIncomplete': False, 'items': completions}
+
+        elif context_type == 'after_with':
+            # 使用上下文：建议资源管理
+            completions.append({
+                'label': '为', 'kind': 14, 'detail': '使用...为 语法', 'sortText': '1_为', 'filterText': '为'
+            })
+            return {'isIncomplete': False, 'items': completions}
+
+        elif context_type == 'after_catch':
+            # 捕获上下文：建议异常类型
+            exceptions = ['值错误', '类型错误', '键错误', '索引错误', '属性错误',
+                          '文件未找到', '导入错误', '运行时错误', '零除错误', '异常']
+            for exc_name in sorted(exceptions):
+                if not prefix or exc_name.startswith(prefix):
+                    completions.append({
+                        'label': exc_name,
+                        'kind': 14,  # Keyword
+                        'detail': '异常类型',
+                        'sortText': f'1_{exc_name}',
+                        'filterText': exc_name,
+                    })
+            return {'isIncomplete': False, 'items': completions}
+
+        elif context_type == 'after_match':
+            # 匹配上下文：建议情况关键字
+            completions.append({
+                'label': '情况', 'kind': 14, 'detail': '匹配分支', 'sortText': '1_情况', 'filterText': '情况'
             })
             return {'isIncomplete': False, 'items': completions}
         
@@ -849,6 +926,61 @@ class DuanLanguageServer:
                         'name': func_name,
                         'arity': arity
                     }
+                })
+
+        # ====== 常用内置函数补全（不在 STDLIB_VERB_ARITY 中的）======
+        extra_builtins = {
+            '打印': '打印内容到控制台',
+            '读取行': '从标准输入读取一行',
+            '写入输出': '向标准输出写入文本',
+            '打印输出': '打印文本并换行',
+            '类型': '获取值的类型',
+            '长': '获取列表/字符串长度',
+            '长度': '获取列表/字符串长度',
+            '转字符串': '将值转换为字符串',
+            '转整数': '将值转换为整数',
+            '转浮点': '将值转换为浮点数',
+            '范围': '生成整数范围',
+            '字符串长度': '获取字符串长度',
+            '分割字符串': '分割字符串为列表',
+            '连接字符串': '连接字符串列表',
+            '替换字符串': '替换字符串中的子串',
+            '去除空白': '去除字符串首尾空白',
+            '解析JSON': '解析 JSON 字符串为段言值',
+            '序列化JSON': '将段言值序列化为 JSON 字符串',
+            '文件存在': '检查文件是否存在',
+            '目录存在': '检查目录是否存在',
+            '读取文件': '读取文件全部内容',
+            '写入文件': '写入内容到文件',
+            '追加文件': '追加内容到文件',
+            '删除文件': '删除文件',
+            '创建目录': '创建目录',
+            '列出目录': '列出目录内容',
+            '执行命令': '执行系统命令',
+            '当前目录': '获取当前工作目录',
+            '切换目录': '切换工作目录',
+            '环境变量': '获取环境变量值',
+            '退出程序': '退出程序',
+            '随机整数': '生成随机整数',
+            '随机浮点': '生成随机浮点数',
+            '随机选择': '从列表中随机选择',
+            '求和': '计算列表数值之和',
+            '平均数': '计算列表数值平均值',
+            '中位数': '计算列表数值中位数',
+            '阶乘': '计算阶乘',
+            '圆周率': '返回圆周率 π',
+            '自然常数': '返回自然常数 e',
+        }
+        for func_name, func_desc in sorted(extra_builtins.items()):
+            if func_name in STDLIB_VERB_ARITY:
+                continue  # 跳过已在 stdlib 列表中的
+            if not prefix or func_name.startswith(prefix):
+                completions.append({
+                    'label': func_name,
+                    'kind': 3,  # Function
+                    'detail': func_desc,
+                    'sortText': f'4_{func_name}',
+                    'filterText': func_name,
                 })
         
         # ====== 内置类型补全 ======
@@ -1661,12 +1793,19 @@ class DuanLanguageServer:
         if not word:
             return None
         
-        # 1. 优先从已缓存的 definitions 中查找
+        # 1. 优先从已缓存的 definitions 中查找（当前文档）
         if doc.uri in self.doc_manager.definitions:
             if word in self.doc_manager.definitions[doc.uri]:
                 return self.doc_manager.definitions[doc.uri][word]
-        
-        # 2. 尝试解析 AST 作为 fallback 查找定义
+
+        # 2. 跨文档查找定义（遍历所有已打开文档）
+        for other_uri, defs in self.doc_manager.definitions.items():
+            if other_uri == doc.uri:
+                continue
+            if word in defs:
+                return defs[word]
+
+        # 3. 尝试解析 AST 作为 fallback 查找定义
         try:
             parser = DuanParser()
             ast = parser.parse(doc.text)
@@ -1697,7 +1836,42 @@ class DuanLanguageServer:
                 return found
         except Exception:
             pass
-        
+
+        # 4. 跨文档 AST 查找（遍历所有已打开文档的 AST）
+        for other_uri, other_doc in self.doc_manager.documents.items():
+            if other_uri == doc.uri:
+                continue
+            try:
+                other_parser = DuanParser()
+                other_ast = other_parser.parse(other_doc.text)
+                other_found = None
+
+                def other_search(node):
+                    nonlocal other_found
+                    if other_found:
+                        return
+                    node_type = type(node).__name__
+                    name = getattr(node, 'name', None)
+                    if name == word and node_type in ('VarDecl', 'Paragraph', 'ClassDefinition',
+                                                       'MethodDefinition', 'AttributeDeclaration',
+                                                       'InterfaceDefinition'):
+                        lineno = getattr(node, 'line', 1) - 1
+                        col = getattr(node, 'col', 0)
+                        other_found = {
+                            'uri': other_uri,
+                            'range': {
+                                'start': {'line': lineno, 'character': col},
+                                'end': {'line': lineno, 'character': col + len(str(name))}
+                            }
+                        }
+                        return
+
+                self.doc_manager._walk_ast(other_ast, other_search)
+                if other_found:
+                    return other_found
+            except Exception:
+                continue
+
         return None
     
     def _handle_document_symbol(self, params: Dict) -> List[Dict]:
@@ -2254,6 +2428,22 @@ class DuanLanguageServer:
                 i += 1
 
         return {'data': data}
+
+    def _handle_document_diagnostic(self, params: Dict) -> Dict:
+        """处理 LSP 3.17+ 拉取式诊断请求 (textDocument/diagnostic)
+
+        返回文档的完整诊断结果，包括语法错误、类型错误等。
+        """
+        uri = params.get('textDocument', {}).get('uri', '')
+        doc = self.doc_manager.get_document(uri)
+        if not doc:
+            return {'kind': 'full', 'items': []}
+
+        diagnostics = self.get_diagnostics(uri)
+        return {
+            'kind': 'full',
+            'items': diagnostics
+        }
 
     def _handle_did_open(self, params: Dict):
         """处理文档打开"""

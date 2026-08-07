@@ -157,6 +157,49 @@ class TypeChecker:
         'None', 'null',
     }
 
+    # 中文变量名模式到类型的映射（按语义匹配）
+    CHINESE_TYPE_PATTERNS: Dict[str, str] = {
+        # 整数类型
+        "总数": "整数", "数量": "整数", "个数": "整数", "次数": "整数",
+        "年龄": "整数", "序号": "整数", "索引": "整数", "长度": "整数",
+        "大小": "整数", "计数": "整数", "编号": "整数", "年份": "整数",
+        "月份": "整数", "日期": "整数", "天数": "整数", "小时": "整数",
+        "分钟": "整数", "秒数": "整数", "行数": "整数", "列数": "整数",
+        "页码": "整数", "版本": "整数", "层级": "整数", "级别": "整数",
+        "步数": "整数", "人数": "整数", "数量级": "整数",
+        # 浮点数类型
+        "价格": "浮数", "金额": "浮数", "费用": "浮数", "工资": "浮数",
+        "温度": "浮数", "利率": "浮数", "比率": "浮数", "比例": "浮数",
+        "概率": "浮数", "速度": "浮数", "距离": "浮数", "面积": "浮数",
+        "体积": "浮数", "重量": "浮数", "密度": "浮数", "利润": "浮数",
+        "折扣": "浮数", "税率": "浮数", "分数": "浮数", "评分": "浮数",
+        # 字符串类型
+        "名称": "串", "名字": "串", "姓名": "串", "标题": "串",
+        "描述": "串", "说明": "串", "备注": "串", "注释": "串",
+        "地址": "串", "路径": "串", "网址": "串", "邮箱": "串",
+        "电话": "串", "手机": "串", "密码": "串", "密钥": "串",
+        "内容": "串", "消息": "串", "文本": "串", "摘要": "串",
+        "标签": "串", "颜色": "串", "编码": "串", "格式": "串",
+        "前缀": "串", "后缀": "串", "关键字": "串", "关键词": "串",
+        "单位": "串", "状态": "串", "类型": "串", "类别": "串",
+        "代码": "串", "消息体": "串", "错误信息": "串",
+        # 布尔类型
+        "是否": "布尔", "是": "布尔", "有": "布尔", "可用": "布尔",
+        "启用": "布尔", "禁用": "布尔", "激活": "布尔", "可见": "布尔",
+        "完成": "布尔", "成功": "布尔", "失败": "布尔", "通过": "布尔",
+        "有效": "布尔", "过期": "布尔", "匹配": "布尔", "包含": "布尔",
+        "存在": "布尔", "选中": "布尔", "展开": "布尔", "加载": "布尔",
+        "就绪": "布尔", "繁忙": "布尔", "空": "布尔",
+        # 列表类型
+        "列表": "列", "数组": "列", "集合": "列", "清单": "列",
+        "队列": "列", "堆栈": "列", "序列": "列", "列表项": "列",
+        "结果集": "列", "数据列表": "列",
+        # 字典类型
+        "字典": "典", "映射": "典", "配置": "典", "设置": "典",
+        "选项": "典", "参数表": "典", "属性表": "典", "键值对": "典",
+        "环境变量": "典",
+    }
+
     def __init__(self, config: TypeCheckerConfig):
         self.config = config
         self.results: List[TypeCheckResult] = []
@@ -277,7 +320,18 @@ class TypeChecker:
         """检查变量声明是否有类型标注"""
         name = getattr(stmt, 'name', '?')
         type_annotation = getattr(stmt, 'type_annotation', None)
+        value = getattr(stmt, 'value', None)
         line = getattr(stmt, 'line', 0)
+
+        # 中文变量名类型推断
+        chinese_type = self._infer_chinese_variable_type(name, value)
+        if chinese_type:
+            self._add_result(
+                TypeErrorSeverity.WARNING,
+                f"中文变量 '{name}'（在 '{context}' 中）语义推断为 '{chinese_type}' 类型"
+                + (f"，当前类型标注为 '{type_annotation}'" if type_annotation and type_annotation != chinese_type else ""),
+                line=line,
+            )
 
         if type_annotation is None:
             check_level = self.config.check_level
@@ -364,6 +418,83 @@ class TypeChecker:
                 pass
 
     # ------------------------------------------------------------------
+    # 中文变量名类型推导
+    # ------------------------------------------------------------------
+
+    def _infer_chinese_variable_type(self, name: str, value_node=None) -> Optional[str]:
+        """根据中文变量名语义推断类型
+
+        通过匹配中文变量名中的语义关键词，推断变量应具有的类型。
+        支持整数、浮点数、字符串、布尔、列表、字典类型的推断。
+
+        Args:
+            name: 变量名（中文或混合）
+            value_node: 可选的初始值节点，用于辅助推断
+
+        Returns:
+            推断出的类型名称（如 "整数"、"浮数"、"串"、"布尔"、"列"、"典"），
+            如果无法推断则返回 None
+        """
+        if not name or not isinstance(name, str):
+            return None
+
+        # 尝试精确匹配整个变量名
+        if name in self.CHINESE_TYPE_PATTERNS:
+            return self.CHINESE_TYPE_PATTERNS[name]
+
+        # 尝试后缀匹配（中文变量名通常以语义词结尾）
+        # 按长度降序匹配，优先匹配更长的模式
+        sorted_patterns = sorted(self.CHINESE_TYPE_PATTERNS.items(), key=lambda x: -len(x[0]))
+        for pattern, inferred_type in sorted_patterns:
+            if name.endswith(pattern):
+                return inferred_type
+
+        # 尝试前缀匹配（仅对长度 >= 2 的模式进行前缀匹配，避免单字误匹配）
+        for pattern, inferred_type in sorted_patterns:
+            if len(pattern) >= 2 and name.startswith(pattern):
+                return inferred_type
+
+        # 如果变量名包含中文，尝试按语义规则推断
+        if re.search(r'[\u4e00-\u9fff]', name):
+            # 以"数"结尾的通常是整数
+            if name.endswith("数"):
+                return "整数"
+            # 以"率"、"比"结尾的通常是浮点数
+            if name.endswith("率") or name.endswith("比"):
+                return "浮数"
+            # 以"法"、"器"结尾的通常是某种对象，不确定类型
+            if name.endswith("法") or name.endswith("器"):
+                return None
+
+        return None
+
+    def _check_chinese_naming_convention(self, name: str, line: int = 0) -> None:
+        """检查中文变量名是否符合类型命名约定
+
+        根据 CHINESE_TYPE_PATTERNS 中的映射关系，检查变量名是否暗示了类型信息。
+        如果变量名包含类型语义但未标注类型，给出建议。
+
+        Args:
+            name: 变量名
+            line: 行号
+        """
+        if not name or not isinstance(name, str):
+            return
+
+        # 检查是否包含中文
+        if not re.search(r'[\u4e00-\u9fff]', name):
+            return
+
+        inferred = self._infer_chinese_variable_type(name)
+        if inferred:
+            self._add_result(
+                TypeErrorSeverity.WARNING,
+                f"中文变量 '{name}' 语义暗示类型为 '{inferred}'，"
+                f"建议添加类型标注以增强代码可读性",
+                line=line,
+            )
+
+    # ------------------------------------------------------------------
     # 辅助方法
     # ------------------------------------------------------------------
 
@@ -379,6 +510,34 @@ class TypeChecker:
 
     def get_runtime_checks(self) -> List[TypeCheckResult]:
         return [r for r in self.results if r.severity == TypeErrorSeverity.RUNTIME]
+
+    def get_errors_with_chinese_type_info(self) -> List[TypeCheckResult]:
+        """获取包含中文类型信息的错误列表
+
+        在原有错误信息基础上，对涉及中文变量名的错误附加类型推断信息。
+
+        Returns:
+            包含中文类型推断信息的错误结果列表
+        """
+        enriched: List[TypeCheckResult] = []
+        for r in self.results:
+            if not r.is_error():
+                continue
+            # 检查消息中是否包含中文变量名并附加推断信息
+            chinese_vars = re.findall(r"['\"]?([\u4e00-\u9fff]+)['\"]?", r.message)
+            for var_name in chinese_vars:
+                inferred = self._infer_chinese_variable_type(var_name)
+                if inferred:
+                    enriched.append(TypeCheckResult(
+                        severity=r.severity,
+                        message=f"{r.message}（中文变量名 '{var_name}' 推断类型为 '{inferred}'）",
+                        line=r.line,
+                        column=r.column,
+                    ))
+                    break
+            else:
+                enriched.append(r)
+        return enriched
 
     def has_errors(self) -> bool:
         return any(r.is_error() for r in self.results)

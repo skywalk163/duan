@@ -780,7 +780,8 @@ def cmd_pkg(args):
         try:
             output = pm.build_project_native(
                 output_path=args.output,
-                verbose=args.verbose
+                verbose=args.verbose,
+                target=args.target
             )
             print(f"✅ 原生编译成功: {output}")
         except Exception as e:
@@ -1138,6 +1139,9 @@ def main():
     pkg_native = pkg_sub.add_parser('native', help='使用 LLVM 后端编译为原生可执行文件')
     pkg_native.add_argument('-o', '--output', default=None, help='输出文件路径')
     pkg_native.add_argument('-v', '--verbose', action='store_true', help='详细输出')
+    pkg_native.add_argument('--target', default=None,
+                            choices=['auto', 'macos', 'linux', 'windows'],
+                            help='目标平台（auto/macos/linux/windows，默认 auto 自动检测）')
 
     # ── pkg search ──
     pkg_search = pkg_sub.add_parser('search', help='搜索 duanpub 包')

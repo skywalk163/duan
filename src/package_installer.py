@@ -165,8 +165,69 @@ BUILTIN_REGISTRY = {
             ],
             "keywords": ["图像", "图片", "处理"]
         },
+        # ── 中文场景专属包 ──
+        "中文分词": {
+            "name": "中文分词",
+            "version": "1.0.0",
+            "description": "中文分词工具：正向最大匹配算法、自定义词典、批量加载",
+            "author": "段言团队",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-segment.git",
+                "https://github.com/duan-lang/duan-segment.git",
+                "https://gitee.com/duan-lang/duan-segment.git",
+            ],
+            "keywords": ["中文", "分词", "NLP", "文本"]
+        },
+        "农历工具": {
+            "name": "农历工具",
+            "version": "1.0.0",
+            "description": "农历工具：公历农历互转、传统节日查询、闰月判断",
+            "author": "段言团队",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-lunar.git",
+                "https://github.com/duan-lang/duan-lunar.git",
+                "https://gitee.com/duan-lang/duan-lunar.git",
+            ],
+            "keywords": ["农历", "日历", "节日", "日期"]
+        },
+        "身份证校验": {
+            "name": "身份证校验",
+            "version": "1.0.0",
+            "description": "身份证号码校验：格式校验、校验码计算、信息提取（出生日期/性别/地区）",
+            "author": "段言团队",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-idcard.git",
+                "https://github.com/duan-lang/duan-idcard.git",
+                "https://gitee.com/duan-lang/duan-idcard.git",
+            ],
+            "keywords": ["身份证", "校验", "身份", "验证"]
+        },
+        "拼音转换": {
+            "name": "拼音转换",
+            "version": "1.0.0",
+            "description": "拼音转换工具：中文转拼音、带声调拼音、拼音首字母提取",
+            "author": "段言团队",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-pinyin.git",
+                "https://github.com/duan-lang/duan-pinyin.git",
+                "https://gitee.com/duan-lang/duan-pinyin.git",
+            ],
+            "keywords": ["拼音", "中文", "音标", "转换"]
+        },
+        "手机号校验": {
+            "name": "手机号校验",
+            "version": "1.0.0",
+            "description": "手机号码校验：格式校验、运营商识别（移动/联通/电信）、归属地查询",
+            "author": "段言团队",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-phone.git",
+                "https://github.com/duan-lang/duan-phone.git",
+                "https://gitee.com/duan-lang/duan-phone.git",
+            ],
+            "keywords": ["手机号", "校验", "运营商", "归属地"]
+        },
     },
-    "updated_at": "2026-07-08"
+    "updated_at": "2026-08-07"
 }
 
 

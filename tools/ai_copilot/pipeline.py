@@ -21,6 +21,7 @@
 
 from syntax_card import generate_syntax_card, generate_pitfalls, generate_example_pairs
 from snippets import SNIPPETS, get_snippets_prompt, get_snippet
+from typing import Optional
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -378,6 +379,63 @@ def _generate_verb_block() -> str:
             entries.append(f"{v}({arity}参)")
         lines.append(f"  {cat}：" + " / ".join(entries))
     return "\n".join(lines)
+
+
+# ═══════════════════════════════════════════════════════════════════
+# Python ↔ 段言 双向翻译
+# ═══════════════════════════════════════════════════════════════════
+
+def python_to_duan(python_code: str, file_path: Optional[str] = None) -> str:
+    """将 Python 代码翻译为段言代码
+
+    使用 Py2DuanTranspiler 将 Python AST 逐节点映射为段言代码。
+    支持 Python 基本语法：import, def, class, if/elif/else, for, while,
+    try/except, with, return, yield, async/await, 赋值, 表达式等。
+
+    Args:
+        python_code: Python 源码字符串，如果不为空则直接翻译
+        file_path: Python 文件路径，如果 python_code 为空则读取文件
+
+    Returns:
+        翻译后的段言代码字符串
+
+    Raises:
+        SyntaxError: 如果 Python 代码有语法错误
+        FileNotFoundError: 如果文件不存在
+
+    示例:
+        >>> python_to_duan("def add(a, b): return a + b")
+        段落 add 接收 a, b：
+            返回 a 加上 b
+    """
+    from translator import python_to_duan as _translate
+    return _translate(python_code, file_path)
+
+
+def duan_to_python(duan_code: str, file_path: Optional[str] = None) -> str:
+    """将段言代码翻译为 Python 代码
+
+    使用 PythonCodeGenerator 将段言 AST 转换为 Python 代码。
+    段言的中文关键字被映射为对应的 Python 英文关键字。
+
+    Args:
+        duan_code: 段言源码字符串，如果不为空则直接翻译
+        file_path: 段言文件路径，如果 duan_code 为空则读取文件
+
+    Returns:
+        翻译后的 Python 代码字符串
+
+    Raises:
+        ValueError: 如果段言代码有语法错误
+        FileNotFoundError: 如果文件不存在
+
+    示例:
+        >>> duan_to_python("段落 add 接收 a, b：\\n    返回 a 加上 b")
+        def add(a, b):
+            return a + b
+    """
+    from translator import duan_to_python as _translate
+    return _translate(duan_code, file_path)
 
 
 if __name__ == "__main__":

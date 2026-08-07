@@ -256,6 +256,12 @@ tools/verify_migration.py
 # Ollama 旧版 Modelfile
 ollama_model/Modelfile.v7_*
 
+# 构建输出目录
+output/
+
+# 其他杂项
+Other/
+
 # 迁移工具脚本
 tools/migrate_cstyle.py
 

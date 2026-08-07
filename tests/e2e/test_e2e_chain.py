@@ -55,6 +55,11 @@ E2E_EXCLUDED = {
     'data_cleaner/清洗器.duan',
     'data_cleaner/分析器.duan',
     'data_cleaner/转换器.duan',
+    # 新示例项目（需交互式输入或复杂运行环境）
+    'games/guess_number/主.duan',
+    'web_crawler/主.duan',
+    'file_tools/batch_rename/主.duan',
+    'web_api/todo_api/主.duan',
 }
 
 EXAMPLES_DIR = REPO_ROOT / 'examples'

@@ -1134,11 +1134,227 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     return exe_path
 
 
+# ===========================================================================
+# LLVMCompiler 类
+# ===========================================================================
+
+
+class LLVMCompiler:
+    """段言 LLVM 编译器类
+
+    封装了从 .duan 源码到原生可执行文件的完整编译流水线。
+    支持 Windows、macOS、Linux 三大平台，支持 x86_64 和 ARM64 架构。
+
+    用法:
+        compiler = LLVMCompiler()
+        # 自动检测当前平台编译
+        compiler.compile("hello.duan")
+
+        # 指定目标平台
+        compiler.compile("hello.duan", target="macos")
+        compiler.compile("hello.duan", target="linux")
+
+        # 直接调用平台特定方法
+        compiler.compile_to_macos("hello.duan", "hello_macos")
+        compiler.compile_to_linux("hello.duan", "hello_linux")
+    """
+
+    # 平台映射表
+    TARGET_PLATFORM_MAP = {
+        "macos": "darwin",
+        "mac": "darwin",
+        "darwin": "darwin",
+        "linux": "linux",
+        "win": "win32",
+        "windows": "win32",
+        "win32": "win32",
+    }
+
+    def __init__(self, verbose: bool = False, optimize_level: int = 2,
+                 debug: bool = False, optimize_size: bool = False,
+                 lto: bool = False, strip: bool = False):
+        """初始化 LLVM 编译器
+
+        Args:
+            verbose: 是否输出详细信息
+            optimize_level: 优化级别（0-3），默认 2
+            debug: 是否生成 DWARF 调试信息
+            optimize_size: 是否启用 -Os 尺寸优化
+            lto: 是否启用 LTO (Link Time Optimization)
+            strip: 是否剥离调试符号
+        """
+        self.verbose = verbose
+        self.optimize_level = optimize_level
+        self.debug = debug
+        self.optimize_size = optimize_size
+        self.lto = lto
+        self.strip = strip
+
+    @staticmethod
+    def detect_platform() -> str:
+        """自动检测当前运行平台
+
+        Returns:
+            "win32" / "darwin" / "linux"
+        """
+        return sys.platform
+
+    @staticmethod
+    def detect_arch() -> str:
+        """自动检测当前架构
+
+        Returns:
+            "x86_64" / "aarch64"
+        """
+        import platform as _p
+        machine = _p.machine().lower()
+        if machine in ('aarch64', 'arm64', 'armv8l', 'armv8b'):
+            return 'aarch64'
+        return 'x86_64'
+
+    @staticmethod
+    def resolve_target_platform(target: str = None) -> str:
+        """解析目标平台参数
+
+        Args:
+            target: 目标平台名称（'macos'/'linux'/'windows' 或 None）
+
+        Returns:
+            平台标识（'darwin'/'linux'/'win32'）
+        """
+        if target is None:
+            return sys.platform
+        target_lower = target.lower().strip()
+        mapped = LLVMCompiler.TARGET_PLATFORM_MAP.get(target_lower)
+        if mapped:
+            return mapped
+        # 尝试部分匹配
+        for key, val in LLVMCompiler.TARGET_PLATFORM_MAP.items():
+            if key in target_lower or target_lower in key:
+                return val
+        # 默认返回当前平台
+        return sys.platform
+
+    def compile(self, source_path: str, output_path: str = None,
+                target: str = None) -> str:
+        """编译 .duan 文件为原生可执行文件
+
+        自动检测目标平台，选择合适的编译参数。
+        支持 typed 模式（默认）和 string 模式。
+
+        Args:
+            source_path: .duan 源文件路径
+            output_path: 输出可执行文件路径（默认与源文件同名）
+            target: 目标平台（'macos'/'linux'/'windows'/'auto'），
+                    'auto' 或 None 表示自动检测当前平台
+
+        Returns:
+            可执行文件路径
+
+        Raises:
+            RuntimeError: 编译失败时抛出
+        """
+        # 解析目标平台
+        target_platform = self.resolve_target_platform(target)
+
+        if self.verbose:
+            current_platform = sys.platform
+            print(f"[LLVMCompiler] 当前平台: {current_platform}")
+            print(f"[LLVMCompiler] 目标平台: {target_platform} (target={target})")
+            print(f"[LLVMCompiler] 目标架构: {self.detect_arch()}")
+
+        # 选择编译方法
+        try:
+            exe_path = compile_duan_typed(
+                source_path=source_path,
+                output_path=output_path,
+                verbose=self.verbose,
+                target_platform=target_platform,
+                target=self.detect_arch(),
+                optimize_level=self.optimize_level,
+                debug=self.debug,
+                optimize_size=self.optimize_size,
+                lto=self.lto,
+                strip=self.strip,
+            )
+            return exe_path
+        except Exception:
+            # 回退到 string 模式
+            if self.verbose:
+                print("[LLVMCompiler] 回退到 string 模式...")
+            exe_path = compile_duan(
+                source_path=source_path,
+                output_path=output_path,
+                verbose=self.verbose,
+                target=self.detect_arch(),
+                optimize_level=self.optimize_level,
+                debug=self.debug,
+                optimize_size=self.optimize_size,
+                lto=self.lto,
+                strip=self.strip,
+            )
+            return exe_path
+
+    def compile_to_macos(self, source_path: str, output_path: str = None) -> str:
+        """编译为 macOS 可执行文件
+
+        强制指定目标平台为 macOS (darwin)，
+        使用 macOS 对应的目标三元组（如 x86_64-apple-macosx 或 arm64-apple-macosx）。
+
+        Args:
+            source_path: .duan 源文件路径
+            output_path: 输出可执行文件路径（默认与源文件同名）
+
+        Returns:
+            可执行文件路径
+        """
+        if self.verbose:
+            print(f"[LLVMCompiler] 目标: macOS ({self.detect_arch()})")
+
+        return self.compile(source_path, output_path, target="darwin")
+
+    def compile_to_linux(self, source_path: str, output_path: str = None) -> str:
+        """编译为 Linux 可执行文件
+
+        强制指定目标平台为 Linux，
+        使用 Linux 对应的目标三元组（如 x86_64-unknown-linux-gnu 或 aarch64-unknown-linux-gnu）。
+
+        Args:
+            source_path: .duan 源文件路径
+            output_path: 输出可执行文件路径（默认与源文件同名）
+
+        Returns:
+            可执行文件路径
+        """
+        if self.verbose:
+            print(f"[LLVMCompiler] 目标: Linux ({self.detect_arch()})")
+
+        return self.compile(source_path, output_path, target="linux")
+
+    def compile_to_windows(self, source_path: str, output_path: str = None) -> str:
+        """编译为 Windows 可执行文件
+
+        强制指定目标平台为 Windows，
+        使用 Windows 对应的目标三元组（如 x86_64-pc-windows-msvc）。
+
+        Args:
+            source_path: .duan 源文件路径
+            output_path: 输出可执行文件路径（默认与源文件同名）
+
+        Returns:
+            可执行文件路径
+        """
+        if self.verbose:
+            print(f"[LLVMCompiler] 目标: Windows ({self.detect_arch()})")
+
+        return self.compile(source_path, output_path, target="win32")
+
+
 if __name__ == '__main__':
     import argparse
     ap = argparse.ArgumentParser(description='段言 LLVM 编译器')
     ap.add_argument('source', help='.duan 源文件')
-    ap.add_argument('output', nargs='?', help='输出 .exe 路径')
+    ap.add_argument('output', nargs='?', help='输出可执行文件路径')
     ap.add_argument('-v', '--verbose', action='store_true', help='详细输出')
     ap.add_argument('--ir-only', action='store_true', help='仅生成 LLVM IR，不编译为 .exe')
     ap.add_argument('--optimize-size', action='store_true',
@@ -1147,6 +1363,9 @@ if __name__ == '__main__':
                     help='启用 LTO (Link Time Optimization)，进一步优化体积和性能')
     ap.add_argument('--strip', action='store_true',
                     help='剥离调试符号，减小最终二进制体积')
+    ap.add_argument('--target', choices=['auto', 'macos', 'linux', 'windows'],
+                    default='auto',
+                    help='目标平台（auto/macos/linux/windows，默认 auto 自动检测）')
     args = ap.parse_args()
 
     try:
@@ -1155,8 +1374,16 @@ if __name__ == '__main__':
             output_ll = (args.output or args.source).replace('.duan', '.ll')
             compile_source_to_ir(source, output_ll, verbose=True)
         else:
-            compile_duan(args.source, args.output, verbose=args.verbose or True,
-                         optimize_size=args.optimize_size, lto=args.lto, strip=args.strip)
+            compiler = LLVMCompiler(
+                verbose=args.verbose or True,
+                optimize_size=args.optimize_size,
+                lto=args.lto,
+                strip=args.strip,
+            )
+            if args.target == 'auto':
+                compiler.compile(args.source, args.output)
+            else:
+                compiler.compile(args.source, args.output, target=args.target)
     except Exception as e:
         print(f"编译错误: {e}", file=sys.stderr)
         sys.exit(1)

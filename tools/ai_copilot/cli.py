@@ -32,6 +32,11 @@
     duan ai fix hello.duan
     duan ai fix hello.duan --error "语法错误: 缺少冒号"
     duan ai fix hello.duan --apply
+
+    # Python↔段言双向翻译
+    duan ai translate --to-duan hello.py
+    duan ai translate --to-python hello.duan
+    duan ai translate --interactive
 """
 
 import argparse
@@ -541,6 +546,111 @@ def _rule_based_fix(content: str, errors: List[str], user_error: Optional[str]) 
 
 
 # ═══════════════════════════════════════════════════════════════════
+# Python ↔ 段言 双向翻译
+# ═══════════════════════════════════════════════════════════════════
+
+def cmd_translate(args):
+    """Python ↔ 段言 双向翻译"""
+    _ensure_utf8()
+
+    from translator import PythonToDuanTranslator, DuanToPythonTranslator
+
+    if args.to_duan:
+        # Python → 段言
+        file_path = args.to_duan
+        if not os.path.isfile(file_path):
+            print(f"文件不存在: {file_path}")
+            sys.exit(1)
+        try:
+            translator = PythonToDuanTranslator()
+            result = translator.translate_file(file_path)
+            if args.output:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    f.write(result)
+                print(f"翻译完成，输出到: {args.output}")
+            else:
+                print(result)
+        except SyntaxError as e:
+            print(f"Python 语法错误: {e}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"翻译错误: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    elif args.to_python:
+        # 段言 → Python
+        file_path = args.to_python
+        if not os.path.isfile(file_path):
+            print(f"文件不存在: {file_path}")
+            sys.exit(1)
+        try:
+            translator = DuanToPythonTranslator()
+            result = translator.translate_file(file_path)
+            if args.output:
+                with open(args.output, 'w', encoding='utf-8') as f:
+                    f.write(result)
+                print(f"翻译完成，输出到: {args.output}")
+            else:
+                print(result)
+        except ValueError as e:
+            print(f"段言语法错误: {e}", file=sys.stderr)
+            sys.exit(1)
+        except Exception as e:
+            print(f"翻译错误: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    elif args.interactive:
+        # 交互式翻译模式
+        print("=" * 50)
+        print("段言 ↔ Python 双向翻译 — 交互模式")
+        print("=" * 50)
+        print("输入 Python 代码翻译为段言，或输入段言代码翻译为 Python")
+        print("特殊命令: exit/quit — 退出, mode py — 切到 Python→段言模式")
+        print("         mode duan — 切到 段言→Python 模式")
+        print("=" * 50)
+
+        mode = "py_to_duan"  # 默认 Python→段言
+        py_translator = PythonToDuanTranslator()
+        duan_translator = DuanToPythonTranslator()
+
+        while True:
+            try:
+                user_input = input(f"\n[{ 'Python→段言' if mode == 'py_to_duan' else '段言→Python' }] > ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print("\n\n再见！")
+                break
+
+            if not user_input:
+                continue
+
+            if user_input.lower() in ('exit', 'quit'):
+                print("再见！")
+                break
+
+            if user_input.lower() == 'mode py':
+                mode = "py_to_duan"
+                print("切换到 Python→段言 模式")
+                continue
+
+            if user_input.lower() == 'mode duan':
+                mode = "duan_to_py"
+                print("切换到 段言→Python 模式")
+                continue
+
+            try:
+                if mode == "py_to_duan":
+                    result = py_translator.translate(user_input)
+                    print(f"\n→ 段言:\n{result}")
+                else:
+                    result = duan_translator.translate(user_input)
+                    print(f"\n→ Python:\n{result}")
+            except (SyntaxError, ValueError) as e:
+                print(f"  ✗ 翻译错误: {e}")
+            except Exception as e:
+                print(f"  ✗ 错误: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════════
 # 主入口
 # ═══════════════════════════════════════════════════════════════════
 
@@ -594,6 +704,19 @@ def main():
     p_fix.add_argument('--apply', '-a', action='store_true', help='直接应用修复到文件')
     p_fix.add_argument('--output', '-o', default=None, help='输出文件路径（默认覆盖原文件）')
     p_fix.set_defaults(func=cmd_fix_context)
+
+    # translate 子命令 (D25: Python↔段言双向翻译)
+    p_translate = subparsers.add_parser('translate', help='Python ↔ 段言 双向翻译')
+    translate_group = p_translate.add_mutually_exclusive_group()
+    translate_group.add_argument('--to-duan', metavar='FILE',
+                                 help='将 Python 文件翻译为段言')
+    translate_group.add_argument('--to-python', metavar='FILE',
+                                 help='将段言文件翻译为 Python')
+    translate_group.add_argument('--interactive', action='store_true',
+                                 help='交互式翻译模式')
+    p_translate.add_argument('--output', '-o', metavar='FILE',
+                             help='输出到文件（默认输出到终端）')
+    p_translate.set_defaults(func=cmd_translate)
 
     args = parser.parse_args()
     if not args.command:
