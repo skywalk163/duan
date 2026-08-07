@@ -1355,6 +1355,7 @@ def debug_set_breakpoints(session_id):
 # ==================== 20+ Demo 列表 & 自动运行 API ====================
 
 _EXAMPLES_ROOT = os.path.join(_project_dir, 'examples')
+_PLAYGROUND_DEMOS_ROOT = os.path.join(_script_dir, 'demos')
 
 
 def _scan_file_demos(root_dir: str, base_category: str = '示例库') -> list:
@@ -1414,6 +1415,8 @@ def _collect_all_demos() -> list:
             })
     # 2) examples/ 文件库
     demos.extend(_scan_file_demos(_EXAMPLES_ROOT, base_category='示例库/根'))
+    # 3) playground/demos/ 文件库
+    demos.extend(_scan_file_demos(_PLAYGROUND_DEMOS_ROOT, base_category='Playground 示例'))
     return demos
 
 
@@ -1551,6 +1554,110 @@ def get_demo(demo_id):
     return jsonify(info)
 
 
+# ==================== 代码格式化 & 静态分析 API ====================
+
+
+@app.route('/api/format', methods=['POST'])
+def format_code_api():
+    """格式化段言代码"""
+    data = request.get_json(silent=True) or {}
+    code = data.get('code', '').strip()
+
+    if not code:
+        return jsonify({'success': False, 'error': '代码不能为空'})
+
+    try:
+        from src.formatter import format_code as fmt
+        formatted = fmt(code)
+        return jsonify({'success': True, 'formatted': formatted})
+    except ImportError:
+        return jsonify({'success': False, 'error': '格式化模块不可用'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'格式化失败: {e}'})
+
+
+@app.route('/api/lint', methods=['POST'])
+def lint_code_api():
+    """静态分析段言代码"""
+    data = request.get_json(silent=True) or {}
+    code = data.get('code', '').strip()
+
+    if not code:
+        return jsonify({'success': False, 'error': '代码不能为空'})
+
+    try:
+        from src.linter.duan_linter import DuanLinter
+        linter = DuanLinter()
+        results = linter.lint(code)
+        return jsonify({
+            'success': True,
+            'issues': [
+                {
+                    'line': r.line,
+                    'column': r.column,
+                    'message': r.message,
+                    'severity': r.severity.value if hasattr(r, 'severity') else 'warning'
+                }
+                for r in results
+            ],
+            'issue_count': len(results)
+        })
+    except ImportError:
+        return jsonify({'success': False, 'error': '静态分析模块不可用'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'静态分析失败: {e}'})
+
+
+# ==================== 教程评估 API ====================
+
+
+@app.route('/api/evaluate', methods=['POST'])
+def evaluate_tutorial():
+    """评估教程答案：接收代码和期望输出，返回比对结果
+
+    请求体：
+      { "code": "段言代码", "expected": "期望输出" }
+
+    返回：
+      { "success": true,
+        "passed": true/false,
+        "output": "实际输出",
+        "expected": "期望输出",
+        "error": "错误信息（如果有）",
+        "execution_time": 12.34 }
+    """
+    data = request.get_json(silent=True) or {}
+    code = data.get('code', '').strip()
+    expected = data.get('expected', '').strip()
+
+    if not code:
+        return jsonify({'success': False, 'error': '代码不能为空'})
+
+    result = run_duan_code(code)
+
+    if not result.get('success'):
+        return jsonify({
+            'success': True,
+            'passed': False,
+            'output': '',
+            'expected': expected,
+            'error': result.get('error', '执行失败'),
+            'execution_time': result.get('execution_time', 0)
+        })
+
+    actual_output = (result.get('output') or '').strip()
+    passed = (actual_output == expected)
+
+    return jsonify({
+        'success': True,
+        'passed': passed,
+        'output': actual_output,
+        'expected': expected,
+        'error': None if passed else '输出不匹配',
+        'execution_time': result.get('execution_time', 0)
+    })
+
+
 if __name__ == '__main__':
     print(f"段言 Web Playground 启动中...")
     print(f"  静态文件目录: {app.static_folder}")
@@ -1559,5 +1666,6 @@ if __name__ == '__main__':
     print(f"  调试器: 已集成")
     n_demos = len(_collect_all_demos())
     print(f"  可用 Demo 数量: {n_demos}  (GET /api/demos)")
+    print(f"  教程评估: POST /api/evaluate")
     print()
     app.run(debug=True, host='0.0.0.0', port=5000)

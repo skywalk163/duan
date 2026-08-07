@@ -1,0 +1,280 @@
+# 段言（Duan）发布工作流
+#
+# 在推送 tag（如 v6.0.0）时触发：
+#   1. 运行全量测试
+#   2. 构建跨平台可执行文件（Windows .exe, Linux/macOS 二进制）
+#   3. 创建 GitHub Release 并上传构建产物
+#   4. 发布到 PyPI
+#   5. 部署文档站点
+#
+# 前置条件：
+#   - 需要在 GitHub 仓库设置 Actions secrets: PYPI_API_TOKEN
+#   - 仓库需要 GITHUB_TOKEN 权限（默认已配置）
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'           # 匹配 v6.0.0, v6.1.0 等语义化版本标签
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: '手动触发的发布标签（如 v6.0.0）'
+        required: true
+        default: 'v6.0.0'
+
+permissions:
+  contents: write       # 创建 Release 和上传产物需要
+  pages: write          # 部署文档页面需要
+  id-token: write       # OIDC 认证需要
+
+concurrency:
+  group: "release-${{ github.ref }}"
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. 运行全量测试 ──────────────────────────────────────
+  test:
+    name: 全量测试
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  # ── 2. 构建跨平台可执行文件 ────────────────────────────────
+  build-exe:
+    name: 构建可执行文件 (${{ matrix.os }})
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            exe-suffix: ".exe"
+            artifact-name: duan6-windows-x64
+          - os: ubuntu-latest
+            exe-suffix: ""
+            artifact-name: duan6-linux-x64
+          - os: macos-latest
+            exe-suffix: ""
+            artifact-name: duan6-macos-x64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装 PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: 构建可执行文件
+        run: |
+          python build_exe.py --name duan6
+
+      - name: 验证可执行文件 (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x dist/duan6${{ matrix.exe-suffix }}
+          file dist/duan6${{ matrix.exe-suffix }}
+          ./dist/duan6${{ matrix.exe-suffix }} --help
+          ./dist/duan6${{ matrix.exe-suffix }} --test
+
+      - name: 验证可执行文件 (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          python -c "
+          import subprocess
+          r = subprocess.run(['dist\\duan6.exe', '--help'], capture_output=True, text=True, encoding='gbk')
+          print('--help 返回码:', r.returncode)
+          r = subprocess.run(['dist\\duan6.exe', '--test'], capture_output=True, text=True, encoding='gbk')
+          print('--test 返回码:', r.returncode)
+          print('--test 输出:', r.stdout[:200])
+          "
+
+      - name: 上传可执行文件产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: dist/duan6${{ matrix.exe-suffix }}
+
+  # ── 3. 构建源码包和 wheel 包 ──────────────────────────────
+  build-package:
+    name: 构建源码包
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 构建包
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: 验证包元数据
+        run: |
+          python -m pip install twine
+          python -m twine check dist/*
+
+      - name: 上传包产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package
+          path: dist/
+
+  # ── 4. 创建 GitHub Release 并上传产物 ─────────────────────
+  create-release:
+    name: 创建 GitHub Release
+    needs: [build-exe, build-package]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: 生成版本号
+        id: version
+        run: |
+          # 从 refs/tags/v6.0.0 提取版本号
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: 生成发布说明
+        id: release-notes
+        run: |
+          # 从 CHANGELOG.md 中提取当前版本的变更内容
+          if [ -f CHANGELOG.md ]; then
+            # 尝试提取当前版本对应的变更日志
+            NOTES=$(python -c "
+import re
+with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
+    content = f.read()
+version = '${{ steps.version.outputs.version }}'
+# 匹配 ## [version] 到下一个 ## 之间的内容
+pattern = rf'## \[{re.escape(version)}\].*?(?=\n## |\Z)'
+match = re.search(pattern, content, re.DOTALL)
+if match:
+    print(match.group(0).strip())
+else:
+    print('请查看 CHANGELOG.md 获取详细变更。')
+")
+            EOF=$(dd if=/dev/urandom bs=1 count=8 2>/dev/null | od -An -tx1 | tr -d ' \n')
+            echo "notes<<$EOF" >> $GITHUB_OUTPUT
+            echo "$NOTES" >> $GITHUB_OUTPUT
+            echo "$EOF" >> $GITHUB_OUTPUT
+          else
+            echo "notes=发布版本 ${{ steps.version.outputs.version }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: 段言 v${{ steps.version.outputs.version }}
+          body: ${{ steps.release-notes.outputs.notes }}
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+          files: |
+            release-artifacts/duan6-windows-x64/duan6.exe
+            release-artifacts/duan6-linux-x64/duan6
+            release-artifacts/duan6-macos-x64/duan6
+            release-artifacts/python-package/*.whl
+            release-artifacts/python-package/*.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── 5. 发布到 PyPI ────────────────────────────────────────
+  publish-pypi:
+    name: 发布到 PyPI
+    needs: [build-package, create-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/duan4/
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package
+          path: dist
+
+      - name: 发布到 PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/
+          verbose: true
+
+  # ── 6. 部署文档站点 ────────────────────────────────────────
+  deploy-docs:
+    name: 部署文档站点
+    needs: [test, create-release]
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装 mkdocs 及依赖
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mkdocs mkdocs-material
+          python -m pip install mkdocs-git-revision-date-localized-plugin
+          python -m pip install pymdown-extensions
+
+      - name: 生成 API 参考文档
+        run: |
+          if [ -f docs/gen_api_docs.py ]; then
+            python docs/gen_api_docs.py
+          fi
+          if [ -f playground/api_docs_generator.py ]; then
+            python playground/api_docs_generator.py --output docs/api || true
+          fi
+
+      - name: 构建文档站点
+        run: |
+          mkdocs build --site-dir site
+
+      - name: 复制 docs-site 静态资源
+        run: |
+          if [ -d "docs-site" ]; then
+            cp -r docs-site/* site/ 2>/dev/null || true
+          fi
+
+      - name: 上传构建产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'site'
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

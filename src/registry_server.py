@@ -31,7 +31,7 @@ from pathlib import Path
 from datetime import datetime
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 
 # =============================================================================
@@ -176,20 +176,58 @@ class PackageStorage:
         with open(pkg_file, 'rb') as f:
             return f.read()
 
-    def search_packages(self, query: str) -> List[Dict]:
-        """搜索包"""
+    def search_packages(self, query: str, sort_by: str = 'downloads',
+                         order: str = 'desc', page: int = 1, page_size: int = 20,
+                         author: str = '', keyword: str = '') -> Tuple[List[Dict], int]:
+        """搜索包，支持排序、分页、过滤"""
         results = []
-        q = query.lower()
+        q = query.lower().strip() if query else ''
+
         for name, info in self.index['packages'].items():
-            if q in name.lower() or q in info.get('description', '').lower():
-                results.append({
-                    'name': name,
-                    'latest_version': info.get('latest_version', '0.0.0'),
-                    'description': info.get('description', ''),
-                    'author': info.get('author', ''),
-                    'downloads': info.get('downloads', 0),
-                })
-        return results
+            # 全文搜索
+            if q:
+                search_text = f"{name} {info.get('description', '')} {info.get('author', '')} {' '.join(info.get('keywords', []))}".lower()
+                if q not in search_text:
+                    continue
+
+            # 作者过滤
+            if author and author.lower() not in info.get('author', '').lower():
+                continue
+
+            # 关键字过滤
+            if keyword:
+                pkg_keywords = [kw.lower() for kw in info.get('keywords', [])]
+                if keyword.lower() not in pkg_keywords:
+                    continue
+
+            results.append({
+                'name': name,
+                'latest_version': info.get('latest_version', '0.0.0'),
+                'description': info.get('description', ''),
+                'author': info.get('author', ''),
+                'downloads': info.get('downloads', 0),
+                'updated': info.get('updated', ''),
+                'keywords': info.get('keywords', []),
+                'deprecated': info.get('deprecated', False),
+            })
+
+        # 排序
+        reverse = order.lower() != 'asc'
+        if sort_by == 'name':
+            results.sort(key=lambda x: x['name'], reverse=reverse)
+        elif sort_by == 'updated':
+            results.sort(key=lambda x: x.get('updated', ''), reverse=reverse)
+        elif sort_by == 'downloads':
+            results.sort(key=lambda x: x.get('downloads', 0), reverse=reverse)
+        else:
+            results.sort(key=lambda x: x.get('downloads', 0), reverse=True)
+
+        # 分页
+        total = len(results)
+        start = (page - 1) * page_size
+        end = start + page_size
+
+        return results[start:end], total
 
     def get_stats(self) -> Dict:
         """获取统计信息"""
@@ -198,6 +236,150 @@ class PackageStorage:
             f.stat().st_size for f in self.packages_dir.rglob('*.zip')
         )
         return stats
+
+    # ------------------------------------------------------------------
+    # 增强功能：元数据管理、版本管理、弃用标记等
+    # ------------------------------------------------------------------
+
+    def list_versions(self, name: str) -> List[Dict]:
+        """列出包的所有版本"""
+        info = self.index['packages'].get(name)
+        if not info:
+            return []
+        versions = []
+        for ver, ver_info in info.get('versions', {}).items():
+            versions.append({
+                'version': ver,
+                'published': ver_info.get('published', ''),
+                'size': ver_info.get('size', 0),
+                'sha256': ver_info.get('sha256', ''),
+                'dependencies': ver_info.get('dependencies', {}),
+            })
+        versions.sort(key=lambda x: x['version'], reverse=True)
+        return versions
+
+    def delete_version(self, name: str, version: str) -> bool:
+        """删除特定版本"""
+        import shutil
+        info = self.index['packages'].get(name)
+        if not info:
+            return False
+        versions = info.get('versions', {})
+        if version not in versions:
+            return False
+
+        # 删除包文件
+        pkg_file = self.packages_dir / name / f'{version}.zip'
+        if pkg_file.exists():
+            pkg_file.unlink()
+
+        # 从索引中删除
+        del versions[version]
+        info['versions'] = versions
+        self.index['stats']['total_versions'] = max(0, self.index['stats']['total_versions'] - 1)
+
+        # 如果还有版本，更新 latest_version
+        if versions:
+            sorted_versions = sorted(versions.keys(), reverse=True)
+            info['latest_version'] = sorted_versions[0]
+        else:
+            # 没有版本了，删除包
+            del self.index['packages'][name]
+            self.index['stats']['total_packages'] = max(0, self.index['stats']['total_packages'] - 1)
+            pkg_dir = self.packages_dir / name
+            if pkg_dir.exists():
+                shutil.rmtree(pkg_dir)
+
+        self._save_index()
+        return True
+
+    def update_metadata(self, name: str, metadata: Dict) -> bool:
+        """更新包元数据"""
+        info = self.index['packages'].get(name)
+        if not info:
+            return False
+        if 'description' in metadata:
+            info['description'] = metadata['description']
+        if 'author' in metadata:
+            info['author'] = metadata['author']
+        if 'license' in metadata:
+            info['license'] = metadata['license']
+        if 'keywords' in metadata:
+            info['keywords'] = metadata['keywords']
+        info['updated'] = str(datetime.now())
+        self._save_index()
+        return True
+
+    def add_maintainer(self, name: str, maintainer: str, role: str = 'maintainer') -> bool:
+        """添加维护者"""
+        info = self.index['packages'].get(name)
+        if not info:
+            return False
+        maintainers = info.setdefault('maintainers', [])
+        if maintainer not in maintainers:
+            maintainers.append(maintainer)
+        self._save_index()
+        return True
+
+    def remove_maintainer(self, name: str, maintainer: str) -> bool:
+        """移除维护者"""
+        info = self.index['packages'].get(name)
+        if not info:
+            return False
+        maintainers = info.get('maintainers', [])
+        if maintainer in maintainers:
+            maintainers.remove(maintainer)
+        self._save_index()
+        return True
+
+    def deprecate(self, name: str, message: str = '') -> bool:
+        """标记包为已弃用"""
+        info = self.index['packages'].get(name)
+        if not info:
+            return False
+        info['deprecated'] = True
+        info['deprecation_message'] = message
+        info['updated'] = str(datetime.now())
+        self._save_index()
+        return True
+
+    def undeprecate(self, name: str) -> bool:
+        """取消弃用标记"""
+        info = self.index['packages'].get(name)
+        if not info:
+            return False
+        info['deprecated'] = False
+        info['deprecation_message'] = ''
+        info['updated'] = str(datetime.now())
+        self._save_index()
+        return True
+
+    def get_dependency_graph(self, name: str) -> Dict:
+        """获取依赖关系图"""
+        graph = {'name': name, 'dependencies': {}}
+        visited = set()
+
+        def _resolve(pkg_name: str, depth: int = 0):
+            if pkg_name in visited or depth > 10:
+                return {}
+            visited.add(pkg_name)
+            info = self.index['packages'].get(pkg_name)
+            if not info:
+                return {}
+            result = {}
+            latest = info.get('latest_version', '0.0.0')
+            ver_info = info.get('versions', {}).get(latest, {})
+            deps = ver_info.get('dependencies', {})
+            for dep_name, dep_version in deps.items():
+                result[dep_name] = {
+                    'version_constraint': dep_version,
+                    'resolved_version': self.index['packages'].get(dep_name, {}).get('latest_version', 'unknown'),
+                    'dependencies': _resolve(dep_name, depth + 1),
+                }
+            return result
+
+        graph['dependencies'] = _resolve(name)
+        return graph
 
 
 # =============================================================================
@@ -208,6 +390,7 @@ class RegistryHandler(BaseHTTPRequestHandler):
     """注册表 HTTP 处理器"""
 
     storage: PackageStorage = None  # 由外部设置
+    admin_token: str = ''           # 管理员令牌（可选）
 
     def log_message(self, format, *args):
         """自定义日志"""
@@ -234,23 +417,30 @@ class RegistryHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def do_OPTIONS(self):
-        """处理 CORS 预检请求"""
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-
-    def do_GET(self):
-        """处理 GET 请求"""
+    def _parse_path_parts(self) -> tuple:
+        """解析路径为结构化部分"""
         parsed = urlparse(self.path)
         path = parsed.path.rstrip('/')
         params = parse_qs(parsed.query)
+        parts = [p for p in path.split('/') if p]
+        return path, parts, params
 
+    def do_GET(self):
+        """处理 GET 请求"""
         try:
-            # GET /api/packages
-            if path == '/api/packages':
+            path, parts, params = self._parse_path_parts()
+
+            # GET /api/health - 健康检查
+            if path == '/api/health':
+                self._send_json({
+                    'status': 'ok',
+                    'timestamp': str(datetime.now()),
+                    'version': '1.0.0',
+                    'registry': '段言包注册表',
+                })
+
+            # GET /api/packages - 列出所有包
+            elif path == '/api/packages':
                 pkgs = self.storage.list_packages()
                 self._send_json({
                     'packages': pkgs,
@@ -259,14 +449,28 @@ class RegistryHandler(BaseHTTPRequestHandler):
                     'version': '1.0.0',
                 })
 
-            # GET /api/search?q=<query>
+            # GET /api/search?q=<query> - 搜索包（增强版）
             elif path == '/api/search':
                 query = params.get('q', [''])[0]
-                results = self.storage.search_packages(query)
+                sort_by = params.get('sort', ['downloads'])[0]
+                order = params.get('order', ['desc'])[0]
+                page = int(params.get('page', ['1'])[0])
+                page_size = int(params.get('page_size', ['20'])[0])
+                author = params.get('author', [''])[0]
+                keyword = params.get('keyword', [''])[0]
+
+                results, total = self.storage.search_packages(
+                    query, sort_by=sort_by, order=order,
+                    page=page, page_size=page_size,
+                    author=author, keyword=keyword,
+                )
                 self._send_json({
                     'results': results,
                     'query': query,
-                    'total': len(results),
+                    'total': total,
+                    'page': page,
+                    'page_size': page_size,
+                    'total_pages': (total + page_size - 1) // page_size if page_size > 0 else 0,
                 })
 
             # GET /api/stats
@@ -274,41 +478,60 @@ class RegistryHandler(BaseHTTPRequestHandler):
                 stats = self.storage.get_stats()
                 self._send_json(stats)
 
+            # GET /api/packages/<name>/download/<version>
+            elif len(parts) >= 5 and parts[3] == 'download' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                version = parts[4]
+                data = self.storage.download_package(pkg_name, version)
+                if data:
+                    self._send_binary(data, f'{pkg_name}-{version}.zip')
+                else:
+                    self._send_error(f'包 {pkg_name} v{version} 未找到', 404)
+
             # GET /api/packages/<name>/download
-            elif path.endswith('/download'):
-                pkg_name = path.split('/')[3] if len(path.split('/')) > 3 else ''
+            elif len(parts) >= 4 and parts[3] == 'download' and parts[1] == 'packages':
+                pkg_name = parts[2]
                 version = params.get('version', [None])[0]
                 data = self.storage.download_package(pkg_name, version)
                 if data:
                     self._send_binary(data, f'{pkg_name}.zip')
                 else:
-                    self._send_error(f'Package not found: {pkg_name}', 404)
+                    self._send_error(f'包 {pkg_name} 未找到', 404)
+
+            # GET /api/packages/<name>/versions
+            elif len(parts) >= 4 and parts[3] == 'versions' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                versions = self.storage.list_versions(pkg_name)
+                self._send_json({
+                    'name': pkg_name,
+                    'versions': versions,
+                    'total': len(versions),
+                })
+
+            # GET /api/packages/<name>/dependencies
+            elif len(parts) >= 4 and parts[3] == 'dependencies' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                graph = self.storage.get_dependency_graph(pkg_name)
+                self._send_json(graph)
 
             # GET /api/packages/<name>/<version>
-            elif len(path.split('/')) == 4 and path.split('/')[3] != 'download':
-                parts = path.split('/')
-                pkg_name = parts[3]
-                try:
-                    # 检查是否是版本号
-                    version = parts[4] if len(parts) > 4 else None
-                except IndexError:
-                    version = params.get('version', [None])[0]
-
+            elif len(parts) >= 4 and parts[1] == 'packages':
+                pkg_name = parts[2]
+                version = parts[3]
                 pkg = self.storage.get_package(pkg_name, version)
                 if pkg:
                     self._send_json(pkg)
                 else:
-                    self._send_error(f'Package not found: {pkg_name}', 404)
+                    self._send_error(f'包 {pkg_name} v{version} 未找到', 404)
 
             # GET /api/packages/<name>
-            elif len(path.split('/')) == 3:
-                pkg_name = path.split('/')[2]
-                version = params.get('version', [None])[0]
-                pkg = self.storage.get_package(pkg_name, version)
+            elif len(parts) == 3 and parts[1] == 'packages':
+                pkg_name = parts[2]
+                pkg = self.storage.get_package(pkg_name)
                 if pkg:
                     self._send_json(pkg)
                 else:
-                    self._send_error(f'Package not found: {pkg_name}', 404)
+                    self._send_error(f'包 {pkg_name} 未找到', 404)
 
             # 根路径
             elif path == '' or path == '/':
@@ -316,12 +539,22 @@ class RegistryHandler(BaseHTTPRequestHandler):
                     'name': '段言包注册表',
                     'version': '1.0.0',
                     'endpoints': [
+                        'GET  /api/health',
                         'GET  /api/packages',
-                        'GET  /api/packages/<name>',
-                        'GET  /api/packages/<name>/<version>',
-                        'GET  /api/packages/<name>/download',
+                        'GET  /api/packages/{name}',
+                        'GET  /api/packages/{name}/{version}',
                         'POST /api/packages/publish',
-                        'GET  /api/search?q=<query>',
+                        'GET  /api/packages/{name}/download',
+                        'GET  /api/packages/{name}/download/{version}',
+                        'GET  /api/search?q={query}',
+                        'GET  /api/packages/{name}/versions',
+                        'GET  /api/packages/{name}/dependencies',
+                        'DELETE /api/packages/{name}/{version}',
+                        'PUT  /api/packages/{name}/metadata',
+                        'POST /api/packages/{name}/maintainers',
+                        'DELETE /api/packages/{name}/maintainers/{user}',
+                        'POST /api/packages/{name}/deprecate',
+                        'POST /api/packages/{name}/undeprecate',
                         'GET  /api/stats',
                     ],
                 })
@@ -334,48 +567,149 @@ class RegistryHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         """处理 POST 请求"""
-        parsed = urlparse(self.path)
-        path = parsed.path.rstrip('/')
+        try:
+            path, parts, params = self._parse_path_parts()
 
-        # POST /api/packages/publish
-        if path == '/api/packages/publish':
-            content_length = int(self.headers.get('Content-Length', 0))
-            content_type = self.headers.get('Content-Type', '')
+            # POST /api/packages/publish - 发布包
+            if path == '/api/packages/publish':
+                content_length = int(self.headers.get('Content-Length', 0))
+                content_type = self.headers.get('Content-Type', '')
 
-            if 'multipart/form-data' in content_type:
-                # 处理文件上传
-                self._send_error('multipart upload not yet supported', 400)
-                return
-
-            body = self.rfile.read(content_length)
-            try:
-                data = json.loads(body)
-                pkg_name = data.get('name')
-                version = data.get('version')
-                metadata = data.get('metadata', {})
-
-                if not pkg_name or not version:
-                    self._send_error('Missing required fields: name, version', 400)
+                if 'multipart/form-data' in content_type:
+                    self._send_error('multipart upload not yet supported', 400)
                     return
 
-                # 从 payload 或外部文件获取包内容
-                pkg_content = data.get('content')
-                if pkg_content:
-                    import base64
-                    pkg_data = base64.b64decode(pkg_content)
+                body = self.rfile.read(content_length)
+                try:
+                    data = json.loads(body)
+                    pkg_name = data.get('name')
+                    version = data.get('version')
+                    metadata = data.get('metadata', {})
+
+                    if not pkg_name or not version:
+                        self._send_error('Missing required fields: name, version', 400)
+                        return
+
+                    pkg_content = data.get('content')
+                    if pkg_content:
+                        import base64
+                        pkg_data = base64.b64decode(pkg_content)
+                    else:
+                        pkg_data = self._create_minimal_package(pkg_name, version, metadata)
+
+                    result = self.storage.publish_package(pkg_data, pkg_name, version, metadata)
+                    self._send_json(result, 201)
+
+                except json.JSONDecodeError:
+                    self._send_error('Invalid JSON', 400)
+                except Exception as e:
+                    self._send_error(f'Publish failed: {str(e)}', 500)
+
+            # POST /api/packages/<name>/maintainers - 添加维护者
+            elif len(parts) >= 5 and parts[3] == 'maintainers' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+                try:
+                    data = json.loads(body)
+                    maintainer = data.get('maintainer', '')
+                    role = data.get('role', 'maintainer')
+                    if not maintainer:
+                        self._send_error('Missing maintainer field', 400)
+                        return
+                    if self.storage.add_maintainer(pkg_name, maintainer, role):
+                        self._send_json({'status': 'ok', 'maintainer': maintainer, 'role': role})
+                    else:
+                        self._send_error(f'包 {pkg_name} 未找到', 404)
+                except json.JSONDecodeError:
+                    self._send_error('Invalid JSON', 400)
+
+            # POST /api/packages/<name>/deprecate - 标记弃用
+            elif len(parts) >= 4 and parts[3] == 'deprecate' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+                try:
+                    data = json.loads(body) if body.strip() else {}
+                    message = data.get('message', '')
+                    if self.storage.deprecate(pkg_name, message):
+                        self._send_json({'status': 'deprecated', 'name': pkg_name, 'message': message})
+                    else:
+                        self._send_error(f'包 {pkg_name} 未找到', 404)
+                except json.JSONDecodeError:
+                    self._send_error('Invalid JSON', 400)
+
+            # POST /api/packages/<name>/undeprecate - 取消弃用
+            elif len(parts) >= 4 and parts[3] == 'undeprecate' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                if self.storage.undeprecate(pkg_name):
+                    self._send_json({'status': 'undeprecated', 'name': pkg_name})
                 else:
-                    # 创建最小包内容
-                    pkg_data = self._create_minimal_package(pkg_name, version, metadata)
+                    self._send_error(f'包 {pkg_name} 未找到', 404)
 
-                result = self.storage.publish_package(pkg_data, pkg_name, version, metadata)
-                self._send_json(result, 201)
+            else:
+                self._send_error('Not Found', 404)
 
-            except json.JSONDecodeError:
-                self._send_error('Invalid JSON', 400)
-            except Exception as e:
-                self._send_error(f'Publish failed: {str(e)}', 500)
-        else:
-            self._send_error('Not Found', 404)
+        except Exception as e:
+            self._send_error(f'Internal error: {str(e)}', 500)
+
+    def do_PUT(self):
+        """处理 PUT 请求"""
+        try:
+            path, parts, params = self._parse_path_parts()
+
+            # PUT /api/packages/<name>/metadata - 更新元数据
+            if len(parts) >= 4 and parts[3] == 'metadata' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                body = self.rfile.read(int(self.headers.get('Content-Length', 0)))
+                try:
+                    metadata = json.loads(body)
+                    if self.storage.update_metadata(pkg_name, metadata):
+                        self._send_json({'status': 'updated', 'name': pkg_name})
+                    else:
+                        self._send_error(f'包 {pkg_name} 未找到', 404)
+                except json.JSONDecodeError:
+                    self._send_error('Invalid JSON', 400)
+            else:
+                self._send_error('Not Found', 404)
+
+        except Exception as e:
+            self._send_error(f'Internal error: {str(e)}', 500)
+
+    def do_DELETE(self):
+        """处理 DELETE 请求"""
+        try:
+            path, parts, params = self._parse_path_parts()
+
+            # DELETE /api/packages/<name>/<version> - 删除版本
+            if len(parts) >= 4 and parts[1] == 'packages':
+                pkg_name = parts[2]
+                version = parts[3]
+                if self.storage.delete_version(pkg_name, version):
+                    self._send_json({'status': 'deleted', 'name': pkg_name, 'version': version})
+                else:
+                    self._send_error(f'版本 {pkg_name} v{version} 未找到', 404)
+
+            # DELETE /api/packages/<name>/maintainers/<user> - 移除维护者
+            elif len(parts) >= 5 and parts[3] == 'maintainers' and parts[1] == 'packages':
+                pkg_name = parts[2]
+                maintainer = parts[4]
+                if self.storage.remove_maintainer(pkg_name, maintainer):
+                    self._send_json({'status': 'removed', 'maintainer': maintainer})
+                else:
+                    self._send_error(f'包 {pkg_name} 未找到', 404)
+
+            else:
+                self._send_error('Not Found', 404)
+
+        except Exception as e:
+            self._send_error(f'Internal error: {str(e)}', 500)
+
+    def do_OPTIONS(self):
+        """处理 CORS 预检请求"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        self.end_headers()
 
     def _create_minimal_package(self, name: str, version: str, metadata: Dict) -> bytes:
         """创建最小包 zip 文件"""
@@ -406,20 +740,27 @@ def main():
     parser.add_argument('--port', type=int, default=8080, help='服务器端口（默认 8080）')
     parser.add_argument('--dir', type=str, default='./registry_data', help='存储目录（默认 ./registry_data）')
     parser.add_argument('--host', type=str, default='0.0.0.0', help='绑定地址（默认 0.0.0.0）')
+    parser.add_argument('--admin-token', type=str, default='', help='管理员令牌（可选）')
     args = parser.parse_args()
 
     # 初始化存储
     storage = PackageStorage(args.dir)
     RegistryHandler.storage = storage
+    RegistryHandler.admin_token = args.admin_token
 
     # 启动服务器
     server = HTTPServer((args.host, args.port), RegistryHandler)
-    print(f'段言包注册表服务器已启动')
-    print(f'  地址: http://{args.host}:{args.port}')
-    print(f'  存储: {args.dir}')
-    print(f'  包数: {storage.index["stats"]["total_packages"]}')
-    print(f'  按 Ctrl+C 停止服务器')
-    print()
+    print(f'╔══════════════════════════════════════════╗')
+    print(f'║     段言包注册表服务器已启动             ║')
+    print(f'╠══════════════════════════════════════════╣')
+    print(f'║  地址: http://{args.host}:{args.port}')
+    print(f'║  存储: {os.path.abspath(args.dir)}')
+    print(f'║  包数: {storage.index["stats"]["total_packages"]}')
+    print(f'║  健康检查: http://{args.host}:{args.port}/api/health')
+    if args.admin_token:
+        print(f'║  管理员模式: 已启用')
+    print(f'║  按 Ctrl+C 停止服务器')
+    print(f'╚══════════════════════════════════════════╝')
 
     try:
         server.serve_forever()

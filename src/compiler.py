@@ -10,6 +10,7 @@
 from typing import List, Optional, Dict, Any, Tuple
 from pathlib import Path
 import os
+import traceback
 
 from lexer import Lexer, LexerError
 from tokens import Token, TokenType
@@ -22,6 +23,15 @@ from optimizer import (
     ConstantFoldingOptimizer,
     LoopInvariantOptimizer,
 )
+from errors import DuanError, DuanErrorFormatter, format_source_context, format_error_with_context
+
+# 导入编译缓存系统
+try:
+    from compiler_cache import CompilationCache
+    _HAS_CACHE = True
+except ImportError:
+    _HAS_CACHE = False
+    CompilationCache = None
 
 OPTIMIZERS = [
     DeadCodeEliminationOptimizer,
@@ -31,6 +41,15 @@ OPTIMIZERS = [
 
 
 _compile_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_compilation_cache_instance = None
+
+
+def _get_cache() -> Optional[Any]:
+    """获取或创建全局编译缓存实例"""
+    global _compilation_cache_instance
+    if _compilation_cache_instance is None and _HAS_CACHE:
+        _compilation_cache_instance = CompilationCache()
+    return _compilation_cache_instance
 
 
 # =============================================================================
@@ -673,6 +692,8 @@ class DuanCompiler:
         self.project_root: Optional[Path] = Path(project_root) if project_root else None
         # 跨模块符号缓存：module_name -> { symbol_name: symbol_info }
         self.global_module_symbols: Dict[str, Dict[str, Any]] = {}
+        # 标准库模块解析器（延迟初始化）
+        self._stdlib_resolver = None
 
     # ------------------------------------------------------------------
     # 版本信息
@@ -680,6 +701,44 @@ class DuanCompiler:
     def version(self) -> str:
         """返回段言编译器版本号"""
         return self.VERSION
+
+    # ------------------------------------------------------------------
+    # 标准库预加载
+    # ------------------------------------------------------------------
+    def preload_stdlib(self):
+        """预加载标准库模块，确保内置函数在编译时可用"""
+        try:
+            from module_resolver import ModuleResolver
+            resolver = ModuleResolver(auto_load_stdlib=True)
+            resolver.preload_builtins()
+            self._stdlib_resolver = resolver
+            # 记录标准库模块名
+            stdlib_names = resolver.get_stdlib_module_names()
+            if stdlib_names:
+                self.warnings.append(f"已加载 {len(stdlib_names)} 个标准库模块")
+        except Exception as e:
+            self.warnings.append(f"标准库预加载失败: {e}")
+
+    def _inject_stdlib_symbols(self, inferencer: Any) -> None:
+        """将标准库符号注入到类型推断器的符号表中"""
+        if self._stdlib_resolver is None:
+            return
+        if not hasattr(inferencer, "symbol_table"):
+            return
+        sym_table = inferencer.symbol_table
+        if sym_table is None or not hasattr(sym_table, "define"):
+            return
+        
+        # 注入内置函数符号
+        stdlib_names = self._stdlib_resolver.get_stdlib_module_names()
+        for name in stdlib_names:
+            if name == 'builtins':
+                continue
+            try:
+                type_val = getattr(inferencer, "type_unknown", None)
+                sym_table.define(str(name), "module", type_val)
+            except Exception:
+                pass
 
     # ------------------------------------------------------------------
     # 核心入口
@@ -739,6 +798,9 @@ class DuanCompiler:
         root = self.project_root
         if root is None:
             root = Path(os.getcwd())
+
+        # 预加载标准库
+        self.preload_stdlib()
 
         # 1) 加载配置
         try:
@@ -860,6 +922,8 @@ class DuanCompiler:
                 # 类型推断：让 inferencer 拥有当前模块及其导入模块符号
                 from type_inferencer import TypeInferencer  # type: ignore
                 mod_inferencer = TypeInferencer()
+                # 注入标准库符号
+                self._inject_stdlib_symbols(mod_inferencer)
                 # 合并已编译模块的符号到当前类型推断器
                 self._merge_module_symbols(mod_inferencer, modules, mod_name)
                 mod_inferencer.infer(our_ast_mod)
@@ -910,7 +974,13 @@ class DuanCompiler:
         try:
             return self._lexer.tokenize(source)
         except LexerError as e:
+            # 提取行号/列号信息并添加上下文
+            line = getattr(e, 'line', 0)
+            col = getattr(e, 'col', 0)
+            context = format_source_context(source, line, col) if source else ""
             self.errors.append(f"词法错误: {e}")
+            if context:
+                self.errors.append(context)
             raise
 
     def parse_raw(self, source: str):
@@ -918,7 +988,13 @@ class DuanCompiler:
         try:
             return self._parser.parse(source)
         except ParseError as e:
+            # 提取行号/列号信息
+            line = getattr(e, 'line', 0)
+            col = getattr(e, 'column', 0) or getattr(e, 'col', 0)
+            context = format_source_context(source, line, col) if source else ""
             self.errors.append(f"语法错误: {e}")
+            if context:
+                self.errors.append(context)
             raise
         except Exception as e:
             self.errors.append(f"解析错误: {e}")
@@ -945,7 +1021,17 @@ class DuanCompiler:
 
         # 聚合类型推断错误（字符串列表，保持向后兼容）
         if hasattr(self._inferencer, 'errors'):
-            self.errors.extend(self._inferencer.errors)
+            for err in self._inferencer.errors:
+                # 尝试提取行号信息
+                err_str = str(err)
+                err_line = self._extract_line_from_error(err)
+                if source and err_line:
+                    context = format_source_context(source, err_line)
+                    self.errors.append(f"[类型推断] {err_str}")
+                    if context:
+                        self.errors.append(context)
+                else:
+                    self.errors.append(f"[类型推断] {err_str}")
         # 也保存结构化错误（携带位置信息）
         if hasattr(self._inferencer, 'get_typed_errors'):
             self._typed_errors = self._inferencer.get_typed_errors()
@@ -1050,6 +1136,57 @@ class DuanCompiler:
                     pass
 
     # ------------------------------------------------------------------
+    # 错误定位辅助
+    # ------------------------------------------------------------------
+    def _extract_line_from_error(self, error: Any) -> int:
+        """从错误对象中提取行号
+        
+        Args:
+            error: 错误对象（可以是异常或字符串）
+            
+        Returns:
+            行号，如果无法提取则返回 0
+        """
+        # 检查对象属性
+        if hasattr(error, 'line'):
+            line = getattr(error, 'line', 0)
+            if line:
+                return line
+        if hasattr(error, 'lineno'):
+            line = getattr(error, 'lineno', 0)
+            if line:
+                return line
+        
+        # 从字符串中匹配
+        import re
+        err_str = str(error)
+        match = re.search(r'[行\s](\d+)', err_str)
+        if match:
+            return int(match.group(1))
+        match = re.search(r'line\s*(\d+)', err_str, re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+        
+        return 0
+
+    def _format_error_with_context(self, error: Exception, source: str,
+                                    line: int = 0, col: int = 0) -> str:
+        """格式化错误并附带源代码上下文
+        
+        Args:
+            error: 异常对象
+            source: 源代码
+            line: 行号
+            col: 列号
+            
+        Returns:
+            格式化的错误信息
+        """
+        if isinstance(error, DuanError):
+            return format_error_with_context(error, source, line or error.line, col or error.col)
+        return format_error_with_context(error, source, line, col)
+
+    # ------------------------------------------------------------------
     # 便捷方法
     # ------------------------------------------------------------------
     @property
@@ -1106,10 +1243,20 @@ def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
     abs_path = os.path.abspath(file_path)
     mtime = os.path.getmtime(abs_path)
 
+    # 旧缓存系统（向后兼容，保持对象引用一致性）
     if use_cache and abs_path in _compile_cache:
         cached_mtime, cached_result = _compile_cache[abs_path]
         if cached_mtime == mtime:
             return cached_result
+
+    # 新缓存系统（CompilationCache）
+    if use_cache and _HAS_CACHE:
+        cache = _get_cache()
+        if cache and cache.is_fresh(abs_path):
+            cached_result = cache.get_cached(abs_path)
+            if cached_result is not None:
+                import json
+                return json.loads(cached_result) if isinstance(cached_result, str) else {}
 
     with open(abs_path, 'r', encoding='utf-8') as f:
         source = f.read()
@@ -1119,6 +1266,12 @@ def compile_file(file_path: str, use_cache: bool = True) -> Dict[str, Any]:
 
     if use_cache:
         _compile_cache[abs_path] = (mtime, result)
+        # 也写入新缓存系统
+        if _HAS_CACHE:
+            cache = _get_cache()
+            if cache:
+                import json
+                cache.set_cached(abs_path, json.dumps(result, ensure_ascii=False, default=str))
 
     return result
 

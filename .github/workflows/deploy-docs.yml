@@ -1,0 +1,70 @@
+# 段言文档站点 - GitHub Pages 部署工作流
+#
+# 功能：
+#   1. 在 push 到 main 或 4.0dev 分支且 docs/ 或 mkdocs.yml 有变更时触发
+#   2. 安装 mkdocs 和 Material 主题
+#   3. 自动生成 API 参考文档
+#   4. 构建静态文档站点并部署到 GitHub Pages
+#
+# 前置条件：
+#   - 在 GitHub 仓库 Settings > Pages > Source 中选择 "GitHub Actions"
+#   - 仓库需要 GITHUB_TOKEN 权限（默认已配置）
+
+name: Deploy Docs to GitHub Pages
+
+on:
+  push:
+    branches: [main, 4.0dev]
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
+      - '.github/workflows/deploy-docs.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装 mkdocs 及依赖
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install mkdocs mkdocs-material
+          python -m pip install mkdocs-git-revision-date-localized-plugin
+          python -m pip install pymdown-extensions
+
+      - name: 生成 API 参考文档
+        run: |
+          python docs/gen_api_docs.py
+
+      - name: 构建站点
+        run: |
+          mkdocs build --site-dir site
+
+      - name: 上传构建产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'site'
+
+      - name: 部署到 GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,32 +1,28 @@
-site_name: 段言 (Duan) 文档
-site_description: 段言 - 中文自然语言编程语言
-site_author: Duan Contributors
-site_url: https://skywalk163.github.io/duan
-
-repo_name: skywalk163/duan
-repo_url: https://github.com/skywalk163/duan
+site_name: 段言 (DuanLang) v6.0
+site_description: 段言编程语言 - 中文编程语言的全新可能
+site_author: DuanLang Team
+repo_url: https://github.com/duan-lang/duan
+repo_name: duan-lang/duan
 edit_uri: edit/main/docs/
 
 theme:
   name: material
   language: zh
-  palette:
-    primary: indigo
-    accent: indigo
-  font:
-    text: 思源黑体
-    code: 思源黑体
   features:
     - navigation.instant
     - navigation.tracking
     - navigation.tabs
     - navigation.sections
+    - navigation.expand
     - navigation.top
     - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy
-    - content.code.annotate
+  palette:
+    - scheme: slate
+      primary: teal
+      accent: green
   icon:
     repo: fontawesome/brands/github
 
@@ -35,7 +31,6 @@ plugins:
       lang: zh
   - git-revision-date-localized:
       enable_creation_date: true
-  - awesome-pages
 
 markdown_extensions:
   - pymdownx.highlight:
@@ -50,9 +45,6 @@ markdown_extensions:
       alternate_style: true
   - pymdownx.tasklist:
       custom_checkbox: true
-  - pymdownx.emoji:
-      emoji_index: !!python/name:material.extensions.emoji.twemoji
-      emoji_generator: !!python:name:material.extensions.emoji.to_svg
   - admonition
   - attr_list
   - md_in_html
@@ -62,48 +54,48 @@ markdown_extensions:
   - tables
   - footnotes
 
-nav:
-  - 首页: index.md
-  - 快速开始: getting-started.md
-
-  - 用户手册:
-      - 概览: USER_MANUAL.md
-      - 语法规范: syntax.md
-      - 标准库: stdlib.md
-      - 案例: examples.md
-
-  - 进阶:
-      - 类系统设计: class_system_design.md
-      - LLVM 后端: llvm_backend_design.md
-      - 模块系统: 模块系统与包管理.md
-      - 模式匹配: interface-design.md
-      - 完整规范: 段言-完整规范文档.md
-
-  - 开发指南:
-      - 架构设计: architecture.md
-      - 开发指南: DEVELOPMENT_GUIDE.md
-      - 项目结构: 项目结构说明.md
-      - API 参考: API_REFERENCE.md
-
-  - 工具链:
-      - 工具总览: tools.md
-      - REPL 设计: REPL_DESIGN.md
-      - 引导策略: BOOTSTRAP_STRATEGY.md
-
-  - 性能与优化:
-      - 性能优化: PERFORMANCE_OPTIMIZATION.md
-      - 优化分析: OPTIMIZATION_ANALYSIS.md
-      - 文件 I/O 报告: FILE_IO_REPORT.md
-      - 模块系统验证: MODULE_SYSTEM_VERIFICATION.md
-
-  - 变更记录:
-      - 进度报告: PROGRESS_REPORT.md
-      - 语言扩展: LANGUAGE_EXTENSIONS.md
-      - 发布检查: RELEASE_CHECKLIST.md
-      - 最终总结: FINAL_SUMMARY.md
-
 extra:
   generator: false
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/skywalk163/duan
+      link: https://github.com/duan-lang/duan
+
+nav:
+  - 首页: index.md
+  - 用户手册: user_guide.md
+  - 发布说明: release_notes_v6.0.md
+  - 已知问题: known_issues.md
+  - 快速入门:
+    - 快速开始: guide/getting-started.md
+    - 安装说明: guide/installation.md
+    - VS Code 配置: guide/vscode-setup.md
+  - 语言参考:
+    - 五层架构详解: language/levels.md
+    - L0 核心字集: language/l0-core.md
+    - L1/L2 文体: language/l1-l2-style.md
+    - L3 领域嵌入: language/l3-domain.md
+    - L4 外语引用: language/l4-foreign.md
+    - 关键字参考: language/keywords.md
+    - 运算符参考: language/operators.md
+    - 类型系统: language/types.md
+  - 标准库:
+    - 标准库索引: stdlib/index.md
+    - 数学模块: stdlib/math.md
+    - 字符串处理: stdlib/string.md
+    - JSON 模块: stdlib/json.md
+    - 文件系统: stdlib/file.md
+    - 日期时间: stdlib/datetime.md
+    - 正则表达式: stdlib/regex.md
+  - 工具:
+    - CLI 使用指南: tools/cli.md
+    - Playground 使用: tools/playground.md
+    - LSP 集成: tools/lsp.md
+    - 调试器: tools/debugger.md
+  - 迁移指南:
+    - v3.3 → v4.0: migration/v3-to-v4.md
+    - v4.0 → v5.x: migration/v4-to-v5.md
+  - API 参考:
+    - API 索引: api/index.md
+    - 标准库 API: api/stdlib.md
+    - 编译器 API: api/compiler.md
+  - 贡献指南: contributing.md

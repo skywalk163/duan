@@ -182,3 +182,131 @@ try:
     from .排版 import *
 except ImportError:
     pass
+
+# ============================================================
+# 新增补齐模块（第8周标准库补齐）
+# ============================================================
+
+try:
+    from .Base64 import *
+except ImportError:
+    pass
+
+try:
+    from .CSV import *
+except ImportError:
+    pass
+
+try:
+    from .HTTP import *
+except ImportError:
+    pass
+
+try:
+    from .网络 import *
+except ImportError:
+    pass
+
+try:
+    from .颜色 import *
+except ImportError:
+    pass
+
+try:
+    from .进程 import *
+except ImportError:
+    pass
+
+try:
+    from .环境 import *
+except ImportError:
+    pass
+
+try:
+    from .信号 import *
+except ImportError:
+    pass
+
+try:
+    from .线程 import *
+except ImportError:
+    pass
+
+try:
+    from .测试 import *
+except ImportError:
+    pass
+
+try:
+    from .性能 import *
+except ImportError:
+    pass
+
+try:
+    from .日志 import *
+except ImportError:
+    pass
+
+try:
+    from .配置 import *
+except ImportError:
+    pass
+
+try:
+    from .统计 import *
+except ImportError:
+    pass
+
+try:
+    from .随机 import *
+except ImportError:
+    pass
+
+try:
+    from .复数 import *
+except ImportError:
+    pass
+
+try:
+    from .向量 import *
+except ImportError:
+    pass
+
+try:
+    from .排序 import *
+except ImportError:
+    pass
+
+try:
+    from .分词 import *
+except ImportError:
+    pass
+
+try:
+    from .格式化 import *
+except ImportError:
+    pass
+
+try:
+    from .模板 import *
+except ImportError:
+    pass
+
+# ============================================================
+# 第8周新增补齐模块（缓存、进度条、数据验证）
+# ============================================================
+
+try:
+    from .缓存 import *
+except ImportError:
+    pass
+
+try:
+    from .进度条 import *
+except ImportError:
+    pass
+
+try:
+    from .数据验证 import *
+except ImportError:
+    pass

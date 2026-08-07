@@ -56,8 +56,36 @@ tests/debug_*.py
 Thumbs.db
 nul
 
-# 文档构建产物
+# 文档站点构建产物
 site/
+docs-site/
+
+# 本地注册表数据
+registry/
+
+# 崩溃报告
+nuitka-crash-report.xml
+
+# Bootstrap 生成产物（由 .duan 源码重新生成，不应入库）
+bootstrap/level*_self_compiled*.py
+bootstrap/level*_bootstrapped.py
+bootstrap/level*_generated.py
+bootstrap/level*_round2_*.py
+bootstrap/duan_ast_out.py
+bootstrap/token_output.py
+bootstrap/bootstrap_compiled.py
+bootstrap/bootstrap_generated.py
+bootstrap/bootstrap_v3_compiled.py
+bootstrap/_*.py
+bootstrap/generate_*.py
+bootstrap/verify_*.py
+bootstrap/test_*.py
+
+# 基准测试报告（生成产物，不入库）
+benchmarks/reports/
+
+# 段言介绍演示文稿
+段言介绍.pptx
 
 # Python 虚拟环境
 .venv/

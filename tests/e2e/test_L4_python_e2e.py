@@ -19,11 +19,18 @@ from duan_parser_v3 import DuanParser
 from code_generator import PythonCodeGenerator
 
 
-def _is_network_available(host="httpbin.org", port=443, timeout=3):
-    """检测网络是否可达"""
+def _is_network_available(host="httpbin.org", port=443, timeout=5):
+    """检测网络是否可达（含 HTTP 响应检查）"""
     try:
         socket.create_connection((host, port), timeout=timeout)
-        return True
+        # 额外检查 HTTP 服务是否正常响应
+        try:
+            import urllib.request
+            req = urllib.request.Request(f"https://{host}/get")
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
     except OSError:
         return False
 

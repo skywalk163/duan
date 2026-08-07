@@ -3,6 +3,7 @@
 段言编译器 - 基准测试运行器
 
 测量编译各阶段（词法、解析、代码生成、执行）的性能和内存占用。
+支持通过 --run-new 运行新增的专项基准测试。
 """
 
 import sys
@@ -10,6 +11,7 @@ import os
 import time
 import json
 import argparse
+import subprocess
 import tracemalloc
 from pathlib import Path
 
@@ -22,6 +24,7 @@ from compiler import DuanCompiler
 
 
 BENCHMARK_DIR = Path(__file__).parent / 'programs'
+REPORT_DIR = Path(__file__).parent / 'reports'
 
 
 def time_it(func, *args, **kwargs):
@@ -210,6 +213,47 @@ def print_results(results_list, show_memory=False):
     print()
 
 
+NEW_BENCHMARKS = [
+    ('benchmark_compiler', '编译器编译速度基准测试'),
+    ('benchmark_runtime', '运行时性能基准测试'),
+    ('benchmark_memory', '内存使用分析'),
+    ('benchmark_hotspot', '热点代码优化分析'),
+    ('benchmark_large_project', '大项目编译测试'),
+]
+
+
+def run_new_benchmark(script_name, label):
+    """运行新增的专项基准测试"""
+    script_path = Path(__file__).parent / f"{script_name}.py"
+    if not script_path.exists():
+        print(f"  — 跳过 {label}，脚本不存在: {script_path}")
+        return
+
+    output_path = REPORT_DIR / f"{script_name.replace('benchmark_', '')}.json"
+    cmd = [sys.executable, str(script_path), '--output', str(output_path)]
+
+    print(f"\n▶ 运行: {label}")
+    print(f"  命令: {' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if result.stdout:
+            # 只打印最后几行
+            lines = result.stdout.strip().split('\n')
+            for line in lines[-5:]:
+                print(f"  {line}")
+        if result.returncode == 0:
+            print(f"  ✓ {label} 完成，报告: {output_path}")
+        else:
+            print(f"  ✗ {label} 失败 (返回码 {result.returncode})")
+            if result.stderr:
+                print(f"  错误: {result.stderr[:300]}")
+    except subprocess.TimeoutExpired:
+        print(f"  ⏱ {label} 超时")
+    except Exception as e:
+        print(f"  ✗ {label} 错误: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description='段言编译器基准测试')
     parser.add_argument('--program', '-p', help='只运行指定基准程序')
@@ -217,9 +261,34 @@ def main():
     parser.add_argument('--json', '-j', action='store_true', help='输出 JSON 格式')
     parser.add_argument('--output', '-o', help='将结果保存到文件')
     parser.add_argument('--mem', '-m', action='store_true', help='测量内存占用（会降低性能）')
+    # 新增参数：运行专项基准测试
+    parser.add_argument('--run-new', '-r', nargs='*', choices=['all'] + [n for n, _ in NEW_BENCHMARKS],
+                        help='运行新增的专项基准测试（指定名称，或 all 运行全部）')
+    parser.add_argument('--list-new', action='store_true', help='列出所有可用的专项基准测试')
     args = parser.parse_args()
 
-    # 收集基准测试程序
+    # 如果只是列出专项基准测试
+    if args.list_new:
+        print("可用的专项基准测试：")
+        for name, label in NEW_BENCHMARKS:
+            print(f"  {name}: {label}")
+        return
+
+    # 运行专项基准测试（如果指定了 --run-new）
+    if args.run_new is not None:
+        REPORT_DIR.mkdir(parents=True, exist_ok=True)
+        if 'all' in args.run_new:
+            targets = NEW_BENCHMARKS
+        else:
+            targets = [(n, l) for n, l in NEW_BENCHMARKS if n in args.run_new]
+
+        print(f"段言编译器专项基准测试 - {len(targets)} 个测试")
+        print("=" * 60)
+        for name, label in targets:
+            run_new_benchmark(name, label)
+        return
+
+    # 原有逻辑：运行 benchmarks/programs/ 中的基准测试
     bench_files = sorted(BENCHMARK_DIR.glob('*.duan'))
 
     if args.program:
@@ -270,6 +339,12 @@ def main():
             with open(args.output, 'w', encoding='utf-8') as f:
                 json.dump(results_list, f, indent=2, ensure_ascii=False)
             print(f"结果已保存到 {args.output}")
+
+    # 提示可以运行专项基准测试
+    if not args.run_new:
+        print()
+        print("提示：使用 --run-new all 可运行新增加的专项基准测试")
+        print("      使用 --list-new 可查看所有可用的专项基准测试")
 
 
 if __name__ == '__main__':

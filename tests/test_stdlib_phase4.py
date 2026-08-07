@@ -334,5 +334,265 @@ class Test编码解码(unittest.TestCase):
         self.assertEqual(back, data)
 
 
+class Test缓存(unittest.TestCase):
+    """测试缓存模块"""
+
+    def test_缓存管理器(self):
+        """测试缓存管理器"""
+        from 缓存 import 缓存管理器
+
+        cache = 缓存管理器(类型='lru', 最大容量=3)
+        cache.设置('a', 1)
+        cache.设置('b', 2)
+        self.assertEqual(cache.获取('a'), 1)
+        self.assertEqual(cache.获取('b'), 2)
+        self.assertIsNone(cache.获取('c'))
+        self.assertTrue(cache.包含('a'))
+        self.assertFalse(cache.包含('c'))
+
+    def test_缓存管理器删除(self):
+        """测试缓存管理器删除"""
+        from 缓存 import 缓存管理器
+
+        cache = 缓存管理器(类型='simple')
+        cache.设置('key', 'value')
+        self.assertTrue(cache.包含('key'))
+        cache.删除('key')
+        self.assertFalse(cache.包含('key'))
+
+    def test_缓存管理器清空(self):
+        """测试缓存管理器清空"""
+        from 缓存 import 缓存管理器
+
+        cache = 缓存管理器(类型='memory')
+        cache.设置('a', 1)
+        cache.设置('b', 2)
+        self.assertEqual(cache.大小(), 2)
+        cache.清空()
+        self.assertEqual(cache.大小(), 0)
+
+    def test_缓存管理器默认值(self):
+        """测试缓存管理器默认值"""
+        from 缓存 import 缓存管理器
+
+        cache = 缓存管理器(类型='lru')
+        self.assertEqual(cache.获取('不存在', '默认'), '默认')
+        self.assertIsNone(cache.获取('不存在'))
+
+
+class Test进度条(unittest.TestCase):
+    """测试进度条模块"""
+
+    def test_创建进度条(self):
+        """测试创建进度条"""
+        from 进度条 import 创建进度条
+
+        pb = 创建进度条(总数=100, 描述='测试')
+        self.assertIsNotNone(pb)
+        self.assertEqual(pb._总数, 100)
+        self.assertEqual(pb._描述, '测试')
+        self.assertEqual(pb._当前, 0)
+
+    def test_进度条更新(self):
+        """测试进度条更新"""
+        from 进度条 import 进度条
+
+        pb = 进度条(总数=10)
+        self.assertEqual(pb._当前, 0)
+        pb.更新(1)
+        self.assertEqual(pb._当前, 1)
+        pb.更新(3)
+        self.assertEqual(pb._当前, 4)
+        pb.设置当前(10)
+        self.assertEqual(pb._当前, 10)
+
+    def test_进度条上下文(self):
+        """测试进度条上下文管理器"""
+        from 进度条 import 进度条
+
+        with 进度条(总数=5) as pb:
+            pb.更新(1)
+            pb.更新(2)
+            self.assertEqual(pb._当前, 3)
+        # 退出时应为完成状态
+        self.assertEqual(pb._当前, 5)
+
+    def test_迭代进度条(self):
+        """测试迭代进度条"""
+        from 进度条 import 迭代进度条
+
+        结果 = []
+        for item in 迭代进度条([1, 2, 3], 描述='迭代'):
+            结果.append(item * 2)
+        self.assertEqual(结果, [2, 4, 6])
+
+    def test_多阶段进度条(self):
+        """测试多阶段进度条"""
+        from 进度条 import 多阶段进度条
+
+        mpb = 多阶段进度条([('阶段1', 5), ('阶段2', 3)], 描述='多阶段测试')
+        for i in range(5):
+            mpb.更新(1)
+        mpb.进入下一阶段()
+        for i in range(3):
+            mpb.更新(1)
+        mpb.完成()
+        self.assertEqual(mpb._当前阶段, 1)
+
+
+class Test数据验证(unittest.TestCase):
+    """测试数据验证模块"""
+
+    def test_验证必填(self):
+        """测试必填验证"""
+        from 数据验证 import 验证必填
+
+        self.assertTrue(验证必填('hello').是否有效())
+        self.assertFalse(验证必填('').是否有效())
+        self.assertFalse(验证必填(None).是否有效())
+
+    def test_验证类型(self):
+        """测试类型验证"""
+        from 数据验证 import 验证类型
+
+        self.assertTrue(验证类型('hello', str).是否有效())
+        self.assertFalse(验证类型('hello', int).是否有效())
+        self.assertTrue(验证类型(42, int).是否有效())
+
+    def test_验证长度(self):
+        """测试长度验证"""
+        from 数据验证 import 验证长度
+
+        self.assertTrue(验证长度('hello', 最小=1, 最大=10).是否有效())
+        self.assertFalse(验证长度('hi', 最小=5).是否有效())
+        self.assertFalse(验证长度('hello world', 最大=5).是否有效())
+
+    def test_验证范围(self):
+        """测试范围验证"""
+        from 数据验证 import 验证范围
+
+        self.assertTrue(验证范围(5, 最小=0, 最大=10).是否有效())
+        self.assertFalse(验证范围(-1, 最小=0).是否有效())
+        self.assertFalse(验证范围(11, 最大=10).是否有效())
+
+    def test_验证邮箱(self):
+        """测试邮箱验证"""
+        from 数据验证 import 验证邮箱
+
+        self.assertTrue(验证邮箱('test@example.com').是否有效())
+        self.assertTrue(验证邮箱('user.name+tag@domain.co.uk').是否有效())
+        self.assertFalse(验证邮箱('not_an_email').是否有效())
+        self.assertFalse(验证邮箱('@domain.com').是否有效())
+
+    def test_验证手机号(self):
+        """测试手机号验证"""
+        from 数据验证 import 验证手机号
+
+        self.assertTrue(验证手机号('13812345678').是否有效())
+        self.assertTrue(验证手机号('15912345678').是否有效())
+        self.assertFalse(验证手机号('12345678901').是否有效())
+        self.assertFalse(验证手机号('1381234567').是否有效())
+
+    def test_验证URL(self):
+        """测试URL验证"""
+        from 数据验证 import 验证URL
+
+        self.assertTrue(验证URL('https://example.com').是否有效())
+        self.assertTrue(验证URL('http://www.example.com/path').是否有效())
+        self.assertFalse(验证URL('not_a_url').是否有效())
+
+    def test_验证IP地址(self):
+        """测试IP地址验证"""
+        from 数据验证 import 验证IP地址
+
+        self.assertTrue(验证IP地址('192.168.1.1').是否有效())
+        self.assertTrue(验证IP地址('::1').是否有效())
+        self.assertFalse(验证IP地址('999.999.999.999').是否有效())
+
+    def test_验证正则表达式(self):
+        """测试正则表达式验证"""
+        from 数据验证 import 验证正则表达式
+
+        self.assertTrue(验证正则表达式('abc123', r'^[a-z]+\d+$').是否有效())
+        self.assertFalse(验证正则表达式('123abc', r'^[a-z]+\d+$').是否有效())
+
+    def test_验证JSON(self):
+        """测试JSON验证"""
+        from 数据验证 import 验证JSON
+
+        self.assertTrue(验证JSON('{"a": 1, "b": 2}').是否有效())
+        self.assertTrue(验证JSON('[1, 2, 3]').是否有效())
+        self.assertFalse(验证JSON('{invalid json}').是否有效())
+
+    def test_验证枚举(self):
+        """测试枚举验证"""
+        from 数据验证 import 验证枚举
+
+        self.assertTrue(验证枚举('red', ['red', 'green', 'blue']).是否有效())
+        self.assertFalse(验证枚举('yellow', ['red', 'green', 'blue']).是否有效())
+
+    def test_验证结果(self):
+        """测试验证结果"""
+        from 数据验证 import 验证结果
+
+        result = 验证结果()
+        self.assertTrue(result.是否有效())
+        result.添加错误('错误1')
+        self.assertFalse(result.是否有效())
+        self.assertEqual(result.获取错误(), ['错误1'])
+        result.添加警告('警告1')
+        self.assertEqual(result.获取警告(), ['警告1'])
+
+    def test_验证结果抛出异常(self):
+        """测试验证结果抛出异常"""
+        from 数据验证 import 验证结果, 验证错误
+
+        result = 验证结果()
+        result.抛出异常()  # 不应抛出
+        result.添加错误('出错啦')
+        with self.assertRaises(验证错误):
+            result.抛出异常()
+
+    def test_数据模式(self):
+        """测试数据模式"""
+        from 数据验证 import 数据模式
+
+        模式 = 数据模式({
+            '姓名': {'类型': str, '必填': True, '长度最小': 2, '长度最大': 50},
+            '年龄': {'类型': int, '范围最小': 0, '范围最大': 150},
+            '邮箱': {'类型': str, '邮箱': True},
+        })
+
+        result = 模式.验证({'姓名': '张三', '年龄': 25, '邮箱': 'test@example.com'})
+        self.assertTrue(result.是否有效())
+
+        result = 模式.验证({'姓名': '', '年龄': 200, '邮箱': 'invalid'})
+        self.assertFalse(result.是否有效())
+
+    def test_验证集合(self):
+        """测试批量验证"""
+        from 数据验证 import 验证集合
+
+        规则 = {
+            'name': [('必填',), ('长度', 1, 50)],
+            'age': [('类型', int), ('范围', 0, 150)],
+            'email': [('邮箱',)],
+        }
+
+        result = 验证集合(规则, {'name': '张三', 'age': 25, 'email': 'test@example.com'})
+        self.assertTrue(result.是否有效())
+
+        result = 验证集合(规则, {'name': '', 'age': -1, 'email': 'bad'})
+        self.assertFalse(result.是否有效())
+
+    def test_创建数据模式(self):
+        """测试创建数据模式"""
+        from 数据验证 import 创建数据模式
+
+        模式 = 创建数据模式({'name': {'类型': str, '必填': True}})
+        self.assertFalse(模式.验证({}).是否有效())
+        self.assertTrue(模式.验证({'name': 'test'}).是否有效())
+
+
 if __name__ == '__main__':
     unittest.main()

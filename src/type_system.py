@@ -41,6 +41,7 @@ TYPE_ID_CLASS = 16
 TYPE_ID_INTERFACE = 17
 TYPE_ID_ENUM = 18
 TYPE_ID_FUTURE = 19
+TYPE_ID_UNION = 20
 
 
 class Type:
@@ -52,6 +53,8 @@ class Type:
         """检查当前类型是否为 other 的子类型"""
         if other._type_id == TYPE_ID_ANY:
             return True
+        if other._type_id == TYPE_ID_UNION:
+            return any(self.is_subtype_of(m) for m in other.types)
         if type(self) == type(other):
             return self._same_type_check(other)
         return False
@@ -726,6 +729,76 @@ class FutureType(Type):
 
 
 # =============================================================================
+# 联合类型（整数|字符串|空）
+# =============================================================================
+
+@dataclass
+class UnionType(Type):
+    """联合类型：值可以是其中任意一种类型
+    
+    例如 整数|字符串|空 表示整数或字符串或空值。
+    联合类型支持嵌套（自动扁平化）和类型变量替换。
+    """
+    types: List[Type] = field(default_factory=list)
+    _type_id = TYPE_ID_UNION
+
+    def __post_init__(self):
+        """自动扁平化：如果某个元素也是联合类型，展开它"""
+        if self.types:
+            flat = []
+            for t in self.types:
+                if isinstance(t, UnionType):
+                    flat.extend(t.types)
+                else:
+                    flat.append(t)
+            self.types = flat
+
+    def __repr__(self):
+        return "|".join(str(t) for t in self.types)
+
+    def is_subtype_of(self, other: 'Type') -> bool:
+        if other._type_id == TYPE_ID_ANY:
+            return True
+        if other._type_id == TYPE_ID_UNION:
+            # 联合类型的每个成员都是 other 的子类型
+            return all(any(t.is_subtype_of(ot) for ot in other.types) for t in self.types)
+        # 联合类型是 other 的子类型：每个成员都是 other 的子类型
+        return all(t.is_subtype_of(other) for t in self.types)
+
+    def contains_type(self, t: Type) -> bool:
+        """检查是否包含指定类型"""
+        for member in self.types:
+            if member._type_id == t._type_id:
+                if member._type_id == TYPE_ID_TVAR:
+                    if member.name == getattr(t, 'name', ''):
+                        return True
+                else:
+                    return True
+            elif member._type_id == TYPE_ID_UNION:
+                if member.contains_type(t):
+                    return True
+        return False
+
+    def collect_type_vars(self) -> Set['TypeVar']:
+        result: Set[TypeVar] = set()
+        for t in self.types:
+            result.update(t.collect_type_vars())
+        return result
+
+    def apply_substitution(self, subs: 'TypeSubstitution') -> 'Type':
+        if not subs:
+            return self
+        new_types = []
+        for t in self.types:
+            applied = t.apply_substitution(subs)
+            new_types.append(applied)
+        return UnionType(new_types)
+
+    def resolve_type_vars(self) -> 'Type':
+        return UnionType([t.resolve_type_vars() for t in self.types])
+
+
+# =============================================================================
 # 类型替换与合一
 # =============================================================================
 
@@ -924,6 +997,24 @@ def unify(t1: Type, t2: Type, subs: Optional[TypeSubstitution] = None) -> TypeSu
         # 未来类型
         if id1 == TYPE_ID_FUTURE:
             return unify(t1.inner_type, t2.inner_type, subs)
+        # 联合类型
+        if id1 == TYPE_ID_UNION and id2 == TYPE_ID_UNION:
+            # 两个联合类型：尝试合一每个配对
+            s = subs
+            for t1_member in t1.types:
+                # t1 必须兼容合一到 t2 的某个成员
+                found = False
+                for t2_member in t2.types:
+                    try:
+                        new_s = unify(t1_member, t2_member, s)
+                        s = new_s
+                        found = True
+                        break
+                    except UnificationError:
+                        continue
+                if not found:
+                    raise UnificationError("联合类型无法合一：没有兼容成员", t1, t2)
+            return s
         # 函数类型
         if id1 == TYPE_ID_FUNCTION:
             if len(t1.param_types) != len(t2.param_types):
@@ -1001,6 +1092,29 @@ def unify(t1: Type, t2: Type, subs: Optional[TypeSubstitution] = None) -> TypeSu
             if t1.value_type:
                 s = unify(t2.type_args[1], t1.value_type, s)
             return s
+
+    # 单边联合类型（仅一方是联合类型，另一方不是）
+    if id1 == TYPE_ID_UNION:
+        # t1 是联合类型，t2 不是：t1 的每个成员必须合一到 t2
+        s = subs
+        for t1_member in t1.types:
+            s = unify(t1_member, t2, s)
+        return s
+    if id2 == TYPE_ID_UNION:
+        # t2 是联合类型，t1 不是：t1 合一到 t2 的某个成员
+        found = False
+        s = subs
+        for t2_member in t2.types:
+            try:
+                new_s = unify(t1, t2_member, s)
+                s = new_s
+                found = True
+                break
+            except UnificationError:
+                continue
+        if not found:
+            raise UnificationError("类型不匹配联合类型的任何成员", t1, t2)
+        return s
 
     raise UnificationError("无法合一的类型", t1, t2)
 
@@ -1379,6 +1493,20 @@ class TypeParser:
                 if resolved:
                     return resolved
             return TypeVar(expr)
+
+        # 联合类型：T|U|V（最低优先级，在基本类型/类型变量之后检查）
+        if '|' in expr:
+            parts = self._split_top_level(expr, '|')
+            if len(parts) > 1:
+                types = [self.parse(p) for p in parts]
+                # 如果其中包含空类型，且只有两个成员，可以转为 OptionalType
+                has_null = any(t._type_id == TYPE_ID_NULL for t in types)
+                if has_null and len(types) == 2:
+                    non_null = [t for t in types if t._type_id != TYPE_ID_NULL]
+                    if non_null:
+                        return OptionalTypeWrapper(non_null[0])
+                return UnionType(types)
+
         # 否则：类/接口/枚举名称
         return ClassType(expr)
 
@@ -1497,6 +1625,8 @@ __all__ = [
     'EnumType',
     # 未来类型
     'FutureType',
+    # 联合类型
+    'UnionType',
     # 合一与替换
     'TypeSubstitution', 'UnificationError', 'unify',
     # 类型解析

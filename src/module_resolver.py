@@ -45,7 +45,14 @@ class CircularDependencyError(ModuleError):
     """循环依赖错误"""
     def __init__(self, cycle: List[str]):
         self.cycle = cycle
+        # 增强格式：显示环路径 + 修复建议
         message = "检测到循环依赖:\n  " + " → ".join(cycle)
+        message += "\n\n修复建议:"
+        message += "\n  1. 检查模块间的导入关系，避免相互引用"
+        message += "\n  2. 将公共功能提取到独立模块"
+        message += "\n  3. 使用接口抽象解耦模块依赖"
+        if len(cycle) >= 2:
+            message += f"\n  4. 请检查模块「{cycle[0]}」和「{cycle[1]}」之间的相互导入"
         super().__init__(message)
 
 
@@ -109,23 +116,103 @@ class DependencyGraph:
 class ModuleResolver:
     """模块解析器"""
     
-    def __init__(self, search_paths: List[str] = None):
+    def __init__(self, search_paths: List[str] = None, auto_load_stdlib: bool = True):
         """
         初始化模块解析器
         
         Args:
             search_paths: 模块搜索路径列表，None表示使用默认路径
+            auto_load_stdlib: 是否自动加载标准库模块
         """
         # 默认搜索路径：当前目录 + stdlib 目录 + contrib 目录
+        base_dir = os.path.dirname(__file__)
+        stdlib_path = os.path.join(base_dir, '..', 'stdlib')
+        contrib_path = os.path.join(base_dir, '..', 'contrib')
         if search_paths is None:
-            base_dir = os.path.dirname(__file__)
-            stdlib_path = os.path.join(base_dir, '..', 'stdlib')
-            contrib_path = os.path.join(base_dir, '..', 'contrib')
             search_paths = ['.', stdlib_path, contrib_path]
         self.search_paths = search_paths
+        self.stdlib_path = stdlib_path
         self.lexer = Lexer()
         self.parser = DuanParser()
         self.module_cache: Dict[str, ModuleInfo] = {}
+        self._stdlib_modules: Dict[str, ModuleInfo] = {}
+        self._builtins_loaded = False
+        self.auto_load_stdlib = auto_load_stdlib
+        if auto_load_stdlib:
+            self._discover_stdlib_modules()
+    
+    def _discover_stdlib_modules(self):
+        """发现并缓存标准库中的所有模块"""
+        stdlib_dir = Path(self.stdlib_path)
+        if not stdlib_dir.exists():
+            return
+        
+        # 扫描 .duan 和 .py 文件
+        for ext in ['*.duan', '*.py']:
+            for module_path in stdlib_dir.glob(ext):
+                module_name = module_path.stem
+                if module_name.startswith('__'):
+                    continue
+                try:
+                    module_info = self.parse_module(module_path)
+                    self._stdlib_modules[module_name] = module_info
+                except Exception:
+                    pass  # 跳过无法解析的标准库模块
+    
+    def get_stdlib_module(self, module_name: str) -> Optional[ModuleInfo]:
+        """获取标准库模块信息"""
+        return self._stdlib_modules.get(module_name)
+    
+    def get_stdlib_module_names(self) -> List[str]:
+        """获取所有可用的标准库模块名"""
+        return sorted(self._stdlib_modules.keys())
+    
+    def load_stdlib_module(self, module_name: str) -> Optional[ModuleInfo]:
+        """
+        加载标准库模块
+        
+        Args:
+            module_name: 模块名
+        
+        Returns:
+            模块信息，如果未找到则返回 None
+        """
+        if module_name in self.module_cache:
+            return self.module_cache[module_name]
+        
+        module_info = self._stdlib_modules.get(module_name)
+        if module_info:
+            self.module_cache[module_name] = module_info
+            return module_info
+        
+        return None
+    
+    def preload_builtins(self):
+        """
+        预加载内置模块（builtins）
+        确保内置函数在编译时可用
+        """
+        if self._builtins_loaded:
+            return
+        
+        builtins_path = Path(self.stdlib_path) / 'builtins.py'
+        if builtins_path.exists():
+            try:
+                module_info = self.parse_module(builtins_path)
+                self.module_cache['builtins'] = module_info
+                self._builtins_loaded = True
+            except Exception:
+                pass
+        
+        # 也尝试加载 builtins.duan
+        builtins_duan = Path(self.stdlib_path) / 'builtins.duan'
+        if builtins_duan.exists():
+            try:
+                module_info = self.parse_module(builtins_duan)
+                self.module_cache['builtins'] = module_info
+                self._builtins_loaded = True
+            except Exception:
+                pass
     
     def find_module(self, module_name: str, from_dir: str = None) -> Path:
         """
@@ -531,6 +618,60 @@ class ModuleResolver:
         
         return None
     
+    def detect_all_cycles(self, graph: DependencyGraph) -> List[List[str]]:
+        """
+        检测所有循环依赖，返回所有环的列表
+        
+        Args:
+            graph: 依赖图
+        
+        Returns:
+            所有循环依赖路径的列表，每个元素是一个环路径
+        """
+        # 使用 DFS 检测所有环
+        WHITE, GRAY, BLACK = 0, 1, 2
+        color = {node: WHITE for node in graph.nodes}
+        parent = {}
+        all_cycles = []
+        visited_edges = set()  # 用于去重，避免报告重复的环
+        
+        def dfs(node: str, path_stack: List[str]):
+            """深度优先搜索检测所有环"""
+            color[node] = GRAY
+            path_stack.append(node)
+            
+            for neighbor in graph.get_dependencies(node):
+                if color.get(neighbor, WHITE) == GRAY:
+                    # 找到环，构建环路径
+                    cycle = []
+                    # 从 path_stack 中提取环
+                    idx = path_stack.index(neighbor)
+                    cycle = path_stack[idx:] + [neighbor]
+                    
+                    # 规范化环表示：以最小节点开头、按最小旋转
+                    if cycle:
+                        min_idx = cycle.index(min(cycle))
+                        cycle = cycle[min_idx:] + cycle[1:min_idx + 1]
+                    
+                    cycle_key = tuple(cycle)
+                    if cycle_key not in visited_edges:
+                        visited_edges.add(cycle_key)
+                        all_cycles.append(cycle)
+                
+                elif color.get(neighbor, WHITE) == WHITE:
+                    parent[neighbor] = node
+                    dfs(neighbor, path_stack)
+            
+            path_stack.pop()
+            color[node] = BLACK
+        
+        # 从每个未访问的节点开始
+        for node in graph.nodes:
+            if color[node] == WHITE:
+                dfs(node, [])
+        
+        return all_cycles
+    
     def topological_sort(self, graph: DependencyGraph) -> List[str]:
         """
         拓扑排序（确定编译顺序）
@@ -631,7 +772,14 @@ class CircularDependencyError(Exception):
 
     def __init__(self, cycle: List[str]):
         self.cycle = list(cycle)
-        super().__init__("检测到循环依赖: " + " -> ".join(self.cycle))
+        message = "检测到循环依赖:\n  " + " -> ".join(self.cycle)
+        message += "\n\n修复建议:"
+        message += "\n  1. 检查模块间的导入关系，避免相互引用"
+        message += "\n  2. 将公共功能提取到独立模块"
+        message += "\n  3. 使用接口抽象解耦模块依赖"
+        if len(self.cycle) >= 2:
+            message += f"\n  4. 请检查模块「{self.cycle[0]}」和「{self.cycle[1]}」之间的相互导入"
+        super().__init__(message)
 
 
 class ModuleDependencyResolver:

@@ -322,6 +322,61 @@ class AnyType(DuanType):
         return True  # 任意类型与任何类型兼容
 
 
+@dataclass(frozen=True)
+class TypeVarType(DuanType):
+    """泛型类型变量（如 T、K、V）
+    
+    用于表示泛型类型参数，如列表[T] 中的 T。
+    """
+    name: str
+
+    def to_duan(self) -> str:
+        return self.name
+
+    def to_python(self) -> str:
+        return self.name
+
+    def is_compatible(self, other: 'DuanType') -> bool:
+        if isinstance(other, TypeVarType):
+            return self.name == other.name
+        # 类型变量与任何类型兼容（由合一过程决定）
+        return True
+
+
+@dataclass(frozen=True)
+class GenericTypeInstance(DuanType):
+    """泛型类型实例化（如 列表[T]、字典[K, V]）"""
+    base_name: str
+    type_args: Tuple[DuanType, ...]
+
+    def to_duan(self) -> str:
+        args = ', '.join(t.to_duan() for t in self.type_args)
+        return f"{self.base_name}<{args}>"
+
+    def to_python(self) -> str:
+        args = ', '.join(t.to_python() for t in self.type_args)
+        return f"{self.base_name}[{args}]"
+
+    def is_compatible(self, other: 'DuanType') -> bool:
+        if isinstance(other, GenericTypeInstance):
+            if self.base_name != other.base_name:
+                return False
+            if len(self.type_args) != len(other.type_args):
+                return False
+            return all(s.is_compatible(o) for s, o in zip(self.type_args, other.type_args))
+        # 兼容具体的 ListType/DictType
+        if isinstance(other, ListType) and self.base_name in ('列表', 'List'):
+            if len(self.type_args) == 1:
+                return self.type_args[0].is_compatible(other.element_type)
+            return True
+        if isinstance(other, DictType) and self.base_name in ('字典', 'Map'):
+            if len(self.type_args) == 2:
+                return self.type_args[0].is_compatible(other.key_type) and \
+                       self.type_args[1].is_compatible(other.value_type)
+            return True
+        return False
+
+
 # =============================================================================
 # 类型构建器
 # =============================================================================
@@ -364,6 +419,10 @@ def parse_type_annotation(annotation: str) -> DuanType:
     if annotation in BUILTIN_TYPE_MAP:
         return BUILTIN_TYPE_MAP[annotation]
 
+    # 泛型类型变量：T、K、V、Key、Val 等（单字母大写或全大写标识符）
+    if _looks_like_type_var(annotation):
+        return TypeVarType(annotation)
+
     # 列表类型：列表<整数>（必须在 | 之前检查，防止泛型内的 | 被拆分）
     if annotation.startswith('列表<') and annotation.endswith('>'):
         inner = parse_type_annotation(annotation[3:-1])
@@ -379,6 +438,22 @@ def parse_type_annotation(annotation: str) -> DuanType:
             return DictType(key_type, val_type)
         return DictType(TYPE_ANY, TYPE_ANY)
 
+    # 泛型类型实例：基名<类型参数, ...>（支持任意泛型基名）
+    if '<' in annotation and annotation.endswith('>'):
+        bracket = annotation.index('<')
+        base_name = annotation[:bracket].strip()
+        args_str = annotation[bracket + 1:-1].strip()
+        if args_str and ',' in args_str:
+            # 多个类型参数
+            parts = [p.strip() for p in args_str.split(',')]
+            type_args = tuple(parse_type_annotation(p) for p in parts)
+        elif args_str:
+            # 单个类型参数
+            type_args = (parse_type_annotation(args_str),)
+        else:
+            type_args = ()
+        return GenericTypeInstance(base_name, type_args)
+
     # 可选类型：可空整数（必须在 | 之前检查）
     if annotation.startswith('可空'):
         inner = parse_type_annotation(annotation[2:])
@@ -391,6 +466,18 @@ def parse_type_annotation(annotation: str) -> DuanType:
 
     # 未知类型，返回任意
     return TYPE_ANY
+
+
+def _looks_like_type_var(name: str) -> bool:
+    """判断是否看起来像类型变量"""
+    if not name:
+        return False
+    if len(name) == 1 and name.isascii() and name.isupper():
+        return True
+    # 首字母大写（ASCII），后续字符为字母或数字（大小写不限）
+    if len(name) <= 10 and name[0].isascii() and name[0].isupper():
+        return all(c.isascii() and c.isalnum() for c in name)
+    return False
 
 
 # =============================================================================
@@ -1091,6 +1178,13 @@ class DuanTypeBridge:
                 if not isinstance(t, PrimitiveType) or t.name != '空':
                     return DuanTypeBridge.simple_to_advanced(t)
             return AdvAnyType()
+        if isinstance(simple_type, TypeVarType):
+            from type_system import TypeVar as AdvTypeVar
+            return AdvTypeVar(simple_type.name)
+        if isinstance(simple_type, GenericTypeInstance):
+            from type_system import GenericTypeInstance as AdvGenericInstance
+            args = [DuanTypeBridge.simple_to_advanced(a) for a in simple_type.type_args]
+            return AdvGenericInstance(simple_type.base_name, args)
         return None
 
     @staticmethod
@@ -1142,6 +1236,12 @@ class DuanTypeBridge:
             ret = DuanTypeBridge.advanced_to_simple(getattr(adv_type, 'return_type', None))
             return FunctionType(params, ret)
         # TypeVar 或其他泛型类型，返回 Any
+        if type_id == TYPE_ID_TVAR:
+            return TypeVarType(getattr(adv_type, 'name', '?'))
+        if type_id == TYPE_ID_GENERIC_INSTANCE:
+            base_name = getattr(adv_type, 'base_name', '?')
+            args = tuple(DuanTypeBridge.advanced_to_simple(a) for a in getattr(adv_type, 'type_args', []))
+            return GenericTypeInstance(base_name, args)
         return TYPE_ANY
 
 

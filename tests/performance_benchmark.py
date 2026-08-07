@@ -262,5 +262,157 @@ def run_benchmarks():
     }
 
 
+class StdlibBenchmark:
+    """标准库性能基准测试"""
+
+    def __init__(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'stdlib'))
+
+    def measure_time(self, func, iterations: int = 1000) -> Tuple[float, float, float]:
+        """测量函数执行时间"""
+        times = []
+        for _ in range(iterations):
+            start = time.perf_counter()
+            func()
+            end = time.perf_counter()
+            times.append((end - start) * 1000)
+        return statistics.mean(times), min(times), max(times)
+
+    def benchmark_哈希(self):
+        """测试哈希模块性能"""
+        from 加密 import MD5, SHA256, SHA512
+
+        data = 'hello world' * 100
+
+        def test_md5():
+            return MD5(data)
+
+        def test_sha256():
+            return SHA256(data)
+
+        def test_sha512():
+            return SHA512(data)
+
+        print(f"\n  哈希模块 (数据长度: {len(data)}):")
+        for name, func in [('MD5', test_md5), ('SHA256', test_sha256), ('SHA512', test_sha512)]:
+            avg, mn, mx = self.measure_time(func, iterations=500)
+            print(f"    {name}: 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+
+    def benchmark_JSON(self):
+        """测试 JSON 模块性能"""
+        import json
+
+        data = {'key' + str(i): 'value' + str(i) for i in range(100)}
+        json_str = json.dumps(data)
+
+        from JSON import 解析JSON, 生成JSON
+
+        def test_parse():
+            return 解析JSON(json_str)
+
+        def test_generate():
+            return 生成JSON(data)
+
+        print(f"\n  JSON模块 (100个字段):")
+        avg, mn, mx = self.measure_time(test_parse, iterations=500)
+        print(f"    解析JSON: 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+        avg, mn, mx = self.measure_time(test_generate, iterations=500)
+        print(f"    生成JSON: 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+
+    def benchmark_缓存(self):
+        """测试缓存模块性能"""
+        from 缓存 import 缓存管理器
+
+        cache = 缓存管理器(类型='lru', 最大容量=1000)
+
+        def test_cache_ops():
+            for i in range(100):
+                cache.设置(f'key{i}', i)
+            for i in range(100):
+                _ = cache.获取(f'key{i}')
+
+        print(f"\n  缓存模块 (LRU, 100次读写):")
+        avg, mn, mx = self.measure_time(test_cache_ops, iterations=200)
+        print(f"    平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+
+    def benchmark_数据验证(self):
+        """测试数据验证模块性能"""
+        from 数据验证 import 验证邮箱, 验证手机号, 验证必填, 验证集合
+
+        emails = ['test@example.com', 'user.name+tag@domain.co.uk', 'a@b.c']
+        phones = ['13812345678', '15912345678', '18812345678']
+
+        def test_email():
+            for e in emails:
+                验证邮箱(e)
+
+        def test_phone():
+            for p in phones:
+                验证手机号(p)
+
+        def test_validation_set():
+            规则 = {
+                'name': [('必填',), ('长度', 1, 50)],
+                'age': [('类型', int), ('范围', 0, 150)],
+                'email': [('邮箱',)],
+            }
+            数据 = {'name': '张三', 'age': 25, 'email': 'test@example.com'}
+            验证集合(规则, 数据)
+
+        print(f"\n  数据验证模块:")
+        avg, mn, mx = self.measure_time(test_email, iterations=500)
+        print(f"    邮箱验证(3个): 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+        avg, mn, mx = self.measure_time(test_phone, iterations=500)
+        print(f"    手机号验证(3个): 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+        avg, mn, mx = self.measure_time(test_validation_set, iterations=500)
+        print(f"    批量验证: 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+
+    def benchmark_正则表达式(self):
+        """测试正则表达式模块性能"""
+        from 正则表达式 import 匹配, 查找全部, 替换
+
+        text = 'hello123world456python789' * 100
+
+        def test_match():
+            return 匹配(r'\d+', text)
+
+        def test_findall():
+            return 查找全部(r'\d+', text)
+
+        def test_replace():
+            return 替换(r'\d+', 'X', text)
+
+        print(f"\n  正则表达式模块 (文本长度: {len(text)}):")
+        avg, mn, mx = self.measure_time(test_match, iterations=200)
+        print(f"    匹配: 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+        avg, mn, mx = self.measure_time(test_findall, iterations=200)
+        print(f"    查找全部: 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+        avg, mn, mx = self.measure_time(test_replace, iterations=200)
+        print(f"    替换: 平均={avg:.3f}ms, 最小={mn:.3f}ms, 最大={mx:.3f}ms")
+
+    def run_all(self):
+        """运行所有标准库性能基准测试"""
+        print("\n" + "=" * 70)
+        print("标准库性能基准测试")
+        print("=" * 70)
+
+        self.benchmark_哈希()
+        self.benchmark_JSON()
+        self.benchmark_缓存()
+        self.benchmark_数据验证()
+        self.benchmark_正则表达式()
+
+        print("\n" + "=" * 70)
+        print("标准库基准测试完成")
+        print("=" * 70)
+
+
+def run_stdlib_benchmarks():
+    """运行标准库性能基准测试"""
+    benchmark = StdlibBenchmark()
+    benchmark.run_all()
+
+
 if __name__ == '__main__':
     run_benchmarks()
+    run_stdlib_benchmarks()

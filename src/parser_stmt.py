@@ -383,6 +383,10 @@ class ParserStmtMixin:
                 return self._parse_ffi_load_library()
             return self._parse_ffi_decl(from_at_c=True)
 
+        # 类型别名定义：类型 别名 = 类型定义
+        if tok.type == TokenType.KEYWORD and tok.value == '类型':
+            return self._parse_type_alias()
+
         # 动词调用作为独立语句
         if tok.type == TokenType.KEYWORD and tok.value in VERB_ARITY:
             return self._parse_expr_stmt()
@@ -4519,6 +4523,77 @@ class ParserStmtMixin:
             self._consume(TokenType.PERIOD)
         
         return FFIVarArgsDecl(name, params, return_type, library_alias, c_name)
+
+    # ---- 类型别名解析 ----
+    def _parse_type_alias(self):
+        """解析类型别名定义：类型 别名 = 类型定义（返回 TypeAlias 节点）
+        
+        语法：
+            类型 名字 = 类型定义
+            类型 名字[泛型参数] = 类型定义
+        """
+        from ast_nodes import TypeAlias
+        
+        line, col = self._current().line, self._current().col
+        self._consume(TokenType.KEYWORD, '类型')  # 消耗 类型
+        
+        # 别名名称
+        name_tok = self._current()
+        if not name_tok or name_tok.type not in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            self._error(f"期望类型别名名称，但得到 {name_tok.type if name_tok else '输入结束'}", line, col)
+            return TypeAlias(name='', target_type='')
+        name = self._consume().value
+        
+        # 可选的泛型参数：[T, K, V]
+        generic_params = []
+        if self._current() and self._current().type == TokenType.LBRACKET:
+            self._consume(TokenType.LBRACKET)  # 消耗 [
+            while self._current() and self._current().type != TokenType.RBRACKET:
+                param_tok = self._current()
+                if param_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    generic_params.append(self._consume().value)
+                if self._current() and self._current().type == TokenType.COMMA:
+                    self._consume(TokenType.COMMA)
+                elif self._current() and self._current().type != TokenType.RBRACKET:
+                    self._error(f"类型别名泛型参数解析错误，期望 ']' 或 ','，但得到 {self._current().value}")
+                    break
+            if self._current() and self._current().type == TokenType.RBRACKET:
+                self._consume(TokenType.RBRACKET)
+            else:
+                self._error("期望 ']' 结束类型别名泛型参数")
+        
+        # 等号
+        if self._current() and self._current().type == TokenType.ASSIGN:
+            self._consume(TokenType.ASSIGN)  # 消耗 =
+        else:
+            # 也支持中文冒号 ： 或 为 关键字
+            if self._current() and self._current().type == TokenType.COLON:
+                self._consume(TokenType.COLON)
+            elif self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '为':
+                self._consume(TokenType.KEYWORD, '为')
+            else:
+                self._error("期望 '='、':' 或 '为' 在类型别名定义中")
+        
+        # 目标类型定义（读取直到行尾或句号）
+        target_type_parts = []
+        while self._current() and self._current().type != TokenType.PERIOD and \
+              self._current().type != TokenType.NEWLINE and \
+              self._current().type != TokenType.EOF:
+            target_type_parts.append(self._consume().value)
+        
+        # 消耗句号
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
+        
+        target_type = ' '.join(target_type_parts).strip()
+        
+        result = TypeAlias(
+            name=name,
+            target_type=target_type,
+            generic_params=generic_params,
+        )
+        result.line, result.col = line, col
+        return result
 
     def _parse_ffi_typedef_def(self) -> FFITypedefDef:
         """解析C类型别名：外部 类型别名 名称 为 基础类型"""

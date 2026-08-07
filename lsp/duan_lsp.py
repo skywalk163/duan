@@ -969,6 +969,7 @@ class DuanLanguageServer:
                     }
                 })
             elif '名称未定义' in msg or '未定义' in msg:
+                var_name = msg.split("'")[1] if "'" in msg else "变量"
                 code_actions.append({
                     'title': '添加变量定义',
                     'kind': 'quickfix',
@@ -977,7 +978,7 @@ class DuanLanguageServer:
                         'changes': {
                             uri: [{
                                 'range': d_range,
-                                'newText': f'定义 {msg.split("'")[1] if "'" in msg else "变量"} 等于 空。\n'
+                                'newText': f'定义 {var_name} 等于 空。\n'
                             }]
                         }
                     }

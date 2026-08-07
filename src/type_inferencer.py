@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 # 统一类型系统（Phase 1 增强版）
 from type_system import (
     Type, NumberType, StringType, BooleanType, NullType,
-    AnyType, UnknownType, OptionalTypeWrapper,
+    AnyType, UnknownType, OptionalTypeWrapper, UnionType,
     ListType, DictType, TupleType, SetType,
     FunctionType, TypeVar, GenericTypeInstance, GenericTypeDef,
     ClassType, InterfaceType, EnumType, FutureType,
@@ -156,6 +156,9 @@ class TypeInferencer:
         # 解构赋值跟踪（解构 (x, y) = expr）
         self._destructure_target: Optional[Tuple[str, ...]] = None
 
+        # 类型别名注册表：名称 → 目标类型字符串
+        self.type_aliases: Dict[str, str] = {}
+
     # ---- 内置类型初始化 ----
     def _init_builtin_types(self):
         """初始化内置类型"""
@@ -172,7 +175,9 @@ class TypeInferencer:
         """将类型字符串解析为 Type 对象"""
         if type_str is None:
             return TYPE_ANY
-        return self.type_parser.parse(type_str)
+        # 解析类型别名引用
+        resolved = self._resolve_type_alias(type_str)
+        return self.type_parser.parse(resolved)
 
     # ---- 注册枚举 ----
     def register_enum(self, enum_def: EnumDefinition):
@@ -269,6 +274,9 @@ class TypeInferencer:
         # 阶段 0：注册所有类型定义（枚举、trait、类）
         self._scan_type_definitions(module)
 
+        # 注册类型别名
+        self._register_type_aliases(module)
+
         # 阶段 1：注册 trait 实现
         for impl in getattr(module, 'trait_impls', []):
             self.register_trait_impl(impl)
@@ -326,8 +334,41 @@ class TypeInferencer:
                 generic_params = getattr(segment, 'generic_params', None) or []
                 if generic_params:
                     self.generic_segment_defs[segment.name] = list(generic_params)
-                # 占位：等待进入推断阶段后再填入具体类型
-                self.symbol_table.define(segment.name, 'function', TYPE_UNKNOWN)
+
+    # ---- 类型别名注册与解析 ----
+    def _register_type_aliases(self, module: Module):
+        """注册模块中的类型别名"""
+        self.type_aliases.clear()
+        # 从 module.type_aliases 注册
+        for alias in getattr(module, 'type_aliases', []) or []:
+            name = getattr(alias, 'name', '')
+            target = getattr(alias, 'target_type', '')
+            if name and target:
+                self.type_aliases[name] = target
+        # 从 module.statements 中扫描 TypeAlias 节点
+        from ast_nodes import TypeAlias as TypeAliasNode
+        for stmt in getattr(module, 'statements', []) or []:
+            if isinstance(stmt, TypeAliasNode):
+                name = getattr(stmt, 'name', '')
+                target = getattr(stmt, 'target_type', '')
+                if name and target:
+                    self.type_aliases[name] = target
+
+    def _resolve_type_alias(self, type_str: str) -> str:
+        """递归解析类型别名引用"""
+        if not type_str:
+            return type_str
+        # 精确匹配别名
+        if type_str in self.type_aliases:
+            resolved = self.type_aliases[type_str]
+            return self._resolve_type_alias(resolved)
+        # 别名可能出现在泛型参数中，如 列表<数字列表>
+        # 通过替换别名引用来实现
+        resolved = type_str
+        for alias_name, alias_target in sorted(self.type_aliases.items(), key=lambda x: -len(x[0])):
+            if alias_name in resolved:
+                resolved = resolved.replace(alias_name, alias_target)
+        return resolved
 
     # ---- HM 阶段 1：预扫描所有定义，注册类型签名 ----
     def _pre_scan_definitions(self, module: Module):
@@ -1335,23 +1376,125 @@ class TypeInferencer:
                 node=stmt
             )
 
+        # 类型守卫检测：若 是整数(值) / 是字符串(值) 等 => 在 then 分支中缩小类型
+        narrowed_var = None
+        narrowed_type = None
+        else_narrowed_type = None
+        type_guard_info = self._detect_type_guard(stmt.condition)
+        if type_guard_info:
+            var_name, narrowed, else_narrowed = type_guard_info
+            narrowed_var = var_name
+            narrowed_type = narrowed
+            else_narrowed_type = else_narrowed
+
         self.symbol_table.enter_scope()
+        if narrowed_var and narrowed_type:
+            # 在 then 分支中，变量类型缩小为检查类型
+            self.symbol_table.define(narrowed_var, 'variable', narrowed_type)
         for s in stmt.then_body:
             self._infer_statement(s)
         self.symbol_table.exit_scope()
 
         if stmt.else_body:
             self.symbol_table.enter_scope()
+            if narrowed_var and else_narrowed_type:
+                # 在 else 分支中，变量类型缩小为排除类型（联合类型）
+                self.symbol_table.define(narrowed_var, 'variable', else_narrowed_type)
             for s in stmt.else_body:
                 self._infer_statement(s)
             self.symbol_table.exit_scope()
 
         for elseif_body in getattr(stmt, 'elseif_bodies', []) or []:
             self.symbol_table.enter_scope()
+            if narrowed_var and else_narrowed_type:
+                self.symbol_table.define(narrowed_var, 'variable', else_narrowed_type)
             for s in elseif_body:
                 self._infer_statement(s)
             self.symbol_table.exit_scope()
         return TYPE_NULL
+
+    # ---- 类型守卫与类型缩小辅助 ----
+    _TYPE_GUARD_FUNCTIONS = {
+        '是整数': (TYPE_NUMBER, '数'),
+        '是字符串': (TYPE_STRING, '串'),
+        '是浮点': (TYPE_NUMBER, '数'),
+        '是布尔': (TYPE_BOOLEAN, '布尔'),
+        '是列表': (ListType(), '列表'),
+        '是字典': (DictType(), '字典'),
+        '是空': (TYPE_NULL, '空'),
+    }
+
+    def _detect_type_guard(self, condition) -> Optional[Tuple[str, Type, Type]]:
+        """检测条件表达式是否为类型守卫（如 是整数(值)）
+        
+        返回 (变量名, then分支缩小类型, else分支排除类型) 或 None
+        """
+        ast_type_id = getattr(condition, '_ast_type_id', 0)
+        if ast_type_id != AST_TYPE_ID_FUNCTION_CALL:
+            return None
+
+        # 获取函数名
+        func_name = ''
+        if hasattr(condition, 'name'):
+            name = condition.name
+            func_name = getattr(name, 'name', '') or getattr(name, 'value', '') or ''
+
+        if func_name not in self._TYPE_GUARD_FUNCTIONS:
+            return None
+
+        narrowed_type, _ = self._TYPE_GUARD_FUNCTIONS[func_name]
+
+        # 检查第一个参数是否为标识符
+        args = getattr(condition, 'arguments', []) or []
+        if not args:
+            return None
+
+        arg = args[0]
+        arg_ast_type = getattr(arg, '_ast_type_id', 0)
+        if arg_ast_type != AST_TYPE_ID_IDENTIFIER:
+            return None
+
+        var_name = getattr(arg, 'name', '') or getattr(arg, 'value', '')
+        if not var_name:
+            return None
+
+        # 查找当前变量类型（用于 else 分支的类型缩小）
+        symbol = self.symbol_table.lookup(var_name)
+        original_type = symbol.data_type if symbol else TYPE_UNKNOWN
+
+        # then 分支：缩小为检查类型
+        then_type = narrowed_type
+
+        # else 分支：如果是联合类型，排除检查类型
+        else_type = original_type
+        if isinstance(original_type, UnionType):
+            remaining = [t for t in original_type.types if not self._types_are_equal(t, narrowed_type)]
+            if remaining:
+                else_type = UnionType(remaining) if len(remaining) > 1 else remaining[0]
+            else:
+                else_type = TYPE_NULL
+        elif isinstance(original_type, OptionalTypeWrapper):
+            if narrowed_type == original_type.inner_type:
+                else_type = TYPE_NULL
+            else:
+                else_type = original_type
+
+        return (var_name, then_type, else_type)
+
+    def _types_are_equal(self, a: Type, b: Type) -> bool:
+        """比较两个类型是否相等（基于 _type_id 和基本属性）"""
+        if a._type_id != b._type_id:
+            return False
+        if a._type_id == TYPE_ID_NUMBER or a._type_id == TYPE_ID_STRING or \
+           a._type_id == TYPE_ID_BOOLEAN or a._type_id == TYPE_ID_NULL:
+            return True
+        if a._type_id == TYPE_ID_LIST:
+            if hasattr(b, 'element_type') and hasattr(a, 'element_type'):
+                return self._types_are_equal(a.element_type or TYPE_ANY, b.element_type or TYPE_ANY)
+            return True
+        if a._type_id == TYPE_ID_DICT:
+            return True
+        return str(a) == str(b)
 
     def _infer_foreach_stmt(self, stmt) -> Type:
         iter_type = self._infer_expr(stmt.iterable)
@@ -1440,6 +1583,20 @@ class TypeInferencer:
                     binding_type = self._get_binding_type(subject_type, pattern)
                     self.symbol_table.define(pattern.binding, 'variable', binding_type)
 
+                # 枚举变体字段绑定：若 变体(字段名)
+                if pattern and getattr(pattern, 'kind', '') == 'variable':
+                    binding = getattr(pattern, 'binding', None)
+                    if binding and variant_name:
+                        variant_fields = subject_type.get_variant_types(variant_name)
+                        if variant_fields:
+                            # 绑定整个变体值
+                            self.symbol_table.define(binding, 'variable', subject_type)
+                            # 如果有字段绑定，逐个绑定
+                            field_bindings = getattr(pattern, 'field_bindings', None) or []
+                            for i, fb in enumerate(field_bindings):
+                                if i < len(variant_fields):
+                                    self.symbol_table.define(fb, 'variable', variant_fields[i])
+
                 if case.guard:
                     guard_type = self._infer_expr(case.guard)
                     if not isinstance(guard_type, (BooleanType, AnyType, UnknownType)):
@@ -1468,9 +1625,73 @@ class TypeInferencer:
                         + ", ".join(unmatched),
                         node=stmt
                     )
+
+        elif isinstance(subject_type, UnionType):
+            # 联合类型模式匹配：类型缩小
+            matched_types = set()
+            for case in stmt.cases:
+                pattern = case.pattern
+                pattern_kind = getattr(pattern, 'kind', '')
+                self.symbol_table.enter_scope()
+
+                if pattern_kind == 'type_check':
+                    # 类型检查模式：若 整数(值)
+                    type_name = getattr(pattern, 'type_name', '')
+                    binding = getattr(pattern, 'binding', None)
+                    if type_name:
+                        narrowed_type = self._parse_type_string(type_name)
+                        matched_types.add(type_name)
+                        if binding:
+                            self.symbol_table.define(binding, 'variable', narrowed_type)
+                    elif binding:
+                        self.symbol_table.define(binding, 'variable', subject_type)
+                else:
+                    # 通配符或变量绑定
+                    binding = getattr(pattern, 'binding', None)
+                    if binding:
+                        self.symbol_table.define(binding, 'variable', subject_type)
+
+                if case.guard:
+                    guard_type = self._infer_expr(case.guard)
+                    if not isinstance(guard_type, (BooleanType, AnyType, UnknownType)):
+                        self._add_error(
+                            f"匹配守卫条件类型应为布尔，实际为 {guard_type}",
+                            node=stmt
+                        )
+
+                for s in case.body:
+                    self._infer_statement(s)
+                self.symbol_table.exit_scope()
+
+            # 检查联合类型穷尽性
+            has_wildcard = any(
+                getattr(c.pattern, 'kind', '') in ('wildcard', 'variable') and
+                not getattr(c.pattern, 'type_name', None)
+                for c in stmt.cases
+            )
+            if not has_wildcard:
+                # 警告未匹配的联合成员
+                unmatched = [str(t) for t in subject_type.types
+                            if str(t) not in matched_types]
+                if unmatched:
+                    self._add_error(
+                        f"非穷尽匹配: 联合类型未处理的成员: {', '.join(unmatched)}",
+                        node=stmt
+                    )
+
         else:
+            # 普通类型匹配
             for case in stmt.cases:
                 self.symbol_table.enter_scope()
+                pattern = case.pattern
+                if pattern and getattr(pattern, 'binding', None):
+                    # 类型缩小：为匹配变量绑定更具体的类型
+                    type_name = getattr(pattern, 'type_name', None)
+                    if type_name:
+                        narrowed = self._parse_type_string(type_name)
+                        self.symbol_table.define(pattern.binding, 'variable', narrowed)
+                    else:
+                        self.symbol_table.define(pattern.binding, 'variable', subject_type)
                 for s in case.body:
                     self._infer_statement(s)
                 self.symbol_table.exit_scope()
@@ -1487,6 +1708,22 @@ class TypeInferencer:
         return None
 
     def _get_binding_type(self, enum_type: EnumType, pattern) -> Type:
+        """获取模式匹配中绑定的变量类型
+        
+        根据枚举变体的字段类型返回合适的绑定类型：
+        - 如果变体有多个字段，返回 TupleType
+        - 如果变体只有一个字段，返回该字段的类型
+        - 如果变体没有字段，返回枚举类型本身
+        """
+        variant_name = self._get_pattern_variant_name(pattern)
+        if variant_name and enum_type.enum_name in self.enum_defs:
+            def_enum = self.enum_defs[enum_type.enum_name]
+            field_types = def_enum.get_variant_types(variant_name)
+            if field_types:
+                if len(field_types) == 1:
+                    return field_types[0]
+                elif len(field_types) > 1:
+                    return TupleType(field_types)
         return TYPE_UNKNOWN
 
     # ---- 表达式推断 ----

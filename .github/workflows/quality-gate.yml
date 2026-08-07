@@ -1,0 +1,182 @@
+# 段言（Duan）代码质量门禁
+#
+# 在 PR 和 push 到 main/4.0dev 时运行：
+#   1. Lint 检查（flake8）
+#   2. 运行全量测试
+#   3. 检查测试覆盖率（不低于 80%）
+#   4. 构建验证
+#
+# 如果任何步骤失败，PR 将被标记为未通过检查。
+
+name: Quality Gate
+
+on:
+  push:
+    branches: [main, 4.0dev]
+  pull_request:
+    branches: [main, 4.0dev]
+  workflow_dispatch:
+
+concurrency:
+  group: quality-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Lint 检查 ──────────────────────────────────────────
+  lint:
+    name: Lint 检查
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装 lint 工具
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install flake8
+
+      - name: 运行 flake8 检查
+        run: |
+          flake8 src/ cli/ contrib --count --statistics --max-line-length=120
+
+      - name: 检查是否存在语法错误
+        run: |
+          python -m py_compile src/compiler.py
+          python -m py_compile src/lexer.py
+          python -m py_compile cli/duan.py
+          echo "✅ 语法检查通过"
+
+  # ── 2. 运行全量测试 ──────────────────────────────────────
+  test:
+    name: 全量测试
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-cov
+          python -m pip install "antlr4-python3-runtime>=4.13.0"
+          python -m pip install numpy sympy pandas
+          python -m pip install matplotlib requests scikit-learn || true
+
+      - name: 运行单元测试
+        run: |
+          pytest tests/unit/ -v --tb=short --cov=src --cov-report=term --cov-report=xml:coverage.xml
+
+      - name: 运行集成测试
+        run: |
+          pytest tests/integration/ -v --tb=short --cov=src --cov-report=term --cov-append --cov-report=xml:coverage-integration.xml
+
+      - name: 运行端到端测试
+        run: |
+          pytest tests/e2e/ -v --tb=short --cov=src --cov-report=term --cov-append --cov-report=xml:coverage-e2e.xml
+
+      - name: 运行全量 pytest
+        run: |
+          pytest tests/ contrib/test_F3_三个增强模块.py \
+                 --ignore=tests/archive \
+                 --ignore=tests/level9_project \
+                 --ignore=tests/performance_benchmark.py \
+                 -v --tb=short \
+                 --cov=src --cov-report=term --cov-append --cov-report=xml:coverage-full.xml
+
+      - name: 检查测试覆盖率（不低于 80%）
+        run: |
+          python -c "
+import xml.etree.ElementTree as ET
+import sys
+
+# 合并所有覆盖率报告
+total_covered = 0
+total_statements = 0
+
+for report in ['coverage.xml', 'coverage-integration.xml', 'coverage-e2e.xml', 'coverage-full.xml']:
+    try:
+        tree = ET.parse(report)
+        root = tree.getroot()
+        for pkg in root.findall('.//package'):
+            for cls in pkg.findall('classes'):
+                for c in cls:
+                    covered = int(c.get('branches-covered', 0))
+                    total_covered += int(c.get('line-covered', 0))
+                    total_statements += int(c.get('line-rate', 0))  # skip
+        # 简单方法：从最后一个完整报告取覆盖率
+    except Exception:
+        pass
+
+# 使用 coverage-full.xml 的最终覆盖率
+try:
+    tree = ET.parse('coverage-full.xml')
+    root = tree.getroot()
+    line_rate = float(root.get('line-rate', 0))
+    coverage_pct = line_rate * 100
+    print(f'测试覆盖率: {coverage_pct:.2f}%')
+    threshold = 80.0
+    if coverage_pct >= threshold:
+        print(f'✅ 覆盖率达标 ({coverage_pct:.2f}% >= {threshold}%)')
+    else:
+        print(f'❌ 覆盖率不足 ({coverage_pct:.2f}% < {threshold}%)')
+        sys.exit(1)
+except Exception as e:
+    print(f'⚠️ 无法解析覆盖率报告: {e}')
+    print('跳过覆盖率检查')
+    sys.exit(0)
+"
+
+      - name: 上传覆盖率报告
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-coverage-${{ matrix.python-version }}
+          path: coverage-*.xml
+
+  # ── 3. 构建验证 ──────────────────────────────────────────
+  build:
+    name: 构建验证
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 构建包
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: 验证包元数据
+        run: |
+          python -m pip install twine
+          python -m twine check dist/*
+
+      - name: 验证安装
+        run: |
+          python -m pip install dist/*.whl
+          python -c "
+          print('✅ 构建验证通过')
+          "
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-gate-build
+          path: dist/

@@ -8,6 +8,7 @@
 import sys
 import traceback
 import os
+from typing import List, Optional, Tuple, Dict, Any
 
 
 def format_exception(exc_type, exc_value, exc_tb, source_lines=None):
@@ -106,7 +107,7 @@ def install_excepthook():
 
 
 def format_source_context(source, line, col=None, context_lines=3):
-    """格式化源代码上下文"""
+    """格式化源代码上下文（增强版：显示行号、列号箭头、上下文行）"""
     if not source:
         return ""
     
@@ -115,31 +116,93 @@ def format_source_context(source, line, col=None, context_lines=3):
         return ""
     
     result = []
+    result.append("📄 源代码上下文:")
+    result.append("─" * 60)
+    
     start = max(0, line - context_lines - 1)
     end = min(len(lines), line + context_lines)
+    
+    # 计算行号宽度
+    line_width = len(str(len(lines)))
     
     for i in range(start, end):
         line_num = i + 1
         line_content = lines[i].rstrip()
-        prefix = "→ " if line_num == line else "  "
-        result.append(f"{prefix}{line_num:4d} │ {line_content}")
         
-        if line_num == line and col:
-            # 添加列指示符
-            indent = len(str(line_num)) + 5
-            arrow = " " * (indent + min(col, len(line_content)) - 1) + "^"
-            result.append(arrow)
+        if line_num == line:
+            # 错误行：使用箭头标记
+            result.append(f"  → {line_num:>{line_width}} │ {line_content}")
+            if col is not None and col > 0:
+                # 计算箭头位置（考虑行号宽度和前缀）
+                arrow_indent = 6 + line_width + min(col, len(line_content))
+                if col <= len(line_content):
+                    result.append(f"    {' ' * (line_width)} │ {' ' * (min(col, len(line_content)) - 1)}^── 此处")
+                else:
+                    result.append(f"    {' ' * (line_width)} │ {' ' * (len(line_content))}  ^── 此处")
+            else:
+                result.append(f"    {' ' * (line_width)} │{' ' * len(line_content)}  ◀━━ 错误位置")
+        else:
+            result.append(f"    {line_num:>{line_width}} │ {line_content}")
     
+    result.append("─" * 60)
     return '\n'.join(result)
+
+
+def format_error_with_context(error: Exception, source: str = None, 
+                               line: int = 0, col: int = 0) -> str:
+    """整合错误信息、源代码位置、修复建议的完整格式
+    
+    Args:
+        error: 异常对象
+        source: 源代码文本
+        line: 错误行号
+        col: 错误列号
+        
+    Returns:
+        格式化的完整错误信息
+    """
+    parts = []
+    parts.append("")
+    parts.append("┌─────────────────────────────────────────────────────────┐")
+    
+    # 错误类型和消息
+    if isinstance(error, DuanError):
+        parts.append(f"│  {error.__class__.__name__}")
+        parts.append(f"│  {error.message}")
+        if error.hint:
+            parts.append(f"│  提示: {error.hint}")
+        # 修复建议
+        if error.fix_suggestions:
+            parts.append("│")
+            parts.append("│  💡 修复建议:")
+            for i, suggestion in enumerate(error.fix_suggestions, 1):
+                parts.append(f"│    {i}. {suggestion}")
+    else:
+        parts.append(f"│  {type(error).__name__}: {error}")
+    
+    parts.append("└─────────────────────────────────────────────────────────┘")
+    
+    # 源代码上下文
+    if source and line > 0:
+        context = format_source_context(source, line, col)
+        if context:
+            parts.append("")
+            parts.append(context)
+    
+    # 格式化后的完整字符串
+    return '\n'.join(parts)
 
 
 class DuanError(Exception):
     """段言基础错误类"""
-    def __init__(self, message: str, line: int = 0, col: int = 0, hint: str = None):
+    def __init__(self, message: str, line: int = 0, col: int = 0, hint: str = None,
+                 fix_suggestions: List[str] = None, source_lines: List[str] = None):
         self.message = message
         self.line = line
         self.col = col
         self.hint = hint
+        self.fix_suggestions = fix_suggestions or []
+        self.source_lines = source_lines or []
         
         parts = []
         parts.append("\n┌─ 段言错误")
@@ -155,22 +218,208 @@ class DuanError(Exception):
         if hint:
             parts.append(f"│ 提示: {hint}")
         
+        if self.fix_suggestions:
+            parts.append("│")
+            parts.append("│ 💡 修复建议:")
+            for i, s in enumerate(self.fix_suggestions, 1):
+                parts.append(f"│   {i}. {s}")
+        
         parts.append("└─")
         super().__init__('\n'.join(parts))
 
 
 class LexerError(DuanError):
     """词法分析错误"""
-    def __init__(self, message: str, line: int = 0, col: int = 0, hint: str = None):
+    def __init__(self, message: str, line: int = 0, col: int = 0, hint: str = None,
+                 fix_suggestions: List[str] = None):
+        # 自动匹配常见词法错误的修复建议
+        if fix_suggestions is None:
+            fix_suggestions = DuanErrorFormatter.get_fix_suggestions('LexerError', message)
         message = f"词法分析错误: {message}"
-        super().__init__(message, line, col, hint)
+        super().__init__(message, line, col, hint, fix_suggestions)
 
 
 class SemanticError(DuanError):
     """语义分析错误"""
-    def __init__(self, message: str, line: int = 0, col: int = 0, hint: str = None):
+    def __init__(self, message: str, line: int = 0, col: int = 0, hint: str = None,
+                 fix_suggestions: List[str] = None):
+        # 自动匹配常见语义错误的修复建议
+        if fix_suggestions is None:
+            fix_suggestions = DuanErrorFormatter.get_fix_suggestions('SemanticError', message)
         message = f"语义错误: {message}"
-        super().__init__(message, line, col, hint)
+        super().__init__(message, line, col, hint, fix_suggestions)
+
+
+class ParseError(DuanError):
+    """语法解析错误"""
+    def __init__(self, message: str, line: int = 0, col: int = 0, hint: str = None,
+                 fix_suggestions: List[str] = None):
+        if fix_suggestions is None:
+            fix_suggestions = DuanErrorFormatter.get_fix_suggestions('ParseError', message)
+        message = f"语法错误: {message}"
+        super().__init__(message, line, col, hint, fix_suggestions)
+
+
+class DuanErrorFormatter:
+    """统一错误格式化器"""
+    
+    # 常见错误的自动修复建议字典
+    FIX_SUGGESTIONS = {
+        'LexerError': {
+            '未闭合的字符串': [
+                '在字符串末尾添加闭合引号: "..."',
+                '检查字符串内是否有转义字符',
+                '确保字符串使用相同的引号开头和结尾',
+            ],
+            '字符串未闭合': [
+                '在字符串末尾添加闭合引号: "..."',
+                '检查字符串内是否有转义字符',
+                '确保字符串使用相同的引号开头和结尾',
+            ],
+            '未知字符': [
+                '检查输入中是否有非法字符',
+                '使用允许的字符集重新输入',
+                '段言支持中文字符、英文字母、数字和基本标点符号',
+            ],
+            '书名号': [
+                '确保书名号《》成对出现',
+                '检查段落名是否以《》包裹',
+                '示例: 段落《我的段落》',
+            ],
+            'f-string': [
+                '检查f-string的引号是否闭合',
+                '确保f-string中的表达式语法正确',
+                'f-string示例: f"值为{变量}"',
+            ],
+            '中文数字': [
+                '检查中文数字格式是否正确',
+                '支持的中文数字: 零一二三四五六七八九十百千万亿',
+            ],
+        },
+        'SemanticError': {
+            '未定义的变量': [
+                '检查变量名拼写是否正确',
+                '在使用变量前先声明: 设 变量名 为 值',
+                '检查变量是否在正确的作用域内',
+            ],
+            '未定义的名称': [
+                '检查名称拼写是否正确',
+                '确认该名称已被定义或导入',
+                '检查是否遗漏了"导入"语句',
+            ],
+            '类型不匹配': [
+                '检查操作数的类型是否正确',
+                '确保函数参数类型与声明一致',
+                '使用类型转换函数（如 转整数、转字符串）',
+            ],
+            '重复定义': [
+                '移除重复的变量或函数定义',
+                '使用不同的名称避免冲突',
+                '检查是否意外导入了同名的模块',
+            ],
+            '参数数量': [
+                '检查函数调用时参数数量是否匹配',
+                '查看函数定义需要的参数个数',
+                '确保参数之间用逗号分隔',
+            ],
+            '作用域': [
+                '检查变量是否在正确的作用域内',
+                '在函数内部定义的变量不能在外部访问',
+                '如需访问外部变量，请使用参数传递',
+            ],
+        },
+        'ParseError': {
+            '语法': [
+                '检查代码语法是否正确',
+                '确保所有括号、引号都已闭合',
+                '检查中英文标点符号是否混用',
+            ],
+            '冒号': [
+                '确保块语句后有冒号（如：如果...：）',
+                '中英文冒号均可使用',
+                '示例: 如果 条件:',
+            ],
+            '缩进': [
+                '检查缩进是否正确（建议使用4个空格）',
+                '不要混用Tab和空格',
+                '同一代码块内的语句缩进必须一致',
+            ],
+            '括号': [
+                '检查括号是否匹配',
+                '确保左括号(和右括号)数量一致',
+                '使用嵌套括号时注意层级关系',
+            ],
+            '引号': [
+                '检查引号是否闭合',
+                '字符串必须使用引号包裹',
+                '示例: "这是一个字符串"',
+            ],
+        },
+    }
+    
+    @staticmethod
+    def get_fix_suggestions(error_type: str, message: str) -> List[str]:
+        """根据错误类型和消息自动匹配修复建议
+        
+        Args:
+            error_type: 错误类型名称（如 'LexerError', 'SemanticError'）
+            message: 错误消息文本
+            
+        Returns:
+            匹配的修复建议列表，未匹配时返回空列表
+        """
+        suggestions_map = DuanErrorFormatter.FIX_SUGGESTIONS.get(error_type, {})
+        matched = []
+        for keyword, suggestions in suggestions_map.items():
+            if keyword in message:
+                matched.extend(suggestions)
+        return matched
+    
+    @staticmethod
+    def format(error: Exception, source: str = None) -> str:
+        """统一格式化错误
+        
+        Args:
+            error: 异常对象
+            source: 可选的源代码
+            
+        Returns:
+            格式化的错误信息
+        """
+        if isinstance(error, DuanError):
+            return format_error_with_context(error, source, error.line, error.col)
+        else:
+            # 普通异常
+            parts = []
+            parts.append(f"\n┌─ 错误: {type(error).__name__}")
+            parts.append(f"│ {error}")
+            
+            # 尝试获取修复建议
+            suggestions = DuanErrorFormatter.get_fix_suggestions(
+                type(error).__name__, str(error))
+            if suggestions:
+                parts.append("│")
+                parts.append("│ 💡 修复建议:")
+                for i, s in enumerate(suggestions, 1):
+                    parts.append(f"│   {i}. {s}")
+            
+            parts.append("└─")
+            return '\n'.join(parts)
+    
+    @staticmethod
+    def format_with_source(error: Exception, source: str, line: int, col: int) -> str:
+        """带源代码标注的格式化
+        
+        Args:
+            error: 异常对象
+            source: 源代码文本
+            line: 错误行号
+            col: 错误列号
+            
+        Returns:
+            带源代码标注的完整错误信息
+        """
+        return format_error_with_context(error, source, line, col)
 
 
 # 安装默认的异常处理器

@@ -51,6 +51,10 @@ repl = [
 docs = [
     "sphinx>=7.0.0",
     "sphinx-rtd-theme>=1.3.0",
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.0.0",
+    "mkdocs-git-revision-date-localized-plugin>=1.2.0",
+    "pymdown-extensions>=10.0.0",
 ]
 
 [project.urls]
@@ -82,6 +86,19 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "_test_*.py"]
 addopts = "-v --tb=short --ignore=tests/archive"
 norecursedirs = ["archive", "__pycache__"]
+
+[tool.coverage.run]
+source = ["src"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/.github/*",
+]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_empty = true
 
 [tool.flake8]
 max-line-length = 120

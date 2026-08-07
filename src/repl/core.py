@@ -9,7 +9,7 @@
 
 import sys
 import os
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 # 添加路径
 _current_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -19,6 +19,9 @@ sys.path.insert(0, os.path.join(_current_dir, 'antlrparser'))
 
 from .executor import Executor, Environment
 from .commands import CommandHandler
+from .highlighter import DuanHighlighter
+from .completer import DuanCompleter
+from errors import DuanError, DuanErrorFormatter, format_source_context, format_error_with_context
 
 
 # =============================================================================
@@ -34,6 +37,8 @@ class DuanREPL:
     - 历史记录
     - 多行支持
     - 命令处理
+    - 语法高亮
+    - 代码补全
     """
 
     def __init__(self, enhanced: bool = False):
@@ -43,12 +48,17 @@ class DuanREPL:
             enhanced: 是否使用增强模式（prompt_toolkit）
         """
         self.executor = Executor()
+        self.highlighter = DuanHighlighter(use_color=True)
+        self.completer = DuanCompleter(
+            env=self.executor.env.variables if self.executor.env else {}
+        )
         self.command_handler = CommandHandler(
-            env=self.executor.env.variables,
+            env=self.executor.env.variables if self.executor.env else {},
             executor=self.executor
         )
         self.buffer: List[str] = []
         self.history: List[str] = []
+        self._history_index = -1  # 历史导航索引
         self.debug_mode = False
         self.enhanced = enhanced
 
@@ -66,8 +76,13 @@ class DuanREPL:
         else:
             self._use_enhanced = False
 
+    # ------------------------------------------------------------------
+    # 多行检测
+    # ------------------------------------------------------------------
+
     def _is_multiline_start(self, line: str) -> bool:
         """判断是否是多行开始"""
+        line = line.strip()
         starters = ['函数', '段落', '类', '接口', '如果', '当', '遍历', '尝试']
         for s in starters:
             if line.startswith(s) and (line.endswith(':') or line.endswith('：')):
@@ -78,17 +93,100 @@ class DuanREPL:
         """判断是否是多行结束"""
         return line.strip() in ['结束。', '结束', '结束。', '否则', '否则：', '否则:']
 
+    def _is_indented_block(self, line: str) -> bool:
+        """判断是否是缩进块中的行"""
+        stripped = line.strip()
+        if not stripped:
+            return False
+        # 缩进块中的行以缩进开头
+        return line.startswith(' ') or line.startswith('\t')
+
+    def _is_continuation(self, line: str) -> bool:
+        """判断当前行是否需要继续输入"""
+        stripped = line.strip()
+        if not stripped:
+            return False
+        # 以运算符结尾的行需要继续
+        operators = ['+', '-', '*', '/', '加', '减', '乘', '除', '且', '或', '，', ',']
+        for op in operators:
+            if stripped.endswith(op):
+                return True
+        # 未闭合的括号
+        if stripped.count('(') > stripped.count(')'):
+            return True
+        if stripped.count('[') > stripped.count(']'):
+            return True
+        return False
+
+    # ------------------------------------------------------------------
+    # 缓冲区管理
+    # ------------------------------------------------------------------
+
     def execute_buffer(self) -> Optional[str]:
         """执行缓冲区代码"""
+        if not self.buffer:
+            return None
+
         code = '\n'.join(self.buffer)
         self.buffer = []
         self.history.append(code)
 
+        return self._execute_code(code)
+
+    def _execute_code(self, code: str) -> Optional[str]:
+        """执行代码并格式化错误
+
+        Args:
+            code: 要执行的段言代码
+
+        Returns:
+            执行结果或错误信息
+        """
         try:
-            self.executor.execute(code)
-            return "执行完成"
+            result = self.executor.execute(code)
+
+            # 高亮显示结果
+            if result is not None:
+                output = str(result)
+                # 尝试高亮输出
+                try:
+                    highlighted = self.highlighter.highlight(output)
+                    return highlighted
+                except Exception:
+                    return output
+
+            return None
+        except DuanError as e:
+            # 使用 DuanErrorFormatter 格式化段言错误
+            return DuanErrorFormatter.format(e, code)
+        except SyntaxError as e:
+            # 语法错误
+            line = e.lineno or 0
+            col = e.offset or 0
+            context = format_source_context(code, line, col)
+            msg = f"语法错误: {e.msg}"
+            if context:
+                msg += f"\n{context}"
+            return msg
         except Exception as e:
-            return f"错误: {e}"
+            # 其他错误
+            import traceback
+            tb = traceback.format_exc()
+            # 尝试提取行号
+            line = 0
+            if hasattr(e, 'lineno'):
+                line = e.lineno
+            elif hasattr(e, 'line'):
+                line = e.line
+            context = format_source_context(code, line) if line else ""
+            msg = f"错误: {type(e).__name__}: {e}"
+            if context:
+                msg += f"\n{context}"
+            return msg
+
+    # ------------------------------------------------------------------
+    # 输入处理
+    # ------------------------------------------------------------------
 
     def process_input(self, line: str) -> Optional[str]:
         """处理输入"""
@@ -115,24 +213,33 @@ class DuanREPL:
                 return None
             elif result == 'RESET':
                 self.executor.reset()
+                self.completer.update_env(
+                    self.executor.env.variables if self.executor.env else {}
+                )
                 return "环境已重置"
 
             return result
 
-        # 多行检测
-        if self._is_multiline_start(line):
+        # 多行检测：缩进块
+        if self.buffer:
+            # 已经在缓冲区中
+            if self._is_multiline_end(line):
+                self.buffer.append(line)
+                return self.execute_buffer()
             self.buffer.append(line)
             return None
 
-        # 添加到缓冲区
-        if self.buffer:
+        # 多行开始
+        if self._is_multiline_start(line) or self._is_continuation(line):
             self.buffer.append(line)
-            if self._is_multiline_end(line):
-                return self.execute_buffer()
             return None
 
         # 单行执行
         return self.execute_line(line)
+
+    # ------------------------------------------------------------------
+    # 输入输出
+    # ------------------------------------------------------------------
 
     def print_banner(self):
         """打印欢迎信息"""
@@ -144,8 +251,47 @@ class DuanREPL:
 ║  输入段言代码，按 Enter 执行                  ║
 ║  输入 :help 获取帮助                         ║
 ║  输入 :exit 或按 Ctrl+D 退出                 ║
+║                                              ║
+║  支持: 多行输入 / 代码补全 / 语法高亮         ║
+║        调试模式 / 断点 / 变量监视             ║
 ╚══════════════════════════════════════════════╝
 """)
+
+    def read_input(self, prompt: str) -> Optional[str]:
+        """读取用户输入（支持历史导航）"""
+        # 在增强模式下使用 prompt_toolkit
+        if self._use_enhanced:
+            return self._enhanced_impl.read_input(prompt)
+
+        try:
+            line = input(prompt)
+            return line
+        except EOFError:
+            return None
+
+    # ------------------------------------------------------------------
+    # 执行
+    # ------------------------------------------------------------------
+
+    def execute_line(self, line: str) -> Optional[str]:
+        """执行单行代码"""
+        self.history.append(line)
+        return self._execute_code(line)
+
+    def execute(self, code: str):
+        """执行代码并返回结果
+
+        Args:
+            code: 段言代码
+
+        Returns:
+            执行结果
+        """
+        return self.executor.execute(code)
+
+    # ------------------------------------------------------------------
+    # 主循环
+    # ------------------------------------------------------------------
 
     def run(self):
         """启动REPL主循环"""
@@ -167,9 +313,13 @@ class DuanREPL:
                 # 处理输入
                 result = self.process_input(line)
 
-                # 显示结果
+                # 显示结果（对结果进行语法高亮）
                 if result and result != 'EXIT':
-                    print(result)
+                    # 如果是错误信息，直接显示（已包含格式化）
+                    if result.startswith(('错误:', '语法错误:', '┌─', '┌─')):
+                        print(result, file=sys.stderr)
+                    else:
+                        print(result)
 
                 if result == 'EXIT':
                     print("再见！")
@@ -181,38 +331,6 @@ class DuanREPL:
             except EOFError:
                 print("\n再见！")
                 break
-
-    def read_input(self, prompt: str) -> Optional[str]:
-        """读取用户输入"""
-        try:
-            return input(prompt)
-        except EOFError:
-            return None
-
-    def execute_line(self, line: str) -> Optional[str]:
-        """执行单行代码"""
-        self.history.append(line)
-
-        try:
-            result = self.executor.execute(line)
-
-            if result is not None:
-                return str(result)
-
-            return None
-        except Exception as e:
-            return f"错误: {e}"
-
-    def execute(self, code: str):
-        """执行代码并返回结果
-
-        Args:
-            code: 段言代码
-
-        Returns:
-            执行结果
-        """
-        return self.executor.execute(code)
 
 
 # =============================================================================

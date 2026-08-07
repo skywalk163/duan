@@ -1,5 +1,9 @@
 .vscode/**
-.vscode-test/**
-node_modules/**
 .git/**
+.gitignore
+node_modules/**
+src/**
+tests/**
+**/*.pyc
+**/__pycache__/**
 *.vsix
