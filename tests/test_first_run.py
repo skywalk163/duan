@@ -248,7 +248,7 @@ class TestTutorialEngine:
 
     def test_engine_steps_have_titles(self, engine):
         """测试所有步骤都有标题"""
-        for step in engine.steps:
+        for step in engine.tutorial.steps:
             assert step.title, f"Step {step.step_id} missing title"
             assert step.task, f"Step {step.step_id} missing task"
             assert step.hint, f"Step {step.step_id} missing hint"
@@ -326,8 +326,8 @@ class TestTutorialEngine:
         """测试创建首次运行教程"""
         from interactive_tutorial import create_first_run_tutorial
         engine = create_first_run_tutorial()
-        assert len(engine.steps) == 5
-        titles = [s.title for s in engine.steps]
+        assert len(engine.tutorial.steps) == 5
+        titles = [s.title for s in engine.tutorial.steps]
         assert "Hello World" in titles
         assert "变量与赋值" in titles
         assert "定义函数（段落）" in titles
@@ -388,9 +388,10 @@ class TestTutorialProgress:
     @pytest.fixture
     def engine(self):
         """创建教程引擎（使用临时进度文件）"""
-        from interactive_tutorial import TutorialEngine, TutorialStep
+        from interactive_tutorial import TutorialEngine, TutorialStep, TutorialDefinition
         step = TutorialStep(0, "Test", "", "", "", "", expected_output="ok")
-        eng = TutorialEngine([step])
+        tutorial = TutorialDefinition("test", "Test", "", "beginner", [step])
+        eng = TutorialEngine(tutorial)
         # 指向临时路径
         with tempfile.TemporaryDirectory() as tmpdir:
             eng.PROGRESS_FILE = os.path.join(tmpdir, "progress.json")
@@ -403,9 +404,10 @@ class TestTutorialProgress:
         engine._save_progress()
 
         # 创建新引擎实例加载进度
-        from interactive_tutorial import TutorialEngine, TutorialStep
+        from interactive_tutorial import TutorialEngine, TutorialStep, TutorialDefinition
         step = TutorialStep(0, "Test", "", "", "", "", expected_output="ok")
-        new_engine = TutorialEngine([step])
+        tutorial = TutorialDefinition("test", "Test", "", "beginner", [step])
+        new_engine = TutorialEngine(tutorial)
         new_engine.PROGRESS_FILE = engine.PROGRESS_FILE
         new_engine._load_progress()
 
@@ -419,7 +421,12 @@ class TestTutorialProgress:
         assert os.path.exists(engine.PROGRESS_FILE)
 
         engine.clear_progress()
-        assert not os.path.exists(engine.PROGRESS_FILE)
+        # 清除后，文件应仍存在但当前教程的进度已被移除
+        assert os.path.exists(engine.PROGRESS_FILE)
+        with open(engine.PROGRESS_FILE, 'r', encoding='utf-8') as f:
+            import json
+            data = json.load(f)
+        assert "test" not in data
 
 
 # =============================================================================

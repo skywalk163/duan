@@ -35,7 +35,7 @@ sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
 
-VERSION = '段言编译器 v6.0.0'
+VERSION = '段言编译器 v6.2.0'
 
 
 # ═══════════════════════════════════════════════════════════════════

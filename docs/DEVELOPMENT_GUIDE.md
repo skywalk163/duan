@@ -106,7 +106,7 @@ export LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config
 
 ```bash
 python -m cli.duan --version
-# 应输出：段言 v6.1.0
+# 应输出：段言 v6.2.0
 
 python -m cli.duan run examples/hello.duan
 # 应输出：你好，段言！
@@ -907,8 +907,8 @@ python -m build
 twine upload dist/*
 
 # 创建 Git 标签
-git tag -a v6.1.0 -m "v6.1.0"
-git push origin v6.1.0
+git tag -a v6.2.0 -m "v6.2.0"
+git push origin v6.2.0
 
 # 发布 Release Notes
 # 在 GitHub 上创建 Release，附上 CHANGELOG 内容

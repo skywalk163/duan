@@ -922,11 +922,16 @@ def run_tutorial(tutorial_id: str, resume: bool = False):
     engine.run()
 
 
-def run_first_run_tutorial() -> bool:
-    """运行首次入门教程（兼容旧版入口）"""
+def create_first_run_tutorial() -> TutorialEngine:
+    """创建首次入门教程引擎（用于测试）"""
     all_tutorials = create_all_tutorials()
     tutorial = all_tutorials["beginner"]
-    engine = TutorialEngine(tutorial)
+    return TutorialEngine(tutorial)
+
+
+def run_first_run_tutorial() -> bool:
+    """运行首次入门教程（兼容旧版入口）"""
+    engine = create_first_run_tutorial()
     return engine.run()
 
 

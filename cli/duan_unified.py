@@ -115,7 +115,83 @@ class DuanUnifiedCLI:
         
         return 0
     
-    def compile_with_src(self, source: str, output_file: Optional[str] = None, run: bool = False, target: str = 'python') -> int:
+    def _resolve_user_module_imports(self, source: str, source_dir: str,
+                                      resolved: set = None) -> str:
+        """解析用户自定义模块导入，将模块源码内联到主源码中。
+
+        src 后端在生成 Python 代码时，会将 `从 清洗器 导入 ...` 直接翻译为
+        `from 清洗器 import ...`，但 Python 解析器无法识别中文模块名。
+        本方法在解析前将用户自定义模块的源码内联，消除跨模块导入依赖。
+
+        Args:
+            source: 源代码
+            source_dir: 源文件所在目录（用于查找模块文件）
+            resolved: 已解析的模块名集合（避免循环依赖）
+
+        Returns:
+            内联后的源码（所有用户模块已内联为单一源码）
+        """
+        import re
+        import os
+        from duan_parser_v3 import DuanParser, ImportStmt
+
+        if resolved is None:
+            resolved = set()
+
+        # 已知的标准库 / Python 模块名（不应被内联）
+        KNOWN_STDLIB = {
+            '文件系统', 'JSON', 'sys', '字符串工具', '数学', '时间', '日期时间',
+            'csv', 'json', 'os', 're', 'random', 'math', 'datetime', 'time',
+            'pathlib', 'typing', 'collections', 'itertools', 'functools',
+            'subprocess', 'shutil', 'glob', 'tempfile', 'io', 'builtins',
+            '复制', 'os路径',
+        }
+
+        # 解析源码以提取导入语句
+        parser = DuanParser()
+        module = parser.parse(source)
+        if not module:
+            return source
+
+        # 收集用户自定义模块导入
+        replacements = []
+        for stmt in getattr(module, 'statements', []):
+            if not isinstance(stmt, ImportStmt):
+                continue
+            mod_name = stmt.module_name
+            if mod_name in resolved or mod_name in KNOWN_STDLIB:
+                continue
+            # 检查模块文件是否存在
+            mod_path = os.path.join(source_dir, f"{mod_name}.duan")
+            if not os.path.exists(mod_path):
+                continue
+            # 读取模块源码
+            with open(mod_path, 'r', encoding='utf-8') as f:
+                mod_source = f.read()
+            # 递归解析模块中的导入
+            resolved.add(mod_name)
+            mod_source = self._resolve_user_module_imports(
+                mod_source, source_dir, resolved
+            )
+            # 构建匹配导入语句的正则表达式
+            # 格式: 从 模块名 导入 符号1, 符号2, ...
+            # 或: 导入 模块名。
+            # 使用 re.DOTALL 以支持多行符号列表
+            if stmt.symbols:
+                pattern = rf'从\s+{re.escape(mod_name)}\s+导入\s+.+?。'
+            else:
+                pattern = rf'导入\s+{re.escape(mod_name)}。'
+            replacements.append((pattern, mod_source))
+
+        # 逆序替换，保持行号位置正确
+        for pattern, mod_source in reversed(replacements):
+            source = re.sub(pattern, mod_source, source, count=1, flags=re.DOTALL)
+
+        return source
+
+    def compile_with_src(self, source: str, output_file: Optional[str] = None,
+                         run: bool = False, target: str = 'python',
+                         source_file: str = None) -> int:
         """使用src手写解析器编译
         
         Args:
@@ -123,6 +199,7 @@ class DuanUnifiedCLI:
             output_file: 输出文件路径
             run: 是否执行
             target: 目标格式 ('python' 或 'llvm')
+            source_file: 源文件路径（用于解析用户模块导入）
         """
         from compiler import DuanCompiler
         
@@ -160,6 +237,12 @@ class DuanUnifiedCLI:
             #   Paragraph/段落定义丢弃，导致运行时 NameError 或生成器报
             #   “未知语句类型 VariableDeclaration”，与 cli/duan.py 的
             #   _compile_src 保持一致的可用路径）
+
+            # 解析用户自定义模块导入（内联 .duan 文件内容）
+            if source_file:
+                source_dir = os.path.dirname(os.path.abspath(source_file))
+                source = self._resolve_user_module_imports(source, source_dir)
+
             from duan_parser_v3 import DuanParser
             from code_generator import PythonCodeGenerator
 
@@ -191,12 +274,24 @@ class DuanUnifiedCLI:
             
             return 0
     
-    def interpret_run(self, source_file: str) -> int:
-        """使用编译器编译并运行（替代旧版解释器）"""
+    def interpret_run(self, source_file: str, script_args: list = None) -> int:
+        """使用编译器编译并运行（替代旧版解释器）
+        
+        Args:
+            source_file: 源文件路径
+            script_args: 传递给脚本的参数列表（不含文件路径）
+        """
         try:
             with open(source_file, 'r', encoding='utf-8') as f:
                 source = f.read()
-            return self.compile_with_src(source, run=True)
+            # 设置脚本的 sys.argv
+            old_argv = sys.argv
+            if script_args:
+                sys.argv = [source_file] + script_args
+            try:
+                return self.compile_with_src(source, run=True, source_file=source_file)
+            finally:
+                sys.argv = old_argv
         except Exception as e:
             print(f"[运行错误] {e}", file=sys.stderr)
             import traceback
@@ -461,13 +556,14 @@ def main():
         pkg_build_parser.add_argument('--incremental', action='store_true', help='使用增量编译（仅编译变更文件）')
         pkg_build_parser.add_argument('--force', '-f', action='store_true', help='强制全量编译（忽略增量缓存）')
         
-        args = parser.parse_args()
+        args, unknown = parser.parse_known_args()
         
         if args.command == 'run':
             if not os.path.exists(args.file):
                 print(f"[错误] 文件不存在: {args.file}", file=sys.stderr)
                 return 1
-            return cli.interpret_run(args.file)
+            # 将未知参数作为脚本参数传递（--input, --output 等）
+            return cli.interpret_run(args.file, script_args=unknown)
         
         elif args.command == 'compile':
             if not os.path.exists(args.file):
@@ -545,7 +641,7 @@ def main():
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
         parser.add_argument('--welcome', action='store_true',
                            help='显示首次运行欢迎引导')
-        parser.add_argument('--version', action='version', version='段言 v6.0.0')
+        parser.add_argument('--version', action='version', version='段言 v6.2.0')
         
         args = parser.parse_args()
         

@@ -50,6 +50,11 @@ E2E_EXCLUDED = {
     'data_pipeline_enhanced/主.duan',
     'snake_game/主.duan',
     'todo_cli/主.duan',
+    # 数据清洗工具（需命令行参数）
+    'data_cleaner/主程序.duan',
+    'data_cleaner/清洗器.duan',
+    'data_cleaner/分析器.duan',
+    'data_cleaner/转换器.duan',
 }
 
 EXAMPLES_DIR = REPO_ROOT / 'examples'

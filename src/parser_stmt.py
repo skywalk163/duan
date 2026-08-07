@@ -1918,6 +1918,16 @@ class ParserStmtMixin:
                     current.else_body = else_body
                     break
         
+        # 消耗结束（如果存在）
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
+        elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
+            self._consume(TokenType.IDENTIFIER)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
+        
         return result
     
     def _parse_foreach_stmt(self, is_async: bool = False) -> ForeachStmt:
@@ -2033,6 +2043,16 @@ class ParserStmtMixin:
         # 消耗 DEDENT（循环体结束）
         if self._current() and self._current().type == TokenType.DEDENT:
             self._consume(TokenType.DEDENT)
+        
+        # 消耗"结束"关键字（可选）
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
+            self._consume(TokenType.KEYWORD, '结束')
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
+        elif self._current() and self._current().type == TokenType.IDENTIFIER and self._current().value == '结束':
+            self._consume(TokenType.IDENTIFIER)
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
         
         return ForeachStmt(variable, iterable, body, is_async=is_async)
     
