@@ -118,7 +118,8 @@ def get_target_triple(target_arch: str, target_platform: str = None) -> str:
             return 'x86_64-unknown-linux-gnu'
 
 
-def get_optimization_flags(optimize_level: int) -> list:
+def get_optimization_flags(optimize_level: int, optimize_size: bool = False,
+                           lto: bool = False) -> list:
     """根据优化级别返回 clang 编译参数
 
     将 -O0/-O1/-O2/-O3 映射到对应的 clang 编译参数，
@@ -126,32 +127,81 @@ def get_optimization_flags(optimize_level: int) -> list:
 
     Args:
         optimize_level: 优化级别（0-3）
+        optimize_size: 是否启用 -Os 尺寸优化（覆盖 optimize_level 的 -Ox 标志）
+        lto: 是否启用 LTO (Link Time Optimization)
 
     Returns:
         clang 编译参数列表
     """
-    flags = [f'-O{optimize_level}']
+    if optimize_size:
+        flags = ['-Os', '-fdata-sections', '-ffunction-sections']
+        if sys.platform != 'darwin':
+            flags.extend(['-Wl,--gc-sections'])
+        else:
+            flags.extend(['-Wl,-dead_strip'])
+    else:
+        flags = [f'-O{optimize_level}']
 
     # 根据优化级别添加 LLVM Pass 控制参数
-    if optimize_level >= 1:
+    if not optimize_size and optimize_level >= 1:
         # -O1 及以上：启用内联、mem2reg（SSA 构建）
         flags.extend(['-mllvm', '-inline'])
         flags.extend(['-mllvm', '-mem2reg'])
 
-    if optimize_level >= 2:
+    if not optimize_size and optimize_level >= 2:
         # -O2 及以上：启用循环展开、合并、GVN
         flags.extend(['-mllvm', '-loop-unroll'])
         flags.extend(['-mllvm', '-loop-rotate'])
         flags.extend(['-mllvm', '-gvn'])
 
-    if optimize_level >= 3:
+    if not optimize_size and optimize_level >= 3:
         # -O3：启用向量化、SLP、更多循环优化
         flags.extend(['-mllvm', '-loop-vectorize'])
         flags.extend(['-mllvm', '-slp-vectorize'])
         flags.extend(['-mllvm', '-licm'])
         flags.extend(['-mllvm', '-simplifycfg'])
 
+    # LTO (Link Time Optimization)
+    if lto:
+        flags.append('-flto')
+        if sys.platform == 'win32':
+            flags.append('-fuse-ld=lld')
+        elif sys.platform == 'darwin':
+            flags.append('-flto=full')
+        else:
+            flags.append('-flto=auto')
+
     return flags
+
+
+def get_size_reduction_summary(original_size: int, stripped_size: int) -> str:
+    """生成体积缩减报告
+
+    Args:
+        original_size: 原始文件大小（字节）
+        stripped_size: 优化后文件大小（字节）
+
+    Returns:
+        格式化的体积缩减报告字符串
+    """
+    reduction = original_size - stripped_size
+    reduction_pct = (reduction / max(original_size, 1)) * 100
+    return (
+        f"体积优化摘要:\n"
+        f"  - 优化前: {_format_size(original_size)}\n"
+        f"  - 优化后: {_format_size(stripped_size)}\n"
+        f"  - 缩减:   {_format_size(reduction)} ({reduction_pct:.1f}%)"
+    )
+
+
+def _format_size(size_bytes: int) -> str:
+    """将字节数格式化为人类可读的大小"""
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    elif size_bytes < 1024 * 1024:
+        return f"{size_bytes / 1024:.1f} KB"
+    else:
+        return f"{size_bytes / (1024 * 1024):.1f} MB"
 
 
 def compile_source(source: str, verbose: bool = False) -> str:
@@ -300,7 +350,8 @@ def compile_source_to_ir(source: str, output_ll: str = None, verbose: bool = Fal
 
 
 def compile_duan(source_path: str, output_path: str = None, verbose: bool = False,
-                 target: str = None, optimize_level: int = 2, debug: bool = False):
+                 target: str = None, optimize_level: int = 2, debug: bool = False,
+                 optimize_size: bool = False, lto: bool = False, strip: bool = False):
     """
     编译 .duan 文件为原生可执行文件
 
@@ -311,6 +362,9 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
         target: 目标架构（'x86_64'/'aarch64'/'arm64'），默认本地架构
         optimize_level: 优化级别（0-3），默认 2
         debug: 是否生成 DWARF 调试信息
+        optimize_size: 是否启用 -Os 尺寸优化（替代 -O2）
+        lto: 是否启用 LTO (Link Time Optimization)
+        strip: 是否剥离调试符号
     """
     # 读取源码
     with open(source_path, 'r', encoding='utf-8') as f:
@@ -347,7 +401,7 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
     runtime_c = os.path.join(runtime_dir, 'runtime.c')
     runtime_o = base_path + '_runtime.o'
 
-    opt_flags = get_optimization_flags(optimize_level)
+    opt_flags = get_optimization_flags(optimize_level, optimize_size=optimize_size, lto=lto)
     arch_flags = get_arch_specific_cflags(target_arch)
     debug_flags = ['-g'] if debug else []
 
@@ -384,6 +438,9 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
         link_args.append('-g')
     if not sys.platform.startswith('win'):
         link_args.append('-lm')
+    # LTO 链接参数
+    if lto:
+        link_args.append('-flto')
 
     result = subprocess.run(
         link_args,
@@ -391,6 +448,24 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
     )
     if result.returncode != 0:
         raise RuntimeError(f"链接失败:\n{result.stderr}")
+
+    # 剥离调试符号
+    original_size = os.path.getsize(exe_path) if os.path.exists(exe_path) else 0
+    if strip and not debug:
+        try:
+            if sys.platform == 'win32':
+                strip_tools = ['llvm-strip', 'strip']
+                for tool in strip_tools:
+                    try:
+                        subprocess.run([tool, exe_path], capture_output=True, timeout=30)
+                        break
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        continue
+            else:
+                subprocess.run(['strip', exe_path], check=True, timeout=30)
+        except (subprocess.SubprocessError, OSError):
+            if verbose:
+                print("  [警告] 无法剥离调试符号")
 
     # 清理临时文件
     if verbose:
@@ -404,15 +479,18 @@ def compile_duan(source_path: str, output_path: str = None, verbose: bool = Fals
             pass
 
     if verbose:
-        size = os.path.getsize(exe_path)
-        print(f"编译成功: {source_path} -> {exe_path} ({size} 字节)")
+        final_size = os.path.getsize(exe_path)
+        print(f"编译成功: {source_path} -> {exe_path} ({final_size} 字节)")
+        if original_size > 0 and strip:
+            print(get_size_reduction_summary(original_size, final_size))
 
     return exe_path
 
 
 def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool = False,
                        target_platform: str = None, target: str = None,
-                       optimize_level: int = 2, debug: bool = False):
+                       optimize_level: int = 2, debug: bool = False,
+                       optimize_size: bool = False, lto: bool = False, strip: bool = False):
     """
     编译 .duan 文件为原生可执行文件（typed 模式）
 
@@ -426,6 +504,9 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
         target: 目标架构（'x86_64'/'aarch64'/'arm64'），默认本地架构
         optimize_level: 优化级别（0-3），默认 2
         debug: 是否生成 DWARF 调试信息
+        optimize_size: 是否启用 -Os 尺寸优化（替代 -O2）
+        lto: 是否启用 LTO (Link Time Optimization)
+        strip: 是否剥离调试符号
     """
     with open(source_path, 'r', encoding='utf-8') as f:
         source = f.read()
@@ -465,7 +546,7 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     runtime_o = base_path + '_runtime.o'
 
     # 使用优化级别对应的编译参数
-    opt_flags = get_optimization_flags(optimize_level)
+    opt_flags = get_optimization_flags(optimize_level, optimize_size=optimize_size, lto=lto)
     arch_flags = get_arch_specific_cflags(target_arch)
     debug_flags = ['-g'] if debug else []
 
@@ -502,6 +583,8 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
         link_args.append('-g')
     if not sys.platform.startswith('win'):
         link_args.append('-lm')
+    if lto:
+        link_args.append('-flto')
 
     result = subprocess.run(
         link_args,
@@ -509,6 +592,23 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
     )
     if result.returncode != 0:
         raise RuntimeError(f"链接失败:\n{result.stderr}")
+
+    # 剥离调试符号
+    original_size = os.path.getsize(exe_path) if os.path.exists(exe_path) else 0
+    if strip and not debug:
+        try:
+            if sys.platform == 'win32':
+                for tool in ['llvm-strip', 'strip']:
+                    try:
+                        subprocess.run([tool, exe_path], capture_output=True, timeout=30)
+                        break
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        continue
+            else:
+                subprocess.run(['strip', exe_path], check=True, timeout=30)
+        except (subprocess.SubprocessError, OSError):
+            if verbose:
+                print("  [警告] 无法剥离调试符号")
 
     if verbose:
         print(f"[6/6] 清理临时文件...")
@@ -521,8 +621,10 @@ def compile_duan_typed(source_path: str, output_path: str = None, verbose: bool 
             pass
 
     if verbose:
-        size = os.path.getsize(exe_path)
-        print(f"编译成功: {source_path} -> {exe_path} ({size} 字节)")
+        final_size = os.path.getsize(exe_path)
+        print(f"编译成功: {source_path} -> {exe_path} ({final_size} 字节)")
+        if original_size > 0 and strip:
+            print(get_size_reduction_summary(original_size, final_size))
 
     return exe_path
 
@@ -858,7 +960,8 @@ def compile_modules_typed(sources: dict, main_module: str = None, verbose: bool 
 
 def compile_duan_project(source_path: str, output_path: str = None, verbose: bool = False,
                          target_platform: str = None, target: str = None,
-                         optimize_level: int = 2, debug: bool = False):
+                         optimize_level: int = 2, debug: bool = False,
+                         optimize_size: bool = False, lto: bool = False, strip: bool = False):
     """
     编译段言项目为原生可执行文件（支持多模块）
 
@@ -872,6 +975,9 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
         target: 目标架构（'x86_64'/'aarch64'/'arm64'），默认本地架构
         optimize_level: 优化级别（0-3），默认 2
         debug: 是否生成 DWARF 调试信息
+        optimize_size: 是否启用 -Os 尺寸优化（替代 -O2）
+        lto: 是否启用 LTO (Link Time Optimization)
+        strip: 是否剥离调试符号
     """
     # 检测目标架构
     target_arch = detect_target_arch(target)
@@ -949,7 +1055,7 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     runtime_o = base_path + '_runtime.o'
 
     # 使用优化级别对应的编译参数
-    opt_flags = get_optimization_flags(optimize_level)
+    opt_flags = get_optimization_flags(optimize_level, optimize_size=optimize_size, lto=lto)
     arch_flags = get_arch_specific_cflags(target_arch)
     debug_flags = ['-g'] if debug else []
 
@@ -986,6 +1092,8 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
         link_args.append('-g')
     if not sys.platform.startswith('win'):
         link_args.append('-lm')
+    if lto:
+        link_args.append('-flto')
 
     result = subprocess.run(
         link_args,
@@ -994,6 +1102,23 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
     if result.returncode != 0:
         raise RuntimeError(f"链接失败:\n{result.stderr}")
 
+    # 剥离调试符号
+    original_size = os.path.getsize(exe_path) if os.path.exists(exe_path) else 0
+    if strip and not debug:
+        try:
+            if sys.platform == 'win32':
+                for tool in ['llvm-strip', 'strip']:
+                    try:
+                        subprocess.run([tool, exe_path], capture_output=True, timeout=30)
+                        break
+                    except (subprocess.SubprocessError, FileNotFoundError):
+                        continue
+            else:
+                subprocess.run(['strip', exe_path], check=True, timeout=30)
+        except (subprocess.SubprocessError, OSError):
+            if verbose:
+                print("  [警告] 无法剥离调试符号")
+
     if verbose:
         for f in [ir_o, runtime_o]:
             try:
@@ -1001,8 +1126,10 @@ def compile_duan_project(source_path: str, output_path: str = None, verbose: boo
                     os.remove(f)
             except Exception:
                 pass
-        size = os.path.getsize(exe_path)
-        print(f"编译成功: {source_path} -> {exe_path} ({size} 字节)")
+        final_size = os.path.getsize(exe_path)
+        print(f"编译成功: {source_path} -> {exe_path} ({final_size} 字节)")
+        if original_size > 0 and strip:
+            print(get_size_reduction_summary(original_size, final_size))
 
     return exe_path
 
@@ -1014,6 +1141,12 @@ if __name__ == '__main__':
     ap.add_argument('output', nargs='?', help='输出 .exe 路径')
     ap.add_argument('-v', '--verbose', action='store_true', help='详细输出')
     ap.add_argument('--ir-only', action='store_true', help='仅生成 LLVM IR，不编译为 .exe')
+    ap.add_argument('--optimize-size', action='store_true',
+                    help='启用 -Os 尺寸优化，替代 -O2（可减少 30-50% 体积）')
+    ap.add_argument('--lto', action='store_true',
+                    help='启用 LTO (Link Time Optimization)，进一步优化体积和性能')
+    ap.add_argument('--strip', action='store_true',
+                    help='剥离调试符号，减小最终二进制体积')
     args = ap.parse_args()
 
     try:
@@ -1022,7 +1155,8 @@ if __name__ == '__main__':
             output_ll = (args.output or args.source).replace('.duan', '.ll')
             compile_source_to_ir(source, output_ll, verbose=True)
         else:
-            compile_duan(args.source, args.output, verbose=args.verbose or True)
+            compile_duan(args.source, args.output, verbose=args.verbose or True,
+                         optimize_size=args.optimize_size, lto=args.lto, strip=args.strip)
     except Exception as e:
         print(f"编译错误: {e}", file=sys.stderr)
         sys.exit(1)

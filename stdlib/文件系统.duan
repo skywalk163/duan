@@ -131,3 +131,132 @@
         '可用':使用.free,
         '使用率':使用.used/使用.total*100,
     }
+
+定义读取二进制文件(路径):
+    with打开(路径,'rb')as文件:返回文件.read()
+
+定义写入二进制文件(路径,内容):
+    with打开(路径,'wb')as文件:文件.write(内容)
+
+定义追加二进制文件(路径,内容):
+    with打开(路径,'ab')as文件:文件.write(内容)
+
+定义文件行列表(路径,编码='utf-8'):
+    with打开(路径,'r',encoding=编码)as文件:返回文件.readlines()
+
+定义写入行列表(路径,行列表,编码='utf-8'):
+    with打开(路径,'w',encoding=编码)as文件:文件.writelines(行列表)
+
+定义读取文件位置(路径,偏移量,大小,编码='utf-8'):
+    with打开(路径,'r',encoding=编码)as文件:
+        文件.seek(偏移量)
+        返回文件.read(大小)
+
+定义读取二进制文件位置(路径,偏移量,大小):
+    with打开(路径,'rb')as文件:
+        文件.seek(偏移量)
+        返回文件.read(大小)
+
+定义筛选目录列表(路径,模式='*',递归=False):
+    import fnmatch
+    结果=[]
+    if递归:
+        for根,目录,文件in os.walk(路径):
+            for f in文件:
+                if fnmatch.fnmatch(f,模式):结果.追加(os.path.join(根,f))
+    else:
+        for项in os.listdir(路径):
+            if fnmatch.fnmatch(项,模式):结果.追加(os.path.join(路径,项))
+    返回结果
+
+定义路径验证(路径):
+    返回{
+        '路径':路径,
+        '绝对路径':os.path.abspath(路径),
+        '规范化路径':os.path.normpath(路径),
+        '存在':os.path.exists(路径),
+        '是文件':os.path.isfile(路径),
+        '是目录':os.path.isdir(路径),
+        '是符号链接':os.path.islink(路径),
+        '是绝对路径':os.path.isabs(路径),
+    }
+
+定义展开用户目录(路径):
+    返回os.path.expanduser(路径)
+
+定义展开环境变量(路径):
+    返回os.path.expandvars(路径)
+
+定义MIME类型检测(路径):
+    import mimetypes
+    mime,_=mimetypes.guess_type(路径)
+    返回mime或'application/octet-stream'
+
+定义计算文件MD5(路径):
+    import hashlib
+    h=hashlib.md5()
+    with打开(路径,'rb')as文件:
+        for块in iter(lambda:文件.read(65536),b''):h.update(块)
+    返回h.hexdigest()
+
+定义计算文件SHA256(路径):
+    import hashlib
+    h=hashlib.sha256()
+    with打开(路径,'rb')as文件:
+        for块in iter(lambda:文件.read(65536),b''):h.update(块)
+    返回h.hexdigest()
+
+定义批量复制文件(源目录,目标目录,模式='*',递归=False):
+    创建目录(目标目录)
+    匹配列表=筛选目录列表(源目录,模式,递归=递归)
+    结果=[]
+    for fp in匹配列表:
+        rel=os.path.relpath(fp,源目录)
+        dst=os.path.join(目标目录,rel)
+        创建目录(os.path.dirname(dst))
+        尝试:shutil.copy2(fp,dst);结果.追加(dst)
+    返回结果
+
+定义批量移动文件(源目录,目标目录,模式='*',递归=False):
+    创建目录(目标目录)
+    匹配列表=筛选目录列表(源目录,模式,递归=递归)
+    结果=[]
+    for fp in匹配列表:
+        rel=os.path.relpath(fp,源目录)
+        dst=os.path.join(目标目录,rel)
+        创建目录(os.path.dirname(dst))
+        尝试:shutil.move(fp,dst);结果.追加(dst)
+    返回结果
+
+定义备份文件(路径,备份目录=None):
+    if not os.path.isfile(路径):抛出异常(f"文件不存在:{路径}")
+    if备份目录:
+        创建目录(备份目录)
+        备份路径=os.path.join(备份目录,os.path.basename(路径)+'.bak')
+    else:备份路径=路径+'.bak'
+    shutil.copy2(路径,备份路径)
+    返回备份路径
+
+定义安全写入文件(路径,内容,编码='utf-8',备份=True):
+    备份路径=''
+    if备份and os.path.isfile(路径):
+        备份路径=路径+'.bak'
+        shutil.copy2(路径,备份路径)
+    写入文件(路径,内容,编码)
+    返回备份路径
+
+定义比较文件内容(路径1,路径2):
+    if not os.path.isfile(路径1)or not os.path.isfile(路径2):返回错误
+    if os.path.getsize(路径1)!=os.path.getsize(路径2):返回错误
+    with打开(路径1,'rb')as f1,打开(路径2,'rb')as f2:
+        while真:
+            块1=f1.read(65536);块2=f2.read(65536)
+            if块1!=块2:返回错误
+            if not块1:返回真
+
+定义目录大小(路径):
+    总大小=0
+    for根,目录,文件in os.walk(路径):
+        for文件名in文件:
+            尝试:总大小+=os.path.getsize(os.path.join(根,文件名))
+    返回总大小

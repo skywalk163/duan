@@ -543,9 +543,25 @@ def main():
         parser.add_argument('-o', '--output', help='输出文件路径')
         parser.add_argument('--run', action='store_true', help='编译并运行')
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
+        parser.add_argument('--welcome', action='store_true',
+                           help='显示首次运行欢迎引导')
         parser.add_argument('--version', action='version', version='段言 v6.0.0')
         
         args = parser.parse_args()
+        
+        # --welcome 标志：触发首次运行引导
+        if args.welcome:
+            try:
+                sys.path.insert(0, _local_src)
+                from first_run import run_welcome
+                result = run_welcome()
+                if result == 'repl':
+                    from first_run import start_repl
+                    start_repl()
+            except ImportError as e:
+                print(f"[错误] 无法加载首次运行引导模块: {e}", file=sys.stderr)
+                return 1
+            return 0
         
         if args.file:
             if not os.path.exists(args.file):

@@ -97,6 +97,11 @@ def 文件存在(path: str) -> bool:
     return os.path.isfile(path)
 
 
+def 是文件(path: str) -> bool:
+    """检查是否为文件"""
+    return os.path.isfile(path)
+
+
 def 目录存在(path: str) -> bool:
     """检查目录是否存在"""
     return os.path.isdir(path)
@@ -155,6 +160,22 @@ def 列出目录(path: str = '.') -> List[str]:
         return os.listdir(path)
     except Exception as e:
         raise RuntimeError(f"列出目录失败 '{path}': {e}")
+
+
+def 列出文件(path: str = '.') -> List[str]:
+    """
+    列出目录中的文件（不包含子目录）
+    
+    参数:
+        path: 目录路径（默认当前目录）
+    
+    返回:
+        文件名列表（仅文件）
+    """
+    try:
+        return [f for f in os.listdir(path) if os.path.isfile(os.path.join(path, f))]
+    except Exception as e:
+        raise RuntimeError(f"列出文件失败 '{path}': {e}")
 
 
 def 文件大小(path: str) -> int:
@@ -270,6 +291,18 @@ def 执行命令(command: str) -> int:
         退出码
     """
     return os.system(command)
+
+
+def 移动文件系统(source: str, target: str) -> None:
+    """
+    移动文件或目录
+    
+    参数:
+        source: 源路径
+        target: 目标路径
+    """
+    import shutil
+    shutil.move(source, target)
 
 
 # =============================================================================
@@ -455,6 +488,11 @@ def 结尾(text: str, suffix: str) -> bool:
 def 查找子串(text: str, substring: str) -> int:
     """查找子串位置，未找到返回-1"""
     return text.find(substring)
+
+
+def 最后索引(text: str, substring: str) -> int:
+    """查找子串最后出现位置，未找到返回-1"""
+    return text.rfind(substring)
 
 
 def 替换字符串次数(text: str, old: str, new: str, count: int = -1) -> str:

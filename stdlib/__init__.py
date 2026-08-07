@@ -182,3 +182,8 @@ try:
     from .排版 import *
 except ImportError:
     pass
+
+try:
+    from .中文NLP import *
+except ImportError:
+    pass

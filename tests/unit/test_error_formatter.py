@@ -37,7 +37,7 @@ class TestFormatter:
     def test_chinese_exc_name(self):
         """测试英文异常名转中文"""
         f = DuanErrorFormatter()
-        assert f._chinese_exc_name('NameError') == '变量未定义'
+        assert f._chinese_exc_name('NameError') == '名称错误'
         assert f._chinese_exc_name('ZeroDivisionError') == '除零错误'
         assert f._chinese_exc_name('UnknownError') == 'UnknownError'
 
@@ -59,7 +59,7 @@ class TestFormatter:
             eval("undefined_var_xyz")
         except NameError as e:
             result = format_runtime_error(source, type(e), e, e.__traceback__)
-            assert '变量未定义' in result
+            assert '名称错误' in result
             assert '拼写' in result
 
     def test_type_error(self):
@@ -88,7 +88,7 @@ class TestFormatter:
             eval("None.nonexistent_attr_xyz")
         except AttributeError as e:
             result = format_runtime_error(source, type(e), e, e.__traceback__)
-            assert '属性不存在' in result
+            assert '属性错误' in result
 
     def test_recursion_error(self):
         """测试递归过深"""
@@ -296,7 +296,7 @@ class TestEnhancedErrorMessages:
             eval("{'a': 1}['unknown_key']")
         except KeyError as e:
             result = format_runtime_error(source, type(e), e, e.__traceback__)
-            assert '键不存在' in result
+            assert '键错误' in result
             assert '字典包含键' in result
             assert '字典获取' in result
 
@@ -307,7 +307,7 @@ class TestEnhancedErrorMessages:
             eval("'hello'.nonexistent_attr")
         except AttributeError as e:
             result = format_runtime_error(source, type(e), e, e.__traceback__)
-            assert '属性不存在' in result
+            assert '属性错误' in result
             assert 'str' in result or '字符串' in result
 
     def test_recursion_error_info(self):

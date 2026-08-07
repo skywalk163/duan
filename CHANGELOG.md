@@ -57,6 +57,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 自举循环验证 **通过**
 - 性能基准测试 **7/8 通过**（many_functions 预存语法错误，非回归问题）
 
+## [6.1.0] - 2026-11-07
+
+### Added
+- **100% 中文错误信息**: 全量替换 20+ 种英文异常类型为中文名称，附带中文修改指引，覆盖语法解析错误、类型错误、值错误等所有场景
+- **标准库增强**: 网络请求模块全面增强（Cookie/会话/代理/异步/文件上传下载），日期时间处理模块（农历/时区/中文日期解析），文件系统模块（文件监控/批量操作/哈希/安全写入），中文 NLP 工具模块（分词/拼音/简繁转换/文本统计）
+- **应用案例库**: 3 个完整应用示例（Web 爬虫、数据处理管线、CLI 文件整理工具），含详细文档和运行说明
+- **LLVM 编译体验优化**: 自动检测下载 LLVM 依赖，EXE 体积优化（--optimize-size/--lto/--strip），增量编译加速（并行编译/中间结果缓存/--fast 模式）
+- **AI Copilot 升级**: 离线轻量级模型方案，Java/C→段言代码转换，数据集 v12（4088 条），多轮对话交互式代码生成
+- **C FFI 绑定简化**: 一键加载 C 库（加载C库），预设绑定（libc/libm/libpthread/libdl），自动平台检测
+- **包注册中心 Web 界面**: 搜索/浏览/查看包详情，安装命令一键复制
+- **包安全认证**: 包签名验证，TOFU 信任模型，漏洞检查
+- **LSP 中文代码补全增强**: 中文关键词补全，snippet 模板，标准库模块补全
+- **VS Code 扩展开箱即用**: 自动激活，欢迎页，状态栏版本显示
+- **语义高亮完善**: 装饰器/二进制数字/中文关键字/内置函数/类型高亮
+- **首次运行交互式引导**: 安装后首次运行自动弹出交互式入门体验
+- **一键安装包方案**: Windows/macOS/Linux 一键安装包设计文档和构建脚本
+- **社区反馈收集**: `duan feedback` 命令，支持本地收集和发送到 GitHub
+- **技术博客 3 篇**: 段言 v6.1 新特性介绍、中文编程的生态建设之路
+
+### Changed
+- **版本号**: 6.0.0 → 6.1.0
+- **文档体系全面升级**: README 重写，文档站首页更新，新增《设计哲学与定位》《段言与Python对比案例》文档
+- **端到端入门教程升级**: 30 分钟入门教程重写，增加"为什么"解释、调试、编译、常见错误章节
+- **教程体系完善**: 分层学习路径（零基础/有经验/教育工作者），少儿编程趣味示例
+- **视频教程脚本**: 新增 Web 开发实战和数据处理入门 2 个脚本
+- **IDE 适配文档**: VS Code/JetBrains/Neovim/Emacs 完整配置指南
+
+### Documentation
+- 新增 `docs/设计哲学与定位.md`
+- 新增 `docs/段言与Python对比案例.md`
+- 新增 `docs/一键安装包方案.md`
+- 新增 `docs/性能基准_vs_Python_v2.md`
+- 新增 `docs/IDE配置指南.md`
+- 新增 `docs/community/discussions_guide.md`
+- 新增 `docs/blog/段言v6.1新特性介绍.md`
+- 新增 `docs/blog/中文编程的生态建设之路.md`
+- 更新 `docs/tutorials/README.md` - 学习路径图
+- 更新 `docs/DEVELOPMENT_GUIDE.md` - 贡献指南完善
+
+### Test
+- 新增测试文件: test_chinese_errors.py, test_http_client.py, test_datetime.py, test_filesystem.py, test_chinese_nlp.py, test_first_run.py
+- 全量回归测试通过
+
 ## [5.6.0] - 2026-08-07
 
 ### Added

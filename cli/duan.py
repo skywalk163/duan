@@ -24,6 +24,7 @@ import os
 import argparse
 import subprocess
 from pathlib import Path
+from feedback_collector import setup_feedback_subparser, run_feedback_cli
 
 # ── 路径设置 ──────────────────────────────────────────────────────
 _CLI_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -1257,6 +1258,9 @@ def main():
     py2duan_p.add_argument('file', nargs='?', help='Python 源文件路径（默认从 stdin 读取）')
     py2duan_p.add_argument('--stats', action='store_true', help='显示 Python 特性统计信息')
 
+    # ── feedback ──
+    setup_feedback_subparser(subparsers)
+
     args = parser.parse_args()
 
     if not args.command:
@@ -1317,6 +1321,10 @@ def main():
 
     elif args.command == 'py2duan':
         cmd_py2duan(args)
+
+    elif args.command == 'feedback':
+        exit_code = run_feedback_cli(args)
+        sys.exit(exit_code)
 
 
 if __name__ == '__main__':

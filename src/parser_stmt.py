@@ -781,11 +781,20 @@ class ParserStmtMixin:
             self.pos = saved_pos
             return self._parse_expr_stmt()
         
-        # 检查索引赋值：甲[丁] 为/等于 值。
+        # 检查索引赋值：甲[丁] 为/等于 值。 或 甲[丁][戊] 为/等于 值。
         if self._current() and self._current().type == TokenType.LBRACKET:
             self._consume(TokenType.LBRACKET)
             index = self._parse_expr()
             self._consume(TokenType.RBRACKET)
+            
+            # 构建索引访问链：甲[丁][戊] → IndexAccess(IndexAccess(Identifier("甲"), 丁), 戊)
+            from ast_nodes_v3 import IndexAccess
+            target = IndexAccess(Identifier(name), index)
+            while self._current() and self._current().type == TokenType.LBRACKET:
+                self._consume(TokenType.LBRACKET)
+                next_index = self._parse_expr()
+                self._consume(TokenType.RBRACKET)
+                target = IndexAccess(target, next_index)
             
             # 检查索引复合赋值：甲[丁] 加上 值。
             if self._current() and self._current().type == TokenType.KEYWORD and self._current().value in compound_ops:
@@ -795,7 +804,7 @@ class ParserStmtMixin:
                 value = self._parse_expr()
                 if self._current() and self._current().type == TokenType.PERIOD:
                     self._consume(TokenType.PERIOD)
-                return IndexedCompoundAssignment(name, index, operator, value)
+                return Assignment(target, BinaryOp(operator, target, value))
             
             # 检查等于/为/=
             if not self._match(TokenType.KEYWORD, '等于') and not self._match(TokenType.KEYWORD, '为') and not self._match(TokenType.EQUALS):
@@ -811,7 +820,7 @@ class ParserStmtMixin:
             if self._current() and self._current().type == TokenType.PERIOD:
                 self._consume(TokenType.PERIOD)
             
-            return IndexedAssignment(name, index, value)
+            return Assignment(target, value)
         
         # 检查复合赋值：甲 加上 1。
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value in compound_ops:

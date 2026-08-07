@@ -836,7 +836,7 @@ class DuanCompiler:
     """
 
     # 段言编译器版本号
-    VERSION = "1.0.0"
+    VERSION = "6.1.0"
 
     def __init__(self, project_root: Optional[str] = None):
         from core.config import DuanConfig
@@ -1373,3 +1373,45 @@ class CompilerQuery:
 
     def has_type_errors(self) -> bool:
         return self.compiler.has_errors
+
+
+# =============================================================================
+# 命令行入口：支持 --welcome 标志
+# =============================================================================
+
+def main():
+    """编译器命令行入口
+
+    支持 --welcome 标志触发首次运行引导体验。
+    """
+    import argparse
+    parser = argparse.ArgumentParser(
+        description='段言（Duan）编程语言编译器',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument('--welcome', action='store_true',
+                        help='显示首次运行欢迎引导')
+    parser.add_argument('--version', action='version',
+                        version=f'段言编译器 v{DuanCompiler.VERSION}')
+
+    args = parser.parse_args()
+
+    if args.welcome:
+        try:
+            from first_run import run_welcome
+            result = run_welcome()
+            if result == 'repl':
+                from first_run import start_repl
+                start_repl()
+        except ImportError as e:
+            print(f"[错误] 无法加载首次运行引导模块: {e}", file=sys.stderr)
+            return 1
+        return 0
+
+    # 默认行为：输出帮助信息
+    parser.print_help()
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

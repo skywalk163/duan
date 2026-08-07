@@ -174,42 +174,45 @@ class DuanErrorFormatter:
         return "\n".join(result)
 
     def _chinese_exc_name(self, en_name: str) -> str:
-        """将英文异常名转为中文"""
+        """将英文异常名转为中文（D05: 全量映射，与 DUAN_EXCEPTION_MAP 保持一致）"""
         mapping = {
-            'NameError': '变量未定义',
+            'SyntaxError': '语法解析错误',
             'TypeError': '类型错误',
             'ValueError': '值错误',
-            'IndexError': '索引越界',
-            'KeyError': '键不存在',
-            'AttributeError': '属性不存在',
-            'ZeroDivisionError': '除零错误',
-            'IOError': '输入输出错误',
-            'FileNotFoundError': '文件未找到',
+            'NameError': '名称错误',
+            'IndexError': '索引错误',
+            'KeyError': '键错误',
+            'AttributeError': '属性错误',
             'ImportError': '导入错误',
-            'ModuleNotFoundError': '模块未找到',
-            'SyntaxError': '语法错误',
-            'IndentationError': '缩进错误',
             'RuntimeError': '运行时错误',
-            'StopIteration': '迭代结束',
-            'RecursionError': '递归过深',
-            'MemoryError': '内存不足',
-            'OverflowError': '数值溢出',
+            'ZeroDivisionError': '除零错误',
+            'FileNotFoundError': '文件未找到',
+            'IOError': '输入输出错误',
+            'MemoryError': '内存错误',
+            'RecursionError': '递归错误',
+            'StopIteration': '迭代停止',
+            'AssertionError': '断言错误',
+            'NotImplementedError': '未实现错误',
+            'OverflowError': '溢出错误',
             'ArithmeticError': '算术错误',
             'LookupError': '查找错误',
-            'OSError': '系统错误',
-            'PermissionError': '权限不足',
+            # 额外常见异常
+            'IndentationError': '缩进错误',
+            'TabError': '制表符错误',
+            'UnicodeError': 'Unicode 错误',
+            'EOFError': '输入结束错误',
+            'KeyboardInterrupt': '用户中断',
+            'SystemExit': '系统退出',
             'ConnectionError': '连接错误',
             'TimeoutError': '超时错误',
-            'AssertionError': '断言失败',
+            'OSError': '系统错误',
+            'ModuleNotFoundError': '模块未找到',
+            'PermissionError': '权限不足',
             'UnicodeDecodeError': 'Unicode解码错误',
             'UnicodeEncodeError': 'Unicode编码错误',
-            'EOFError': '文件提前结束',
             'FloatingPointError': '浮点运算错误',
             'ReferenceError': '引用错误',
-            'TabError': 'Tab与空格混用',
             'SystemError': '系统内部错误',
-            'SystemExit': '程序退出',
-            'KeyboardInterrupt': '用户中断',
         }
         return mapping.get(en_name, en_name)
 
@@ -286,6 +289,34 @@ class DuanErrorFormatter:
         suggestions.append("")
         suggestions.append("💡 修复建议：")
         suggestions.append("-" * 60)
+
+        # D06: 添加通用中文修改指引
+        _chinese_hints = {
+            'SyntaxError': '请检查代码语法是否正确，确保所有括号、引号、冒号等符号已正确配对。',
+            'TypeError': '请检查操作数类型是否匹配，段言中文本和数字不能直接进行运算。',
+            'ValueError': '请检查传入的值是否在有效范围内，可能需要先进行类型转换。',
+            'NameError': '请检查变量名是否拼写正确，使用前需先通过「设」关键字定义变量。',
+            'IndexError': '请检查索引是否在有效范围内，段言列表索引从 0 开始。',
+            'KeyError': '请检查字典键是否存在，可以使用「字典包含键」方法先判断。',
+            'AttributeError': '请检查对象是否拥有该属性或方法，需确认类定义中已声明。',
+            'ImportError': '请检查模块名是否拼写正确，确认模块已安装或在标准库路径中。',
+            'RuntimeError': '程序运行时出现异常，请根据具体错误信息排查。',
+            'ZeroDivisionError': '除数不能为零，请在除法前添加条件判断。',
+            'FileNotFoundError': '请检查文件路径是否正确，确认文件是否存在。',
+            'IOError': '输入输出操作失败，请检查文件状态和权限。',
+            'MemoryError': '内存不足，请尝试优化代码或增加系统内存。',
+            'RecursionError': '递归过深，请检查函数是否存在无限递归，增加递归终止条件。',
+            'StopIteration': '迭代器已无更多元素，请检查循环逻辑或使用默认值。',
+            'AssertionError': '断言条件不满足，请检查断言表达式是否正确。',
+            'NotImplementedError': '该方法尚未实现，请补充实现代码。',
+            'OverflowError': '数值运算结果超出范围，请使用更大的数据类型。',
+            'ArithmeticError': '算术运算出错，请检查操作数和运算符是否正确。',
+            'LookupError': '查找操作失败，请检查索引或键是否存在。',
+        }
+        _general_hint = _chinese_hints.get(exc_name)
+        if _general_hint:
+            suggestions.append(f"📌 {_general_hint}")
+            suggestions.append("")
 
         if exc_name == 'NameError':
             suggestions.append("• 检查变量名是否拼写正确")

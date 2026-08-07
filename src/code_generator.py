@@ -131,6 +131,7 @@ class PythonCodeGenerator:
             '系统错误': 'SystemError',
             '断言错误': 'AssertionError',
             '停止迭代': 'StopIteration',
+            '错误': 'Exception',
         }
         
         # 运算符映射
@@ -177,6 +178,7 @@ class PythonCodeGenerator:
             '输出': 'print',
             '断言': '_duan_assert',
             '读取': 'input',
+            '输入': 'input',
             '长': 'len',
             '长度': 'len',
             '首': 'lambda x: x[0]',
@@ -213,12 +215,14 @@ class PythonCodeGenerator:
             '写入文件': '_duan_builtin.写入文件',
             '追加文件': '_duan_builtin.追加文件',
             '文件存在': '_duan_builtin.文件存在',
+            '是文件': '_duan_builtin.是文件',
             '目录存在': '_duan_builtin.目录存在',
             '路径存在': '_duan_builtin.路径存在',
             '创建目录': '_duan_builtin.创建目录',
             '删除文件': '_duan_builtin.删除文件',
             '删除目录': '_duan_builtin.删除目录',
             '列出目录': '_duan_builtin.列出目录',
+            '列出文件': '_duan_builtin.列出文件',
             '文件大小': '_duan_builtin.文件大小',
             
             # 路径操作
@@ -236,6 +240,7 @@ class PythonCodeGenerator:
             '当前目录': '_duan_builtin.当前目录',
             '切换目录': '_duan_builtin.切换目录',
             '执行命令': '_duan_builtin.执行命令',
+            '移动文件系统': '_duan_builtin.移动文件系统',
 
             # 标准输入输出
             '读取行': '_duan_builtin.读取行',
@@ -290,6 +295,7 @@ class PythonCodeGenerator:
             '开头': '_duan_builtin.开头',
             '结尾': '_duan_builtin.结尾',
             '查找子串': '_duan_builtin.查找子串',
+            '最后索引': '_duan_builtin.最后索引',
             '替换字符串次数': '_duan_builtin.替换字符串次数',
             '截取到末尾': '_duan_builtin.截取到末尾',
             '字符串计数': '_duan_builtin.字符串计数',
@@ -1833,7 +1839,10 @@ class PythonCodeGenerator:
         elif isinstance(expr, UnaryOp):
             operand = self._generate_expr(expr.operand)
             op = self.operator_map.get(expr.operator, expr.operator)
-            # 一元运算符不留空格：(-5) 而非 (- 5)
+            # 符号运算符不留空格：(-5) 而非 (- 5)
+            # 关键字运算符（not, ~等）需要留空格：(not x) 而非 (notx)
+            if op in ('not', '~', 'not '):
+                return f"({op} {operand})"
             return f"({op}{operand})"
         
         elif isinstance(expr, ParagraphCall):

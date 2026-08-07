@@ -5,6 +5,114 @@ const fs = require('fs');
 const { exec } = require('child_process');
 
 // =============================================================================
+// 欢迎页 / 首次运行
+// =============================================================================
+
+const EXTENSION_VERSION = '6.0.0';
+const WELCOME_SHOWN_KEY = 'duan.welcomeShown';
+
+function showWelcomePage(context) {
+    const panel = vscode.window.createWebviewPanel(
+        'duanWelcome',
+        '欢迎使用段言编程语言',
+        vscode.ViewColumn.One,
+        { enableScripts: true }
+    );
+
+    panel.webview.html = getWelcomeHtml();
+}
+
+function getWelcomeHtml() {
+    return `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>欢迎使用段言</title>
+<style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px 40px; max-width: 900px; margin: 0 auto; color: var(--vscode-editor-foreground); background: var(--vscode-editor-background); }
+    h1 { font-size: 2.2em; border-bottom: 2px solid var(--vscode-textLink-foreground); padding-bottom: 10px; }
+    h2 { font-size: 1.5em; margin-top: 30px; }
+    .badge { display: inline-block; background: var(--vscode-textLink-foreground); color: #fff; padding: 2px 12px; border-radius: 12px; font-size: 0.9em; }
+    .section { background: var(--vscode-sideBar-background); border-radius: 8px; padding: 16px 20px; margin: 12px 0; }
+    code { background: var(--vscode-textCodeBlock-background); padding: 1px 6px; border-radius: 3px; font-size: 0.9em; }
+    pre { background: var(--vscode-textCodeBlock-background); padding: 12px; border-radius: 6px; overflow-x: auto; }
+    .steps { counter-reset: step; list-style: none; padding: 0; }
+    .steps li { counter-increment: step; margin: 10px 0; padding: 10px 10px 10px 40px; position: relative; }
+    .steps li::before { content: counter(step); position: absolute; left: 0; top: 10px; width: 26px; height: 26px; background: var(--vscode-textLink-foreground); color: #fff; border-radius: 50%; text-align: center; line-height: 26px; font-weight: bold; font-size: 0.9em; }
+    .quick-links { display: flex; gap: 10px; flex-wrap: wrap; margin: 16px 0; }
+    .quick-links a { flex: 1; min-width: 160px; text-align: center; padding: 12px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); text-decoration: none; border-radius: 6px; font-weight: 500; }
+    .quick-links a:hover { background: var(--vscode-button-hoverBackground); }
+</style>
+</head>
+<body>
+    <h1>欢迎使用段言 <span class="badge">v${EXTENSION_VERSION}</span></h1>
+    <p>段言（DuanLang）是一门面向中文母语者的编程语言，兼具 Python 的简洁与 Rust 的安全。</p>
+
+    <div class="quick-links">
+        <a href="#" onclick="vscode.postMessage({command:'newFile'})">📄 新建段言文件</a>
+        <a href="#" onclick="vscode.postMessage({command:'openREPL'})">💻 打开 REPL</a>
+        <a href="#" onclick="vscode.postMessage({command:'openHelp'})">📖 查看文档</a>
+    </div>
+
+    <h2>🚀 快速开始</h2>
+    <ol class="steps">
+        <li>新建一个 <code>.duan</code> 文件，或打开已有的段言文件</li>
+        <li>开始编写代码 —— 语法高亮、代码补全、实时诊断自动生效</li>
+        <li>按 <code>Ctrl+Shift+R</code> 运行当前文件</li>
+        <li>按 <code>Ctrl+Shift+B</code> 编译当前文件</li>
+    </ol>
+
+    <h2>📝 代码示例</h2>
+    <pre>段落 主函数 接收 参数：
+    打印("你好，段言！")
+    定义 甲 等于 10
+    定义 乙 等于 20
+    设 结果 为 甲 加 乙
+    打印("甲 + 乙 = " 加 结果)
+结束。
+
+主函数()</pre>
+
+    <h2>✨ 核心特性</h2>
+    <div class="section">
+        <strong>🎨 中文关键字</strong> — 用中文编写代码，降低编程入门门槛
+    </div>
+    <div class="section">
+        <strong>🔧 完整 IDE 支持</strong> — 语法高亮、自动补全、跳转定义、实时错误提示
+    </div>
+    <div class="section">
+        <strong>⚡ 多后端编译</strong> — 支持 Python 解释执行和 LLVM 原生编译
+    </div>
+    <div class="section">
+        <strong>🛡️ 类型系统</strong> — 可选静态类型检查，兼顾灵活与安全
+    </div>
+
+    <h2>📚 资源</h2>
+    <ul>
+        <li><a href="https://skywalk163.github.io/duan">官方文档</a></li>
+        <li><a href="https://github.com/skywalk163/duan">GitHub 仓库</a></li>
+        <li>在 VS Code 命令面板中搜索 <code>段言:</code> 查看所有可用命令</li>
+    </ul>
+
+    <p style="text-align:center; margin-top: 40px; opacity: 0.6;">段言 v${EXTENSION_VERSION} — 用中文，写世界</p>
+</body>
+</html>`;
+}
+
+function checkFirstRun(context) {
+    const hasShown = context.globalState.get(WELCOME_SHOWN_KEY, false);
+    if (!hasShown) {
+        context.globalState.update(WELCOME_SHOWN_KEY, true);
+        return true;
+    }
+    if (vscode.workspace.getConfiguration('duan.welcome').get('alwaysShow', false)) {
+        return true;
+    }
+    return false;
+}
+
+// =============================================================================
 // 全局状态
 // =============================================================================
 
@@ -203,18 +311,18 @@ function updateStatusBar(status) {
     if (!statusBarItem) return;
     switch (status) {
         case 'running':
-            statusBarItem.text = '$(check) 段言';
-            statusBarItem.tooltip = '段言语言服务运行中';
+            statusBarItem.text = `$(check) 段言 v${EXTENSION_VERSION}`;
+            statusBarItem.tooltip = '段言语言服务运行中 - 点击重启';
             statusBarItem.backgroundColor = undefined;
             break;
         case 'error':
-            statusBarItem.text = '$(error) 段言';
+            statusBarItem.text = `$(error) 段言 v${EXTENSION_VERSION}`;
             statusBarItem.tooltip = '段言语言服务错误 - 点击重启';
             statusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
             break;
         case 'offline':
         default:
-            statusBarItem.text = '$(circle-slash) 段言';
+            statusBarItem.text = `$(circle-slash) 段言 v${EXTENSION_VERSION}`;
             statusBarItem.tooltip = '段言语言服务离线 - 点击重启';
             statusBarItem.backgroundColor = undefined;
             break;
@@ -685,6 +793,12 @@ class DuanFormattingProvider {
 // =============================================================================
 
 function registerCommands(context) {
+    // --- 显示欢迎页 ---
+    const welcomeCmd = vscode.commands.registerCommand('duan.welcome', () => {
+        showWelcomePage(context);
+    });
+    context.subscriptions.push(welcomeCmd);
+
     // --- 运行文件 ---
     const runCmd = vscode.commands.registerCommand('duan.run', () => {
         const filePath = getActiveDuanFile();
@@ -861,6 +975,13 @@ function activate(context) {
     }
 
     outputChannel.appendLine('[段言] 扩展初始化完成');
+
+    // 首次安装显示欢迎页
+    if (checkFirstRun(context)) {
+        setTimeout(() => {
+            showWelcomePage(context);
+        }, 500);
+    }
 }
 
 function deactivate() {

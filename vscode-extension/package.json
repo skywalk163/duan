@@ -23,7 +23,8 @@
         "Language Packs"
     ],
     "activationEvents": [
-        "onLanguage:duan"
+        "onLanguage:duan",
+        "onCommand:duan.welcome"
     ],
     "main": "./extension.js",
     "contributes": {
@@ -49,6 +50,11 @@
             }
         ],
         "commands": [
+            {
+                "command": "duan.welcome",
+                "title": "段言: 显示欢迎页",
+                "category": "段言"
+            },
             {
                 "command": "duan.run",
                 "title": "段言: 运行当前文件",
@@ -179,6 +185,17 @@
                     "type": "boolean",
                     "default": true,
                     "description": "确保文件以换行符结尾"
+                },
+                "duan.welcome.alwaysShow": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "每次启动 VS Code 时自动显示段言欢迎页"
+                },
+                "duan.version": {
+                    "type": "string",
+                    "default": "6.1.0",
+                    "readOnly": true,
+                    "description": "段言扩展版本号"
                 }
             }
         },

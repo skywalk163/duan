@@ -38,6 +38,11 @@ E2E_EXCLUDED = {
     'games/guess_number.duan',
     'algorithms/sorting.duan',
     'algorithms/data_structures.duan',
+    # 少儿编程示例（需交互式输入）
+    'kids/number_game.duan',
+    'kids/story_generator.duan',
+    # CLI 工具示例（需命令行参数）
+    'web_crawler/crawler.duan',
     # 算法库（已计划在未来版本修复语法）
     'algorithms_lib/主.duan',
     # 新示例项目（需进一步语法适配）

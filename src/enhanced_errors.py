@@ -55,8 +55,9 @@ class ErrorFormatter:
         parts = []
 
         # 错误标题
+        chinese_name = _chinese_names.get(err_type, err_type)
         parts.append(self._color('error', '错误'))
-        parts.append(f': {err_type}')
+        parts.append(f': {chinese_name}')
         parts.append(self._color('reset', ''))
         parts.append(f'\n  {err_msg}')
 
@@ -149,6 +150,59 @@ class ErrorFormatter:
 
     def _get_suggestion(self, err_type: str, err_msg: str) -> str:
         """获取修复建议"""
+        # D05: 全量中文错误名称映射
+        _chinese_names = {
+            'SyntaxError': '语法解析错误',
+            'TypeError': '类型错误',
+            'ValueError': '值错误',
+            'NameError': '名称错误',
+            'IndexError': '索引错误',
+            'KeyError': '键错误',
+            'AttributeError': '属性错误',
+            'ImportError': '导入错误',
+            'RuntimeError': '运行时错误',
+            'ZeroDivisionError': '除零错误',
+            'FileNotFoundError': '文件未找到',
+            'IOError': '输入输出错误',
+            'MemoryError': '内存错误',
+            'RecursionError': '递归错误',
+            'StopIteration': '迭代停止',
+            'AssertionError': '断言错误',
+            'NotImplementedError': '未实现错误',
+            'OverflowError': '溢出错误',
+            'ArithmeticError': '算术错误',
+            'LookupError': '查找错误',
+        }
+
+        # D06: 中文错误附带修改指引
+        _chinese_hints = {
+            'SyntaxError': '请检查代码语法是否正确，确保所有括号、引号、冒号等符号已正确配对。',
+            'TypeError': '请检查操作数类型是否匹配，段言中文本和数字不能直接进行运算。',
+            'ValueError': '请检查传入的值是否在有效范围内，可能需要先进行类型转换。',
+            'NameError': '请检查变量名是否拼写正确，使用前需先通过「设」关键字定义变量。',
+            'IndexError': '请检查索引是否在有效范围内，段言列表索引从 0 开始。',
+            'KeyError': '请检查字典键是否存在，可以使用「字典包含键」方法先判断。',
+            'AttributeError': '请检查对象是否拥有该属性或方法，需确认类定义中已声明。',
+            'ImportError': '请检查模块名是否拼写正确，确认模块已安装或在标准库路径中。',
+            'RuntimeError': '程序运行时出现异常，请根据具体错误信息排查。',
+            'ZeroDivisionError': '除数不能为零，请在除法前添加条件判断。',
+            'FileNotFoundError': '请检查文件路径是否正确，确认文件是否存在。',
+            'IOError': '输入输出操作失败，请检查文件状态和权限。',
+            'MemoryError': '内存不足，请尝试优化代码或增加系统内存。',
+            'RecursionError': '递归过深，请检查函数是否存在无限递归，增加递归终止条件。',
+            'StopIteration': '迭代器已无更多元素，请检查循环逻辑或使用默认值。',
+            'AssertionError': '断言条件不满足，请检查断言表达式是否正确。',
+            'NotImplementedError': '该方法尚未实现，请补充实现代码。',
+            'OverflowError': '数值运算结果超出范围，请使用更大的数据类型。',
+            'ArithmeticError': '算术运算出错，请检查操作数和运算符是否正确。',
+            'LookupError': '查找操作失败，请检查索引或键是否存在。',
+        }
+
+        # 先尝试返回通用的中文修改指引
+        hint = _chinese_hints.get(err_type)
+        if hint:
+            return hint
+
         suggestions = {
             # 语法错误
             'SyntaxError': {

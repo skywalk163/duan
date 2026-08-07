@@ -72,27 +72,68 @@ jobs:
         id: release_notes
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          cat > release_body.md << 'RELEOF'
-          ## 段言（Duan）v6.0.0 正式发布！
+          IS_PRERELEASE=false
+          if echo "$VERSION" | grep -qE "-(rc|alpha|beta|dev)"; then
+            IS_PRERELEASE=true
+          fi
+          echo "prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
 
-          经过三个月的密集开发，段言从 v5.5.0 推进到 v6.0.0 正式发布。这是段言迄今为止最重要的版本，标志着从「功能完整」到「生产就绪」的跨越。
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            cat > release_body.md << RELEOF
+          ## 段言（Duan）v$VERSION 预览版发布！
 
-          ### 三大里程碑
-
-          1. **核心语言特性全部就绪** — 异常处理、模式匹配、异步/协程、装饰器、上下文管理器
-          2. **生态体系自闭环** — Web 框架、包注册中心、示例项目、自举编译器、AI 数据集
-          3. **社区与文档启航** — 英文文档、技术博客、GitHub Discussions、迁移指南
+          这是段言 v6.1.0 的社区预览版本，欢迎测试和反馈。
 
           ### 安装
 
-          ```bash
+          \`\`\`bash
           pip install duan==$VERSION
-          ```
+          \`\`\`
+
+          ### 主要新特性
+
+          - **100% 中文错误信息** — 全量替换 20+ 种英文异常为中文
+          - **标准库 4 大增强** — 网络请求、日期时间、文件系统、中文 NLP
+          - **LLVM 编译体验优化** — 自动下载依赖、增量编译加速
+          - **AI Copilot 升级** — 离线模型、Java/C→段言转换
+          - **C FFI 绑定简化** — 一键加载 C 库
+          - **一键安装包** — Windows/macOS/Linux 安装包方案
 
           ### 完整更新日志
 
-          请参阅 [CHANGELOG.md](CHANGELOG.md) 和 [RELEASE_NOTES.md](docs/RELEASE_NOTES.md) 获取完整变更列表。
+          请参阅 [CHANGELOG.md](CHANGELOG.md) 和 [docs/release_notes_v6.1.0.md](docs/release_notes_v6.1.0.md) 获取完整变更列表。
+
+          ### 反馈
+
+          请通过 [GitHub Issues](https://github.com/skywalk163/duan/issues) 提交 bug 报告和功能建议。
           RELEOF
+          else
+            cat > release_body.md << RELEOF
+          ## 段言（Duan）v6.1.0 正式发布！
+
+          段言 v6.1.0 是 v6.0 大版本后的首个功能更新，聚焦于**中文编程体验的全面升级**——从 100% 中文错误信息到标准库增强，从 LLVM 编译优化到 AI Copilot 升级，共 20+ 项新特性。
+
+          ### 亮点速览
+
+          - 🌐 **100% 中文错误信息** — 全量替换 20+ 种英文异常为中文，附中文修改指引
+          - 📚 **标准库 4 大增强** — 网络请求、日期时间、文件系统、中文 NLP 全新模块
+          - 🚀 **LLVM 编译体验优化** — 自动下载依赖、EXE 体积优化、增量编译加速
+          - 🤖 **AI Copilot 升级** — 离线轻量模型、Java/C→段言转换、数据集 v12
+          - 🔌 **C FFI 绑定简化** — 一键加载 C 库，预设 libc/libm 等常用库绑定
+          - 📦 **一键安装包** — Windows/macOS/Linux 安装包方案
+          - 💬 **社区反馈收集** — \`duan feedback\` 命令，一键反馈到 GitHub
+
+          ### 安装
+
+          \`\`\`bash
+          pip install duan==$VERSION
+          \`\`\`
+
+          ### 完整更新日志
+
+          请参阅 [CHANGELOG.md](CHANGELOG.md) 和 [docs/release_notes_v6.1.0.md](docs/release_notes_v6.1.0.md) 获取完整变更列表。
+          RELEOF
+          fi
 
           echo "body<<BODYEOF" >> $GITHUB_OUTPUT
           cat release_body.md >> $GITHUB_OUTPUT
@@ -105,5 +146,5 @@ jobs:
           body: ${{ steps.release_notes.outputs.body }}
           files: dist/*
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.release_notes.outputs.prerelease }}
           generate_release_notes: false
