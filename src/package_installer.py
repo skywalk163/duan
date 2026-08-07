@@ -50,6 +50,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "扩展数学函数库：矩阵运算、复数、统计函数",
             "author": "段言团队",
+            "category": "数学计算",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-math-ext.git",
                 "https://github.com/duan-lang/duan-math-ext.git",
@@ -62,6 +63,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "HTTP 客户端库：GET/POST 请求、JSON 解析",
             "author": "段言团队",
+            "category": "网络通信",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-http.git",
                 "https://github.com/duan-lang/duan-http.git",
@@ -74,6 +76,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "CLI 开发工具：参数解析、进度条、颜色输出",
             "author": "段言团队",
+            "category": "开发工具",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-cli-utils.git",
                 "https://github.com/duan-lang/duan-cli-utils.git",
@@ -86,6 +89,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "单元测试框架：断言、测试套件、覆盖率",
             "author": "段言团队",
+            "category": "开发工具",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-test.git",
                 "https://github.com/duan-lang/duan-test.git",
@@ -98,6 +102,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "数据库操作库：SQL 查询、连接池、ORM",
             "author": "段言团队",
+            "category": "数据存储",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-db.git",
                 "https://github.com/duan-lang/duan-db.git",
@@ -110,6 +115,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "文本模板引擎：变量替换、循环、条件渲染",
             "author": "段言团队",
+            "category": "开发工具",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-template.git",
                 "https://github.com/duan-lang/duan-template.git",
@@ -122,6 +128,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "日志记录库：分级日志、文件输出、格式化",
             "author": "段言团队",
+            "category": "开发工具",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-log.git",
                 "https://github.com/duan-lang/duan-log.git",
@@ -134,6 +141,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "配置文件管理：TOML/JSON/YAML 读写",
             "author": "段言团队",
+            "category": "开发工具",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-config.git",
                 "https://github.com/duan-lang/duan-config.git",
@@ -146,6 +154,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "加密工具库：哈希、对称加密、Base64",
             "author": "段言团队",
+            "category": "安全加密",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-crypto.git",
                 "https://github.com/duan-lang/duan-crypto.git",
@@ -158,6 +167,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "图像处理库：缩放、裁剪、滤镜",
             "author": "段言团队",
+            "category": "多媒体",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-image.git",
                 "https://github.com/duan-lang/duan-image.git",
@@ -165,12 +175,13 @@ BUILTIN_REGISTRY = {
             ],
             "keywords": ["图像", "图片", "处理"]
         },
-        # ── 中文场景专属包 ──
+        # ── 中文场景专属包（第1月） ──
         "中文分词": {
             "name": "中文分词",
             "version": "1.0.0",
             "description": "中文分词工具：正向最大匹配算法、自定义词典、批量加载",
             "author": "段言团队",
+            "category": "文本处理",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-segment.git",
                 "https://github.com/duan-lang/duan-segment.git",
@@ -183,6 +194,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "农历工具：公历农历互转、传统节日查询、闰月判断",
             "author": "段言团队",
+            "category": "日期时间",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-lunar.git",
                 "https://github.com/duan-lang/duan-lunar.git",
@@ -195,6 +207,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "身份证号码校验：格式校验、校验码计算、信息提取（出生日期/性别/地区）",
             "author": "段言团队",
+            "category": "数据校验",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-idcard.git",
                 "https://github.com/duan-lang/duan-idcard.git",
@@ -207,6 +220,7 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "拼音转换工具：中文转拼音、带声调拼音、拼音首字母提取",
             "author": "段言团队",
+            "category": "文本处理",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-pinyin.git",
                 "https://github.com/duan-lang/duan-pinyin.git",
@@ -219,12 +233,79 @@ BUILTIN_REGISTRY = {
             "version": "1.0.0",
             "description": "手机号码校验：格式校验、运营商识别（移动/联通/电信）、归属地查询",
             "author": "段言团队",
+            "category": "数据校验",
             "mirrors": [
                 "https://gitcode.com/duan-lang/duan-phone.git",
                 "https://github.com/duan-lang/duan-phone.git",
                 "https://gitee.com/duan-lang/duan-phone.git",
             ],
             "keywords": ["手机号", "校验", "运营商", "归属地"]
+        },
+        # ── 中文场景专属包（第2月） ──
+        "中文文本处理": {
+            "name": "中文文本处理",
+            "version": "1.0.0",
+            "description": "中文文本处理增强：字符统计、标点清理、分句分段、词频统计",
+            "author": "段言团队",
+            "category": "文本处理",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-chinese-text.git",
+                "https://github.com/duan-lang/duan-chinese-text.git",
+                "https://gitee.com/duan-lang/duan-chinese-text.git",
+            ],
+            "keywords": ["中文", "文本", "处理", "NLP"]
+        },
+        "中国行政区划": {
+            "name": "中国行政区划",
+            "version": "1.0.0",
+            "description": "中国行政区划查询：省份/城市/区县查询、行政区划代码、验证",
+            "author": "段言团队",
+            "category": "地理位置",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-china-region.git",
+                "https://github.com/duan-lang/duan-china-region.git",
+                "https://gitee.com/duan-lang/duan-china-region.git",
+            ],
+            "keywords": ["行政区划", "省份", "城市", "地理位置"]
+        },
+        "中文数字转换": {
+            "name": "中文数字转换",
+            "version": "1.0.0",
+            "description": "中文数字转换：中文数字与阿拉伯数字互转、大写金额转换",
+            "author": "段言团队",
+            "category": "文本处理",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-chinese-num.git",
+                "https://github.com/duan-lang/duan-chinese-num.git",
+                "https://gitee.com/duan-lang/duan-chinese-num.git",
+            ],
+            "keywords": ["数字", "转换", "金额", "中文"]
+        },
+        "中国传统节日": {
+            "name": "中国传统节日",
+            "version": "1.0.0",
+            "description": "中国传统节日查询：日期查询、节日判断、倒计时、月度节日列表",
+            "author": "段言团队",
+            "category": "日期时间",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-festival.git",
+                "https://github.com/duan-lang/duan-festival.git",
+                "https://gitee.com/duan-lang/duan-festival.git",
+            ],
+            "keywords": ["节日", "传统", "农历", "日期"]
+        },
+        "中文编码工具": {
+            "name": "中文编码工具",
+            "version": "1.0.0",
+            "description": "中文编码转换：编码检测、GBK/UTF-8互转、Unicode转义",
+            "author": "段言团队",
+            "category": "编码转换",
+            "mirrors": [
+                "https://gitcode.com/duan-lang/duan-encoding.git",
+                "https://github.com/duan-lang/duan-encoding.git",
+                "https://gitee.com/duan-lang/duan-encoding.git",
+            ],
+            "keywords": ["编码", "GBK", "UTF-8", "转换"]
         },
     },
     "updated_at": "2026-08-07"
@@ -970,6 +1051,91 @@ class PackageInstaller:
             results = self.search(keyword)
             return [{'name': r.name, 'version': r.version, 'description': r.description,
                      'keywords': r.keywords} for r in results]
+
+    def search_packages(self, keyword: str) -> List[Dict]:
+        """搜索包（增强版）：按包名、描述关键词搜索
+
+        比 search() 方法更灵活，支持 category 字段匹配，
+        返回完整的字典列表而非 PackageInfo 对象。
+
+        Args:
+            keyword: 搜索关键词
+
+        Returns:
+            匹配的包信息字典列表
+        """
+        results = []
+        keyword_lower = keyword.lower()
+        packages = self._registry.get('packages', {})
+
+        for name, info in packages.items():
+            # 按包名匹配
+            if keyword_lower in name.lower():
+                results.append(dict(info))
+                continue
+            # 按描述匹配
+            if keyword_lower in info.get('description', '').lower():
+                results.append(dict(info))
+                continue
+            # 按关键词匹配
+            for kw in info.get('keywords', []):
+                if keyword_lower in kw.lower():
+                    results.append(dict(info))
+                    break
+            # 按分类匹配
+            if keyword_lower in info.get('category', '').lower():
+                if info not in results:
+                    results.append(dict(info))
+
+        return results
+
+    def get_packages_by_category(self, category: str) -> List[Dict]:
+        """按分类获取包列表
+
+        支持分类：文本处理、数据校验、日期时间、编码转换、地理位置、
+        数学计算、网络通信、开发工具、数据存储、安全加密、多媒体等。
+
+        Args:
+            category: 分类名称
+
+        Returns:
+            该分类下的包信息字典列表
+        """
+        results = []
+        category_lower = category.lower().strip()
+        packages = self._registry.get('packages', {})
+
+        for name, info in packages.items():
+            pkg_category = info.get('category', '').lower().strip()
+            if pkg_category == category_lower:
+                results.append(dict(info))
+
+        return results
+
+    def get_package_stats(self) -> Dict:
+        """获取注册中心统计信息
+
+        Returns:
+            统计信息字典，包含总包数、各分类包数、最新更新时间等
+        """
+        packages = self._registry.get('packages', {})
+        total = len(packages)
+
+        # 按分类统计
+        category_counts: Dict[str, int] = {}
+        for info in packages.values():
+            cat = info.get('category', '未分类')
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+
+        # 按分类排序
+        sorted_categories = dict(sorted(category_counts.items(), key=lambda x: x[1], reverse=True))
+
+        return {
+            "total_packages": total,
+            "categories": sorted_categories,
+            "updated_at": self._registry.get('updated_at', 'unknown'),
+            "package_names": list(packages.keys()),
+        }
 
     def install_all_dependencies(self, package_toml_path: Optional[Path] = None) -> bool:
         """从 package.toml 自动安装所有依赖

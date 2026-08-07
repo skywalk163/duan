@@ -1,24 +1,18 @@
 {
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-    "name": "段言 DuanLang",
+    "name": "Duan",
     "scopeName": "source.duan",
+    "fileTypes": [".duan"],
     "patterns": [
         { "include": "#comments" },
         { "include": "#strings" },
         { "include": "#numbers" },
-        { "include": "#decorators" },
-        { "include": "#keywords-control" },
-        { "include": "#keywords-declaration" },
-        { "include": "#keywords-class" },
-        { "include": "#keywords-type" },
-        { "include": "#keywords-exception" },
-        { "include": "#keywords-modifier" },
-        { "include": "#keywords-extra" },
+        { "include": "#keywords" },
         { "include": "#operators" },
-        { "include": "#booleans" },
         { "include": "#builtins" },
-        { "include": "#entity-names" },
-        { "include": "#module-names" },
+        { "include": "#types" },
+        { "include": "#string_interpolation" },
+        { "include": "#decorator" },
         { "include": "#punctuation" }
     ],
     "repository": {
@@ -26,17 +20,11 @@
             "patterns": [
                 {
                     "name": "comment.line.number-sign.duan",
-                    "match": "#.*$"
-                },
-                {
-                    "name": "comment.block.duan",
-                    "begin": "（\\*",
-                    "end": "\\*）"
-                },
-                {
-                    "name": "comment.block.duan",
-                    "begin": "/\\*",
-                    "end": "\\*/"
+                    "begin": "#",
+                    "end": "$",
+                    "beginCaptures": {
+                        "0": { "name": "punctuation.definition.comment.duan" }
+                    }
                 }
             ]
         },
@@ -46,10 +34,19 @@
                     "name": "string.quoted.double.duan",
                     "begin": "\"",
                     "end": "\"",
+                    "beginCaptures": {
+                        "0": { "name": "punctuation.definition.string.begin.duan" }
+                    },
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.string.end.duan" }
+                    },
                     "patterns": [
                         {
+                            "include": "#string_interpolation"
+                        },
+                        {
                             "name": "constant.character.escape.duan",
-                            "match": "\\\\."
+                            "match": "\\\\[nrt\"'\\\\]"
                         }
                     ]
                 },
@@ -57,62 +54,50 @@
                     "name": "string.quoted.single.duan",
                     "begin": "'",
                     "end": "'",
+                    "beginCaptures": {
+                        "0": { "name": "punctuation.definition.string.begin.duan" }
+                    },
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.string.end.duan" }
+                    },
                     "patterns": [
                         {
                             "name": "constant.character.escape.duan",
-                            "match": "\\\\."
+                            "match": "\\\\[nrt\"'\\\\]"
                         }
                     ]
                 },
                 {
-                    "name": "string.quoted.backtick.duan",
-                    "begin": "`",
-                    "end": "`",
-                    "patterns": [
-                        {
-                            "name": "constant.character.escape.duan",
-                            "match": "\\\\."
-                        }
-                    ]
-                },
-                {
-                    "name": "string.quoted.double.duan",
+                    "name": "string.quoted.other.duan",
                     "begin": "「",
-                    "end": "」"
-                },
+                    "end": "」",
+                    "beginCaptures": {
+                        "0": { "name": "punctuation.definition.string.begin.duan" }
+                    },
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.string.end.duan" }
+                    }
+                }
+            ]
+        },
+        "string_interpolation": {
+            "patterns": [
                 {
-                    "name": "string.quoted.single.duan",
-                    "begin": "『",
-                    "end": "』"
-                },
-                {
-                    "name": "string.interpolated.duan",
-                    "begin": "f\"",
-                    "end": "\"",
+                    "name": "meta.embedded.interpolation.duan",
+                    "begin": "\\{",
+                    "end": "\\}",
+                    "beginCaptures": {
+                        "0": { "name": "punctuation.definition.interpolation.begin.duan" }
+                    },
+                    "endCaptures": {
+                        "0": { "name": "punctuation.definition.interpolation.end.duan" }
+                    },
                     "patterns": [
-                        {
-                            "name": "constant.character.escape.duan",
-                            "match": "\\\\."
-                        },
-                        {
-                            "name": "meta.interpolation.duan",
-                            "match": "\\{[^}]*\\}"
-                        }
-                    ]
-                },
-                {
-                    "name": "string.interpolated.duan",
-                    "begin": "f'",
-                    "end": "'",
-                    "patterns": [
-                        {
-                            "name": "constant.character.escape.duan",
-                            "match": "\\\\."
-                        },
-                        {
-                            "name": "meta.interpolation.duan",
-                            "match": "\\{[^}]*\\}"
-                        }
+                        { "include": "#keywords" },
+                        { "include": "#operators" },
+                        { "include": "#builtins" },
+                        { "include": "#numbers" },
+                        { "include": "#strings" }
                     ]
                 }
             ]
@@ -120,128 +105,40 @@
         "numbers": {
             "patterns": [
                 {
+                    "name": "constant.numeric.float.duan",
+                    "match": "\\b[0-9]+\\.[0-9]+([eE][+-]?[0-9]+)?\\b"
+                },
+                {
+                    "name": "constant.numeric.integer.duan",
+                    "match": "\\b[0-9]+\\b"
+                },
+                {
                     "name": "constant.numeric.hex.duan",
                     "match": "\\b0[xX][0-9a-fA-F]+\\b"
                 },
                 {
                     "name": "constant.numeric.binary.duan",
                     "match": "\\b0[bB][01]+\\b"
-                },
-                {
-                    "name": "constant.numeric.float.duan",
-                    "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
-                },
-                {
-                    "name": "constant.numeric.integer.duan",
-                    "match": "\\b\\d+\\b"
-                },
-                {
-                    "name": "constant.numeric.chinese.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])[零一二三四五六七八九十百千万亿]+(?![\\u4e00-\\u9fff])"
                 }
             ]
         },
-        "decorators": {
+        "keywords": {
             "patterns": [
-                {
-                    "name": "entity.other.attribute.decorator.duan",
-                    "match": "@[\\w\\u4e00-\\u9fff_]+"
-                }
-            ]
-        },
-        "keywords-control": {
-            "patterns": [
-                {
-                    "name": "keyword.control.conditional.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(如果|否则|否则如果|否则若|若|那么|则)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "keyword.control.loop.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(循环|当|遍历|对于|从|到|至|步长|步|跳出|跳过|在|对|于|中的)(?![\\u4e00-\\u9fff])"
-                },
                 {
                     "name": "keyword.control.flow.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(返回|结束|结束嵌入)(?![\\u4e00-\\u9fff])"
+                    "match": "\\b(如果|否则|否则如果|否则若|若|则|遍历|当|跳出|跳过|返回|匹配|情况|默认)\\b"
                 },
                 {
-                    "name": "keyword.control.match.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(匹配|情况)(?![\\u4e00-\\u9fff])"
-                }
-            ]
-        },
-        "keywords-declaration": {
-            "patterns": [
-                {
-                    "name": "storage.type.function.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(段落|函数|段|定义|常量|类型|创建)(?![\\u4e00-\\u9fff])"
+                    "name": "keyword.declaration.duan",
+                    "match": "\\b(段落|段|函数|类|接口|实现|数据|枚举|构造|属性|继承|外部|标注|trait|类型别名|错误|新建|定义|常量|类型|接收|结束)\\b"
                 },
-                {
-                    "name": "storage.modifier.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(设|为|导入|导出|标注|嵌入|使用|加载|从)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "storage.type.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(可空|断言)(?![\\u4e00-\\u9fff])"
-                }
-            ]
-        },
-        "keywords-class": {
-            "patterns": [
-                {
-                    "name": "storage.type.class.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(类|继承|构造|属性|接口|实现|协议)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "storage.modifier.access.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(静态|静态方法|类方法|私有|公有|保护|私属性|私段落)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "storage.modifier.abstract.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(抽象)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "variable.language.self.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(己|父)(?![\\u4e00-\\u9fff])"
-                }
-            ]
-        },
-        "keywords-type": {
-            "patterns": [
-                {
-                    "name": "storage.type.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(枚举|结构体|异常|数据|类型别名|trait|特性|类型|模块|标准库|作用域|生成|开启|关闭)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "storage.type.builtin.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(整数|浮数|小数|字符串|文本|列表|字典|集合|布尔|任意|数|串|列|典|集|浮点数|可空)(?![\\u4e00-\\u9fff])"
-                }
-            ]
-        },
-        "keywords-exception": {
-            "patterns": [
-                {
-                    "name": "keyword.control.exception.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(尝试|捕获|抛出|最终)(?![\\u4e00-\\u9fff])"
-                }
-            ]
-        },
-        "keywords-modifier": {
-            "patterns": [
-                {
-                    "name": "keyword.control.async.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(异步|等待)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "keyword.other.modifier.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(新建|外部|加载库|推迟|并行|并|之|的)(?![\\u4e00-\\u9fff])"
-                }
-            ]
-        },
-        "keywords-extra": {
-            "patterns": [
                 {
                     "name": "keyword.other.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(无|非局部|产出|pass|空操作|全局|FFI调试|回调|联合体|变长参数|位域|函数指针|宏|调试|外部错误|取地址|解引用|指针偏移|设置指针值|分配内存|释放内存|创建数组|设置数组|获取FFI错误|获取系统错误码)(?![\\u4e00-\\u9fff])"
+                    "match": "\\b(导入|导出|从|设|为|使用|尝试|捕获|抛出|最终|异步|等待|作用域|并行|推迟|嵌入|结束嵌入|并|pass|全局|非局部|删除|断言|开启类型检查|关闭类型检查|生成|产出|产出从|是|在|不在|不是|私有|公有|保护|静态|类方法|特性|抽象|取地址|解引用|指针偏移|设置指针值|分配内存|释放内存|创建数组|设置数组|获取FFI错误|获取系统错误码)\\b"
+                },
+                {
+                    "name": "constant.language.duan",
+                    "match": "\\b(真|假|空|无|己|父)\\b"
                 }
             ]
         },
@@ -249,106 +146,55 @@
             "patterns": [
                 {
                     "name": "keyword.operator.arithmetic.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(加|减|乘|除|取余|模|幂|求幂|整除|乘以|除以|加上|减去|模以|幂以)(?![\\u4e00-\\u9fff])"
+                    "match": "\\b(加|减|乘|除|除以|模|取余|幂|求幂|整除|加上|减去|乘以|于)\\b"
                 },
                 {
                     "name": "keyword.operator.comparison.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(等于|大于|小于|不等于|大于等于|小于等于|不小于|不大于)(?![\\u4e00-\\u9fff])"
+                    "match": "\\b(等于|不等于|大于|小于|大于等于|小于等于|不小于|不大于)\\b"
                 },
                 {
                     "name": "keyword.operator.logical.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(且|或|非|与|异或)(?![\\u4e00-\\u9fff])"
+                    "match": "\\b(且|与|或|异或|非)\\b"
                 },
                 {
                     "name": "keyword.operator.bitwise.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(左移|右移)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "keyword.operator.arrow.duan",
-                    "match": "->"
-                },
-                {
-                    "name": "keyword.operator.assignment.duan",
-                    "match": "="
-                },
-                {
-                    "name": "keyword.operator.comparison.symbol.duan",
-                    "match": "==|!=|<=|>=|<|>"
-                },
-                {
-                    "name": "keyword.operator.arithmetic.symbol.duan",
-                    "match": "\\+|\\-|\\*|\\/|%"
-                }
-            ]
-        },
-        "booleans": {
-            "patterns": [
-                {
-                    "name": "constant.language.boolean.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(真|假)(?![\\u4e00-\\u9fff])"
-                },
-                {
-                    "name": "constant.language.null.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(空|无)(?![\\u4e00-\\u9fff])"
+                    "match": "\\b(左移|右移)\\b"
                 }
             ]
         },
         "builtins": {
             "patterns": [
                 {
-                    "name": "support.function.builtin.duan",
-                    "match": "(?<![\\u4e00-\\u9fff])(打印|输出|读取|输入|长度|类型|转整数|转小数|转浮点|转字符串|取整|绝对值|最大值|最小值|范围|解析JSON|序列化JSON|美化JSON|打开|关闭|排序|反转|求和|求最大|求最小|去重|筛选|映射|读取文件|写入文件|追加文件|文件存在|目录存在|路径存在|创建目录|删除文件|删除目录|列出目录|绝对路径|连接路径|目录名|文件名|分割扩展名|环境变量|设置环境变量|参数列表|退出程序|当前目录|切换目录|执行命令|字符串长度|分割字符串|连接字符串|替换字符串|去除空白|字符串截取|列表长度|列表追加|列表获取|列表弹出|列表插入|列表排序|列表反转|列表包含|列表创建|字典创建|字典设置|字典删除|字典获取|字典键列表|字典值列表|字典项列表|写入输出|写入错误|读取行|读取N字节|刷新输出|打印输出|打印错误|搜索|全部匹配|替换|分割|匹配迭代|是否匹配|转义|Base64编码|Base64解码|Hex编码|Hex解码|MD5哈希|SHA1哈希|SHA256哈希|SHA512哈希|线性回归|阶乘|平均数|中位数|众数|方差|标准差|样本方差|样本标准差|累积和|随机整数|随机浮点|随机选择|圆周率|自然常数|角度转弧度|弧度转角度|是整数|是浮点|是字符串|是列表|是字典|是空|是字母|是数字符|是空白|日期转时间戳|星期几|星期名称|是否工作日|是否周末|解析时间|创建回调|创建结构体值|创建枚举|创建联合体|解析库路径|变长参数调用|获取平台|查找库|结构体大小|字段偏移|结构体转字节|字节转结构体|注册回调|注销回调|获取回调|位域设置|位域获取|创建函数指针|创建类型别名|定义宏|获取宏|首|末|余|长|列)(?![\\u4e00-\\u9fff])"
+                    "name": "support.function.duan",
+                    "match": "\\b(打印|显示|输出|读取|输入|长度|类型|范围|整数|浮数|小数|字符串|串|列表|列|字典|典|集合|集|布尔|绝对值|最大值|最小值|求和|排序|反转|筛选|映射|打包|枚举|全部|任意|四舍五入|取整|转整数|转小数|转浮点|转字符串|解析JSON|序列化JSON|打开|关闭|读取文件|写入文件|实例检查|等等)\\b"
                 }
             ]
         },
-        "entity-names": {
+        "types": {
             "patterns": [
                 {
-                    "name": "entity.name.function.duan",
-                    "comment": "段落/函数名定义",
-                    "match": "(?:(?<=(?:段落|函数|段)\\s+)|(?<=(?:段落|函数|段)\\s+接收\\s+))([\\w\\u4e00-\\u9fff_]+)"
-                },
-                {
-                    "name": "entity.name.type.class.duan",
-                    "comment": "类名定义",
-                    "match": "(?<=(?:类|接口|协议|枚举|结构体|异常|数据)\\s+)([\\w\\u4e00-\\u9fff_]+)"
-                },
-                {
-                    "name": "entity.name.function.duan",
-                    "comment": "函数调用",
-                    "match": "(?<![\\u4e00-\\u9fff])([\\w\\u4e00-\\u9fff_]+)(?=\\s*[:：]\\s*$)"
+                    "name": "support.type.duan",
+                    "match": "\\b(整数|浮数|小数|字符串|串|布尔|列表|列|字典|典|集合|集|元组|空|任意|可选|联合|可调用|可迭代|迭代器|生成器|列表类型|字典类型|集合类型|元组类型|序列|映射|类型|己|指针)\\b"
                 }
             ]
         },
-        "module-names": {
+        "decorator": {
             "patterns": [
                 {
-                    "name": "entity.name.module.duan",
-                    "match": "《[^》]+》"
+                    "name": "entity.other.attribute-name.duan",
+                    "match": "@\\w+"
                 }
             ]
         },
         "punctuation": {
             "patterns": [
                 {
-                    "name": "punctuation.terminator.duan",
-                    "match": "。"
-                },
-                {
                     "name": "punctuation.separator.duan",
-                    "match": "，|、"
+                    "match": "：|；|，|。|、"
                 },
                 {
-                    "name": "punctuation.colon.duan",
-                    "match": "：|:"
-                },
-                {
-                    "name": "punctuation.section.brackets.begin.duan",
-                    "match": "（|【|｛|\\(|\\[|\\{"
-                },
-                {
-                    "name": "punctuation.section.brackets.end.duan",
-                    "match": "）|】|｝|\\)|\\]|\\}"
+                    "name": "punctuation.bracket.duan",
+                    "match": "（|）|【|】|《|》"
                 }
             ]
         }

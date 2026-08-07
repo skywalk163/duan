@@ -572,6 +572,332 @@ class OfflineModel:
             "recommended_models": self.RECOMMENDED_MODELS,
         }
 
+    # ═══════════════════════════════════════════════════════════════════
+    # 翻译方法
+    # ═══════════════════════════════════════════════════════════════════
+
+    def translate_duan_to_python(self, duan_code: str) -> str:
+        """将段言代码翻译为 Python 代码（基于规则）
+
+        Args:
+            duan_code: 段言源码字符串
+
+        Returns:
+            翻译后的 Python 代码
+        """
+        try:
+            from tools.ai_copilot.translator import duan_to_python
+            return duan_to_python(duan_code=duan_code)
+        except Exception as e:
+            logger.warning(f"翻译器不可用，使用规则回退: {e}")
+            return self._rule_translate_duan_to_python(duan_code)
+
+    def translate_python_to_duan(self, python_code: str) -> str:
+        """将 Python 代码翻译为段言代码（基于规则）
+
+        Args:
+            python_code: Python 源码字符串
+
+        Returns:
+            翻译后的段言代码
+        """
+        try:
+            from tools.ai_copilot.translator import python_to_duan
+            return python_to_duan(python_code=python_code)
+        except Exception as e:
+            logger.warning(f"翻译器不可用，使用规则回退: {e}")
+            return self._rule_translate_python_to_duan(python_code)
+
+    def _rule_translate_duan_to_python(self, duan_code: str) -> str:
+        """基于规则的段言→Python 翻译（回退方案）"""
+        result = duan_code
+        # 关键字映射
+        replacements = [
+            # 控制流
+            ('如果', 'if'), ('否则如果', 'elif'), ('否则若', 'elif'),
+            ('否则', 'else'), ('遍历', 'for'), ('当', 'while'),
+            ('跳出', 'break'), ('跳过', 'continue'), ('返回', 'return'),
+            ('匹配', 'match'), ('情况', 'case'),
+            # 函数/类定义
+            ('段落 ', 'def '), ('函数 ', 'def '), ('段 ', 'def '),
+            ('类 ', 'class '), ('构造', 'def __init__'),
+            ('接收', 'lambda'), ('新建', ''),
+            # 异常
+            ('尝试', 'try'), ('捕获', 'except'), ('最终', 'finally'),
+            ('抛出', 'raise'),
+            # 异步
+            ('异步', 'async'), ('等待', 'await'),
+            # 上下文
+            ('使用', 'with'), (' 为 ', ' as '),
+            # 导入
+            ('导入《', 'import '), ('》', ''),
+            ('从《', 'from '), ('》导入《', ' import '),
+            # 变量
+            ('设 ', ''), (' 为 ', ' = '),
+            # 常量
+            ('真', 'True'), ('假', 'False'), ('空', 'None'), ('无', 'None'),
+            ('己', 'self'), ('父', 'super'),
+            # 运算符
+            (' 加 ', ' + '), (' 减 ', ' - '), (' 乘 ', ' * '),
+            (' 除 ', ' / '), (' 除以 ', ' / '), (' 整除 ', ' // '),
+            (' 模 ', ' % '), (' 取余 ', ' % '), (' 幂 ', ' ** '),
+            (' 大于 ', ' > '), (' 小于 ', ' < '), (' 等于 ', ' == '),
+            (' 不等于 ', ' != '), (' 大于等于 ', ' >= '), (' 小于等于 ', ' <= '),
+            (' 且 ', ' and '), (' 或 ', ' or '), (' 非 ', ' not '),
+            (' 与 ', ' & '), (' 异或 ', ' ^ '), (' 左移 ', ' << '), (' 右移 ', ' >> '),
+            # 内置函数
+            ('打印', 'print'), ('长度', 'len'), ('类型', 'type'),
+            ('范围', 'range'), ('输入', 'input'), ('读取', 'input'),
+            ('转整数', 'int'), ('转小数', 'float'), ('转字符串', 'str'),
+            ('绝对值', 'abs'), ('最大值', 'max'), ('最小值', 'min'),
+            ('求和', 'sum'), ('排序', 'sorted'), ('解析JSON', 'json.loads'),
+            ('序列化JSON', 'json.dumps'),
+            # 冒号
+            ('：', ':'),
+        ]
+        for old, new in replacements:
+            result = result.replace(old, new)
+        return result
+
+    def _rule_translate_python_to_duan(self, python_code: str) -> str:
+        """基于规则的 Python→段言 翻译（回退方案）"""
+        result = python_code
+        replacements = [
+            # 控制流
+            ('if ', '如果 '), ('elif ', '否则如果 '), ('else:', '否则：'),
+            ('for ', '遍历 '), ('while ', '当 '),
+            ('break', '跳出'), ('continue', '跳过'), ('return ', '返回 '),
+            # 函数/类定义
+            ('def ', '段落 '), ('class ', '类 '),
+            ('__init__', '构造'),
+            # 异常
+            ('try:', '尝试：'), ('except ', '捕获 '), ('finally:', '最终：'),
+            ('raise ', '抛出 '),
+            # 异步
+            ('async ', '异步 '), ('await ', '等待 '),
+            # 上下文
+            ('with ', '使用 '), (' as ', ' 为 '),
+            # 导入
+            ('import ', '导入《'), ('from ', '从《'),
+            # 赋值
+            (' = ', ' 为 '),
+            # 常量
+            ('True', '真'), ('False', '假'), ('None', '空'),
+            ('self', '己'), ('super', '父'),
+            # 运算符
+            (' + ', ' 加 '), (' - ', ' 减 '), (' * ', ' 乘 '),
+            (' / ', ' 除 '), (' // ', ' 整除 '),
+            (' % ', ' 模 '), (' ** ', ' 幂 '),
+            (' > ', ' 大于 '), (' < ', ' 小于 '), (' == ', ' 等于 '),
+            (' != ', ' 不等于 '), (' >= ', ' 大于等于 '), (' <= ', ' 小于等于 '),
+            (' and ', ' 且 '), (' or ', ' 或 '), (' not ', ' 非 '),
+            # 内置函数
+            ('print', '打印'), ('len', '长度'), ('type', '类型'),
+            ('range', '范围'), ('input', '输入'),
+            ('int(', '转整数('), ('float(', '转小数('), ('str(', '转字符串('),
+            ('abs(', '绝对值('), ('max(', '最大值('), ('min(', '最小值('),
+            ('sum(', '求和('), ('sorted(', '排序('),
+            # 冒号
+            (':', '：'),
+        ]
+        # 按长度降序排列，避免短匹配破坏长匹配
+        replacements.sort(key=lambda x: -len(x[0]))
+        for old, new in replacements:
+            result = result.replace(old, new)
+        # 处理设 变量 为
+        result = re.sub(r'(\w+)\s+为\s+', r'设 \1 为 ', result)
+        return result
+
+    # ═══════════════════════════════════════════════════════════════════
+    # 代码片段生成
+    # ═══════════════════════════════════════════════════════════════════
+
+    def generate_snippet(self, description: str, context: Optional[Dict] = None) -> str:
+        """根据描述和上下文生成代码片段
+
+        Args:
+            description: 代码片段描述
+            context: 上下文信息（可选），如 {"变量名": "列表", "类型": "整数"}
+
+        Returns:
+            生成的段言代码片段
+        """
+        desc_lower = description.lower()
+        ctx = context or {}
+
+        # 匹配已知片段
+        snippet = self._rule_engine.generate(description) if self._rule_engine else ""
+        if snippet and not snippet.startswith("# 无法识别"):
+            return snippet
+
+        # 模板生成
+        templates = {
+            ("排序", "sort", "排列"): self._template_sort,
+            ("查找", "搜索", "search", "find"): self._template_search,
+            ("文件", "file", "读写"): self._template_file,
+            ("HTTP", "网络", "请求", "http"): self._template_http,
+            ("JSON", "解析", "序列化"): self._template_json,
+            ("正则", "regex", "匹配"): self._template_regex,
+            ("列表", "数组", "list", "array"): self._template_list,
+            ("字典", "map", "dict", "映射"): self._template_dict,
+            ("日期", "时间", "date", "time"): self._template_datetime,
+            ("线程", "thread", "并行"): self._template_thread,
+            ("加密", "md5", "sha", "hash"): self._template_crypto,
+            ("数据库", "sql", "db", "database"): self._template_database,
+            ("测试", "test", "单元测试"): self._template_test,
+        }
+
+        for keywords, template_fn in templates.items():
+            if any(kw in desc_lower for kw in keywords):
+                return template_fn(ctx)
+
+        return f"""# 根据描述生成: {description}
+# 上下文: {ctx or "无"}
+段落 生成函数 接收 参数：
+    打印("待实现: {description}")
+    返回 空
+"""
+
+    def _template_sort(self, ctx: Dict) -> str:
+        return """段落 排序函数 接收 列表：
+    如果 长度(列表) 小于等于 1：
+        返回 列表
+    设 基准 为 列表[0]
+    设 左 为 []
+    设 右 为 []
+    遍历 项 于 列表[1:]：
+        如果 项 小于 基准：
+            左.追加(项)
+        否则：
+            右.追加(项)
+    返回 排序函数(左) 加 [基准] 加 排序函数(右)
+"""
+
+    def _template_search(self, ctx: Dict) -> str:
+        return """段落 查找函数 接收 列表, 目标：
+    遍历 索引 于 范围(0, 长度(列表) 减 1)：
+        如果 列表[索引] 等于 目标：
+            返回 索引
+    返回 -1
+"""
+
+    def _template_file(self, ctx: Dict) -> str:
+        filename = ctx.get("文件名", "文件.txt")
+        return f"""段落 读取文件 接收 路径：
+    使用 打开(路径) 为 文件：
+        设 内容 为 文件.读取()
+        返回 内容
+
+段落 写入文件 接收 路径, 内容：
+    使用 打开(路径, "w") 为 文件：
+        文件.写入(内容)
+
+# 示例用法
+# 设 数据 为 读取文件("{filename}")
+# 打印(数据)
+"""
+
+    def _template_http(self, ctx: Dict) -> str:
+        url = ctx.get("url", "https://api.example.com")
+        return f"""导入《网络请求》
+
+段落 获取数据 接收 ：
+    设 响应 为 网络请求.获取("{url}")
+    如果 响应.状态码 等于 200：
+        返回 响应.文本()
+    否则：
+        打印("请求失败: " 加 响应.状态码)
+        返回 空
+"""
+
+    def _template_json(self, ctx: Dict) -> str:
+        return """段落 处理JSON 接收 数据：
+    尝试：
+        设 解析结果 为 解析JSON(数据)
+        打印("解析成功")
+        返回 解析结果
+    捕获 异常：
+        打印("JSON解析失败")
+        返回 空
+
+段落 生成JSON 接收 数据：
+    返回 序列化JSON(数据, ensure_ascii=False)
+"""
+
+    def _template_regex(self, ctx: Dict) -> str:
+        return """导入《正则表达式》
+
+段落 匹配模式 接收 文本, 模式：
+    设 结果 为 正则表达式.查找(模式, 文本)
+    如果 结果：
+        返回 结果.组()
+    返回 空
+"""
+
+    def _template_list(self, ctx: Dict) -> str:
+        return """段落 处理列表 接收 列表：
+    设 结果 为 []
+    遍历 项 于 列表：
+        如果 项 大于 0：
+            结果.追加(项)
+    返回 结果
+"""
+
+    def _template_dict(self, ctx: Dict) -> str:
+        return """段落 处理字典 接收 字典：
+    遍历 键, 值 于 字典.项()：
+        打印(键 加 ": " 加 值)
+    返回 字典
+"""
+
+    def _template_datetime(self, ctx: Dict) -> str:
+        return """导入《日期时间》
+
+段落 获取当前时间 接收 ：
+    设 现在 为 日期时间.现在()
+    打印(现在)
+    返回 现在
+"""
+
+    def _template_thread(self, ctx: Dict) -> str:
+        return """导入《线程》
+
+段落 任务 接收 名称：
+    打印("任务执行中: " 加 名称)
+
+# 创建线程
+设 线程1 为 线程.新建(任务, "线程1")
+线程1.启动()
+线程1.等待()
+"""
+
+    def _template_crypto(self, ctx: Dict) -> str:
+        return """导入《加密》
+
+段落 计算哈希 接收 文本：
+    返回 加密.MD5(文本)
+"""
+
+    def _template_database(self, ctx: Dict) -> str:
+        return """导入《SQLite》
+
+段落 查询数据库 接收 查询语句：
+    设 数据库 为 SQLite.连接("data.db")
+    设 游标 为 数据库.执行(查询语句)
+    设 结果 为 游标.获取全部()
+    数据库.关闭()
+    返回 结果
+"""
+
+    def _template_test(self, ctx: Dict) -> str:
+        return """导入《单元测试框架》
+
+段落 测试用例 接收 ：
+    设 结果 为 1 加 1
+    断言 结果 等于 2
+    打印("测试通过")
+"""
+
 
 # ═══════════════════════════════════════════════════════════════════
 # CLI 入口

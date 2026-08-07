@@ -8,7 +8,7 @@ const { exec } = require('child_process');
 // 欢迎页 / 首次运行
 // =============================================================================
 
-const EXTENSION_VERSION = '6.0.0';
+const EXTENSION_VERSION = '6.3.0';
 const WELCOME_SHOWN_KEY = 'duan.welcomeShown';
 
 function showWelcomePage(context) {
@@ -841,7 +841,7 @@ function registerCommands(context) {
         runCommandWithDiagnostics('check', [], '语法检查');
     });
 
-    // --- 编译 ---
+    // --- 编译为 Python ---
     const compileCmd = vscode.commands.registerCommand('duan.compile', () => {
         const filePath = getActiveDuanFile();
         if (!filePath) return;
@@ -882,6 +882,56 @@ function registerCommands(context) {
         terminal.sendText(`cd "${projectRoot}" ; ${pythonCmd} -m cli.duan repl`);
     });
 
+    // --- Python↔Duan 双向翻译 ---
+    const translateCmd = vscode.commands.registerCommand('duan.translate', () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showInformationMessage('请打开一个文件进行翻译');
+            return;
+        }
+        const filePath = editor.document.uri.fsPath;
+        const projectRoot = getProjectRoot();
+        const pythonCmd = getPythonPath();
+        const isDuan = filePath.endsWith('.duan');
+        const direction = isDuan ? '--to-python' : '--to-duan';
+        const terminal = vscode.window.createTerminal('段言翻译');
+        terminal.show();
+        terminal.sendText(`cd "${projectRoot}" ; ${pythonCmd} -m tools.ai_copilot.translator ${direction} "${filePath}"`);
+    });
+
+    // --- AI 辅助代码生成 ---
+    const aiCmd = vscode.commands.registerCommand('duan.ai', async () => {
+        const query = await vscode.window.showInputBox({
+            prompt: '请输入代码生成需求描述',
+            placeHolder: '例如：写一个二分查找函数',
+            ignoreFocusOut: true
+        });
+        if (!query) return;
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: '段言 AI 生成中...',
+            cancellable: false
+        }, async () => {
+            try {
+                const projectRoot = getProjectRoot();
+                const pythonCmd = getPythonPath();
+                const { execSync } = require('child_process');
+                const result = execSync(
+                    `"${pythonCmd}" -c "import sys; sys.path.insert(0, '${projectRoot.replace(/\\/g, '\\\\')}'); from tools.ai_copilot.offline_model import OfflineModel; m = OfflineModel(); print(m.generate('${query.replace(/'/g, "\\'")}'))"`,
+                    { cwd: projectRoot, encoding: 'utf-8', timeout: 30000 }
+                );
+                const snippet = new vscode.SnippetString(result.trim());
+                const editor = vscode.window.activeTextEditor;
+                if (editor) {
+                    editor.insertSnippet(snippet);
+                    vscode.window.showInformationMessage('段言 AI 代码已插入');
+                }
+            } catch (e) {
+                vscode.window.showErrorMessage(`AI 生成失败: ${e.message}`);
+            }
+        });
+    });
+
     // --- 重启 LSP ---
     const restartCmd = vscode.commands.registerCommand('duan.restartLSP', async () => {
         updateStatusBar('offline');
@@ -904,7 +954,7 @@ function registerCommands(context) {
 
     context.subscriptions.push(
         runCmd, buildCmd, formatCmd, checkCmd, compileCmd, compileLLVMCmd,
-        typeCheckCmd, replCmd, restartCmd
+        typeCheckCmd, replCmd, restartCmd, translateCmd, aiCmd
     );
 }
 
@@ -918,7 +968,7 @@ function activate(context) {
     // 输出通道
     outputChannel = vscode.window.createOutputChannel('段言');
     context.subscriptions.push(outputChannel);
-    outputChannel.appendLine('段言语言扩展 v1.0.0 已激活');
+    outputChannel.appendLine('段言语言扩展 v6.3.0 已激活');
 
     // 问题面板
     createDiagnosticCollection(context);

@@ -286,8 +286,7 @@ class DuanUnifiedCLI:
                 source = f.read()
             # 设置脚本的 sys.argv
             old_argv = sys.argv
-            if script_args:
-                sys.argv = [source_file] + script_args
+            sys.argv = [source_file] + (script_args or [])
             try:
                 return self.compile_with_src(source, run=True, source_file=source_file)
             finally:
@@ -723,7 +722,7 @@ def main():
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
         parser.add_argument('--welcome', action='store_true',
                            help='显示首次运行欢迎引导')
-        parser.add_argument('--version', action='version', version='段言 v6.2.1')
+        parser.add_argument('--version', action='version', version='段言 v6.3.0')
         
         args = parser.parse_args()
         

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [6.3.0] - 2026-08-07
+
+### Added
+- **100% 自举编译器达成**: 完成全部 33 个功能点的自举实现，自举编译器完成度从 81.8%（27/33）提升至 100%（33/33），段言编译器已完全能够编译自身。新增 `bootstrap_cycle_verify.py` 自举循环验证工具，支持 5 步验证流程（Python 编译→编译器 A→自编译→编译器 B→输出一致性比较）
+- **AI 工具链增强**: VS Code 扩展全面升级（语法高亮、代码补全、实时诊断、LSP 集成），Python↔段言双向翻译能力增强，端侧模型支持离线 AI 辅助（`offline_model.py`），`translator.py` 支持双向翻译（Python→段言 + 段言→Python）
+- **生态拓展**: 标准库扩充至 50+ 模块，新增 5 个中文场景专属模块（中文分词、农历工具、身份证校验、拼音转换、手机号校验），新增 `网络请求.py` 增强（URL 工具函数、异常类体系），新增 10+ 完整示例项目（CLI 工具、Web 应用、数据处理、游戏、儿童编程等）
+- **社区推广**: 更新全中文贡献指南（CONTRIBUTING.md 扩充至 696 行 10+ 章节），新增 docs/community/ 全套社区文档（学习路径、贡献指南、反馈收集、讨论运营），新增发布检查清单
+- **全链路测试通过**: E2E 测试覆盖 30+ 示例程序，词法分析→语法解析→代码生成全链路验证通过，LLVM 后端和包管理器测试通过，新增 `test_e2e_full_coverage.py` 全链路覆盖测试
+
+### Changed
+- **版本号**: 6.2.1 → 6.3.0
+- **贡献指南增强**: 新增详细开发环境配置、测试运行指南、PR 检查清单、代码审查指南、翻译贡献指南
+- **E2E 测试修复**: 修复 calculator_app 命令行参数传递、file_search 运算符兼容性、全链路测试断言
+- **网络请求模块增强**: 新增 `响应`、`HTTP错误`、`请求错误`、`超时错误`、`连接错误` 等异常类，新增 `编码URL`、`解码URL`、`解析URL`、`拼接URL`、`解析查询串` 等 URL 工具函数
+
+### Test
+- 全量回归测试: **2584 passed, 51 skipped, 0 failures**（较 v6.2.1 的 2564 passed 增长 20 个测试用例）
+- E2E 测试全部通过
+- 自举编译器 33/33 功能点验证通过
+
 ## [6.2.1] - 2026-08-07
 
 ### Added

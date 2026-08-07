@@ -1,9 +1,9 @@
 {
-    "name": "duan",
-    "displayName": "段言 DuanLang",
-    "description": "段言 (Duan) 编程语言 VS Code 扩展 — 中文编程语言支持，提供语法高亮、自动补全、诊断、格式化等功能",
-    "version": "6.0.0",
-    "publisher": "dumate",
+    "name": "duan-lang",
+    "displayName": "段言 (Duan Language)",
+    "description": "段言中文编程语言支持 - 语法高亮、代码补全、LSP、格式化、调试",
+    "version": "0.1.0",
+    "publisher": "duan-lang",
     "license": "MIT",
     "icon": "icon.png",
     "repository": {
@@ -15,12 +15,12 @@
         "url": "https://github.com/skywalk163/duan/issues"
     },
     "engines": {
-        "vscode": "^1.70.0"
+        "vscode": "^1.80.0"
     },
     "categories": [
         "Programming Languages",
         "Snippets",
-        "Language Packs"
+        "LSP"
     ],
     "activationEvents": [
         "onLanguage:duan",
@@ -31,8 +31,8 @@
         "languages": [
             {
                 "id": "duan",
+                "aliases": ["段言", "Duan"],
                 "extensions": [".duan"],
-                "aliases": ["Duan", "段言"],
                 "configuration": "./language-configuration.json"
             }
         ],
@@ -57,7 +57,12 @@
             },
             {
                 "command": "duan.run",
-                "title": "段言: 运行当前文件",
+                "title": "段言: 运行文件",
+                "category": "段言"
+            },
+            {
+                "command": "duan.compile",
+                "title": "段言: 编译为Python",
                 "category": "段言"
             },
             {
@@ -73,11 +78,6 @@
             {
                 "command": "duan.check",
                 "title": "段言: 检查语法",
-                "category": "段言"
-            },
-            {
-                "command": "duan.compile",
-                "title": "段言: 编译当前文件",
                 "category": "段言"
             },
             {
@@ -98,6 +98,16 @@
             {
                 "command": "duan.restartLSP",
                 "title": "段言: 重启语言服务器",
+                "category": "段言"
+            },
+            {
+                "command": "duan.translate",
+                "title": "段言: Python↔段言双向翻译",
+                "category": "段言"
+            },
+            {
+                "command": "duan.ai",
+                "title": "段言: AI辅助代码生成",
                 "category": "段言"
             }
         ],
@@ -193,7 +203,7 @@
                 },
                 "duan.version": {
                     "type": "string",
-                    "default": "6.1.0",
+                    "default": "6.2.1",
                     "readOnly": true,
                     "description": "段言扩展版本号"
                 }
@@ -243,6 +253,6 @@
         "package": "vsce package"
     },
     "devDependencies": {
-        "@types/vscode": "^1.70.0"
+        "@types/vscode": "^1.80.0"
     }
 }

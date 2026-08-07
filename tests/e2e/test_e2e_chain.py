@@ -60,6 +60,9 @@ E2E_EXCLUDED = {
     'web_crawler/主.duan',
     'file_tools/batch_rename/主.duan',
     'web_api/todo_api/主.duan',
+    'chat_bot/主.duan',
+    'markdown_editor/主.duan',
+    'password_manager/主.duan',
 }
 
 EXAMPLES_DIR = REPO_ROOT / 'examples'

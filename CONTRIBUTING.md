@@ -190,6 +190,255 @@ duan/
 
 ---
 
+## 详细开发环境配置
+
+### Python 环境要求
+
+段言编译器使用 Python 编写，以下是推荐的开发环境配置：
+
+| 工具 | 版本要求 | 用途 |
+|------|----------|------|
+| **Python** | 3.10 ~ 3.13 | 编译器运行环境 |
+| **Git** | 2.30+ | 版本控制 |
+| **VS Code** | 最新版 | 推荐 IDE（含段言扩展） |
+| **pytest** | 7.0+ | 测试框架 |
+| **ANTLR** (可选) | 4.13+ | 备选解析后端 |
+
+### 完整安装步骤
+
+```bash
+# 1. 克隆仓库
+git clone https://github.com/skywalk163/duan.git
+cd duan
+
+# 2. 创建并激活虚拟环境
+# Windows:
+python -m venv venv
+venv\Scripts\activate
+
+# macOS/Linux:
+# python3 -m venv venv
+# source venv/bin/activate
+
+# 3. 安装项目依赖（开发模式）
+pip install -e .
+
+# 4. 安装开发工具
+pip install -e ".[dev]"
+
+# 5. 安装 ANTLR 支持（可选）
+pip install -e ".[antlr]"
+
+# 6. 验证安装
+python -m cli.duan_unified --version
+python -m cli.duan_unified run examples/hello.duan
+```
+
+### 验证开发环境
+
+运行以下命令确认环境配置正确：
+
+```bash
+# 查看版本号
+python -m cli.duan_unified --version
+
+# 运行 Hello World
+python -m cli.duan_unified run examples/hello.duan
+
+# 运行测试套件
+python -m pytest tests/ -q --tb=short
+```
+
+---
+
+## 如何运行测试
+
+### 测试目录结构
+
+```
+tests/
+├── unit/           # 单元测试（词法分析、语法解析、代码生成等）
+├── integration/    # 集成测试（模块间交互）
+├── e2e/            # 端到端测试（完整链路，覆盖示例程序）
+└── test_e2e_full_coverage.py  # 全链路覆盖测试
+```
+
+### 运行全部测试
+
+```bash
+# 运行所有测试（推荐）
+python -m pytest tests/
+
+# 仅显示失败和跳过的测试
+python -m pytest tests/ -q --tb=short
+
+# 显示详细输出
+python -m pytest tests/ -v
+```
+
+### 运行特定测试
+
+```bash
+# 运行单个测试文件
+python -m pytest tests/unit/test_lexer.py -v
+
+# 运行单个测试用例
+python -m pytest tests/unit/test_lexer.py::test_xxx -v
+
+# 按关键词筛选
+python -m pytest tests/ -k "lexer or parser"
+
+# 运行 E2E 测试
+python -m pytest tests/e2e/ -v
+```
+
+### 运行测试并生成覆盖率报告
+
+```bash
+# 安装覆盖率工具
+pip install pytest-cov
+
+# 运行测试并生成覆盖率报告
+python -m pytest tests/ --cov=src --cov-report=term-missing
+
+# 生成 HTML 覆盖率报告
+python -m pytest tests/ --cov=src --cov-report=html
+```
+
+### 测试注意事项
+
+- 提交 PR 前确保所有测试通过：`python -m pytest tests/ -q --tb=short`
+- 新增功能必须包含对应的测试用例
+- E2E 测试覆盖示例程序，修改示例时需同步更新测试
+- 测试文件命名规范：`test_模块名_功能.py`
+
+---
+
+## Pull Request 检查清单
+
+提交 PR 前，请逐项确认：
+
+### 代码质量
+- [ ] 代码遵循项目代码规范（参见「代码规范」章节）
+- [ ] 所有测试通过（`python -m pytest tests/ -q --tb=short`）
+- [ ] 新增功能包含充分的测试用例
+- [ ] Bug 修复包含回归测试
+- [ ] 代码无明显的性能问题
+
+### 文档与注释
+- [ ] 关键逻辑有中文注释说明
+- [ ] 新增的公开 API 有文档字符串
+- [ ] 如果修改了用户可见行为，更新了相关文档
+- [ ] 示例代码使用最新语法
+
+### 提交规范
+- [ ] 分支命名符合规范（`feature/xxx`、`fix/xxx`、`docs/xxx`）
+- [ ] Commit 信息简洁明了，说明变更原因
+- [ ] 一个分支只解决一个问题
+- [ ] 没有包含调试代码或临时文件
+
+### 兼容性
+- [ ] 没有破坏现有功能
+- [ ] 兼容 Python 3.10 ~ 3.13
+- [ ] 跨平台测试（Windows/macOS/Linux）通过
+
+---
+
+## 代码审查指南
+
+### 审查原则
+
+1. **尊重与建设性**：以帮助作者改进为目的，而非挑剔
+2. **关注关键问题**：优先审查逻辑正确性、安全性、性能
+3. **代码风格次之**：风格问题可标注，但不应阻塞合入
+4. **及时响应**：争取在 48 小时内完成审查
+
+### 审查清单
+
+#### 功能正确性
+- 代码是否实现了预期的功能？
+- 边界情况是否处理妥当？（空值、零值、超大输入等）
+- 是否有潜在的并发问题？
+
+#### 代码质量
+- 是否有重复代码可以抽取复用？
+- 函数/段落是否职责单一？
+- 错误处理是否恰当？
+- 是否有过度设计（不必要的抽象）？
+
+#### 安全性
+- 用户输入是否经过验证？
+- 文件路径操作是否安全？（防止路径遍历）
+- 是否存在命令注入风险？
+- 敏感信息（密钥、密码）是否泄露？
+
+#### 测试覆盖
+- 新增代码是否有对应的测试？
+- 测试是否覆盖了正常路径和异常路径？
+- 测试是否真实有效（不是虚假测试）？
+
+### 审查流程
+
+1. **阅读 PR 描述**：了解变更目的和范围
+2. **查看关键文件**：优先审查核心逻辑文件
+3. **运行测试**：确保所有测试通过
+4. **留下评论**：使用 GitHub 的 Review 功能
+5. **批准或请求修改**：确认无误后批准合入
+
+### 常用审查标签
+
+| 标签 | 含义 | 操作 |
+|------|------|------|
+| `nit` | 小问题（拼写、格式） | 可选修改 |
+| `suggestion` | 改进建议 | 可考虑采纳 |
+| `blocking` | 必须修改的问题 | 需修改后才能合入 |
+| `question` | 疑问 | 需要作者澄清 |
+
+---
+
+## 如何贡献翻译
+
+段言项目支持多语言文档，欢迎贡献翻译！
+
+### 翻译范围
+
+- **文档翻译**：`docs/` 目录下的文档翻译为其他语言
+- **错误信息翻译**：编译器和运行时错误信息的多语言支持
+- **示例注释翻译**：示例代码中的注释翻译
+- **VS Code 扩展**：扩展界面文本的本地化
+
+### 翻译流程
+
+1. **确认需求**：在 GitHub Issues 中搜索 `translation` 标签，或新建 Issue 说明你想翻译的语言
+2. **创建分支**：`git checkout -b translation/目标语言-文档名`
+3. **翻译文档**：在 `docs/` 下创建对应语言的子目录（如 `docs/en/`、`docs/ja/`）
+4. **保持同步**：翻译应跟随中文原版的最新版本
+5. **提交 PR**：在 PR 描述中标注 `translation` 标签
+
+### 翻译规范
+
+- **保持术语一致**：使用统一的术语翻译表
+- **保留代码示例**：代码示例不需要翻译，只需翻译注释和说明文字
+- **保留链接**：内部链接保持相对路径，外部链接保持原样
+- **注明译者**：在文档末尾添加 `> 翻译：@你的GitHub用户名`
+
+### 中文术语对照表（英→中）
+
+| 英文 | 中文 |
+|------|------|
+| compiler | 编译器 |
+| lexer | 词法分析器 |
+| parser | 语法分析器 |
+| code generator | 代码生成器 |
+| abstract syntax tree | 抽象语法树 |
+| type system | 类型系统 |
+| standard library | 标准库 |
+| bootstrap | 自举 |
+| module | 模块 |
+| package | 包 |
+
+---
+
 ## 如何贡献代码
 
 ### 第一步：选择一个任务
