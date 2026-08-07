@@ -243,6 +243,7 @@ class PythonCodeGenerator:
             # 字符串工具
             '转整数': '_duan_builtin.转整数',
             '转浮点': '_duan_builtin.转浮点',
+            '转串': '_duan_builtin.转字符串',
             '转字符串': '_duan_builtin.转字符串',
             '到字符串': '_duan_builtin.转字符串',
             '转换字符串': '_duan_builtin.转字符串',

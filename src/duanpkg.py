@@ -481,6 +481,11 @@ def cmd_init(args):
     name = args.name or os.path.basename(os.getcwd())
     pkg_dir = Path(args.dir or os.getcwd())
 
+    # 如果指定了模板，从模板创建
+    template = getattr(args, 'template', None)
+    if template:
+        return _init_from_template(name, pkg_dir, template)
+
     pkg_json = {
         "name": name,
         "version": "0.1.0",
@@ -511,6 +516,75 @@ def cmd_init(args):
     print(f"已初始化包 {name} v0.1.0")
     print(f"  duan.json -> {pkg_file}")
     print(f"  main.duan -> {main_file}")
+    return 0
+
+
+def _init_from_template(name: str, target_dir: Path, template_name: str) -> int:
+    """从模板初始化新包"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from templates import list_templates, copy_template
+    except ImportError:
+        # 尝试本地导入
+        try:
+            from src.templates import list_templates, copy_template
+        except ImportError:
+            print("错误: 无法加载模板模块")
+            return 1
+
+    # 验证模板是否存在
+    templates = list_templates()
+    template_names = [t['name'] for t in templates]
+    if template_name not in template_names:
+        print(f"错误: 未找到模板 '{template_name}'")
+        print(f"可用模板: {', '.join(template_names)}")
+        return 1
+
+    # 复制模板
+    target_path = str(target_dir)
+    success = copy_template(template_name, target_path)
+    if not success:
+        return 1
+
+    # 更新 package.toml 中的包名
+    pkg_toml = target_dir / "package.toml"
+    if pkg_toml.exists():
+        with open(pkg_toml, 'r', encoding='utf-8') as f:
+            content = f.read()
+        content = content.replace('name = "' + template_name + '"', f'name = "{name}"', 1)
+        with open(pkg_toml, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    print(f"已从模板 '{template_name}' 创建项目 '{name}'")
+    print(f"  目标目录: {target_dir}")
+    return 0
+
+
+def cmd_list_templates(args):
+    """列出可用模板"""
+    try:
+        sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        from templates import list_templates
+    except ImportError:
+        try:
+            from src.templates import list_templates
+        except ImportError:
+            print("错误: 无法加载模板模块")
+            return 1
+
+    templates = list_templates()
+    if not templates:
+        print("暂无可用模板")
+        return 0
+
+    print(f"可用模板 ({len(templates)} 个):\n")
+    print(f"{'模板名称':<22} {'描述'}")
+    print("-" * 60)
+    for t in templates:
+        desc = t['description'] or '无描述'
+        print(f"  {t['name']:<20} {desc[:50]}")
+    print()
+    print("使用: duanpkg init <包名> --template <模板名>")
     return 0
 
 
@@ -1524,6 +1598,7 @@ def main():
     p_init = sub.add_parser('init', help='初始化新包')
     p_init.add_argument('name', nargs='?', help='包名')
     p_init.add_argument('--dir', help='目标目录')
+    p_init.add_argument('--template', '-t', help='从模板创建（使用 list-templates 查看可用模板）')
 
     # install
     p_install = sub.add_parser('install', help='安装包')
@@ -1558,6 +1633,9 @@ def main():
     p_info = sub.add_parser('info', help='查看包信息')
     p_info.add_argument('package', help='包名')
     p_info.add_argument('--registry', '-r', help='远程注册表地址')
+
+    # list-templates
+    sub.add_parser('list-templates', help='列出可用项目模板')
 
     # remove
     p_remove = sub.add_parser('remove', help='卸载包')
@@ -1611,6 +1689,7 @@ def main():
         'metadata': cmd_metadata,
         'versions': cmd_versions,
         'registry-server': cmd_registry_server,
+        'list-templates': cmd_list_templates,
     }
 
     return commands[args.command](args)

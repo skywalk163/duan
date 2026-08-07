@@ -1,0 +1,9 @@
+# 段言项目配置
+[package]
+name = "student_management"
+version = "0.1.0"
+entry = "主.duan"
+authors = []
+description = "学生管理系统 - 管理学生信息和成绩"
+
+[dependencies]

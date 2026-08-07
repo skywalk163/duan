@@ -9,6 +9,14 @@ Python → 段言 确定性转译器
     from py2duan_transpiler import Py2DuanTranspiler
     t = Py2DuanTranspiler()
     duan_code = t.transpile(python_code)
+
+改进（v4.0）:
+    - 增强 for 循环处理（支持 for-else）
+    - 增强列表推导式（支持条件过滤）
+    - 增强字典操作（支持 dict.get, dict.items 等）
+    - 增强异常处理（支持 try-else-finally）
+    - 增强 walrus 操作符 (:=)
+    - 增强 with 语句多上下文管理
 """
 import ast
 
@@ -96,6 +104,32 @@ BUILTIN_FUNC_MAP = {
     'len':       'len',
     'open':      'open',
     'enumerate': 'enumerate',
+    'ord':       'ord',       # 保留原名
+    'chr':       'chr',       # 保留原名
+    'hex':       'hex',       # 保留原名
+    'bin':       'bin',       # 保留原名
+    'oct':       'oct',       # 保留原名
+    'repr':      'repr',      # 保留原名
+    'format':    'format',    # 保留原名
+    'bytes':     '字节',      # 新增
+    'bytearray': '字节数组',  # 新增
+    'memoryview':'内存视图',  # 新增
+    'iter':      '迭代器',    # 新增
+    'next':      '下一个',    # 新增
+    'slice':     '切片',      # 新增
+    'super':     '父',        # 新增
+    'object':    '对象',      # 新增
+    'property':  '特性',      # 新增
+    'staticmethod':'静态方法',# 新增
+    'classmethod':'类方法',   # 新增
+    'hasattr':   '有属性',    # 新增
+    'getattr':   '获取属性',  # 新增
+    'setattr':   '设置属性',  # 新增
+    'delattr':   '删除属性',  # 新增
+    'callable':  '可调用',    # 新增
+    'dir':       '目录',      # 新增
+    'vars':      '变量',      # 新增
+    'id':        '标识',      # 新增
 }
 
 NAME_MAP = {

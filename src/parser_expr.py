@@ -555,9 +555,14 @@ class ParserExprMixin:
                         self._consume(TokenType.RPAREN)
                 else:
                     # 无括号式：列 参数1 参数2 参数3
+                    # 支持逗号分隔参数，如：输出 "答案:", 42。
                     while self._current():
                         next_tok = self._current()
-                        if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.COMMA, TokenType.RPAREN, TokenType.RBRACKET,
+                        # 逗号是参数分隔符，不是管道运算符
+                        if next_tok.type == TokenType.COMMA:
+                            self._consume(TokenType.COMMA)
+                            continue
+                        if next_tok.type in (TokenType.DOT, TokenType.PERIOD, TokenType.RPAREN, TokenType.RBRACKET,
                                              TokenType.NEWLINE, TokenType.DEDENT, TokenType.INDENT):
                             break
                         if next_tok.type == TokenType.KEYWORD and next_tok.value in KEYWORDS_DOUBLE:

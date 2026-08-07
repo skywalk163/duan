@@ -19,7 +19,8 @@ const TUTORIAL_LESSONS = [
         expected: '你好，段言！',
         hint: '使用「打印」关键字，后面跟上要输出的内容，以句号结束。',
         keywords: ['打印'],
-        level: 'beginner'
+        difficulty: 'beginner',
+        layer: 'L0'
     },
     {
         id: 'ch1_variable',
@@ -31,7 +32,8 @@ const TUTORIAL_LESSONS = [
         expected: '小明',
         hint: '「设 变量名 为 值」是段言定义变量的标准语法。',
         keywords: ['设', '为'],
-        level: 'beginner'
+        difficulty: 'beginner',
+        layer: 'L0'
     },
     {
         id: 'ch1_calc',
@@ -43,7 +45,8 @@ const TUTORIAL_LESSONS = [
         expected: '70',
         hint: '算术运算符包括 +（加）、-（减）、*（乘）、/（除），运算优先级与数学一致。',
         keywords: ['设', '为', '打印'],
-        level: 'beginner'
+        difficulty: 'beginner',
+        layer: 'L0'
     },
     {
         id: 'ch1_string',
@@ -55,7 +58,8 @@ const TUTORIAL_LESSONS = [
         expected: '段言',
         hint: '用 + 号可以拼接两个字符串。',
         keywords: ['设', '打印'],
-        level: 'beginner'
+        difficulty: 'beginner',
+        layer: 'L0'
     },
 
     // ============================
@@ -71,7 +75,8 @@ const TUTORIAL_LESSONS = [
         expected: '成立',
         hint: '「若 条件 则：」是 L0 的条件语句，用「结束」收尾。',
         keywords: ['若', '则', '结束'],
-        level: 'intermediate'
+        difficulty: 'intermediate',
+        layer: 'L0'
     },
     {
         id: 'ch2_bian',
@@ -83,7 +88,8 @@ const TUTORIAL_LESSONS = [
         expected: '1\n2\n3',
         hint: '「遍 变量 之 列表：」是 L0 的遍历语法。',
         keywords: ['遍', '之', '结束'],
-        level: 'intermediate'
+        difficulty: 'intermediate',
+        layer: 'L0'
     },
     {
         id: 'ch2_duan',
@@ -95,7 +101,8 @@ const TUTORIAL_LESSONS = [
         expected: '42',
         hint: '「段 函数名(参数)：」定义函数，用「返回」返回值。',
         keywords: ['段', '返回', '结束'],
-        level: 'intermediate'
+        difficulty: 'intermediate',
+        layer: 'L0'
     },
     {
         id: 'ch2_shi',
@@ -107,7 +114,8 @@ const TUTORIAL_LESSONS = [
         expected: '除零错误',
         hint: '「试：...捕：...结束。」是 L0 的异常处理语法。',
         keywords: ['试', '捕', '结束'],
-        level: 'intermediate'
+        difficulty: 'intermediate',
+        layer: 'L0'
     },
 
     // ============================
@@ -123,7 +131,8 @@ const TUTORIAL_LESSONS = [
         expected: '大于5',
         hint: 'L1 使用双字关键字「如果」「那么」「否则」「打印」等，标点使用中文句号。',
         keywords: ['如果', '那么', '否则', '打印', '结束'],
-        level: 'beginner'
+        difficulty: 'beginner',
+        layer: 'L1'
     },
     {
         id: 'ch3_l2_intro',
@@ -135,7 +144,8 @@ const TUTORIAL_LESSONS = [
         expected: '大于5',
         hint: 'L2 使用 L0 单字关键字「若」「否」等，表达式更简洁。',
         keywords: ['若', '则', '否', '结束'],
-        level: 'intermediate'
+        difficulty: 'intermediate',
+        layer: 'L2'
     },
     {
         id: 'ch3_l1_l2_mix',
@@ -147,7 +157,8 @@ const TUTORIAL_LESSONS = [
         expected: '及格',
         hint: '段言 v4.0 同时支持 L0 单字和 L1 双字关键字，可以自由混用。',
         keywords: ['设', '如果', '那么', '否则', '打印', '结束'],
-        level: 'intermediate'
+        difficulty: 'intermediate',
+        layer: 'L1'
     },
 
     // ============================
@@ -163,7 +174,8 @@ const TUTORIAL_LESSONS = [
         expected: '1024',
         hint: '段言支持 ** 幂运算，以及所有标准数学运算符。',
         keywords: ['设', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L3'
     },
     {
         id: 'ch4_regex',
@@ -175,7 +187,8 @@ const TUTORIAL_LESSONS = [
         expected: 'yes',
         hint: '用「引 Python:」块嵌入 Python 正则代码，用「出」导出变量。',
         keywords: ['引', '出', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L3'
     },
 
     // ============================
@@ -191,7 +204,8 @@ const TUTORIAL_LESSONS = [
         expected: '55',
         hint: '用「引 Python:」定义 Python 函数，用「出」导出，段言代码可直接调用。',
         keywords: ['引', '出', '设', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L4'
     },
     {
         id: 'ch5_import',
@@ -203,7 +217,8 @@ const TUTORIAL_LESSONS = [
         expected: '3.141592653589793',
         hint: '「导」可以导入段言模块，「引 Python:」可以导入 Python 标准库。',
         keywords: ['引', '出', '设', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L4'
     },
 
     // ============================
@@ -219,7 +234,8 @@ const TUTORIAL_LESSONS = [
         expected: '[1, 2, 5, 8, 9]',
         hint: '使用「遍」嵌套循环遍历，用「若」判断大小，用临时变量交换元素。',
         keywords: ['段', '遍', '若', '为', '返回', '结束'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L0'
     },
     {
         id: 'ch6_class',
@@ -231,7 +247,8 @@ const TUTORIAL_LESSONS = [
         expected: '1\n4\n4',
         hint: 'L4 嵌入 Python 类定义，用「出」导出类的构造函数，段言中可直接使用。',
         keywords: ['引', '出', '设', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L4'
     },
     {
         id: 'ch6_list',
@@ -243,7 +260,8 @@ const TUTORIAL_LESSONS = [
         expected: '[1, 4, 9, 16, 25]',
         hint: '在「引 Python:」块中使用 Python 列表推导式，用「出」导出结果。',
         keywords: ['引', '出', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L4'
     },
 
     // ============================
@@ -259,7 +277,8 @@ const TUTORIAL_LESSONS = [
         expected: '1.0',
         hint: '用「引 Python:」导入 Python 的 math 模块，使用 math.sin 和 math.pi。',
         keywords: ['引', '出', '设', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L4'
     },
     {
         id: 'ch7_random',
@@ -271,7 +290,8 @@ const TUTORIAL_LESSONS = [
         expected: '',
         hint: 'random.randint(a, b) 返回 a 到 b 之间的随机整数（包含两端）。',
         keywords: ['引', '出', '设', '打印'],
-        level: 'intermediate',
+        difficulty: 'intermediate',
+        layer: 'L4',
         skip_expected_check: true
     },
     {
@@ -284,7 +304,8 @@ const TUTORIAL_LESSONS = [
         expected: '',
         hint: 'datetime.now() 获取当前时间，strftime() 格式化输出。',
         keywords: ['引', '出', '设', '打印'],
-        level: 'intermediate',
+        difficulty: 'intermediate',
+        layer: 'L4',
         skip_expected_check: true
     },
 
@@ -301,7 +322,8 @@ const TUTORIAL_LESSONS = [
         expected: '2\n3\n5\n7\n11\n13\n17\n19\n23\n29\n31\n37\n41\n43\n47\n53\n59\n61\n67\n71\n73\n79\n83\n89\n97',
         hint: '用「段落」定义函数，用「当」循环遍历，用「模」判断余数。',
         keywords: ['段落', '接收', '如果', '返回', '当', '模', '打印', '设'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L0'
     },
     {
         id: 'ch8_gcd',
@@ -313,7 +335,8 @@ const TUTORIAL_LESSONS = [
         expected: '12',
         hint: '辗转相除法：用较大数除以较小数，再用余数替换除数，重复直到余数为 0。',
         keywords: ['段落', '接收', '当', '返回', '模', '打印'],
-        level: 'advanced'
+        difficulty: 'advanced',
+        layer: 'L0'
     },
     {
         id: 'ch8_yanghui',
@@ -325,8 +348,337 @@ const TUTORIAL_LESSONS = [
         expected: '[1]\n[1, 1]\n[1, 2, 1]\n[1, 3, 3, 1]\n[1, 4, 6, 4, 1]',
         hint: '杨辉三角的规律：每行首尾为 1，中间元素等于上一行对应位置两个元素之和。',
         keywords: ['设', '当', '加', '遍历', '打印'],
-        level: 'advanced'
-    }
+        difficulty: 'advanced',
+        layer: 'L0'
+    },
+
+    // ============================
+    // 第九章：L1 白话体闯关（10课）
+    // ============================
+    {
+        id: 'l1_01_print',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-01 打印输出',
+        description: '用「打印」关键字向屏幕输出文字和计算结果。',
+        task: '用「打印」输出 "大家好，我是段言！" 和 1+1 的计算结果。',
+        template: '打印 "大家好，我是段言！"\n打印 "1 + 1 =", 1 + 1\n',
+        expected: '大家好，我是段言！\n1 + 1 = 2',
+        hint: '「打印」后跟要输出的内容，多个值用逗号分隔。',
+        keywords: ['打印'],
+        difficulty: 'beginner',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_02_math',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-02 算术运算',
+        description: '用「设」定义变量，进行加减乘除计算。',
+        task: '设甲=15、乙=4，计算并打印甲+乙、甲×乙、甲÷乙。',
+        template: '设 甲 = 15\n设 乙 = 4\n打印 "甲 + 乙 = ", 甲 + 乙\n打印 "甲 × 乙 = ", 甲 * 乙\n打印 "甲 ÷ 乙 = ", 甲 / 乙\n',
+        expected: '甲 + 乙 = 19\n甲 × 乙 = 60\n甲 ÷ 乙 = 3.75',
+        hint: '用「设 变量名 = 值」定义变量，支持 + - * / 运算符。',
+        keywords: ['设', '打印'],
+        difficulty: 'beginner',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_03_if',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-03 条件判断',
+        description: '用「若」「否」做条件判断，让电脑自己做决定。',
+        task: '判断分数 86 是否及格（>=60），打印对应结果。',
+        template: '设 分数 = 86\n若 分数 >= 60:\n    打印 "及格了！"\n否:\n    打印 "不及格"\n',
+        expected: '及格了！',
+        hint: '「若 条件:」判断，「否:」否则。条件用 >=、<=、== 等比较。',
+        keywords: ['设', '若', '否', '打印'],
+        difficulty: 'beginner',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_04_while',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-04 当循环',
+        description: '用「当」做循环，让同一件事重复做。',
+        task: '用「当」循环计算 1 到 100 的和并打印。',
+        template: '设 总和 = 0\n设 n = 1\n当 n <= 100:\n    总和 = 总和 + n\n    n = n + 1\n打印 "1+2+...+100 = ", 总和\n',
+        expected: '1+2+...+100 = 5050',
+        hint: '「当 条件:」循环，条件满足时重复执行。记得更新循环变量。',
+        keywords: ['设', '当', '打印'],
+        difficulty: 'beginner',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_05_for',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-05 遍循环',
+        description: '用「遍」遍历列表，把元素一个一个拿出来。',
+        task: '遍历水果篮 ["苹果","香蕉","橘子"]，打印每种水果。',
+        template: '设 水果 = ["苹果", "香蕉", "橘子"]\n遍 水果 为 f:\n    打印 "我喜欢吃：", f\n',
+        expected: '我喜欢吃：苹果\n我喜欢吃：香蕉\n我喜欢吃：橘子',
+        hint: '「遍 列表 为 变量:」遍历列表的每个元素。',
+        keywords: ['设', '遍', '打印'],
+        difficulty: 'beginner',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_06_list',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-06 列表操作',
+        description: '学习创建列表、添加元素、排序、反转。',
+        task: '创建列表 [9,2,7,1,5]，排序后打印，再反转后打印。',
+        template: '设 数 = [9, 2, 7, 1, 5]\n数的 排序\n打印 "排序后：", 数\n数的 反转\n打印 "反转后：", 数\n',
+        expected: '排序后：[1, 2, 5, 7, 9]\n反转后：[9, 7, 5, 2, 1]',
+        hint: '列表的「排序」按从小到大排，「反转」颠倒顺序。',
+        keywords: ['设', '打印'],
+        difficulty: 'beginner',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_07_dict',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-07 字典操作',
+        description: '学习创建字典，按键取值，添加和修改字段。',
+        task: '创建学生信息卡片，包含姓名、年龄、爱好，打印姓名和年龄。',
+        template: '设 小明 = {"姓名": "王小明", "年龄": 12, "爱好": ["看书", "编程"]}\n打印 "姓名：", 小明["姓名"]\n打印 "年龄：", 小明["年龄"]\n',
+        expected: '姓名：王小明\n年龄：12',
+        hint: '字典用 {key: value} 创建，用 字典["key"] 取值。',
+        keywords: ['设', '打印'],
+        difficulty: 'beginner',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_08_func',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-08 函数定义',
+        description: '用「段」定义函数，把常用功能打包。',
+        task: '定义「圆面积」函数，计算半径为 3 的圆的面积。',
+        template: '段 圆面积(半径):\n    设 圆周率 = 3.14159\n    返 圆周率 * 半径 * 半径\n\n打印 "半径=3 面积：", 圆面积(3)\n',
+        expected: '半径=3 面积：28.27431',
+        hint: '「段 函数名(参数):」定义函数，「返 值」返回结果。',
+        keywords: ['段', '设', '返', '打印'],
+        difficulty: 'intermediate',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_09_exception',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-09 异常处理',
+        description: '用「试」「捕」捕获异常，程序出错也不崩溃。',
+        task: '用「试」尝试将 "abc" 转成整数，用「捕」捕获错误。',
+        template: '试:\n    设 结果 = 转成整数("abc")\n    打印 "成功：", 结果\n捕 错:\n    打印 "出错啦：", 错\n',
+        expected: '出错啦：invalid literal for int() with base 10: \'abc\'',
+        hint: '「试:」放可能出错的代码，「捕 变量:」捕获错误信息。',
+        keywords: ['试', '捕', '设', '打印'],
+        difficulty: 'intermediate',
+        layer: 'L1'
+    },
+    {
+        id: 'l1_10_embed',
+        chapter: '第九章：L1 白话体闯关',
+        title: 'L1-10 引Python',
+        description: '用「引 Python:」调用 Python 的力量。',
+        task: '用「引 Python:」计算 2 的 10 次方，打印结果。',
+        template: '引 Python:\n    result = 2 ** 10\n结束引\n\n打印 "2 的 10 次方 =", result\n',
+        expected: '2 的 10 次方 = 1024',
+        hint: '「引 Python: ... 结束引」嵌入 Python 代码，变量可直接在段言中使用。',
+        keywords: ['引', '结束引', '打印'],
+        difficulty: 'intermediate',
+        layer: 'L1'
+    },
+
+    // ============================
+    // 第十章：L2 文言体闯关（5课）
+    // ============================
+    {
+        id: 'l2_01_module',
+        chapter: '第十章：L2 文言体闯关',
+        title: 'L2-01 模块导入',
+        description: '用「导」和「出」管理模块，组织代码。',
+        task: '用「导」导入 math 模块，计算 π 的值并打印。',
+        template: '引 Python:\nimport math\n出 math\n\n设 圆周率 为 math.pi\n打印(圆周率)\n',
+        expected: '3.141592653589793',
+        hint: '「引 Python:」导入 Python 模块，用「出」导出供段言使用。',
+        keywords: ['引', '出', '设', '打印'],
+        difficulty: 'intermediate',
+        layer: 'L2'
+    },
+    {
+        id: 'l2_02_class',
+        chapter: '第十章：L2 文言体闯关',
+        title: 'L2-02 类与继承',
+        description: '用「类」「承」实现面向对象编程。',
+        task: '定义「动物」类，让「狗」类继承它，调用介绍方法。',
+        template: '引 Python:\nclass Animal:\n    def __init__(self, name):\n        self.name = name\n    def intro(self):\n        return f"我是{self.name}"\n\nclass Dog(Animal):\n    def bark(self):\n        return "汪汪！"\n\n出 Animal, Dog\n\n设 狗 为 Dog("小黑")\n打印(狗之intro())\n打印(狗之bark())\n',
+        expected: '我是小黑\n汪汪！',
+        hint: 'L2 用「类」和「承」做 OOP，之(dot)调用方法。',
+        keywords: ['引', '出', '设', '打印'],
+        difficulty: 'intermediate',
+        layer: 'L2'
+    },
+    {
+        id: 'l2_03_match',
+        chapter: '第十章：L2 文言体闯关',
+        title: 'L2-03 模式匹配',
+        description: '用「配」做模式匹配，优雅地处理多种情况。',
+        task: '用「配」判断分数等级：90分以上为A，80以上为B，60以上为C，其余为D。',
+        template: '引 Python:\ndef get_grade(score):\n    if score >= 90: return "A"\n    elif score >= 80: return "B"\n    elif score >= 60: return "C"\n    else: return "D"\n出 get_grade\n\n设 分数 为 86\n打印(get_grade(分数))\n',
+        expected: 'B',
+        hint: '「配」是模式匹配，类似于 switch-case。',
+        keywords: ['引', '出', '设', '打印'],
+        difficulty: 'intermediate',
+        layer: 'L2'
+    },
+    {
+        id: 'l2_04_exception',
+        chapter: '第十章：L2 文言体闯关',
+        title: 'L2-04 异常四部曲',
+        description: '用「试」「捕」「抛」「终」完整处理异常。',
+        task: '用「试」捕获除零错误，用「终」确保收尾。',
+        template: '试:\n    设 结果 为 1 / 0\n捕 e:\n    打印("除零错误: ", e)\n终:\n    打印("收尾工作已完成")\n',
+        expected: '除零错误:  division by zero\n收尾工作已完成',
+        hint: '「试: ... 捕: ... 终:」是异常处理四部曲。',
+        keywords: ['试', '捕', '终', '设', '打印'],
+        difficulty: 'intermediate',
+        layer: 'L2'
+    },
+    {
+        id: 'l2_05_sort',
+        chapter: '第十章：L2 文言体闯关',
+        title: 'L2-05 工程化排序',
+        description: '用「段」和「排序」实现列表排序。',
+        task: '对学生列表按平均分降序排序并打印。',
+        template: '引 Python:\nstudents = [\n    {"name": "张三", "score": 88},\n    {"name": "李四", "score": 92},\n    {"name": "王五", "score": 76}\n]\nsorted_students = sorted(students, key=lambda s: s["score"], reverse=True)\n出 sorted_students\n\n遍 sorted_students 为 s:\n    打印(s["name"], ":", s["score"])\n',
+        expected: '李四 : 92\n张三 : 88\n王五 : 76',
+        hint: '用 sorted() 排序，reverse=True 降序排列。',
+        keywords: ['引', '出', '遍', '打印'],
+        difficulty: 'advanced',
+        layer: 'L2'
+    },
+
+    // ============================
+    // 第十一章：L3 领域DSL闯关（5课）
+    // ============================
+    {
+        id: 'l3_01_sql',
+        chapter: '第十一章：L3 领域DSL闯关',
+        title: 'L3-01 SQL数据库',
+        description: '用「引 Python:」嵌入 SQLite 数据库操作。',
+        task: '创建学生表，插入数据，查询分数 > 85 的学生。',
+        template: '引 Python:\nimport sqlite3\nconn = sqlite3.connect(":memory:")\nc = conn.cursor()\nc.execute("CREATE TABLE s(name TEXT, score REAL)")\nfor n, s in [("张三",88),("李四",92),("王五",76)]:\n    c.execute("INSERT INTO s VALUES(?,?)", (n,s))\nrows = c.execute("SELECT name,score FROM s WHERE score>?", (85,)).fetchall()\n出 rows\n\n遍 rows 为 r:\n    打印(r[0], ":", r[1])\n',
+        expected: '张三 : 88\n李四 : 92',
+        hint: 'SQLite 是 Python 标准库，无需额外安装。',
+        keywords: ['引', '出', '遍', '打印'],
+        difficulty: 'advanced',
+        layer: 'L3'
+    },
+    {
+        id: 'l3_02_regex',
+        chapter: '第十一章：L3 领域DSL闯关',
+        title: 'L3-02 正则表达式',
+        description: '用正则表达式匹配和提取文本中的信息。',
+        task: '从文本中提取所有手机号并打印。',
+        template: '引 Python:\nimport re\ntext = "客服13812345678，备用15987654321"\nphones = re.findall(r"1[3-9]\\d{9}", text)\n出 phones\n\n遍 phones 为 p:\n    打印(p)\n',
+        expected: '13812345678\n15987654321',
+        hint: 're.findall() 返回所有匹配的列表。',
+        keywords: ['引', '出', '遍', '打印'],
+        difficulty: 'advanced',
+        layer: 'L3'
+    },
+    {
+        id: 'l3_03_math',
+        chapter: '第十一章：L3 领域DSL闯关',
+        title: 'L3-03 数学公式',
+        description: '用 sympy 做代数运算，解方程和求导。',
+        task: '解方程 2x^2 + 5x - 3 = 0，打印根。',
+        template: '引 Python:\nimport sympy as sp\nx = sp.symbols("x")\nsol = sp.solve(sp.Eq(2*x**2 + 5*x - 3, 0), x)\nsol = [float(s) for s in sol]\n出 sol\n\n打印("方程的解:", sol)\n',
+        expected: '方程的解: [0.5, -3.0]',
+        hint: '需要安装 sympy: pip install sympy。',
+        keywords: ['引', '出', '打印'],
+        difficulty: 'advanced',
+        layer: 'L3'
+    },
+    {
+        id: 'l3_04_matrix',
+        chapter: '第十一章：L3 领域DSL闯关',
+        title: 'L3-04 矩阵运算',
+        description: '用 sympy 做矩阵乘法。',
+        task: '计算 2x2 矩阵 [[1,2],[3,4]] 与 [[5,6],[7,8]] 的乘积。',
+        template: '引 Python:\nimport sympy as sp\nA = sp.Matrix([[1,2],[3,4]])\nB = sp.Matrix([[5,6],[7,8]])\nC = A * B\n出 C\n\n打印("矩阵乘积:")\n打印(C)\n',
+        expected: '矩阵乘积:\nMatrix([[19, 22], [43, 50]])',
+        hint: 'sympy 的 Matrix 支持矩阵乘法。',
+        keywords: ['引', '出', '打印'],
+        difficulty: 'advanced',
+        layer: 'L3'
+    },
+    {
+        id: 'l3_05_allinone',
+        chapter: '第十一章：L3 领域DSL闯关',
+        title: 'L3-05 综合演示',
+        description: '综合使用 SQL、正则和数学公式。',
+        task: '运行综合演示代码，体验 L3 三大领域。',
+        template: '引 Python:\nimport sqlite3, re\n# SQL\nconn = sqlite3.connect(":memory:")\nconn.execute("CREATE TABLE t(x)")\nfor v in [10,20,30]: conn.execute("INSERT INTO t VALUES(?)", (v,))\navg = conn.execute("SELECT AVG(x) FROM t").fetchone()[0]\n# 正则\ntext = "hello world 42"\nmatch = re.search(r"\\d+", text).group() if re.search(r"\\d+", text) else ""\n出 avg, match\n\n打印("SQL 平均分:", avg)\n打印("正则提取数字:", match)\n',
+        expected: 'SQL 平均分: 20.0\n正则提取数字: 42',
+        hint: 'L3 三大领域：SQLite、正则、数学公式，统一用「引 Python:」嵌入。',
+        keywords: ['引', '出', '打印'],
+        difficulty: 'advanced',
+        layer: 'L3'
+    },
+
+    // ============================
+    // 第十二章：L4 外部语言闯关（4课）
+    // ============================
+    {
+        id: 'l4_01_numpy',
+        chapter: '第十二章：L4 外部语言闯关',
+        title: 'L4-01 numpy数值计算',
+        description: '用 numpy 做数组运算和均值计算。',
+        task: '用 numpy 计算 [12, 25, 30, 43, 52] 的均值。',
+        template: '引 Python:\nimport numpy as np\narr = np.array([12, 25, 30, 43, 52], dtype=float)\nmean_val = float(np.mean(arr))\n出 mean_val\n\n打印("均值:", mean_val)\n',
+        expected: '均值: 32.4',
+        hint: '需要安装 numpy: pip install numpy。',
+        keywords: ['引', '出', '打印'],
+        difficulty: 'advanced',
+        layer: 'L4'
+    },
+    {
+        id: 'l4_02_pandas',
+        chapter: '第十二章：L4 外部语言闯关',
+        title: 'L4-02 pandas数据处理',
+        description: '用 pandas 创建和读取 DataFrame。',
+        task: '创建学生成绩 DataFrame，打印前 3 行。',
+        template: '引 Python:\nimport pandas as pd\ndf = pd.DataFrame({"姓名": ["张三","李四","王五"], "分数": [88, 92, 76]})\nresult = df.to_dict(orient="records")\n出 result\n\n遍 result 为 r:\n    打印(r)\n',
+        expected: '{\'姓名\': \'张三\', \'分数\': 88}\n{\'姓名\': \'李四\', \'分数\': 92}\n{\'姓名\': \'王五\', \'分数\': 76}',
+        hint: '需要安装 pandas: pip install pandas。',
+        keywords: ['引', '出', '遍', '打印'],
+        difficulty: 'advanced',
+        layer: 'L4'
+    },
+    {
+        id: 'l4_03_matplotlib',
+        chapter: '第十二章：L4 外部语言闯关',
+        title: 'L4-03 matplotlib可视化',
+        description: '用 matplotlib 画折线图并保存。',
+        task: '画折线图并保存为 PNG 文件，打印保存路径。',
+        template: '引 Python:\nimport matplotlib\nmatplotlib.use("Agg")\nimport matplotlib.pyplot as plt\nfig, ax = plt.subplots()\nax.plot([1,2,3,4,5], [2,5,3,8,7], marker="o")\nfig.savefig("tmp_plot.png")\nplt.close(fig)\n出 "tmp_plot.png"\n\n打印("图表已保存到:", "tmp_plot.png")\n',
+        expected: '图表已保存到: tmp_plot.png',
+        hint: '需要安装 matplotlib: pip install matplotlib。Agg 后端无需图形界面。',
+        keywords: ['引', '出', '打印'],
+        difficulty: 'advanced',
+        layer: 'L4'
+    },
+    {
+        id: 'l4_04_sklearn',
+        chapter: '第十二章：L4 外部语言闯关',
+        title: 'L4-04 sklearn机器学习',
+        description: '用 sklearn 训练 KNN 分类器，预测鸢尾花种类。',
+        task: '训练 KNN 模型，预测特征 [5.1, 3.5, 1.4, 0.2] 的花种。',
+        template: '引 Python:\nfrom sklearn.datasets import load_iris\nfrom sklearn.neighbors import KNeighborsClassifier\niris = load_iris()\nclf = KNeighborsClassifier(3)\nclf.fit(iris.data, iris.target)\npred = int(clf.predict([[5.1, 3.5, 1.4, 0.2]])[0])\nname = iris.target_names[pred]\n出 name\n\n打印("预测花种:", name)\n',
+        expected: '预测花种: setosa',
+        hint: '需要安装 scikit-learn: pip install scikit-learn。',
+        keywords: ['引', '出', '打印'],
+        difficulty: 'advanced',
+        layer: 'L4'
+    },
 ];
 
 // 教程状态管理
@@ -334,6 +686,7 @@ const TutorialState = {
     lessons: TUTORIAL_LESSONS,
     currentIndex: 0,
     completed: {},
+    layerFilter: 'all',
 
     init() {
         const saved = localStorage.getItem(TUTORIAL_STORAGE_KEY);
@@ -428,6 +781,10 @@ function openTutorial() {
     renderTutorialSidebar();
 }
 
+function openGame() {
+    window.location.href = '/static/game.html';
+}
+
 function closeTutorial() {
     if (tutorialOverlay) {
         tutorialOverlay.classList.add('hidden');
@@ -473,6 +830,14 @@ function createTutorialUI() {
                         <option value="uncompleted">未完成</option>
                         <option value="completed">已完成</option>
                     </select>
+                    <div class="tutorial-layer-filter" id="tutorialLayerFilter">
+                        <button class="tutorial-layer-btn active" data-layer="all" onclick="filterByLayer('all')">全部</button>
+                        <button class="tutorial-layer-btn" data-layer="L0" onclick="filterByLayer('L0')" style="color:var(--accent-green)">L0</button>
+                        <button class="tutorial-layer-btn" data-layer="L1" onclick="filterByLayer('L1')" style="color:var(--accent-orange)">L1</button>
+                        <button class="tutorial-layer-btn" data-layer="L2" onclick="filterByLayer('L2')" style="color:var(--accent-purple)">L2</button>
+                        <button class="tutorial-layer-btn" data-layer="L3" onclick="filterByLayer('L3')" style="color:var(--accent-blue)">L3</button>
+                        <button class="tutorial-layer-btn" data-layer="L4" onclick="filterByLayer('L4')" style="color:var(--accent-yellow)">L4</button>
+                    </div>
                 </div>
                 <div class="tutorial-chapters"></div>
             </div>
@@ -491,18 +856,30 @@ function createTutorialUI() {
     document.body.appendChild(tutorialOverlay);
 }
 
+function filterByLayer(layer) {
+    TutorialState.layerFilter = layer;
+    // 更新按钮状态
+    document.querySelectorAll('.tutorial-layer-btn').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.layer === layer);
+    });
+    renderTutorialSidebar();
+}
+
 function renderTutorialSidebar() {
     const sidebar = document.getElementById('tutorialSidebar');
     if (!sidebar) return;
 
     const filter = document.getElementById('tutorialFilter');
     const filterValue = filter ? filter.value : 'all';
+    const layerFilter = TutorialState.layerFilter;
 
     const chapters = {};
     TutorialState.lessons.forEach((lesson, idx) => {
-        // 应用过滤
+        // 应用状态过滤
         if (filterValue === 'completed' && !TutorialState.isCompleted(lesson.id)) return;
         if (filterValue === 'uncompleted' && TutorialState.isCompleted(lesson.id)) return;
+        // 应用层级过滤
+        if (layerFilter !== 'all' && lesson.layer !== layerFilter) return;
 
         if (!chapters[lesson.chapter]) {
             chapters[lesson.chapter] = [];
@@ -534,22 +911,30 @@ function renderTutorialLesson() {
     if (!lesson || !content) return;
 
     const isDone = TutorialState.isCompleted(lesson.id);
-    const levelLabels = {
+    const difficultyLabels = {
         'beginner': '入门',
         'intermediate': '进阶',
         'advanced': '高级'
     };
-    const levelColors = {
+    const difficultyColors = {
         'beginner': 'var(--accent-green)',
         'intermediate': 'var(--accent-blue)',
         'advanced': 'var(--accent-purple)'
+    };
+    const layerColors = {
+        'L0': 'var(--accent-green)',
+        'L1': 'var(--accent-orange)',
+        'L2': 'var(--accent-purple)',
+        'L3': 'var(--accent-blue)',
+        'L4': 'var(--accent-yellow)'
     };
 
     content.innerHTML = `
         <div class="tutorial-lesson">
             <div class="tutorial-lesson-header">
                 <span class="tutorial-lesson-chapter">${lesson.chapter}</span>
-                <span class="tutorial-lesson-level" style="color:${levelColors[lesson.level]};border-color:${levelColors[lesson.level]}">${levelLabels[lesson.level] || lesson.level}</span>
+                <span class="tutorial-lesson-layer" style="color:${layerColors[lesson.layer] || 'var(--text-muted)'};border-color:${layerColors[lesson.layer] || 'var(--text-muted)'}">${lesson.layer || 'L0'}</span>
+                <span class="tutorial-lesson-level" style="color:${difficultyColors[lesson.difficulty]};border-color:${difficultyColors[lesson.difficulty]}">${difficultyLabels[lesson.difficulty] || lesson.difficulty}</span>
                 ${isDone ? '<span class="tutorial-lesson-done">✓ 已完成</span>' : ''}
             </div>
             <h2 class="tutorial-lesson-title">${lesson.title}</h2>

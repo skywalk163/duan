@@ -33,7 +33,14 @@ sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
 
-VERSION = '段言编译器 v1.10.3'
+# 从 version 模块导入版本信息
+try:
+    from src.version import DEV_BRANCH, VERSION as LANG_VERSION, is_dev_branch, get_dev_version_string
+    VERSION = f'段言编译器 v{LANG_VERSION}'
+    if is_dev_branch():
+        VERSION = f'段言编译器 v4.0dev-{LANG_VERSION} (开发分支)'
+except ImportError:
+    VERSION = '段言编译器 v1.10.3'
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -817,6 +824,7 @@ def main():
     )
 
     parser.add_argument('--version', action='version', version=VERSION)
+    parser.add_argument('--dev-version', action='store_true', help='显示开发分支版本信息')
     parser.add_argument('-v', '--verbose', action='store_true', help='详细输出')
 
     subparsers = parser.add_subparsers(dest='command', help='可用命令')
@@ -974,6 +982,15 @@ def main():
     tutorial_p.add_argument('--repl', action='store_true', help='交互式练习模式')
 
     args = parser.parse_args()
+
+    # 处理 --dev-version 标志
+    if getattr(args, 'dev_version', False):
+        try:
+            from src.version import get_dev_version_string
+            print(get_dev_version_string())
+        except ImportError:
+            print(VERSION)
+        sys.exit(0)
 
     if not args.command:
         parser.print_help()

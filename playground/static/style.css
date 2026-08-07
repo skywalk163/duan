@@ -1397,6 +1397,19 @@ body {
     box-shadow: 0 0 12px rgba(63, 185, 80, 0.3);
 }
 
+.btn-game {
+    background: linear-gradient(135deg, #d2992222, #db6d2822);
+    border: 1px solid var(--accent-yellow);
+    color: var(--accent-yellow);
+    font-weight: 600;
+}
+
+.btn-game:hover {
+    background: linear-gradient(135deg, #d2992244, #db6d2844);
+    color: var(--accent-yellow);
+    box-shadow: 0 0 12px rgba(210, 153, 34, 0.3);
+}
+
 /* =============================================================================
    交互式教程
    ============================================================================= */
@@ -1507,10 +1520,45 @@ body {
     font-family: var(--font-sans);
     cursor: pointer;
     outline: none;
+    margin-bottom: 6px;
 }
 
 .tutorial-sidebar-filter select:focus {
     border-color: var(--accent-green);
+}
+
+/* 层级过滤按钮 */
+.tutorial-layer-filter {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.tutorial-layer-btn {
+    flex: 1;
+    min-width: 36px;
+    padding: 4px 6px;
+    font-size: 11px;
+    font-weight: 600;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: var(--font-sans);
+    text-align: center;
+}
+
+.tutorial-layer-btn:hover {
+    background: var(--bg-hover);
+    filter: brightness(1.2);
+}
+
+.tutorial-layer-btn.active {
+    background: var(--bg-hover);
+    border-color: currentColor;
+    box-shadow: 0 0 6px rgba(0,0,0,0.3);
 }
 
 .tutorial-empty-filter {

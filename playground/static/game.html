@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>段言 L0 核心字趣味学习</title>
+    <link rel="stylesheet" href="/static/game.css">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>段</text></svg>">
+</head>
+<body>
+    <div class="game-container">
+        <!-- 顶部导航 -->
+        <header class="game-header">
+            <div class="game-header-left">
+                <a href="/" class="game-back-btn">← 返回 Playground</a>
+                <span class="game-title">L0 核心字趣味学习</span>
+            </div>
+            <div class="game-header-right">
+                <button class="game-mode-btn" id="modeLearnBtn" onclick="switchMode('learn')">📖 学习模式</button>
+                <button class="game-mode-btn" id="modeQuizBtn" onclick="switchMode('quiz')">🧠 闯关模式</button>
+                <button class="game-mode-btn" id="modeMatchBtn" onclick="switchMode('match')">🔗 连连看</button>
+            </div>
+        </header>
+
+        <!-- 进度条 -->
+        <div class="game-progress-bar-container">
+            <div class="game-progress-bar" id="gameProgressBar"></div>
+        </div>
+
+        <!-- 学习模式 -->
+        <div class="game-body" id="gameBodyLearn">
+            <div class="game-intro">
+                <h2>🎯 认识 L0 核心字</h2>
+                <p>段言 L0 层包含 <strong>19 个核心字</strong>，是 L1 白话体的基础。点击卡片查看每个字的含义和用法，掌握它们就能写出完整的段言程序！</p>
+            </div>
+            <div class="game-card-grid" id="cardGrid"></div>
+        </div>
+
+        <!-- 闯关模式 -->
+        <div class="game-body hidden" id="gameBodyQuiz">
+            <div class="quiz-header">
+                <h2>🧠 知识闯关</h2>
+                <p class="quiz-desc">根据提示，选出对应的 L0 核心字！</p>
+                <div class="quiz-stats">
+                    <span>第 <strong id="quizCurrent">1</strong> / <strong id="quizTotal">19</strong> 题</span>
+                    <span>✅ <strong id="quizCorrect">0</strong></span>
+                    <span>❌ <strong id="quizWrong">0</strong></span>
+                </div>
+            </div>
+            <div class="quiz-question" id="quizQuestion"></div>
+            <div class="quiz-options" id="quizOptions"></div>
+            <div class="quiz-result" id="quizResult"></div>
+            <button class="btn btn-next hidden" id="quizNextBtn" onclick="nextQuizQuestion()">下一题 →</button>
+        </div>
+
+        <!-- 连连看模式 -->
+        <div class="game-body hidden" id="gameBodyMatch">
+            <div class="match-header">
+                <h2>🔗 连连看配对</h2>
+                <p class="match-desc">将 L0 核心字与它的含义描述配对！</p>
+                <div class="match-stats">
+                    <span>已配对: <strong id="matchPairs">0</strong> / 19</span>
+                    <span>用时: <strong id="matchTimer">0</strong>s</span>
+                </div>
+                <button class="btn btn-shuffle" onclick="shuffleMatch()">🔄 重新洗牌</button>
+            </div>
+            <div class="match-board" id="matchBoard"></div>
+            <div class="match-result" id="matchResult"></div>
+        </div>
+    </div>
+
+    <!-- 详情弹窗 -->
+    <div class="detail-overlay hidden" id="detailOverlay">
+        <div class="detail-modal" id="detailModal">
+            <button class="detail-close" onclick="closeDetail()">✕</button>
+            <div class="detail-content" id="detailContent"></div>
+        </div>
+    </div>
+
+    <script src="/static/game.js"></script>
+</body>
+</html>

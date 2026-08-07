@@ -17,12 +17,20 @@
   duan compile hello.duan -o hello.py
   duan repl                          # 启动REPL
 """
-
 import sys
 import os
 import argparse
 from pathlib import Path
 from typing import Optional, List
+
+# 版本信息
+try:
+    from src.version import DEV_BRANCH, VERSION as LANG_VERSION, is_dev_branch, get_dev_version_string
+    DEV_VERSION_STR = f'段言 v4.0dev-{LANG_VERSION} (开发分支)'
+    STABLE_VERSION_STR = f'段言 v{LANG_VERSION}'
+    VERSION_STR = DEV_VERSION_STR if is_dev_branch() else STABLE_VERSION_STR
+except ImportError:
+    VERSION_STR = '段言 v1.0.0'
 
 # 添加路径 - 先尝试本地路径（开发模式），再尝试已安装路径
 _local_src = str(Path(__file__).parent.parent / 'src')
@@ -291,6 +299,8 @@ def main():
     if len(sys.argv) > 1 and sys.argv[1] in ['run', 'compile', 'repl']:
         # 子命令模式
         parser = argparse.ArgumentParser(description='段言（Duan）编程语言编译器')
+        parser.add_argument('--version', action='version', version=VERSION_STR)
+        parser.add_argument('--dev-version', action='store_true', help='显示开发分支版本信息')
         subparsers = parser.add_subparsers(dest='command', help='子命令')
         
         # run 子命令
@@ -314,6 +324,15 @@ def main():
         debug_parser.add_argument('file', nargs='?', help='要调试的文件路径（可选）')
         
         args = parser.parse_args()
+        
+        # 处理 --dev-version 标志
+        if getattr(args, 'dev_version', False):
+            try:
+                from src.version import get_dev_version_string
+                print(get_dev_version_string())
+            except ImportError:
+                print(VERSION_STR)
+            return 0
         
         if args.command == 'run':
             if not os.path.exists(args.file):
@@ -373,9 +392,19 @@ def main():
         parser.add_argument('-o', '--output', help='输出文件路径')
         parser.add_argument('--run', action='store_true', help='编译并运行')
         parser.add_argument('--ast', action='store_true', help='显示AST结构')
-        parser.add_argument('--version', action='version', version='段言 v1.0.0')
+        parser.add_argument('--version', action='version', version=VERSION_STR)
+        parser.add_argument('--dev-version', action='store_true', help='显示开发分支版本信息')
         
         args = parser.parse_args()
+        
+        # 处理 --dev-version 标志
+        if getattr(args, 'dev_version', False):
+            try:
+                from src.version import get_dev_version_string
+                print(get_dev_version_string())
+            except ImportError:
+                print(VERSION_STR)
+            return 0
         
         if args.file:
             if not os.path.exists(args.file):

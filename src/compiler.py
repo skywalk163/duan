@@ -39,6 +39,36 @@ OPTIMIZERS = [
     LoopInvariantOptimizer,
 ]
 
+# L3 领域嵌入模块注册表
+# 每个模块通过 `引 Python:` 语法在 .duan 文件中导入使用
+L3_MODULES = {
+    'l3_echarts': {
+        'module': 'l3_echarts',
+        'class': 'L3ECharts',
+        'description': 'ECharts 可视化 DSL（柱状图/折线图/饼图/散点图）',
+    },
+    'l3_markdown': {
+        'module': 'l3_markdown',
+        'class': 'L3Markdown',
+        'description': 'Markdown 文档生成 DSL（标题/段落/列表/表格/代码块）',
+    },
+}
+
+# FFI 模块注册表
+# 通过 `引 Python:` 语法在 .duan 文件中导入使用
+FFI_MODULES = {
+    'ffi_go': {
+        'module': 'ffi_go',
+        'class': 'GoFFI',
+        'description': 'Go FFI 绑定（引用Go库/绑定函数/类型转换）',
+    },
+    'ffi_rust': {
+        'module': 'ffi_rust',
+        'class': 'RustFFI',
+        'description': 'Rust FFI 绑定（引用Rust库/绑定函数/字符串处理）',
+    },
+}
+
 
 _compile_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _compilation_cache_instance = None

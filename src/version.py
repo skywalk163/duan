@@ -21,6 +21,9 @@ RELEASE_DATE = "2026-10-29"
 # 版本阶段: dev / alpha / beta / rc / stable
 RELEASE_STAGE = "stable"
 
+# 开发分支标志（True 表示当前为 4.0dev 开发分支）
+DEV_BRANCH = True
+
 # 支持的语法层级
 SUPPORTED_LEVELS = ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7"]
 
@@ -75,3 +78,13 @@ def get_version_string() -> str:
 def get_full_version_string() -> str:
     """获取完整版本字符串"""
     return f"段言 DuanLang v{VERSION}「{VERSION_NAME}」— {RELEASE_DATE}"
+
+
+def get_dev_version_string() -> str:
+    """获取开发分支版本字符串"""
+    return f"段言 DuanLang v4.0dev-{VERSION} (开发分支) — {RELEASE_DATE}"
+
+
+def is_dev_branch() -> bool:
+    """判断当前是否为开发分支"""
+    return DEV_BRANCH
