@@ -8,7 +8,60 @@
 import sys
 import re
 import traceback
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Set
+
+
+def _levenshtein_distance(s1: str, s2: str) -> int:
+    """计算 Levenshtein 编辑距离"""
+    if len(s1) < len(s2):
+        return _levenshtein_distance(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    prev_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        curr_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = prev_row[j + 1] + 1
+            deletions = curr_row[j] + 1
+            substitutions = prev_row[j] + (c1 != c2)
+            curr_row.append(min(insertions, deletions, substitutions))
+        prev_row = curr_row
+    return prev_row[-1]
+
+
+def _find_similar_names(name: str, candidates: Set[str], max_distance: int = 3, max_results: int = 3) -> List[str]:
+    """查找相似名称"""
+    scored = []
+    for candidate in candidates:
+        dist = _levenshtein_distance(name, candidate)
+        if dist <= max_distance:
+            scored.append((dist, candidate))
+    scored.sort(key=lambda x: (x[0], len(x[1])))
+    return [c for _, c in scored[:max_results]]
+
+
+# 常见变量/函数名建议列表
+COMMON_DUAN_NAMES = {
+    '打印', '长度', '输入', '整数', '文本', '浮点数', '布尔',
+    '列表', '字典', '元组', '集合', '范围', '枚举',
+    '转字符串', '转整数', '转浮点数', '转布尔',
+    '追加', '弹出', '插入', '排序', '反转', '清除', '复制',
+    '包含', '获取', '设置', '删除', '更新', '合并',
+    '打开', '读取', '写入', '关闭',
+    '真', '假', '空', '无',
+    '数学', '随机', '时间', '文件', '系统', 'JSON',
+    '序列化', '解析', '创建', '格式化',
+    '替换', '分割', '连接', '查找', '统计',
+    '最大值', '最小值', '求和', '平均值', '绝对值',
+    '类型', '实例', '属性', '方法', '类',
+    '主', '入口', '初始化', '运行', '测试',
+    '读取文件', '写入文件', '文件存在', '目录存在',
+    '解析JSON', '序列化JSON', '美化JSON',
+    '列表长度', '列表追加', '列表弹出', '列表插入', '列表排序', '列表包含',
+    '字符串长度', '字符串替换', '字符串分割', '字符串包含',
+    '字典包含键', '字典获取', '字典键列表', '字典值列表',
+    '平方根', '阶乘', '幂', '绝对值', '取整', '随机数',
+}
 
 
 class DuanErrorFormatter:
@@ -18,6 +71,7 @@ class DuanErrorFormatter:
         self.source = source
         self.source_name = source_name
         self.source_lines = source.split('\n') if source else []
+        self._known_names: Set[str] = set()  # 已知变量/函数名，用于相似名建议
 
     def parse_line_mapping(self, python_code: str) -> dict:
         """从生成的 Python 代码中解析 DUAN_SRC 行号映射表
@@ -194,6 +248,38 @@ class DuanErrorFormatter:
             yield exc_tb.tb_frame, exc_tb.tb_lineno
             exc_tb = exc_tb.tb_next
 
+    def _extract_name_from_msg(self, exc_name: str, exc_msg: str) -> Optional[str]:
+        """从错误消息中提取名称"""
+        # NameError: name 'xxx' is not defined
+        m = re.search(r"name\s+'([^']+)'", exc_msg)
+        if m:
+            return m.group(1)
+        # KeyError: 'xxx'
+        m = re.search(r"'([^']+)'", exc_msg)
+        if m:
+            return m.group(1)
+        return None
+
+    def _get_similar_name_suggestions(self, name: str) -> List[str]:
+        """获取相似名称建议"""
+        candidates = COMMON_DUAN_NAMES | self._known_names
+        # 从源码中提取变量名
+        if self.source_lines:
+            for line in self.source_lines:
+                # 匹配 设 X 为 ...
+                for m in re.finditer(r'设\s+(\w+)\s+为', line):
+                    candidates.add(m.group(1))
+                # 匹配 段落 X 接收
+                for m in re.finditer(r'段落\s+(\w+)\s+接收', line):
+                    candidates.add(m.group(1))
+                # 匹配 类 X
+                for m in re.finditer(r'类\s+(\w+)', line):
+                    candidates.add(m.group(1))
+                # 匹配 导入 X
+                for m in re.finditer(r'从\s+(\w+)\s+导入', line):
+                    candidates.add(m.group(1))
+        return _find_similar_names(name, candidates)
+
     def _suggest_fix(self, exc_name: str, exc_msg: str) -> List[str]:
         """根据异常类型给出修复建议"""
         suggestions = []
@@ -205,7 +291,15 @@ class DuanErrorFormatter:
             suggestions.append("• 检查变量名是否拼写正确")
             suggestions.append("• 确认变量在使用前已经通过'设 ... 为'声明")
             suggestions.append("• 检查变量是否在正确的作用域内（如在段落内部定义的变量不能在外部使用）")
-            suggestions.append(f"  错误信息提示: {exc_msg}")
+            # 相似名称建议
+            name = self._extract_name_from_msg(exc_name, exc_msg)
+            if name:
+                similar = self._get_similar_name_suggestions(name)
+                if similar:
+                    suggestions.append(f"• 您是不是想找: {', '.join(similar)}？")
+                else:
+                    suggestions.append(f"  未找到与 '{name}' 相似的名称，请检查拼写")
+            suggestions.append(f"  错误信息: {exc_msg}")
             suggestions.append("")
             suggestions.append("  示例：")
             suggestions.append("    正确: 设 x 为 10")
@@ -217,7 +311,11 @@ class DuanErrorFormatter:
             suggestions.append("• 检查操作数类型是否正确（如不能对文本进行乘法运算）")
             suggestions.append("• 确认函数调用时参数类型与声明一致")
             suggestions.append("• 如果使用了类型注解，请检查实际传值是否符合类型要求")
-            suggestions.append(f"  错误信息提示: {exc_msg}")
+            # 提取类型信息
+            type_m = re.search(r"unsupported operand type\(s\) for [^:]+: '([^']+)' and '([^']+)'", exc_msg)
+            if type_m:
+                suggestions.append(f"• 操作类型不匹配: '{type_m.group(1)}' 和 '{type_m.group(2)}' 不能进行该操作")
+            suggestions.append(f"  错误信息: {exc_msg}")
             suggestions.append("")
             suggestions.append("  示例：")
             suggestions.append("    正确: 设 x 为 整数 = 10")
@@ -228,34 +326,59 @@ class DuanErrorFormatter:
             suggestions.append("          打印(x 乘 2)")
         elif exc_name == 'IndexError':
             suggestions.append("• 检查列表索引是否在有效范围内（索引从0开始，长度为N的列表最大索引为N-1）")
-            suggestions.append("• 可以先用 长度() 获取列表长度后再访问")
-            suggestions.append("• 使用 有() 方法判断索引是否有效")
+            suggestions.append("• 可以先用 列表长度() 获取列表长度后再访问")
+            suggestions.append("• 使用 列表包含() 方法判断索引是否有效")
+            # 提取索引信息
+            idx_m = re.search(r"list index out of range", exc_msg)
+            if idx_m:
+                suggestions.append("• 列表索引超出范围，请检查索引值是否小于列表长度")
             suggestions.append("")
             suggestions.append("  示例：")
             suggestions.append("    正确: 设 lst 为 [1, 2, 3]")
-            suggestions.append("          如 索引 < 长度(lst)：")
+            suggestions.append("          如 索引 < 列表长度(lst)：")
             suggestions.append("              打印(lst[索引])")
             suggestions.append("          否则：")
             suggestions.append("              打印(\"索引越界\")")
         elif exc_name == 'KeyError':
             suggestions.append("• 检查字典键是否存在")
-            suggestions.append("• 可以用 有() 方法先判断键是否存在")
-            suggestions.append("• 使用 获取() 方法提供默认值")
+            suggestions.append("• 可以用 字典包含键() 方法先判断键是否存在")
+            suggestions.append("• 使用 字典获取() 方法提供默认值")
+            # 提取键名
+            key_m = re.search(r"'([^']+)'", exc_msg)
+            if key_m:
+                key_name = key_m.group(1)
+                suggestions.append(f"• 键 '{key_name}' 不存在")
             suggestions.append("")
             suggestions.append("  示例：")
             suggestions.append("    正确: 设 d 为 {'名字': '张三'}")
-            suggestions.append("          如 有(d, '年龄')：")
+            suggestions.append("          如 字典包含键(d, '年龄')：")
             suggestions.append("              打印(d['年龄'])")
             suggestions.append("          否则：")
-            suggestions.append("              打印(获取(d, '年龄', 0))")
+            suggestions.append("              打印(字典获取(d, '年龄', 0))")
         elif exc_name == 'AttributeError':
             suggestions.append("• 检查对象是否拥有该属性或方法")
             suggestions.append("• 确认类名/对象名拼写正确")
             suggestions.append("• 检查是否混淆了属性和方法（方法需要加括号调用）")
+            # 提取属性名
+            attr_m = re.search(r"'([^']+)' object has no attribute '([^']+)'", exc_msg)
+            if attr_m:
+                obj_type = attr_m.group(1)
+                attr_name = attr_m.group(2)
+                suggestions.append(f"• 对象类型 '{obj_type}' 没有属性 '{attr_name}'")
+                # 常见属性建议
+                common_attrs = {
+                    'str': ['长度', '替换', '分割', '连接', '查找', '格式化'],
+                    'list': ['追加', '弹出', '插入', '排序', '反转', '长度'],
+                    'dict': ['获取', '键列表', '值列表', '包含键', '更新'],
+                    'int': ['转字符串', '转浮点数'],
+                    'float': ['转整数', '转字符串'],
+                }
+                if obj_type in common_attrs:
+                    suggestions.append(f"• '{obj_type}' 的常用属性: {', '.join(common_attrs[obj_type])}")
             suggestions.append("")
             suggestions.append("  示例：")
             suggestions.append("    正确: 设 s 为 \"hello\"")
-            suggestions.append("          打印(长度(s))")
+            suggestions.append("          打印(字符串长度(s))")
             suggestions.append("")
             suggestions.append("    错误: 设 s 为 \"hello\"")
             suggestions.append("          打印(s.长度)")
@@ -269,19 +392,40 @@ class DuanErrorFormatter:
             suggestions.append("              打印(10 / 除数)")
             suggestions.append("          否则：")
             suggestions.append("              打印(\"除数不能为零\")")
-        elif exc_name == 'IndentationError':
-            suggestions.append("• 检查缩进是否一致（段言使用 4 空格缩进）")
-            suggestions.append("• 不要混用 Tab 和空格")
-            suggestions.append("• 确保所有同级语句缩进级别相同")
-            suggestions.append("")
-            suggestions.append("  示例：")
-            suggestions.append("    正确: 段落 测试：")
-            suggestions.append("              打印(\"第一行\")")
-            suggestions.append("              打印(\"第二行\")")
-            suggestions.append("")
-            suggestions.append("    错误: 段落 测试：")
-            suggestions.append("              打印(\"第一行\")")
-            suggestions.append("            打印(\"缩进不一致\")")
+        elif exc_name == 'SyntaxError' or exc_name == 'IndentationError':
+            if exc_name == 'SyntaxError':
+                suggestions.append("• 检查代码语法是否正确")
+                suggestions.append("• 确保所有括号（(), [], {}）匹配")
+                suggestions.append("• 确保字符串引号闭合")
+                suggestions.append("• 检查冒号是否在条件/循环/函数定义后正确使用")
+                # 提取语法错误位置
+                syn_m = re.search(r"line\s+(\d+)", exc_msg)
+                if syn_m:
+                    suggestions.append(f"• 语法错误在第 {syn_m.group(1)} 行附近")
+                suggestions.append("")
+                suggestions.append("  常见错误：")
+                suggestions.append("    1. 段落定义后缺少冒号")
+                suggestions.append("       ✓ 正确: 段落 测试 接收：")
+                suggestions.append("       ✗ 错误: 段落 测试 接收")
+                suggestions.append("    2. 条件语句后缺少冒号")
+                suggestions.append("       ✓ 正确: 如果 x > 0：")
+                suggestions.append("       ✗ 错误: 如果 x > 0")
+                suggestions.append("    3. 字符串引号未闭合")
+                suggestions.append("       ✓ 正确: 打印(\"hello\")")
+                suggestions.append("       ✗ 错误: 打印(\"hello)")
+            else:
+                suggestions.append("• 检查缩进是否一致（段言使用 4 空格缩进）")
+                suggestions.append("• 不要混用 Tab 和空格")
+                suggestions.append("• 确保所有同级语句缩进级别相同")
+                suggestions.append("")
+                suggestions.append("  示例：")
+                suggestions.append("    正确: 段落 测试：")
+                suggestions.append("              打印(\"第一行\")")
+                suggestions.append("              打印(\"第二行\")")
+                suggestions.append("")
+                suggestions.append("    错误: 段落 测试：")
+                suggestions.append("              打印(\"第一行\")")
+                suggestions.append("            打印(\"缩进不一致\")")
         elif exc_name == 'FileNotFoundError':
             suggestions.append("• 检查文件路径是否正确")
             suggestions.append("• 使用绝对路径或相对于当前目录的路径")
@@ -318,10 +462,21 @@ class DuanErrorFormatter:
             suggestions.append("• 检查模块名是否拼写正确")
             suggestions.append("• 确认模块已安装或在标准库路径中")
             suggestions.append("• 使用 导入 语句而不是直接使用模块名")
+            # 提取模块名
+            mod_m = re.search(r"(\w+)'?\s*(?:is not|No module named)", exc_msg)
+            if mod_m:
+                mod_name = mod_m.group(1)
+                suggestions.append(f"• 模块 '{mod_name}' 未找到")
+                similar = _find_similar_names(mod_name, {'数学', '随机', '时间', '文件', '系统', 'JSON', '字符串', '列表', '字典', 'os', 'sys', 'json', 'math', 'random', 'time', 'datetime', 're', 'pathlib'})
+                if similar:
+                    suggestions.append(f"• 您是不是想导入: {', '.join(similar)}？")
             suggestions.append("")
             suggestions.append("  示例：")
             suggestions.append("    正确: 导入 数学")
-            suggestions.append("          打印(数学.π)")
+            suggestions.append("          打印(数学.平方根(16))")
+            suggestions.append("")
+            suggestions.append("    正确: 从 数学 导入 阶乘")
+            suggestions.append("          打印(阶乘(5))")
         elif exc_name == 'PermissionError':
             suggestions.append("• 检查文件或目录的访问权限")
             suggestions.append("• 以管理员/超级用户身份运行程序")

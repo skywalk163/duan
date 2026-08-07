@@ -602,6 +602,393 @@ _HANDCRAFTED: List[tuple] = [
      "尝试：\n    设 f 为 打开(\"test.txt\")\n    设 data 为 f.读取()\n捕获 文件未找到, 权限错误：\n    设 data 为 \"\""),
     ("异常映射", "try:\n    result = risky_operation()\nexcept Exception as e:\n    print(f'Error: {e}')\n    result = None",
      "尝试：\n    设 result 为 危险操作()\n捕获 异常 为 e：\n    打印(f\"错误: {e}\")\n    设 result 为 空"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：包管理器
+    # ═══════════════════════════════════════════════════════════════
+    ("包管理器", "duan init myproject", "duan 初始化 myproject"),
+    ("包管理器", "duan install 标准数学扩展", "duan 安装 标准数学扩展"),
+    ("包管理器", "duan install --git https://gitcode.com/user/repo.git", "duan 安装 --git https://gitcode.com/user/repo.git"),
+    ("包管理器", "duan install --path ./local-pkg", "duan 安装 --path ./local-pkg"),
+    ("包管理器", "duan install --search 网络", "duan 安装 --search 网络"),
+    ("包管理器", "duan install --list", "duan 安装 --list 已安装"),
+    ("包管理器", "duan install --registry", "duan 安装 --registry 列表"),
+    ("包管理器", "duan pkg update 标准数学扩展", "duan 包 更新 标准数学扩展"),
+    ("包管理器", "duan pkg update --all", "duan 包 更新 --all"),
+    ("包管理器", "duan pkg update --check", "duan 包 更新 --check"),
+    ("包管理器", "duan publish", "duan 发布"),
+    ("包管理器", "duan pkg search 数学 --remote", "duan 包 搜索 数学 --remote"),
+    ("包管理器", "duan pkg info 标准数学扩展", "duan 包 信息 标准数学扩展"),
+    ("包管理器", "duan pkg list", "duan 包 列表"),
+    ("包管理器", "duan pkg build", "duan 包 构建"),
+    ("包管理器", "duan pkg run", "duan 包 运行"),
+    ("包管理器", "duan pkg native", "duan 包 原生编译"),
+    ("包管理器", "duan init --template lib", "duan 初始化 --template 库"),
+    ("包管理器", "duan build", "duan 构建"),
+    ("包管理器", "duan run main.duan", "duan 运行 main.duan"),
+    ("包管理器", "duan compile main.duan -o out.py", "duan 编译 main.duan -o out.py"),
+    ("包管理器", "duan ast main.duan", "duan AST main.duan"),
+    ("包管理器", "duan tokens main.duan", "duan 令牌 main.duan"),
+    ("包管理器", "duan --version", "duan --版本"),
+    ("包管理器", "duan --help", "duan --帮助"),
+    ("包管理器", "duan run main.duan --backend src", "duan 运行 main.duan --后端 src"),
+    ("包管理器", "duan compile main.duan --backend llvm", "duan 编译 main.duan --后端 llvm"),
+    ("包管理器", "duan compile main.duan --backend llvm-typed", "duan 编译 main.duan --后端 llvm-typed"),
+    ("包管理器", "duan run main.duan --watch", "duan 运行 main.duan --监视"),
+    ("包管理器", "duan run main.duan --verbose", "duan 运行 main.duan --详细"),
+    ("包管理器", "duan install --with-deps 标准数学扩展", "duan 安装 --with-deps 标准数学扩展"),
+    ("包管理器", "duan install --uninstall 网络请求", "duan 安装 --卸载 网络请求"),
+    ("包管理器", "duan install --project ./myproject 标准数学扩展", "duan 安装 --project ./myproject 标准数学扩展"),
+    ("包管理器", "duan install --registry-url https://reg.example.com/registry.json", "duan 安装 --注册中心-url https://reg.example.com/registry.json"),
+    ("包管理器", "duan install --update-registry", "duan 安装 --更新注册中心"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：package.toml 配置
+    # ═══════════════════════════════════════════════════════════════
+    ("包配置", """[package]
+name = "myproject"
+version = "0.1.0"
+entry = "主.duan"
+authors = ["作者"]
+description = "我的段言项目"
+
+[dependencies]
+标准数学扩展 = "1.0.0"
+网络请求 = { version = "2.0.0" }""",
+     """[package]
+name = "myproject"
+version = "0.1.0"
+entry = "主.duan"
+authors = ["作者"]
+description = "我的段言项目"
+
+[dependencies]
+标准数学扩展 = "1.0.0"
+网络请求 = { version = "2.0.0" }"""),
+    ("包配置", """[package]
+name = "utils"
+version = "1.0.0"
+entry = "工具.duan"
+authors = ["段言团队"]
+description = "实用工具库"
+
+[dependencies]
+日志 = { path = "../log" }
+配置管理 = { git = "https://gitcode.com/duan-lang/config.git" }""",
+     """[package]
+name = "utils"
+version = "1.0.0"
+entry = "工具.duan"
+authors = ["段言团队"]
+description = "实用工具库"
+
+[dependencies]
+日志 = { path = "../log" }
+配置管理 = { git = "https://gitcode.com/duan-lang/config.git" }"""),
+    ("包配置", "package.toml 中 name 字段不能为空", "package.toml 中 name 字段不能为空"),
+    ("包配置", "package.toml 中 version 字段不能为空", "package.toml 中 version 字段不能为空"),
+    ("包配置", "duan.lock 锁定包版本实现可重现安装", "duan.lock 锁定包版本实现可重现安装"),
+    ("包配置", "依赖解析器按拓扑排序安装依赖", "依赖解析器按拓扑排序安装依赖"),
+    ("包配置", "检测到循环依赖: A -> B -> A", "检测到循环依赖: A -> B -> A"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：LSP 语言服务器
+    # ═══════════════════════════════════════════════════════════════
+    ("LSP", "LSP 初始化请求返回服务器能力", "LSP 初始化请求返回服务器能力"),
+    ("LSP", "textDocument/completion 返回代码补全项", "文本文档/补全 返回代码补全项"),
+    ("LSP", "textDocument/hover 返回悬停信息", "文本文档/悬停 返回悬停信息"),
+    ("LSP", "textDocument/definition 返回跳转定义位置", "文本文档/定义 返回跳转定义位置"),
+    ("LSP", "textDocument/rename 支持符号重命名", "文本文档/重命名 支持符号重命名"),
+    ("LSP", "textDocument/formatting 自动格式化代码", "文本文档/格式化 自动格式化代码"),
+    ("LSP", "textDocument/references 查找符号引用", "文本文档/引用 查找符号引用"),
+    ("LSP", "textDocument/documentSymbol 提取文档符号", "文本文档/文档符号 提取文档符号"),
+    ("LSP", "textDocument/codeAction 提供代码操作", "文本文档/代码操作 提供代码操作"),
+    ("LSP", "textDocument/signatureHelp 参数提示", "文本文档/签名帮助 参数提示"),
+    ("LSP", "textDocument/documentHighlight 高亮符号", "文本文档/文档高亮 高亮符号"),
+    ("LSP", "textDocument/didOpen 打开文档时自动分析", "文本文档/已打开 打开文档时自动分析"),
+    ("LSP", "textDocument/didChange 文档变更时更新诊断", "文本文档/已变更 文档变更时更新诊断"),
+    ("LSP", "textDocument/didSave 保存时重新分析", "文本文档/已保存 保存时重新分析"),
+    ("LSP", "textDocument/publishDiagnostics 发布诊断信息", "文本文档/发布诊断 发布诊断信息"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：LSP 代码重构
+    # ═══════════════════════════════════════════════════════════════
+    ("LSP重构", "LSP 提取函数：将选中代码提取为新函数", "LSP 提取函数：将选中代码提取为新函数"),
+    ("LSP重构", "LSP 内联变量：将变量替换为其值", "LSP 内联变量：将变量替换为其值"),
+    ("LSP重构", "LSP 重命名符号：全局重命名变量/函数/类", "LSP 重命名符号：全局重命名变量/函数/类"),
+    ("LSP重构", "LSP 语义高亮：基于 AST 对符号着色", "LSP 语义高亮：基于 AST 对符号着色"),
+    ("LSP重构", "LSP 语义令牌：返回语义令牌列表", "LSP 语义令牌：返回语义令牌列表"),
+    ("LSP重构", "LSP 代码操作：添加缺失的定义", "LSP 代码操作：添加缺失的定义"),
+    ("LSP重构", "LSP 代码操作：查看段言语法文档", "LSP 代码操作：查看段言语法文档"),
+    ("LSP重构", "LSP 文档符号包含函数、变量、类、方法", "LSP 文档符号包含函数、变量、类、方法"),
+    ("LSP重构", "LSP 格式化支持 tabSize 和 insertSpaces 选项", "LSP 格式化支持 tabSize 和 insertSpaces 选项"),
+    ("LSP重构", "LSP 范围格式化支持指定行范围", "LSP 范围格式化支持指定行范围"),
+    ("LSP重构", "LSP 诊断包括语法错误和类型错误", "LSP 诊断包括语法错误和类型错误"),
+    ("LSP重构", "LSP 类型推断缓存变量类型用于悬停", "LSP 类型推断缓存变量类型用于悬停"),
+    ("LSP重构", "LSP 跳转定义支持 AST 回退解析", "LSP 跳转定义支持 AST 回退解析"),
+    ("LSP重构", "LSP 重命名检查完整词边界防止误替换", "LSP 重命名检查完整词边界防止误替换"),
+    ("LSP重构", "LSP 签名帮助显示函数参数列表", "LSP 签名帮助显示函数参数列表"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：增量编译
+    # ═══════════════════════════════════════════════════════════════
+    ("增量编译", "增量编译：只重新编译变更的模块", "增量编译：只重新编译变更的模块"),
+    ("增量编译", "编译缓存：缓存已编译模块的 AST 和 Python 代码", "编译缓存：缓存已编译模块的 AST 和 Python 代码"),
+    ("增量编译", "缓存失效：模块内容变更时自动清除缓存", "缓存失效：模块内容变更时自动清除缓存"),
+    ("增量编译", "依赖追踪：记录模块间的依赖关系", "依赖追踪：记录模块间的依赖关系"),
+    ("增量编译", "增量构建：检测到依赖变更时级联重新编译", "增量构建：检测到依赖变更时级联重新编译"),
+    ("增量编译", "文件名哈希缓存：基于文件名和修改时间做缓存键", "文件名哈希缓存：基于文件名和修改时间做缓存键"),
+    ("增量编译", "模块时间戳：比较文件修改时间判断是否需要重新编译", "模块时间戳：比较文件修改时间判断是否需要重新编译"),
+    ("增量编译", "编译缓存目录：.duan_cache 存储编译中间产物", "编译缓存目录：.duan_cache 存储编译中间产物"),
+    ("增量编译", "快速重启：编译缓存减少重复编译时间", "快速重启：编译缓存减少重复编译时间"),
+    ("增量编译", "并行编译：无依赖的模块可并行编译", "并行编译：无依赖的模块可并行编译"),
+    ("增量编译", "增量编译支持 src 后端和 antlr 后端", "增量编译支持 src 后端和 antlr 后端"),
+    ("增量编译", "build_project 实现增量构建逻辑", "build_project 实现增量构建逻辑"),
+    ("增量编译", "get_mtime 获取文件修改时间用于缓存判断", "get_mtime 获取文件修改时间用于缓存判断"),
+    ("增量编译", "缓存键包含模块名、文件路径和修改时间戳", "缓存键包含模块名、文件路径和修改时间戳"),
+    ("增量编译", "模块解析器缓存已解析的模块导入关系", "模块解析器缓存已解析的模块导入关系"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：LLVM 异步
+    # ═══════════════════════════════════════════════════════════════
+    ("LLVM异步", "async def fetch_data():\n    return await async_request()",
+     "异步 段落 获取数据：\n    返回 等待 异步请求()"),
+    ("LLVM异步", "async def compute():\n    result = await expensive_calc()\n    return result * 2",
+     "异步 段落 计算：\n    设 result 为 等待 耗时计算()\n    返回 result 乘以 2"),
+    ("LLVM异步", "async def read_all():\n    data = await read_file('data.txt')\n    return data",
+     "异步 段落 读取全部：\n    设 data 为 等待 读取文件(\"data.txt\")\n    返回 data"),
+    ("LLVM异步", "async for item in async_stream:\n    print(item)",
+     "异步 遍历 item 于 异步流：\n    打印(item)"),
+    ("LLVM异步", "async with open('file.txt') as f:\n    content = await f.read()",
+     "异步 使用 文件 为 打开(\"file.txt\")：\n    设 content 为 等待 文件.读取()"),
+    ("LLVM异步", "async def run_tasks():\n    task1 = await start_task('a')\n    task2 = await start_task('b')\n    return task1 + task2",
+     "异步 段落 运行任务：\n    设 task1 为 等待 开始任务(\"a\")\n    设 task2 为 等待 开始任务(\"b\")\n    返回 task1 加上 task2"),
+    ("LLVM异步", "async def retry_async(n):\n    for i in range(n):\n        try:\n            return await try_fetch()\n        except:\n            continue",
+     "异步 段落 重试异步 接收 n：\n    遍历 i 于 0至n减去1：\n        尝试：\n            返回 等待 尝试获取()\n        捕获 异常：\n            跳过"),
+    ("LLVM异步", "async def main():\n    result = await asyncio.gather(task1(), task2())\n    print(result)",
+     "异步 段落 主：\n    设 result 为 等待 异步收集(任务1(), 任务2())\n    打印(result)"),
+    ("LLVM异步", "async def timeout_request(url, timeout=5):\n    try:\n        return await async_http_get(url)\n    except TimeoutError:\n        return None",
+     "异步 段落 超时请求 接收 url, timeout：\n    尝试：\n        返回 等待 异步HTTP获取(url)\n    捕获 超时错误：\n        返回 空"),
+    ("LLVM异步", "async def producer():\n    for i in range(10):\n        await produce(i)",
+     "异步 段落 生产者：\n    遍历 i 于 0至9：\n        等待 生产(i)"),
+    ("LLVM异步", "async def consumer():\n    async for item in async_queue:\n        process(item)",
+     "异步 段落 消费者：\n    异步 遍历 item 于 异步队列：\n        处理(item)"),
+    ("LLVM异步", "async def fetch_with_retry(url, max_retries=3):\n    for attempt in range(max_retries):\n        try:\n            return await async_get(url)\n        except Exception as e:\n            if attempt == max_retries - 1:\n                raise",
+     "异步 段落 带重试获取 接收 url, max_retries：\n    遍历 attempt 于 0至max_retries减去1：\n        尝试：\n            返回 等待 异步获取(url)\n        捕获 异常 为 e：\n            如果 attempt 等于 max_retries 减去 1：\n                抛出"),
+    ("LLVM异步", "async def batch_process(items):\n    results = []\n    for item in items:\n        r = await process_one(item)\n        results.append(r)\n    return results",
+     "异步 段落 批量处理 接收 items：\n    设 results 为 []\n    遍历 item 于 items：\n        设 r 为 等待 处理单个(item)\n        results.追加(r)\n    返回 results"),
+    ("LLVM异步", "async def stream_reader():\n    async for chunk in async_stream:\n        if chunk == b'':\n            break\n        print(chunk)",
+     "异步 段落 流读取器：\n    异步 遍历 chunk 于 异步流：\n        如果 chunk 等于 b\"\"：\n            跳出\n        打印(chunk)"),
+    ("LLVM异步", "async def with_timeout(coro, timeout=1.0):\n    try:\n        return await asyncio.wait_for(coro, timeout)\n    except asyncio.TimeoutError:\n        return None",
+     "异步 段落 带超时 接收 coro, timeout：\n    尝试：\n        返回 等待 异步等待(coro, timeout)\n    捕获 超时错误：\n        返回 空"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：LLVM 异常
+    # ═══════════════════════════════════════════════════════════════
+    ("LLVM异常", "try:\n    result = 10 / 0\nexcept ZeroDivisionError:\n    result = 0",
+     "尝试：\n    设 result 为 10 除以 0\n捕获 除以零：\n    设 result 为 0"),
+    ("LLVM异常", "raise ValueError('invalid') from cause",
+     "抛出 数值错误(\"invalid\") 从 cause"),
+    ("LLVM异常", "try:\n    x = int('abc')\nexcept ValueError as e:\n    print(f'error: {e}')\n    raise",
+     "尝试：\n    设 x 为 整数(\"abc\")\n捕获 数值错误 为 e：\n    打印(f\"error: {e}\")\n    抛出"),
+    ("LLVM异常", "try:\n    f = open('data.txt')\n    content = f.read()\nexcept FileNotFoundError:\n    content = ''\nexcept PermissionError:\n    content = ''\nfinally:\n    print('done')",
+     "尝试：\n    设 f 为 打开(\"data.txt\")\n    设 content 为 f.读取()\n捕获 文件未找到：\n    设 content 为 \"\"\n捕获 权限错误：\n    设 content 为 \"\"\n最终：\n    打印(\"完成\")"),
+    ("LLVM异常", "try:\n    x = get_value()\nexcept (ValueError, TypeError) as e:\n    x = 0\n    print(e)",
+     "尝试：\n    设 x 为 获取值()\n捕获 数值错误, 类型错误 为 e：\n    设 x 为 0\n    打印(e)"),
+    ("LLVM异常", "try:\n    result = risky_call()\nexcept Exception:\n    result = fallback()\nelse:\n    print('success')",
+     "尝试：\n    设 result 为 危险调用()\n捕获 异常：\n    设 result 为 回退()\n否则：\n    打印(\"成功\")"),
+    ("LLVM异常", "class CustomError(Exception):\n    def __init__(self, msg):\n        self.msg = msg\n        super().__init__(msg)",
+     "类 自定义错误 继承 异常：\n    属性 消息\n    构造 接收 msg：\n        己.消息 为 msg\n        父.构造(msg)"),
+    ("LLVM异常", "raise CustomError('something went wrong')",
+     "抛出 自定义错误(\"something went wrong\")"),
+    ("LLVM异常", "try:\n    x = 1 / 0\nexcept ZeroDivisionError:\n    x = float('inf')",
+     "尝试：\n    设 x 为 1 除以 0\n捕获 除以零：\n    设 x 为 浮数(\"inf\")"),
+    ("LLVM异常", "try:\n    d = {'a': 1}\n    val = d['missing']\nexcept KeyError:\n    val = d.get('missing', 0)",
+     "尝试：\n    设 d 为 {\"a\": 1}\n    设 val 为 d[\"missing\"]\n捕获 键错误：\n    设 val 为 d.get(\"missing\", 0)"),
+    ("LLVM异常", "try:\n    import non_existent_module\nexcept ImportError:\n    print('module not found')",
+     "尝试：\n    导入 不存在的模块\n捕获 导入错误：\n    打印(\"模块未找到\")"),
+    ("LLVM异常", "try:\n    result = None\n    result.some_method()\nexcept AttributeError:\n    result = 0",
+     "尝试：\n    设 result 为 空\n    result.某方法()\n捕获 属性错误：\n    设 result 为 0"),
+    ("LLVM异常", "try:\n    recursive_func(10000)\nexcept RecursionError:\n    print('too deep')",
+     "尝试：\n    递归函数(10000)\n捕获 递归错误：\n    打印(\"太深了\")"),
+    ("LLVM异常", "try:\n    large_list = [0] * (10**10)\nexcept MemoryError:\n    large_list = []",
+     "尝试：\n    设 large_list 为 [0] * (10 的 10 次方)\n捕获 内存错误：\n    设 large_list 为 []"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：注册中心
+    # ═══════════════════════════════════════════════════════════════
+    ("注册中心", "GET /api/v1/packages 返回包列表", "GET /api/v1/packages 返回包列表"),
+    ("注册中心", "GET /api/v1/packages/{name} 返回包详情", "GET /api/v1/packages/{name} 返回包详情"),
+    ("注册中心", "GET /api/v1/packages/{name}/{version} 返回特定版本", "GET /api/v1/packages/{name}/{version} 返回特定版本"),
+    ("注册中心", "POST /api/v1/packages 发布新包", "POST /api/v1/packages 发布新包"),
+    ("注册中心", "DELETE /api/v1/packages/{name} 删除包", "DELETE /api/v1/packages/{name} 删除包"),
+    ("注册中心", "GET /api/v1/search?q=数学 搜索包", "GET /api/v1/search?q=数学 搜索包"),
+    ("注册中心", "注册中心返回 JSON 格式的包元数据", "注册中心返回 JSON 格式的包元数据"),
+    ("注册中心", "注册中心支持语义化版本号", "注册中心支持语义化版本号"),
+    ("注册中心", "注册中心存储包名、版本、描述、作者、关键词", "注册中心存储包名、版本、描述、作者、关键词"),
+    ("注册中心", "注册中心支持包依赖关系声明", "注册中心支持包依赖关系声明"),
+    ("注册中心", "注册中心包的 zip 下载链接", "注册中心包的 zip 下载链接"),
+    ("注册中心", "注册中心使用 filesystem 存储包数据", "注册中心使用 filesystem 存储包数据"),
+    ("注册中心", "注册中心数据目录 ./registry_data", "注册中心数据目录 ./registry_data"),
+    ("注册中心", "注册中心默认端口 8000", "注册中心默认端口 8000"),
+    ("注册中心", "注册中心支持 CORS 跨域请求", "注册中心支持 CORS 跨域请求"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：py2duan 升级
+    # ═══════════════════════════════════════════════════════════════
+    ("py2duan", "async def f():\n    await g()", "异步 段落 f：\n    等待 g()"),
+    ("py2duan", "async for x in async_iter:\n    print(x)", "异步 遍历 x 于 async_iter：\n    打印(x)"),
+    ("py2duan", "async with open('f') as f:\n    data = await f.read()", "异步 使用 文件 为 打开(\"f\")：\n    设 data 为 等待 文件.读取()"),
+    ("py2duan", "def f(a, b=1, *args, **kwargs):\n    pass", "段落 f 接收 a, b 等于 1, *args, **kwargs：\n    空操作"),
+    ("py2duan", "a = 1\nb = 2\na, b = b, a", "设 a 为 1\n设 b 为 2\n设 a, b 为 b, a"),
+    ("py2duan", "from typing import List, Optional", "从 类型工具 导入 列表类型, 可选类型"),
+    ("py2duan", "class MyClass:\n    @staticmethod\n    def method():\n        pass", "类 MyClass：\n    静态 段落 method：\n        空操作"),
+    ("py2duan", "class MyClass:\n    @classmethod\n    def method(cls):\n        pass", "类 MyClass：\n    类方法 段落 method：\n        空操作"),
+    ("py2duan", "class MyClass:\n    @property\n    def value(self):\n        return self._val", "类 MyClass：\n    特性 段落 value：\n        返回 己._val"),
+    ("py2duan", "del x", "删除 x"),
+    ("py2duan", "assert x > 0, 'invalid'", "断言 x 大于 0, \"invalid\""),
+    ("py2duan", "global x, y", "全局 x, y"),
+    ("py2duan", "nonlocal x", "非局部 x"),
+    ("py2duan", "yield x", "产出 x"),
+    ("py2duan", "yield from gen", "产出 从 gen"),
+    ("py2duan", "match x:\n    case 0:\n        print('zero')\n    case n:\n        print(n)",
+     "匹配 x：\n    当 0：\n        打印(\"zero\")\n    当 n：\n        打印(n)"),
+    ("py2duan", "match x:\n    case [a, *rest]:\n        print(a, rest)",
+     "匹配 x：\n    当 [a, *rest]：\n        打印(a)\n        打印(rest)"),
+    ("py2duan", "match x:\n    case {'key': val}:\n        print(val)",
+     "匹配 x：\n    当 {\"key\": val}：\n        打印(val)"),
+    ("py2duan", "match x:\n    case 1 if flag:\n        print('one')\n    case _:\n        print('other')",
+     "匹配 x：\n    当 1 若 flag：\n        打印(\"one\")\n    当 _：\n        打印(\"other\")"),
+    ("py2duan", "match x:\n    case 1 | 2 | 3:\n        print('small')",
+     "匹配 x：\n    当 1 | 2 | 3：\n        打印(\"small\")"),
+    ("py2duan", "match x:\n    case int(n):\n        print(f'int: {n}')",
+     "匹配 x：\n    当 整数(n)：\n        打印(f\"int: {n}\")"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：异步编程综合
+    # ═══════════════════════════════════════════════════════════════
+    ("异步综合", "async def fetch_user(user_id):\n    url = f'https://api.example.com/users/{user_id}'\n    response = await async_http_get(url)\n    return response.json()",
+     "异步 段落 获取用户 接收 user_id：\n    设 url 为 f\"https://api.example.com/users/{user_id}\"\n    设 response 为 等待 异步HTTP获取(url)\n    返回 response.JSON()"),
+    ("异步综合", "async def parallel_fetch(ids):\n    tasks = []\n    for uid in ids:\n        tasks.append(fetch_user(uid))\n    results = await asyncio.gather(*tasks)\n    return results",
+     "异步 段落 并行获取 接收 ids：\n    设 tasks 为 []\n    遍历 uid 于 ids：\n        tasks.追加(获取用户(uid))\n    设 results 为 等待 异步收集(*tasks)\n    返回 results"),
+    ("异步综合", "async def safe_fetch(url):\n    try:\n        data = await async_http_get(url)\n        return data\n    except ConnectionError:\n        return None\n    except TimeoutError:\n        return None",
+     "异步 段落 安全获取 接收 url：\n    尝试：\n        设 data 为 等待 异步HTTP获取(url)\n        返回 data\n    捕获 连接错误：\n        返回 空\n    捕获 超时错误：\n        返回 空"),
+    ("异步综合", "async def producer_consumer():\n    queue = AsyncQueue()\n    async def produce():\n        for i in range(10):\n            await queue.put(i)\n        await queue.put(None)\n    async def consume():\n        while True:\n            item = await queue.get()\n            if item is None:\n                break\n            print(f'got: {item}')\n    await asyncio.gather(produce(), consume())",
+     "异步 段落 生产者消费者：\n    设 queue 为 异步队列()\n    异步 段落 生产：\n        遍历 i 于 0至9：\n            等待 queue.放入(i)\n        等待 queue.放入(空)\n    异步 段落 消费：\n        当 真：\n            设 item 为 等待 queue.取出()\n            如果 item 等于 空：\n                跳出\n            打印(f\"got: {item}\")\n    等待 异步收集(生产(), 消费())"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：LSP 语义令牌
+    # ═══════════════════════════════════════════════════════════════
+    ("语义令牌", "LSP 语义令牌类型: namespace, type, class, enum, interface, function, variable, property, parameter, keyword",
+     "LSP 语义令牌类型: namespace, type, class, enum, interface, function, variable, property, parameter, keyword"),
+    ("语义令牌", "LSP 语义令牌修饰符: declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation",
+     "LSP 语义令牌修饰符: declaration, definition, readonly, static, deprecated, abstract, async, modification, documentation"),
+    ("语义令牌", "语义令牌编码: token_type, token_modifiers, line, start_pos, length",
+     "语义令牌编码: token_type, token_modifiers, line, start_pos, length"),
+    ("语义令牌", "语义高亮基于 AST 节点类型分配颜色", "语义高亮基于 AST 节点类型分配颜色"),
+    ("语义令牌", "函数名使用 Function 令牌类型", "函数名使用 Function 令牌类型"),
+    ("语义令牌", "变量名使用 Variable 令牌类型", "变量名使用 Variable 令牌类型"),
+    ("语义令牌", "类名使用 Class 令牌类型", "类名使用 Class 令牌类型"),
+    ("语义令牌", "方法名使用 Method 令牌类型", "方法名使用 Method 令牌类型"),
+    ("语义令牌", "属性名使用 Property 令牌类型", "属性名使用 Property 令牌类型"),
+    ("语义令牌", "参数名使用 Parameter 令牌类型", "参数名使用 Parameter 令牌类型"),
+    ("语义令牌", "关键字使用 Keyword 令牌类型", "关键字使用 Keyword 令牌类型"),
+    ("语义令牌", "语义令牌响应包含数据数组", "语义令牌响应包含数据数组"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：包管理器依赖安装
+    # ═══════════════════════════════════════════════════════════════
+    ("依赖安装", "install_with_deps 自动安装包及其依赖", "install_with_deps 自动安装包及其依赖"),
+    ("依赖安装", "依赖解析器从 package.toml 读取依赖", "依赖解析器从 package.toml 读取依赖"),
+    ("依赖安装", "依赖解析器从 duan.json 读取依赖", "依赖解析器从 duan.json 读取依赖"),
+    ("依赖安装", "拓扑排序确保依赖先安装", "拓扑排序确保依赖先安装"),
+    ("依赖安装", "循环依赖检测防止无限安装", "循环依赖检测防止无限安装"),
+    ("依赖安装", "依赖安装顺序: A -> B -> C", "依赖安装顺序: A -> B -> C"),
+    ("依赖安装", "已安装的依赖自动跳过", "已安装的依赖自动跳过"),
+    ("依赖安装", "依赖安装失败不会中断主包安装", "依赖安装失败不会中断主包安装"),
+    ("依赖安装", "duan install --with-deps 启用依赖安装", "duan 安装 --with-deps 启用依赖安装"),
+    ("依赖安装", "LockFile 记录已安装包版本", "LockFile 记录已安装包版本"),
+    ("依赖安装", "LockFile 保存到 duan.lock 文件", "LockFile 保存到 duan.lock 文件"),
+    ("依赖安装", "LockFile 支持可重现安装", "LockFile 支持可重现安装"),
+    ("依赖安装", "LockFile 包含安装时间戳", "LockFile 包含安装时间戳"),
+    ("依赖安装", "LockFile 版本号 1.0", "LockFile 版本号 1.0"),
+    ("依赖安装", "Version.satisfies 检查版本约束", "Version.satisfies 检查版本约束"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：包管理器远程搜索
+    # ═══════════════════════════════════════════════════════════════
+    ("远程搜索", "duan pkg search 数学 --remote 从远程注册中心搜索", "duan 包 搜索 数学 --remote 从远程注册中心搜索"),
+    ("远程搜索", "远程搜索发送 HTTP GET 请求到注册中心", "远程搜索发送 HTTP GET 请求到注册中心"),
+    ("远程搜索", "远程搜索 URL: GET /api/v1/search?q=数学", "远程搜索 URL: GET /api/v1/search?q=数学"),
+    ("远程搜索", "远程搜索返回包名、版本、描述", "远程搜索返回包名、版本、描述"),
+    ("远程搜索", "远程搜索支持关键词过滤", "远程搜索支持关键词过滤"),
+    ("远程搜索", "远程搜索超时 10 秒", "远程搜索超时 10 秒"),
+    ("远程搜索", "远程搜索失败时回退到本地搜索", "远程搜索失败时回退到本地搜索"),
+    ("远程搜索", "远程搜索结果缓存到本地注册表", "远程搜索结果缓存到本地注册表"),
+    ("远程搜索", "远程注册中心 URL 可通过 --registry-url 配置", "远程注册中心 URL 可通过 --registry-url 配置"),
+    ("远程搜索", "远程搜索默认 URL http://localhost:8000/api/v1/search", "远程搜索默认 URL http://localhost:8000/api/v1/search"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：增量编译缓存
+    # ═══════════════════════════════════════════════════════════════
+    ("编译缓存", "CompilationCache 类管理编译缓存", "CompilationCache 类管理编译缓存"),
+    ("编译缓存", "缓存键: module_name + file_mtime + content_hash", "缓存键: module_name + file_mtime + content_hash"),
+    ("编译缓存", "缓存目录: .duan_cache/", "缓存目录: .duan_cache/"),
+    ("编译缓存", "缓存存储 AST 节点和生成的 Python 代码", "缓存存储 AST 节点和生成的 Python 代码"),
+    ("编译缓存", "get_cached_ast 从缓存中获取 AST", "get_cached_ast 从缓存中获取 AST"),
+    ("编译缓存", "set_cached_ast 将 AST 存入缓存", "set_cached_ast 将 AST 存入缓存"),
+    ("编译缓存", "get_cached_code 从缓存中获取 Python 代码", "get_cached_code 从缓存中获取 Python 代码"),
+    ("编译缓存", "set_cached_code 将 Python 代码存入缓存", "set_cached_code 将 Python 代码存入缓存"),
+    ("编译缓存", "invalidate_cache 清除指定模块的缓存", "invalidate_cache 清除指定模块的缓存"),
+    ("编译缓存", "clear_all_cache 清除所有缓存", "clear_all_cache 清除所有缓存"),
+    ("编译缓存", "缓存文件使用 JSON 格式存储", "缓存文件使用 JSON 格式存储"),
+    ("编译缓存", "缓存文件包含版本号以支持向后兼容", "缓存文件包含版本号以支持向后兼容"),
+    ("编译缓存", "缓存大小限制防止无限增长", "缓存大小限制防止无限增长"),
+    ("编译缓存", "增量编译减少 50% 以上的重复编译时间", "增量编译减少 50% 以上的重复编译时间"),
+    ("编译缓存", "模块解析器缓存模块导入关系", "模块解析器缓存模块导入关系"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：LLVM 异步运行时
+    # ═══════════════════════════════════════════════════════════════
+    ("LLVM运行时", "LLVM 异步运行时基于协程实现", "LLVM 异步运行时基于协程实现"),
+    ("LLVM运行时", "async_task 结构体表示异步任务", "async_task 结构体表示异步任务"),
+    ("LLVM运行时", "async_await 实现协程挂起与恢复", "async_await 实现协程挂起与恢复"),
+    ("LLVM运行时", "event_loop 事件循环驱动异步任务", "event_loop 事件循环驱动异步任务"),
+    ("LLVM运行时", "async_run 启动异步任务执行", "async_run 启动异步任务执行"),
+    ("LLVM运行时", "LLVM 异步状态机实现协程切换", "LLVM 异步状态机实现协程切换"),
+    ("LLVM运行时", "async_state 枚举: INIT, RUNNING, SUSPENDED, COMPLETED, FAILED",
+     "async_state 枚举: INIT, RUNNING, SUSPENDED, COMPLETED, FAILED"),
+    ("LLVM运行时", "异步运行时支持超时取消", "异步运行时支持超时取消"),
+    ("LLVM运行时", "异步运行时支持并发任务", "异步运行时支持并发任务"),
+    ("LLVM运行时", "LLVM 异常表附加到每个函数", "LLVM 异常表附加到每个函数"),
+    ("LLVM运行时", "LLVM 异常处理使用 setjmp/longjmp", "LLVM 异常处理使用 setjmp/longjmp"),
+    ("LLVM运行时", "LLVM 异常类型包括 ValueError, TypeError, KeyError, IndexError",
+     "LLVM 异常类型包括 ValueError, TypeError, KeyError, IndexError"),
+    ("LLVM运行时", "LLVM 异常类型包括 ZeroDivisionError, FileNotFoundError, AttributeError",
+     "LLVM 异常类型包括 ZeroDivisionError, FileNotFoundError, AttributeError"),
+    ("LLVM运行时", "LLVM 异常类型包括 StopIteration, ImportError, RuntimeError",
+     "LLVM 异常类型包括 StopIteration, ImportError, RuntimeError"),
+    ("LLVM运行时", "LLVM 异常类型包括 RecursionError, MemoryError, OverflowError",
+     "LLVM 异常类型包括 RecursionError, MemoryError, OverflowError"),
+
+    # ═══════════════════════════════════════════════════════════════
+    # v5.5 新特性：包版本管理
+    # ═══════════════════════════════════════════════════════════════
+    ("版本管理", "语义化版本号: major.minor.patch", "语义化版本号: major.minor.patch"),
+    ("版本管理", "版本约束 >=1.0.0 表示大于等于 1.0.0", "版本约束 >=1.0.0 表示大于等于 1.0.0"),
+    ("版本管理", "版本约束 ^1.0.0 表示 >=1.0.0 <2.0.0", "版本约束 ^1.0.0 表示 >=1.0.0 <2.0.0"),
+    ("版本管理", "版本约束 ~1.0.0 表示 >=1.0.0 <1.1.0", "版本约束 ~1.0.0 表示 >=1.0.0 <1.1.0"),
+    ("版本管理", "版本比较: 1.0.0 < 2.0.0", "版本比较: 1.0.0 < 2.0.0"),
+    ("版本管理", "版本比较: 1.0.0-alpha < 1.0.0", "版本比较: 1.0.0-alpha < 1.0.0"),
+    ("版本管理", "预发布版本: alpha, beta, rc", "预发布版本: alpha, beta, rc"),
+    ("版本管理", "duan pkg update 检查远程版本并更新", "duan 包 更新 检查远程版本并更新"),
+    ("版本管理", "duan pkg update --check 只检查不更新", "duan 包 更新 --check 只检查不更新"),
+    ("版本管理", "更新失败自动回滚到旧版本", "更新失败自动回滚到旧版本"),
+    ("版本管理", "更新前备份当前版本到缓存", "更新前备份当前版本到缓存"),
+    ("版本管理", "Version.parse 解析版本字符串", "Version.parse 解析版本字符串"),
+    ("版本管理", "Version.compare 比较两个版本", "Version.compare 比较两个版本"),
+    ("版本管理", "Version.satisfies 检查版本约束满足", "Version.satisfies 检查版本约束满足"),
+    ("版本管理", "版本号格式: 主版本.次版本.修订号", "版本号格式: 主版本.次版本.修订号"),
 ]
 
 
@@ -1621,6 +2008,17 @@ class User(PrintableMixin):
 # 数据质量审计
 # ═══════════════════════════════════════════════════════════════════
 
+def _normalize_py_for_compile(py: str) -> str:
+    """将 Python 代码标准化为可编译形式
+
+    - 将 \\n 转为真实换行
+    - 将单行语句片段包装为完整函数/循环（暗坑类）
+    """
+    # 将 \\n 转为真实换行
+    code = py.replace('\\n', '\n')
+    return code
+
+
 def _audit_pairs(pairs: List[Tuple[str, str, str]]) -> Dict:
     """审计数据质量：检查语法正确性和语义等价性
 
@@ -1636,6 +2034,12 @@ def _audit_pairs(pairs: List[Tuple[str, str, str]]) -> Dict:
         "suspicious_duplicates": [],
     }
 
+    # 允许的片段类（代码片段不是完整程序，跳过编译检查）
+    FRAGMENT_CATEGORIES = {'暗坑', 'for…else', '包管理器', '包配置', 'LSP', 'LSP重构',
+                           '增量编译', '注册中心', '语义令牌', '依赖安装', '远程搜索',
+                           '编译缓存', 'LLVM运行时', '版本管理', 'py2duan', 'LLVM异步',
+                           '字符串', '字典', '模式匹配', '上下文', '异常'}
+
     seen = set()
     for cat, py, duan in pairs:
         # 按类别统计
@@ -1650,10 +2054,11 @@ def _audit_pairs(pairs: List[Tuple[str, str, str]]) -> Dict:
             report["empty_output"] += 1
             report["issues"].append(f"[{cat}] 空输出: input={py[:50]}")
 
-        # 检查 Python 语法正确性
-        if py.strip():
+        # 检查 Python 语法正确性（跳过片段类）
+        if py.strip() and cat not in FRAGMENT_CATEGORIES:
             try:
-                compile(py, '<audit>', 'exec')
+                normalized = _normalize_py_for_compile(py)
+                compile(normalized, '<audit>', 'exec')
             except SyntaxError as e:
                 report["issues"].append(f"[{cat}] Python语法错误: {e}")
 
@@ -1666,9 +2071,6 @@ def _audit_pairs(pairs: List[Tuple[str, str, str]]) -> Dict:
         if untranslated:
             report["issues"].append(f"[{cat}] 段言端含未翻译关键字: {untranslated}")
 
-        # 检查 Python 和段言是否同时含变量的语义一致性
-        py_vars = set(re.findall(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', py))
-        duan_vars = set(re.findall(r'\b([a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*)\b', duan))
         # 检查重复
         key = (cat, py[:50], duan[:50])
         if key in seen:

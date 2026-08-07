@@ -94,7 +94,7 @@ BUILTIN_FUNC_MAP = {
     'isinstance': '实例检查',
     'range':     'range',
     'len':       'len',
-    'open':      'open',
+    'open':      '打开',
     'enumerate': 'enumerate',
 }
 
@@ -127,6 +127,32 @@ METHOD_MAP = {
     'read':     '读取',
     'write':    '写入',
     'close':    '关闭',
+}
+
+# typing 模块类型名映射（v5.5）
+TYPING_MAP = {
+    'List': '列表类型',
+    'Dict': '字典类型',
+    'Set': '集合类型',
+    'Tuple': '元组类型',
+    'Optional': '可选类型',
+    'Union': '联合类型',
+    'Any': '任意类型',
+    'Callable': '可调用类型',
+    'Iterable': '可迭代类型',
+    'Iterator': '迭代器类型',
+    'Generator': '生成器类型',
+    'Sequence': '序列类型',
+    'Mapping': '映射类型',
+    'TypeVar': '类型变量',
+    'Generic': '泛型类型',
+    'Protocol': '协议类型',
+    'Final': '最终类型',
+    'Literal': '字面量类型',
+    'NamedTuple': '命名元组',
+    'NewType': '新类型',
+    'TypeAlias': '类型别名',
+    'Self': '自身类型',
 }
 
 # v5.0 异常名映射
@@ -750,6 +776,19 @@ class Py2DuanTranspiler:
     def _visit_ExceptHandler(self, handler: ast.ExceptHandler):
         if handler.type:
             type_str = self._visit_expr(handler.type)
+            # 异常名映射（v5.5）
+            if isinstance(handler.type, ast.Name):
+                mapped = EXCEPTION_MAP.get(handler.type.id, handler.type.id)
+                if mapped != handler.type.id:
+                    type_str = mapped
+            elif isinstance(handler.type, ast.Tuple):
+                mapped_elts = []
+                for elt in handler.type.elts:
+                    if isinstance(elt, ast.Name):
+                        mapped_elts.append(EXCEPTION_MAP.get(elt.id, elt.id))
+                    else:
+                        mapped_elts.append(self._visit_expr(elt))
+                type_str = f"({', '.join(mapped_elts)})"
             if handler.name:
                 self._emit(f"捕获 {type_str} 为 {handler.name}：")
             else:
@@ -767,8 +806,13 @@ class Py2DuanTranspiler:
             self._emit("抛出")
         elif node.cause:
             exc_str = self._visit_expr(node.exc)
+            # 异常名映射
+            if isinstance(node.exc, ast.Call) and isinstance(node.exc.func, ast.Name):
+                exc_name = node.exc.func.id
+                if exc_name in EXCEPTION_MAP:
+                    exc_str = exc_str.replace(exc_name, EXCEPTION_MAP[exc_name], 1)
             cause_str = self._visit_expr(node.cause)
-            self._emit(f"抛出 {exc_str} from {cause_str}")
+            self._emit(f"抛出 {exc_str} 来自 {cause_str}")
         else:
             exc_str = self._visit_expr(node.exc)
             # 异常名映射
@@ -788,12 +832,17 @@ class Py2DuanTranspiler:
 
     def _visit_ImportFrom(self, node: ast.ImportFrom):
         module = node.module or ""
+        # typing 模块映射（v5.5）
+        if module in ('typing', 'typing_extensions'):
+            module = '类型工具'
         names = []
         for alias in node.names:
+            # 类型名映射
+            name = TYPING_MAP.get(alias.name, alias.name)
             if alias.asname:
-                names.append(f"{alias.name} 为 {alias.asname}")
+                names.append(f"{name} 为 {alias.asname}")
             else:
-                names.append(alias.name)
+                names.append(name)
         names_str = ", ".join(names)
         self._emit(f"从 {module} 导入 {names_str}")
 

@@ -1,0 +1,109 @@
+name: 发布
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号（如 6.0.0）'
+        required: true
+        type: string
+
+jobs:
+  build-and-publish:
+    name: 构建并发布到 PyPI
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装构建依赖
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+
+      - name: 构建分发包
+        run: python -m build
+
+      - name: 验证分发包
+        run: python -m twine check dist/*
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: 发布到 PyPI
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: python -m twine upload dist/*
+
+  github-release:
+    name: 创建 GitHub Release
+    needs: build-and-publish
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载构建产物
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: 生成发布说明
+        id: release_notes
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          cat > release_body.md << 'RELEOF'
+          ## 段言（Duan）v6.0.0 正式发布！
+
+          经过三个月的密集开发，段言从 v5.5.0 推进到 v6.0.0 正式发布。这是段言迄今为止最重要的版本，标志着从「功能完整」到「生产就绪」的跨越。
+
+          ### 三大里程碑
+
+          1. **核心语言特性全部就绪** — 异常处理、模式匹配、异步/协程、装饰器、上下文管理器
+          2. **生态体系自闭环** — Web 框架、包注册中心、示例项目、自举编译器、AI 数据集
+          3. **社区与文档启航** — 英文文档、技术博客、GitHub Discussions、迁移指南
+
+          ### 安装
+
+          ```bash
+          pip install duan==$VERSION
+          ```
+
+          ### 完整更新日志
+
+          请参阅 [CHANGELOG.md](CHANGELOG.md) 和 [RELEASE_NOTES.md](docs/RELEASE_NOTES.md) 获取完整变更列表。
+          RELEOF
+
+          echo "body<<BODYEOF" >> $GITHUB_OUTPUT
+          cat release_body.md >> $GITHUB_OUTPUT
+          echo "BODYEOF" >> $GITHUB_OUTPUT
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: 段言 ${{ github.ref_name }}
+          body: ${{ steps.release_notes.outputs.body }}
+          files: dist/*
+          draft: false
+          prerelease: false
+          generate_release_notes: false

@@ -1,6 +1,6 @@
 # Getting Started with Duan
 
-> **Version:** v5.5.0
+> **Version:** v6.0
 > **Last updated:** 2026-08-07
 
 ---
@@ -201,8 +201,95 @@ Functions with default parameters:
 
 ```段言
 设 名字 为 "段言"
-设 版本 为 5.5
+设 版本 为 6.0
 打印(f"语言：{名字}，版本：{版本}")
+```
+
+### Pattern Matching
+
+```段言
+匹配 值：
+    情况 1：
+        打印("一")
+    情况 2, 3：
+        打印("二或三")
+    默认：
+        打印("其他")
+```
+
+### Async/Await
+
+```段言
+异步 段落 获取数据 接收 url：
+    返回 等待 请求(url)
+
+异步 范围：
+    任务 数据 为 获取数据("https://api.example.com")
+    任务 更多 为 获取数据("https://api.example.com/more")
+    等待 全部(数据, 更多)
+```
+
+### Context Managers
+
+```段言
+使用 打开文件("test.txt") 为 文件：
+    设 内容 为 文件.读取()
+    打印 内容
+```
+
+### Lambda Expressions
+
+```段言
+设 加倍 为 参数 x => x * 2
+打印 加倍(5)  # Output: 10
+
+# With list operations
+设 数字 为 [1, 2, 3, 4, 5]
+设 加倍后 为 映射(数字, 参数 x => x * 2)
+```
+
+### List Comprehensions
+
+```段言
+# Basic list comprehension
+设 平方数 为 [x * x 遍历 x 之 范围(1, 6)]
+打印 平方数  # [1, 4, 9, 16, 25]
+
+# With condition
+设 偶数 为 [x 遍历 x 之 范围(1, 11) 若 x % 2 == 0]
+打印 偶数  # [2, 4, 6, 8, 10]
+```
+
+### Pipeline Operator
+
+```段言
+设 结果 为 数据 |> 过滤 |> 映射 |> 归约
+```
+
+### Type Annotations (v6.0)
+
+```段言
+段落 加法 接收 a:整数, b:整数 返回 整数：
+    返回 a + b
+```
+
+### Nullable Types (v6.0)
+
+```段言
+设 可能为空 为 可空("hello")
+如果 可能为空 不是 空：
+    打印 安全展开(可能为空)
+```
+
+### Interfaces & Protocols (v6.0)
+
+```段言
+协议 可打印：
+    段落 打印 接收：
+
+类 文档 实现 可打印：
+    段落 打印 接收：
+        打印("文档内容")
 ```
 
 ### Exception Handling

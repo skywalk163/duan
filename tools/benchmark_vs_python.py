@@ -48,12 +48,13 @@ def run_duan_code(source_code: str) -> str:
     return '\n'.join(output_lines)
 
 
-def time_python(func, *args, **kwargs):
-    """测量 Python 函数执行时间"""
+def time_python(code):
+    """测量 Python 代码执行时间"""
+    namespace = {}
     start = time.perf_counter()
-    result = func(*args, **kwargs)
+    exec(code, namespace)
     elapsed = time.perf_counter() - start
-    return result, elapsed
+    return namespace, elapsed
 
 
 def time_duan(code_template: str, iterations: int = 1) -> float:
@@ -292,6 +293,261 @@ DUAN_STR_CODE = """
 """
 
 
+# ===== 基准测试 8: 矩阵乘法 (CPU密集型) =====
+
+PY_MATRIX_CODE = """
+def matrix_mul(n):
+    A = [[i * n + j for j in range(n)] for i in range(n)]
+    B = [[j * n + i for j in range(n)] for i in range(n)]
+    C = [[0] * n for _ in range(n)]
+    for i in range(n):
+        for j in range(n):
+            s = 0
+            for k in range(n):
+                s += A[i][k] * B[k][j]
+            C[i][j] = s
+    return C
+
+matrix_mul(50)
+"""
+
+DUAN_MATRIX_CODE = """
+段落 矩阵乘法 接收 n：
+  设 A 为 []。
+  设 i 为 0。
+  当 i 小于 n：
+    设 行 为 []。
+    设 j 为 0。
+    当 j 小于 n：
+      列表追加(行, i * n + j)。
+      j 为 j + 1。
+    列表追加(A, 行)。
+    i 为 i + 1。
+
+  设 B 为 []。
+  设 i 为 0。
+  当 i 小于 n：
+    设 行 为 []。
+    设 j 为 0。
+    当 j 小于 n：
+      列表追加(行, j * n + i)。
+      j 为 j + 1。
+    列表追加(B, 行)。
+    i 为 i + 1。
+
+  设 C 为 []。
+  设 i 为 0。
+  当 i 小于 n：
+    设 行 为 []。
+    设 j 为 0。
+    当 j 小于 n：
+      列表追加(行, 0)。
+      j 为 j + 1。
+    列表追加(C, 行)。
+    i 为 i + 1。
+
+  设 i 为 0。
+  当 i 小于 n：
+    设 j 为 0。
+    当 j 小于 n：
+      设 s 为 0。
+      设 k 为 0。
+      当 k 小于 n：
+        s 为 s + A[i][k] * B[k][j]。
+        k 为 k + 1。
+      C[i][j] 为 s。
+      j 为 j + 1。
+    i 为 i + 1。
+  返回 C。
+
+矩阵乘法(30)。
+"""
+
+
+# ===== 基准测试 9: 快速排序 (CPU密集型) =====
+
+PY_QUICKSORT_CODE = """
+def quicksort(arr):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[0]
+    left = [x for x in arr[1:] if x <= pivot]
+    right = [x for x in arr[1:] if x > pivot]
+    return quicksort(left) + [pivot] + quicksort(right)
+
+import random
+data = [random.randint(0, 10000) for _ in range(5000)]
+quicksort(data)
+"""
+
+DUAN_QUICKSORT_CODE = """
+段落 快速排序 接收 数组：
+  如果 列表长度(数组) 小于等于 1：
+    返回 数组。
+  设 基准 为 数组[0]。
+  设 左 为 []。
+  设 右 为 []。
+  设 i 为 1。
+  当 i 小于 列表长度(数组)：
+    如果 数组[i] 小于等于 基准：
+      列表追加(左, 数组[i])。
+    否则：
+      列表追加(右, 数组[i])。
+    i 为 i + 1。
+  返回 合并列表(快速排序(左), 合并列表([基准], 快速排序(右)))。
+
+段落 合并列表 接收 a, b：
+  设 结果 为 []。
+  设 i 为 0。
+  当 i 小于 列表长度(a)：
+    列表追加(结果, a[i])。
+    i 为 i + 1。
+  设 i 为 0。
+  当 i 小于 列表长度(b)：
+    列表追加(结果, b[i])。
+    i 为 i + 1。
+  返回 结果。
+
+设 数据 为 []。
+设 i 为 0。
+当 i 小于 1000：
+  列表追加(数据, (i * 7 + 3) % 1000)。
+  i 为 i + 1。
+
+快速排序(数据)。
+"""
+
+
+# ===== 基准测试 10: JSON 序列化/解析 (IO密集型模拟) =====
+
+PY_JSON_CODE = """
+import json
+data = {"users": [{"id": i, "name": f"user_{i}", "scores": [i * j for j in range(5)]} for i in range(100)]}
+for _ in range(20):
+    s = json.dumps(data, ensure_ascii=False)
+    d = json.loads(s)
+"""
+
+DUAN_JSON_CODE = """
+设 数据 为 {}。
+设 用户列表 为 []。
+设 i 为 0。
+当 i 小于 50：
+  设 用户 为 {}。
+  用户["id"] 为 i。
+  用户["name"] 为 "user_" + 转字符串(i)。
+  设 分数 为 []。
+  设 j 为 0。
+  当 j 小于 5：
+    列表追加(分数, i * j)。
+    j 为 j + 1。
+  用户["scores"] 为 分数。
+  列表追加(用户列表, 用户)。
+  i 为 i + 1。
+数据["users"] 为 用户列表。
+
+设 i 为 0。
+当 i 小于 5：
+  设 s 为 序列化JSON(数据)。
+  设 d 为 解析JSON(s)。
+  i 为 i + 1。
+"""
+
+
+# ===== 基准测试 11: 文件 I/O (IO密集型模拟) =====
+
+PY_FILEIO_CODE = """
+import tempfile, os
+content = "\\n".join(f"line_{i}" for i in range(10000))
+tmpdir = tempfile.mkdtemp()
+for _ in range(5):
+    path = os.path.join(tmpdir, f"test_{_}.txt")
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(content)
+    with open(path, 'r', encoding='utf-8') as f:
+        data = f.read()
+"""
+
+DUAN_FILEIO_CODE = """
+段落 文件IO 接收：
+  设 内容 为 ""。
+  设 i 为 0。
+  当 i 小于 1000：
+    内容 为 内容 + "line_" + 转字符串(i) + "\\n"。
+    i 为 i + 1。
+
+  设 i 为 0。
+  当 i 小于 3：
+    写入文件("_benchmark_temp_" + 转字符串(i) + ".txt", 内容)。
+    设 读取 为 读取文件("_benchmark_temp_" + 转字符串(i) + ".txt")。
+    i 为 i + 1。
+
+文件IO()。
+"""
+
+
+# ===== 基准测试 12: 大列表拼接 (内存操作) =====
+
+PY_LIST_CONCAT_CODE = """
+def list_concat():
+    result = []
+    for i in range(100):
+        result.extend([i] * 100)
+    return len(result)
+
+list_concat()
+"""
+
+DUAN_LIST_CONCAT_CODE = """
+段落 列表拼接：
+  设 结果 为 []。
+  设 i 为 0。
+  当 i 小于 50：
+    设 j 为 0。
+    当 j 小于 50：
+      列表追加(结果, i)。
+      j 为 j + 1。
+    i 为 i + 1。
+  返回 列表长度(结果)。
+
+列表拼接()。
+"""
+
+
+# ===== 基准测试 13: 字典操作 (内存操作) =====
+
+PY_DICT_CODE = """
+def dict_ops():
+    d = {}
+    for i in range(10000):
+        d[f"key_{i}"] = i
+    total = 0
+    for i in range(5000):
+        total += d.get(f"key_{i}", 0)
+    return total
+
+dict_ops()
+"""
+
+DUAN_DICT_CODE = """
+段落 字典操作：
+  设 d 为 {}。
+  设 i 为 0。
+  当 i 小于 2000：
+    d["key_" + 转字符串(i)] 为 i。
+    i 为 i + 1。
+  设 总和 为 0。
+  设 i 为 0。
+  当 i 小于 1000：
+    如果 字典包含键(d, "key_" + 转字符串(i))：
+      总和 为 总和 + d["key_" + 转字符串(i)]。
+    i 为 i + 1。
+  返回 总和。
+
+字典操作()。
+"""
+
+
 def run_benchmark(name: str, py_code: str, duan_code: str,
                   py_iterations: int = 3, duan_iterations: int = 1):
     """运行单次基准测试，返回 (name, python_time, duan_time, ratio)"""
@@ -300,7 +556,7 @@ def run_benchmark(name: str, py_code: str, duan_code: str,
     # Python 基准
     py_times = []
     for _ in range(py_iterations):
-        _, t = time_python(exec, py_code)
+        _, t = time_python(py_code)
         py_times.append(t)
     py_avg = sum(py_times) / len(py_times)
 
@@ -373,6 +629,23 @@ def generate_report(results: list, output_path: str):
         lines.append(f"- **{len(results) - len(valid_ratios)}** 项测试失败")
         lines.append(f"- 段言平均执行时间为 Python 的 **{avg_ratio:.2f} 倍**")
         lines.append("")
+
+        # 按场景分类
+        lines.append("### 按场景分类")
+        lines.append("")
+        lines.append("| 场景分类 | 测试项 | 平均比率 |")
+        lines.append("|---------|-------|---------|")
+        cpu_tests = [r for r in results if 'CPU密集型' in r[0] or r[0] in ['斐波那契数列 (n=30)', '素数筛法 (n=10000)', '冒泡排序 (n=200)', '阶乘计算 (n=100)', '汉诺塔 (n=15)', '矩阵乘法 (30x30)', '快速排序 (n=1000)']]
+        io_tests = [r for r in results if 'IO密集型' in r[0] or r[0] in ['JSON 序列化/解析', '文件 I/O 读写']]
+        mem_tests = [r for r in results if '内存操作' in r[0] or r[0] in ['列表操作 (1000次)', '字符串操作 (200次)', '大列表拼接 (2500元素)', '字典操作 (2000键值)']]
+        for cat, tests, label in [('CPU 密集型', cpu_tests, 'CPU'), ('IO 密集型', io_tests, 'IO'), ('内存操作', mem_tests, '内存')]:
+            valid = [r[3] for r in tests if r[3] is not None]
+            if valid:
+                avg = sum(valid) / len(valid)
+                names = ', '.join(r[0] for r in tests)
+                lines.append(f"| {label} | {names} | {avg:.2f}x |")
+        lines.append("")
+
         lines.append("> 注：段言目前通过 SRC 后端解释执行（编译为 Python 字节码再运行），")
         lines.append("> 性能差距主要来源于解释执行的开销。未来 LLVM 后端完成后将大幅提升性能。")
         lines.append("")
@@ -397,6 +670,12 @@ def main():
         ("汉诺塔 (n=15)", PY_HANOI_CODE, DUAN_HANOI_CODE, 3, 1),
         ("列表操作 (1000次)", PY_LIST_OPS_CODE, DUAN_LIST_OPS_CODE, 3, 1),
         ("字符串操作 (200次)", PY_STR_CODE, DUAN_STR_CODE, 3, 1),
+        ("矩阵乘法 (30x30)", PY_MATRIX_CODE, DUAN_MATRIX_CODE, 3, 1),
+        ("快速排序 (n=1000)", PY_QUICKSORT_CODE, DUAN_QUICKSORT_CODE, 3, 1),
+        ("JSON 序列化/解析", PY_JSON_CODE, DUAN_JSON_CODE, 3, 1),
+        ("文件 I/O 读写", PY_FILEIO_CODE, DUAN_FILEIO_CODE, 3, 1),
+        ("大列表拼接 (2500元素)", PY_LIST_CONCAT_CODE, DUAN_LIST_CONCAT_CODE, 3, 1),
+        ("字典操作 (2000键值)", PY_DICT_CODE, DUAN_DICT_CODE, 3, 1),
     ]
 
     results = []
@@ -407,6 +686,13 @@ def main():
         except Exception as e:
             print(f"  基准测试失败 [{name}]: {e}")
             results.append((name, 0, 0, None))
+
+    # 清理临时文件
+    for f in Path('.').glob('_benchmark_temp_*.txt'):
+        try:
+            f.unlink()
+        except Exception:
+            pass
 
     # 生成报告
     output_path = PROJECT_DIR / 'docs' / '性能基准_vs_Python.md'

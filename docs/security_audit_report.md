@@ -1,7 +1,7 @@
 # 安全审计报告
 
-**审计日期**: 2026-08-06  
-**项目**: 段言 (Duan) v5.0.0  
+**审计日期**: 2026-08-07  
+**项目**: 段言 (Duan) v6.0.0  
 **审计范围**: 源代码、依赖声明、配置文件、Web 服务
 
 ---
@@ -38,11 +38,7 @@
 
 **说明**: 该文件位于 gitignored 目录（`.gitignore` 第 198 行 `tools/ai_copilot/remote_*.py`），不会进入版本控制。但硬盘上仍存在明文凭据，建议删除或改为读取环境变量。
 
-### 2.2 已修复：历史硬编码凭据
-
-之前 18 个 SSH 脚本的硬编码凭据问题已在 v4.0 阶段通过 `ssh_config.py` + `.env` 模式修复，相关脚本已归档。
-
-### 2.3 无风险：环境变量引用
+### 2.2 无风险：环境变量引用
 
 以下文件通过环境变量读取凭据，为正确做法：
 
@@ -50,9 +46,13 @@
 - `tools/ai_copilot/diagnose_gguf.py`～`diagnose_gguf3.py`: `PASS = SSH_PASS_DUMATE2`（从环境变量导入）
 - `tools/ai_copilot/deploy_remote.py`: `PASS = SSH_PASS_DUMATE`（从环境变量导入）
 
-### 2.4 无风险：URL 解析中的 password 参数
+### 2.3 无风险：URL 解析中的 password 参数
 
 `stdlib/duanpub/邮件.py`、`stdlib/duanpub/URL解析.py` 中的 `password` 参数为正常库函数参数，用于运行时配置，非硬编码凭据。
+
+### 2.4 无风险：密码校验函数
+
+`contrib/随机数据.py` 中的 `password` 变量为随机密码生成器输出，`generate_v7_samples.py` 中的 `validate_password` 为密码校验函数示例，均为正常功能代码。
 
 ---
 
@@ -96,12 +96,12 @@
 
 | 文件 | 端点/函数 | 风险 | 状态 |
 |------|-----------|------|------|
-| `playground/server.py:874` | `GET /api/projects/<name>/files/<path:filepath>` | 未对 `filepath` 做 `../` 过滤 | 🟡 中风险 |
-| `playground/server.py:889` | `PUT /api/projects/<name>/files/<path:filepath>` | 已做 `replace('/','_')` 处理 | 🟢 安全 |
-| `playground/server.py:908` | `POST /api/projects/<name>/files` | 已做 `replace('/','_')` 处理 | 🟢 安全 |
+| `playground/server.py:872` | `GET /api/projects/<name>/files/<path:filepath>` | 已添加 `filepath` 的 `../` 过滤 | ✅ 已修复 |
+| `playground/server.py:885` | `PUT /api/projects/<name>/files/<path:filepath>` | 已做 `replace('/','_')` 处理 | 🟢 安全 |
+| `playground/server.py:898` | `POST /api/projects/<name>/files` | 已做 `replace('/','_')` 处理 | 🟢 安全 |
 | `playground/server.py:673` | `_get_project_dir()` | 已做 `..` 替换 | 🟢 安全 |
 
-**结论**: `get_project_file` 端点缺少对 `filepath` 参数的路径遍历防护，与其他端点行为不一致。建议添加 `replace('..', '_')` 处理。
+**结论**: 所有端点均已添加路径遍历防护，✅ 全部修复。
 
 ### 3.5 反序列化安全
 
@@ -125,16 +125,15 @@
 
 | 严重程度 | 问题数 | 说明 |
 |----------|--------|------|
-| 🔴 高 | 1 | 硬编码 SSH 凭据在 gitignored 文件中残留 |
-| 🟡 中 | 1 | `get_project_file` 端点缺少路径遍历防护 |
+| 🔴 高 | 1 | 硬编码 SSH 凭据在 gitignored 文件中残留（已有 gitignore 保护，建议进一步清理） |
+| 🟡 中 | 0 | ✅ 路径遍历问题已在 v6.0.0 中修复 |
 | 🟢 低 | 2 | `shell=True` 在 `contrib/进程.py` 中；REPL 中 eval 使用 |
 | ℹ️ 信息 | 0 | 核心 exec/subprocess 使用属于语言实现本质需求 |
 
 ### 建议修复项（优先级排序）
 
 1. **高**: 删除 `tools/ai_copilot/remote_test_v8.py` 中的硬编码凭据，改用环境变量读取（与 `ssh_config.py` 一致）
-2. **中**: 在 `playground/server.py:874` 的 `get_project_file` 中添加 `filepath` 的 `../` 过滤
-3. **低**: 在 `contrib/进程.py` 文档字符串中添加 `shell=True` 的安全警告，提示不要在不可信输入上使用
+2. **低**: 在 `contrib/进程.py` 文档字符串中添加 `shell=True` 的安全警告，提示不要在不可信输入上使用
 
 ---
 

@@ -71,6 +71,9 @@ LSP_METHODS = {
     
     # 光标位置
     'textDocument/documentHighlight': 'textDocument/documentHighlight',
+    
+    # 语义令牌
+    'textDocument/semanticTokens/full': 'textDocument/semanticTokens/full',
 }
 
 
@@ -510,6 +513,19 @@ class DuanLanguageServer:
             'documentHighlightProvider': True,
             'signatureHelpProvider': {
                 'triggerCharacters': ['（', '(', '，', ',']
+            },
+            'semanticTokensProvider': {
+                'legend': {
+                    'tokenTypes': ['namespace', 'type', 'class', 'enum', 'interface',
+                                   'function', 'variable', 'property', 'parameter', 'keyword',
+                                   'method', 'string', 'number', 'operator', 'comment'],
+                    'tokenModifiers': ['declaration', 'definition', 'readonly', 'static',
+                                       'deprecated', 'abstract', 'async', 'modification', 'documentation']
+                },
+                'range': False,
+                'full': {
+                    'delta': False
+                }
             }
         }
         
@@ -533,6 +549,7 @@ class DuanLanguageServer:
             'textDocument/codeAction': self._handle_code_action,
             'textDocument/documentHighlight': self._handle_document_highlight,
             'textDocument/signatureHelp': self._handle_signature_help,
+            'textDocument/semanticTokens/full': self._handle_semantic_tokens_full,
         }
         
         handler = handlers.get(method)
@@ -1850,7 +1867,7 @@ class DuanLanguageServer:
         return {'changes': changes}
 
     def _handle_code_action(self, params: Dict) -> List[Dict]:
-        """处理代码操作请求（快速修复）"""
+        """处理代码操作请求（快速修复 + 重构）"""
         uri = params.get('textDocument', {}).get('uri', '')
         doc = self.doc_manager.get_document(uri)
         if not doc:
@@ -1885,13 +1902,162 @@ class DuanLanguageServer:
                         'changes': {
                             uri: [{
                                 'range': d_range,
-                                'newText': '定义 {} 等于 空。\n'.format(msg.split("'")[1] if "'" in msg else "变量")
+                                'newText': '设 {} 为 空\n'.format(msg.split("'")[1] if "'" in msg else "变量")
                             }]
                         }
                     }
                 })
 
+        # 获取选中范围 (用于重构)
+        range_info = params.get('range', {})
+        if range_info and range_info.get('start') and range_info.get('end'):
+            start_line = range_info['start'].get('line', 0)
+            end_line = range_info['end'].get('line', 0)
+            start_char = range_info['start'].get('character', 0)
+            end_char = range_info['end'].get('character', 0)
+
+            # 提取函数重构
+            if start_line < end_line or (start_line == end_line and end_char - start_char > 5):
+                selected_text = ''
+                if start_line == end_line:
+                    selected_text = doc.get_line(start_line)[start_char:end_char]
+                else:
+                    lines = []
+                    for ln in range(start_line, end_line + 1):
+                        ln_text = doc.get_line(ln)
+                        if ln == start_line:
+                            lines.append(ln_text[start_char:])
+                        elif ln == end_line:
+                            lines.append(ln_text[:end_char])
+                        else:
+                            lines.append(ln_text)
+                    selected_text = '\n'.join(lines)
+
+                if selected_text.strip():
+                    code_actions.append({
+                        'title': '提取函数 (将选中代码提取为新函数)',
+                        'kind': 'refactor.extract.function',
+                        'diagnostics': [],
+                        'command': {
+                            'title': '提取函数',
+                            'command': 'duan.extractFunction',
+                            'arguments': [uri, start_line, end_line, selected_text]
+                        }
+                    })
+
+            # 内联变量重构（选中单个变量引用时）
+            if start_line == end_line and end_char - start_char > 0:
+                word = doc.get_line(start_line)[start_char:end_char]
+                if word and word.isidentifier():
+                    code_actions.append({
+                        'title': f"内联变量 '{word}' (将变量替换为其值)",
+                        'kind': 'refactor.inline',
+                        'diagnostics': [],
+                        'command': {
+                            'title': '内联变量',
+                            'command': 'duan.inlineVariable',
+                            'arguments': [uri, word, start_line, start_char]
+                        }
+                    })
+
         return code_actions
+
+    def _handle_semantic_tokens_full(self, params: Dict) -> Dict:
+        """处理语义令牌全量请求
+
+        基于文本分析生成语义令牌，分类为：
+        - keyword: 段言关键字（设/返回/如果/遍历/当/类/段落等）
+        - function: 函数名
+        - variable: 变量名
+        - class: 类名
+        - parameter: 参数名
+        - property: 属性名
+        - number: 数字字面量
+        - string: 字符串字面量
+        - operator: 运算符
+        - comment: 注释
+        """
+        uri = params.get('textDocument', {}).get('uri', '')
+        doc = self.doc_manager.get_document(uri)
+        if not doc:
+            return {'data': []}
+
+        data = []
+        for line_idx, line_text in enumerate(doc.lines):
+            # 令牌编码: line, start_char, length, token_type, token_modifiers
+            i = 0
+            line_len = len(line_text)
+            while i < line_len:
+                ch = line_text[i]
+
+                # 跳过空白
+                if ch in (' ', '\t'):
+                    i += 1
+                    continue
+
+                # 注释：以 # 开头
+                if ch == '#':
+                    comment_end = line_len
+                    data.extend([line_idx, i, comment_end - i, 14, 0])  # comment type = 14
+                    break
+
+                # 字符串字面量
+                if ch in ('"', "'"):
+                    str_start = i
+                    i += 1
+                    while i < line_len and line_text[i] != ch:
+                        if line_text[i] == '\\':
+                            i += 1  # 跳过转义
+                        i += 1
+                    if i < line_len:
+                        i += 1  # 跳过结束引号
+                    data.extend([line_idx, str_start, i - str_start, 11, 0])  # string type = 11
+                    continue
+
+                # 数字字面量
+                if ch.isdigit() or (ch == '.' and i + 1 < line_len and line_text[i + 1].isdigit()):
+                    num_start = i
+                    while i < line_len and (line_text[i].isdigit() or line_text[i] == '.'):
+                        i += 1
+                    data.extend([line_idx, num_start, i - num_start, 12, 0])  # number type = 12
+                    continue
+
+                # 中文/字母标识符
+                if ch.isalpha() or '\u4e00' <= ch <= '\u9fff':
+                    word_start = i
+                    while i < line_len and (line_text[i].isalnum() or '\u4e00' <= line_text[i] <= '\u9fff' or line_text[i] == '_'):
+                        i += 1
+                    word = line_text[word_start:i]
+
+                    # 判断 token 类型
+                    keywords = {'设', '为', '如果', '否则', '遍历', '于', '当', '返回', '类',
+                                '段落', '协议', '构造', '属性', '己', '父', '真', '假', '空',
+                                '尝试', '捕获', '最终', '抛出', '使用', '导入', '从', '匹配',
+                                '若', '跳出', '跳过', '删除', '静态', '特性', '类方法', '异步',
+                                '等待', '全局', '非局部', '产出', '断言', '空操作', '继承', '实现'}
+                    if word in keywords:
+                        data.extend([line_idx, word_start, i - word_start, 9, 0])  # keyword type = 9
+                    elif word[0].isupper() if word[0].isascii() else False:
+                        # 大写开头的英文词 → class/type
+                        data.extend([line_idx, word_start, i - word_start, 2, 0])  # class type = 2
+                    else:
+                        # 默认作为 variable
+                        data.extend([line_idx, word_start, i - word_start, 6, 0])  # variable type = 6
+                    continue
+
+                # 运算符
+                operators = {'+', '-', '*', '/', '%', '=', '>', '<', '!', '&', '|', '^', '~'}
+                if ch in operators:
+                    op_start = i
+                    while i < line_len and line_text[i] in operators:
+                        i += 1
+                    data.extend([line_idx, op_start, i - op_start, 13, 0])  # operator type = 13
+                    continue
+
+                # 其他字符（标点等）
+                i += 1
+
+        return {'data': data}
 
     def _handle_did_open(self, params: Dict):
         """处理文档打开"""

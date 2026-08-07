@@ -476,6 +476,10 @@ class UnifiedCodeGenerator:
         elif is_instance(stmt, 'DecoratorDefinition'):
             self._generate_decorator(stmt)
         
+        # 装饰器链（多个装饰器 + 函数）
+        elif is_instance(stmt, 'DecoratedFunction'):
+            self._generate_decorated_function_unified(stmt)
+        
         # 导入语句
         elif is_instance(stmt, 'ImportStatement') or is_instance(stmt, 'ImportStmt'):
             self._generate_import_stmt(stmt)
@@ -738,12 +742,28 @@ class UnifiedCodeGenerator:
     
     def _generate_with_stmt(self, stmt):
         """生成上下文管理器语句：使用 表达式 作为 变量：...结束。"""
-        context_expr = self._generate_expr(stmt.context_expr)
-        if hasattr(stmt, 'variable') and stmt.variable:
-            var = self._sanitize_name(stmt.variable)
-            self._add_line(f"with {context_expr} as {var}:")
+        prefix = "async " if hasattr(stmt, 'is_async') and stmt.is_async else ""
+        
+        # 检查是否有多个上下文管理器
+        items = getattr(stmt, 'items', None)
+        if items and len(items) > 1:
+            parts = []
+            for expr, var in items:
+                expr_str = self._generate_expr(expr)
+                if var:
+                    var_name = self._sanitize_name(var)
+                    parts.append(f"{expr_str} as {var_name}")
+                else:
+                    parts.append(expr_str)
+            context_str = ', '.join(parts)
+            self._add_line(f"{prefix}with {context_str}:")
         else:
-            self._add_line(f"with {context_expr}:")
+            context_expr = self._generate_expr(stmt.context_expr)
+            if hasattr(stmt, 'variable') and stmt.variable:
+                var = self._sanitize_name(stmt.variable)
+                self._add_line(f"{prefix}with {context_expr} as {var}:")
+            else:
+                self._add_line(f"{prefix}with {context_expr}:")
         
         self.indent_level += 1
         if hasattr(stmt, 'body') and stmt.body:
@@ -806,6 +826,27 @@ class UnifiedCodeGenerator:
         # 再生成被装饰的段落
         if hasattr(stmt, 'paragraph') and stmt.paragraph:
             self._generate_segment(stmt.paragraph)
+    
+    def _generate_decorated_function_unified(self, stmt):
+        """生成装饰器链（多个装饰器 + 函数定义）"""
+        for decorator_info in getattr(stmt, 'decorators', []):
+            decorator_name = self._sanitize_name(decorator_info.name)
+            decorator_args = getattr(decorator_info, 'args', None)
+            if decorator_args:
+                args_parts = []
+                for a in decorator_args:
+                    if hasattr(a, 'name'):
+                        args_parts.append(f"{a.name}={self._generate_expr(a.value)}")
+                    else:
+                        args_parts.append(self._generate_expr(a))
+                args_str = ', '.join(args_parts)
+                self._add_line(f"@{decorator_name}({args_str})")
+            else:
+                self._add_line(f"@{decorator_name}")
+        # 生成被装饰的函数
+        func = getattr(stmt, 'function', None)
+        if func:
+            self._generate_segment(func)
     
     def _generate_import_stmt(self, stmt):
         """生成导入语句"""

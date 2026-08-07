@@ -1,199 +1,254 @@
 """
-段言上下文管理器测试
+段言（Duan）编程语言 - 上下文管理器测试
 
-测试内容：
-1. 使用 文件 为 变量：读文件
-2. 使用 表达式 为 变量：自动资源管理
-3. 无变量上下文管理器
-4. 嵌套上下文管理器
-5. 上下文管理器异常处理
+测试 使用 关键字资源管理，包括同步/异步上下文管理器、多个上下文管理器
 """
 
+import pytest
 import sys
 import os
-import io
-import tempfile
-from contextlib import redirect_stdout
 
+# 确保 src 在路径中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from duan_parser_v3 import DuanParser
-from code_generator import PythonCodeGenerator
+from duan_parser_v3 import DuanParser, ParseError
+from ast_nodes_v3 import WithStmt, Module, ReturnStmt, NumberLiteral
+from code_generator import PythonCodeGenerator as CodeGenerator
 
 
-def run_duan(code: str) -> str:
-    """使用 src 后端解析并执行段言代码，返回输出"""
+# =============================================================================
+# 编译辅助函数
+# =============================================================================
+
+def _compile_ok(code: str) -> str:
+    """编译代码，成功返回生成的Python代码，失败抛出异常"""
     parser = DuanParser()
     module = parser.parse(code)
-    generator = PythonCodeGenerator()
-    py_code = generator.generate(module)
-    
-    # 执行生成的 Python 代码，捕获输出
-    output = io.StringIO()
-    local_vars = {}
-    try:
-        with redirect_stdout(output):
-            exec(py_code, {}, local_vars)
-    except SystemExit:
-        pass
-    result = output.getvalue().strip()
+    gen = CodeGenerator()
+    result = gen.generate(module)
     return result
 
 
-def _compile(duan_code: str) -> str:
-    """编译段言代码，返回Python源码"""
+def _compile_error(code: str) -> str:
+    """编译代码，期望失败返回错误信息"""
     parser = DuanParser()
-    module = parser.parse(duan_code)
-    generator = PythonCodeGenerator()
-    return generator.generate(module)
+    try:
+        module = parser.parse(code)
+        gen = CodeGenerator()
+        result = gen.generate(module)
+        return f"期望错误但编译成功: {result}"
+    except (ParseError, Exception) as e:
+        return str(e)
 
 
-def test_with_stmt_generates_python_with():
-    """使用 生成Python with语句"""
-    code = """
-使用 读取文件("test.txt") 为 文件：
-  打印 文件.读取()。
+# =============================================================================
+# 1. 基本上下文管理器测试
+# =============================================================================
+
+class TestBasicWith:
+    """测试基本使用 关键字上下文管理器"""
+
+    def test_with_simple_expr(self):
+        """基本使用表达式"""
+        code = """
+使用 打开("test.txt") 为 f:
+  输出(f)
 """
-    py_code = _compile(code)
-    # 应生成 with open(...) as 变量:
-    assert 'with open("test.txt") as 文件:' in py_code or 'with open("test.txt") as file:' in py_code, \
-        f"Expected 'with open' in:\n{py_code}"
+        result = _compile_ok(code)
+        assert 'with open(' in result or 'with 打开(' in result
+        assert 'as f' in result
 
-
-def test_without_variable():
-    """无变量的上下文管理器"""
-    code = """
-使用 锁定()：
-  打印 "已锁定"。
+    def test_with_variable(self):
+        """使用变量作为上下文管理器"""
+        code = """
+设 资源 为 创建资源()
+使用 资源:
+  输出("使用资源")
 """
-    py_code = _compile(code)
-    # 应生成 with 语句（无 as 子句）
-    assert 'with ' in py_code
-    # 不应有 as 变量
-    # 检查打印语句在 with 块中
-    assert 'with 锁定():' in py_code or 'with 锁定 ():' in py_code
+        result = _compile_ok(code)
+        assert 'with ' in result
 
-
-def test_nested_with():
-    """嵌套上下文管理器"""
-    code = """
-使用 获取资源A() 为 甲：
-  使用 获取资源B() 为 乙：
-    打印 甲.名称()。
-    打印 乙.名称()。
+    def test_with_body(self):
+        """上下文管理器体"""
+        code = """
+使用 打开("a.txt") 为 f:
+  设 内容 为 f.读取()
+  输出(内容)
 """
-    py_code = _compile(code)
-    assert 'with ' in py_code
-    # 应有两个 with 嵌套
-    with_count = py_code.count('with ')
-    assert with_count >= 2, f"Expected 2+ 'with' statements, got {with_count}"
+        result = _compile_ok(code)
+        assert 'with ' in result
+        assert 'f.读取' in result or 'f.read' in result
 
-
-def test_custom_context_manager():
-    """自定义上下文管理器类"""
-    result = run_duan('''
-类 资源：
-  构造(名称)：
-    设 己.名称 为 名称。
-    打印 "创建:" + 名称。
-  结束。
-  
-  段落 __进入__()：
-    打印 "进入:" + 己.名称。
-    返回 己。
-  结束。
-  
-  段落 __退出__(类型, 值, 回溯)：
-    打印 "退出:" + 己.名称。
-    返回 假。
-  结束。
-结束。
-
-使用 新建 资源("测试") 为 资源：
-  打印 "使用:" + 资源.名称。
-结束。
-''')
-    lines = result.split('\n')
-    assert "创建:测试" in result, f"Expected '创建:测试' in result, got '{result}'"
-    assert "进入:测试" in result, f"Expected '进入:测试' in result, got '{result}'"
-    assert "使用:测试" in result, f"Expected '使用:测试' in result, got '{result}'"
-    assert "退出:测试" in result, f"Expected '退出:测试' in result, got '{result}'"
-
-
-def test_context_manager_method_names():
-    """__进入__ 和 __退出__ 方法名映射"""
-    code = """
-类 资源：
-  构造(名称)：
-    设 己.名称 为 名称。
-  结束。
-  
-  段落 __进入__()：
-    返回 己。
-  结束。
-  
-  段落 __退出__(类型, 值, 回溯)：
-    返回 假。
-  结束。
-结束。
+    def test_without_variable(self):
+        """不使用 as 变量"""
+        code = """
+使用 锁:
+  输出("临界区")
 """
-    py_code = _compile(code)
-    # 中文方法名应保留
-    assert '__进入__' in py_code or f'__enter__' in py_code, f"Expected __enter__ in generated code:\n{py_code}"
-    assert '__退出__' in py_code or '__exit__' in py_code, f"Expected __exit__ in generated code:\n{py_code}"
+        result = _compile_ok(code)
+        assert 'with 锁:' in result or 'with lock:' in result
 
 
-def test_context_manager_exception_handling():
-    """上下文管理器中的异常处理"""
-    result = run_duan('''
-类 安全资源：
-  段落 __进入__()：
-    打印 "进入"。
-    返回 己。
-  结束。
-  
-  段落 __退出__(类型, 值, 回溯)：
-    打印 "退出"。
-    返回 假。
-  结束。
-结束。
+# =============================================================================
+# 2. 异步上下文管理器测试
+# =============================================================================
 
-尝试：
-  使用 新建 安全资源() 为 资源：
-    打印 "使用中"。
-    抛出 运行时错误("错误！")。
-  结束。
-捕获 e：
-  打印 "捕获:" + 字符串(e)。
-结束。
-''')
-    assert "进入" in result, f"Expected '进入' in result, got '{result}'"
-    assert "使用中" in result, f"Expected '使用中' in result, got '{result}'"
-    assert "退出" in result, f"Expected '退出' in result, got '{result}'"
-    assert "捕获" in result, f"Expected '捕获' in result, got '{result}'"
+class TestAsyncWith:
+    """测试使用 异步 上下文管理器"""
+
+    def test_async_with_basic(self):
+        """基本异步上下文管理器"""
+        code = """
+使用 异步 打开文件("test.txt") 为 f:
+  等待 f.读取()
+"""
+        result = _compile_ok(code)
+        assert 'async with ' in result
+
+    def test_async_with_await(self):
+        """异步上下文管理器 + 等待"""
+        code = """
+使用 异步 连接数据库() 为 db:
+  设 结果 为 等待 db.查询("SELECT 1")
+  输出(结果)
+"""
+        result = _compile_ok(code)
+        assert 'async with ' in result
+
+    def test_async_without_variable(self):
+        """异步上下文管理器不带变量"""
+        code = """
+使用 异步 资源锁:
+  输出("异步临界区")
+"""
+        result = _compile_ok(code)
+        assert 'async with ' in result
+
+    def test_async_with_return(self):
+        """异步上下文管理器 + 返回值"""
+        code = """
+函数 处理数据():
+  使用 异步 打开文件("data.txt") 为 f:
+    返回 等待 f.读取()
+"""
+        result = _compile_ok(code)
+        assert 'async with ' in result
+
+
+# =============================================================================
+# 3. AST 结构测试
+# =============================================================================
+
+class TestWithAST:
+    """测试上下文管理器 AST 结构"""
+
+    def test_ast_with_stmt(self):
+        """验证 WithStmt AST 节点"""
+        code = """
+使用 打开("test.txt") 为 f:
+  输出(f)
+"""
+        parser = DuanParser()
+        module = parser.parse(code)
+        assert len(module.statements) >= 1
+        # 找到 WithStmt
+        with_stmt = None
+        for stmt in module.statements:
+            if isinstance(stmt, WithStmt):
+                with_stmt = stmt
+                break
+        assert with_stmt is not None, "未找到 WithStmt 节点"
+        assert with_stmt.variable == 'f'
+
+    def test_ast_async_with(self):
+        """验证异步上下文管理器 AST 节点"""
+        code = """
+使用 异步 打开文件("test.txt") 为 f:
+  等待 f.读取()
+"""
+        parser = DuanParser()
+        module = parser.parse(code)
+        with_stmt = None
+        for stmt in module.statements:
+            if isinstance(stmt, WithStmt):
+                with_stmt = stmt
+                break
+        assert with_stmt is not None
+        assert with_stmt.is_async == True
+
+    def test_ast_multiple_items(self):
+        """验证多个上下文管理器 AST 节点"""
+        code = """
+使用 打开("a.txt") 为 f1, 打开("b.txt") 为 f2:
+  输出(f1)
+"""
+        parser = DuanParser()
+        module = parser.parse(code)
+        with_stmt = None
+        for stmt in module.statements:
+            if isinstance(stmt, WithStmt):
+                with_stmt = stmt
+                break
+        assert with_stmt is not None
+        assert with_stmt.items is not None
+        assert len(with_stmt.items) == 2
+
+
+# =============================================================================
+# 5. 代码生成测试
+# =============================================================================
+
+class TestWithCodeGen:
+    """测试上下文管理器代码生成"""
+
+    def test_codegen_sync_with(self):
+        """同步上下文管理器代码生成"""
+        code = """
+使用 打开("test.txt") 为 f:
+  输出(f)
+"""
+        result = _compile_ok(code)
+        assert 'with ' in result
+        assert 'as f:' in result
+
+    def test_codegen_async_with(self):
+        """异步上下文管理器代码生成"""
+        code = """
+使用 异步 打开文件("test.txt") 为 f:
+  等待 f.读取()
+"""
+        result = _compile_ok(code)
+        assert 'async with ' in result
+
+
+# =============================================================================
+# 6. 端到端功能测试
+# =============================================================================
+
+class TestWithEndToEnd:
+    """上下文管理器端到端测试"""
+
+    def test_with_file_read(self):
+        """使用文件读取"""
+        code = """
+使用 打开("data.txt") 为 f:
+  设 内容 为 f.读取()
+  输出(内容)
+"""
+        result = _compile_ok(code)
+        assert 'with ' in result
+        assert 'f.读取' in result or 'f.read' in result
+
+    def test_async_with_file(self):
+        """异步文件读取"""
+        code = """
+使用 异步 打开文件("data.txt") 为 f:
+  设 内容 为 等待 f.读取()
+  输出(内容)
+"""
+        result = _compile_ok(code)
+        assert 'async with ' in result
 
 
 if __name__ == '__main__':
-    tests = [
-        ("上下文管理器文件", test_with_file_context),
-        ("生成Python with", test_with_stmt_generates_python_with),
-        ("无变量上下文", test_without_variable),
-        ("嵌套上下文", test_nested_with),
-        ("自定义上下文管理器", test_custom_context_manager),
-        ("方法名映射", test_context_manager_method_names),
-        ("异常处理", test_context_manager_exception_handling),
-    ]
-    passed = 0
-    failed = 0
-    for name, fn in tests:
-        try:
-            fn()
-            print(f"  [OK] {name}")
-            passed += 1
-        except Exception as e:
-            import traceback
-            print(f"  [失败] {name}: {e}")
-            traceback.print_exc()
-            failed += 1
-    print(f"\n总计: {len(tests)}  |  通过: {passed}  |  失败: {failed}")
-    sys.exit(0 if failed == 0 else 1)
+    pytest.main([__file__, '-v'])

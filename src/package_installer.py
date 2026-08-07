@@ -865,6 +865,104 @@ class PackageInstaller:
 
         return results
 
+    def remote_search(self, keyword: str, registry_url: Optional[str] = None) -> List[Dict]:
+        """从远程注册中心搜索段件
+
+        Args:
+            keyword: 搜索关键词
+            registry_url: 远程注册中心 URL，默认使用 self.registry_url
+
+        Returns:
+            匹配的包信息列表
+        """
+        url = registry_url or self.registry_url
+        if not url:
+            print("提示: 未配置远程注册中心 URL，使用 --registry-url 指定")
+            # 回退到本地搜索
+            results = self.search(keyword)
+            return [{'name': r.name, 'version': r.version, 'description': r.description,
+                     'keywords': r.keywords} for r in results]
+
+        try:
+            # 拼接搜索 URL
+            from urllib.parse import urljoin, quote
+            search_url = urljoin(url.rstrip('/') + '/', 'api/v1/search')
+            search_url = f"{search_url}?q={quote(keyword)}"
+
+            req = urllib.request.Request(search_url, headers={
+                'User-Agent': 'duan-package-installer/1.0',
+                'Accept': 'application/json'
+            })
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                results = data if isinstance(data, list) else data.get('results', [])
+                if results:
+                    print(f"远程搜索找到 {len(results)} 个匹配包:")
+                    for pkg in results:
+                        desc = pkg.get('description', '')
+                        ver = pkg.get('version', '')
+                        print(f"  {pkg.get('name', '?'):20} v{ver:6}  {desc}")
+                return results
+        except Exception as e:
+            print(f"远程搜索失败: {e}")
+            print("回退到本地搜索...")
+            results = self.search(keyword)
+            return [{'name': r.name, 'version': r.version, 'description': r.description,
+                     'keywords': r.keywords} for r in results]
+
+    def install_all_dependencies(self, package_toml_path: Optional[Path] = None) -> bool:
+        """从 package.toml 自动安装所有依赖
+
+        Args:
+            package_toml_path: package.toml 文件路径，默认在项目根目录查找
+
+        Returns:
+            是否全部安装成功
+        """
+        if package_toml_path is None:
+            package_toml_path = self.project_root / 'package.toml'
+
+        if not package_toml_path.exists():
+            return True  # 没有 package.toml 视为成功
+
+        try:
+            content = package_toml_path.read_text(encoding='utf-8')
+        except Exception:
+            return True
+
+        # 解析 [dependencies] 节
+        dep_section = False
+        dependencies = {}
+        for line in content.split('\n'):
+            line = line.strip()
+            if line.startswith('['):
+                dep_section = line.strip().lower().startswith('[dependencies]')
+                continue
+            if dep_section and '=' in line:
+                parts = line.split('=', 1)
+                name = parts[0].strip().strip('"').strip("'")
+                version = parts[1].strip().strip('"').strip("'")
+                if name:
+                    dependencies[name] = version
+
+        if not dependencies:
+            print("package.toml 中没有发现依赖")
+            return True
+
+        print(f"发现 {len(dependencies)} 个依赖，开始自动安装...")
+        success = True
+        for dep_name, dep_version in dependencies.items():
+            pkg_dir = self._packages_dir / dep_name
+            if pkg_dir.exists():
+                print(f"  依赖 '{dep_name}' 已安装，跳过")
+                continue
+            print(f"  安装依赖: {dep_name} ({dep_version})")
+            if not self.install_with_deps(dep_name):
+                print(f"  警告: 依赖 '{dep_name}' 安装失败")
+                success = False
+
+        return success
+
     def list_registry(self) -> List[PackageInfo]:
         """列出注册表中所有段件"""
         packages = self._registry.get('packages', {})

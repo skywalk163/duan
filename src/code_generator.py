@@ -11,7 +11,7 @@ import ast_nodes as ast_nodes_module
 
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef, FFIPointerType, FFIArrayType, FFIAddressOf, FFIDereference, FFIPointerOffset, FFIGetLastError, FFIGetErrno
-from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock, FunctionCallExpr
+from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock, FunctionCallExpr, CatchClause, YieldStmt, AsyncScope, DecoratedFunction, DecoratorInfo
 from ast_nodes import ExpressionStatement, SegmentName
 
 
@@ -48,6 +48,9 @@ class PythonCodeGenerator:
         
         # 是否需要导入 ABC/abstractmethod
         self._needs_abc = False
+        
+        # 是否需要导入 asyncio
+        self._needs_asyncio = False
         
         # 运行时类型检查开关（默认关闭，零开销）
         self._runtime_type_check = False
@@ -474,6 +477,7 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("        _duan_builtin.包含 = lambda sub, s: sub in s")
         self._add_line("        _duan_builtin.字符串长度 = len")
+        self._add_line("        _duan_builtin.字符串获取 = lambda s, i: s[i]")
         self._add_line("        _duan_builtin.截取 = lambda s, start, end: s[start:end]")
         self._add_line("        _duan_builtin.转大写 = lambda s: s.upper()")
         self._add_line("        _duan_builtin.转小写 = lambda s: s.lower()")
@@ -517,6 +521,7 @@ class PythonCodeGenerator:
         self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("    _duan_builtin.包含 = lambda sub, s: sub in s")
         self._add_line("    _duan_builtin.字符串长度 = len")
+        self._add_line("    _duan_builtin.字符串获取 = lambda s, i: s[i]")
         self._add_line("    _duan_builtin.截取 = lambda s, start, end: s[start:end]")
         self._add_line("    _duan_builtin.转大写 = lambda s: s.upper()")
         self._add_line("    _duan_builtin.转小写 = lambda s: s.lower()")
@@ -559,6 +564,18 @@ class PythonCodeGenerator:
                     break
             self.output_lines.insert(insert_pos, "")
             self.output_lines.insert(insert_pos, abc_import)
+        
+        if self._needs_asyncio:
+            asyncio_import = "import asyncio"
+            # 插入在文件头之后，第一个语句之前
+            insert_pos = 0
+            for i, line in enumerate(self.output_lines):
+                if line.startswith("#") or line == "":
+                    insert_pos = i + 1
+                else:
+                    break
+            self.output_lines.insert(insert_pos, "")
+            self.output_lines.insert(insert_pos, asyncio_import)
         
         return self._build_output()
     
@@ -696,6 +713,9 @@ class PythonCodeGenerator:
         elif isinstance(stmt, DecoratorDefinition):
             # 装饰器定义
             self._generate_decorator_definition(stmt)
+        elif isinstance(stmt, DecoratedFunction):
+            # 装饰器链（多个装饰器 + 函数）
+            self._generate_decorated_function(stmt)
         elif isinstance(stmt, InterfaceDefinition):
             # 接口定义
             self._generate_interface_definition(stmt)
@@ -755,6 +775,16 @@ class PythonCodeGenerator:
             # 等待语句 → await expression
             inner = self._generate_expr(stmt.expression)
             self._add_line(f"await {inner}")
+        elif isinstance(stmt, YieldStmt):
+            # 生成语句 → yield expression
+            if stmt.value:
+                value = self._generate_expr(stmt.value)
+                self._add_line(f"yield {value}")
+            else:
+                self._add_line("yield")
+        elif isinstance(stmt, AsyncScope):
+            # 异步作用域（结构化并发）
+            self._generate_async_scope(stmt)
         elif type(stmt).__name__ == 'CForStmt':
             # C风格for循环
             self._generate_c_for_stmt(stmt)
@@ -1048,6 +1078,53 @@ class PythonCodeGenerator:
             else:
                 self._add_line("pass")
     
+    def _generate_catch_clause(self, catch_type, catch_var, catch_body):
+        """生成单个except块"""
+        if catch_type == '外部错误':
+            # FFI 外部错误处理
+            if catch_var:
+                self._add_line(f"except (ctypes.ArgumentError, OSError, RuntimeError) as {self._sanitize_name(catch_var)}:")
+            else:
+                self._add_line("except (ctypes.ArgumentError, OSError, RuntimeError):")
+        elif catch_type and catch_var:
+            # 捕获指定类型 + 变量：except 值错误 as 错误:
+            # 支持多类型捕获：(Type1, Type2) 格式
+            ct = self._resolve_exception_type(catch_type)
+            if ',' in ct:
+                ct = f"({ct})"
+            self._add_line(f"except {ct} as {self._sanitize_name(catch_var)}:")
+        elif catch_type:
+            # 捕获指定类型无变量：except 值错误:
+            ct = self._resolve_exception_type(catch_type)
+            if ',' in ct:
+                ct = f"({ct})"
+            self._add_line(f"except {ct}:")
+        elif catch_var:
+            # 无类型有变量（向后兼容）：except Exception as 错误:
+            self._add_line(f"except Exception as {self._sanitize_name(catch_var)}:")
+        else:
+            # 无类型无变量：except Exception:
+            self._add_line("except Exception:")
+        
+        self.indent_level += 1
+        if catch_body:
+            for s in catch_body:
+                self._generate_statement(s)
+        else:
+            self._add_line("pass")
+        self.indent_level -= 1
+
+    def _resolve_exception_type(self, type_name: str) -> str:
+        """将段言异常类型名解析为Python异常类型名"""
+        # 检查是否在异常名映射中
+        if type_name in self.exception_name_map:
+            return self.exception_name_map[type_name]
+        # 检查是否已经是Python内置异常名
+        import builtins
+        if hasattr(builtins, type_name):
+            return type_name
+        return type_name
+
     def _generate_try_stmt(self, stmt: TryStmt):
         """生成异常捕获语句"""
         # try块
@@ -1060,38 +1137,17 @@ class PythonCodeGenerator:
             self._add_line("pass")
         self.indent_level -= 1
         
-        # except块
-        if stmt.catch_body:
-            if stmt.catch_type == '外部错误':
-                # FFI 外部错误处理
-                if stmt.catch_var:
-                    self._add_line(f"except (ctypes.ArgumentError, OSError, RuntimeError) as {stmt.catch_var}:")
-                else:
-                    self._add_line("except (ctypes.ArgumentError, OSError, RuntimeError):")
-            elif stmt.catch_type and stmt.catch_var:
-                # 捕获指定类型 + 变量：except 值错误 as 错误:
-                # 支持多类型捕获：(Type1, Type2) 格式
-                ct = stmt.catch_type
-                if ',' in ct:
-                    ct = f"({ct})"
-                self._add_line(f"except {ct} as {stmt.catch_var}:")
-            elif stmt.catch_type:
-                # 捕获指定类型无变量：except 值错误:
-                ct = stmt.catch_type
-                if ',' in ct:
-                    ct = f"({ct})"
-                self._add_line(f"except {ct}:")
-            elif stmt.catch_var:
-                # 无类型有变量（向后兼容）：except Exception as 错误:
-                self._add_line(f"except Exception as {stmt.catch_var}:")
-            else:
-                # 无类型无变量：except Exception:
-                self._add_line("except Exception:")
-            
-            self.indent_level += 1
-            for s in stmt.catch_body:
-                self._generate_statement(s)
-            self.indent_level -= 1
+        # 优先使用 catch_clauses 列表（支持多捕获块）
+        if stmt.catch_clauses:
+            for clause in stmt.catch_clauses:
+                if isinstance(clause, CatchClause):
+                    self._generate_catch_clause(clause.catch_type, clause.catch_var, clause.catch_body)
+                elif isinstance(clause, tuple) and len(clause) == 3:
+                    ct, cv, cb = clause
+                    self._generate_catch_clause(ct, cv, cb)
+        elif stmt.catch_body:
+            # 向后兼容：使用旧的单捕获块字段
+            self._generate_catch_clause(stmt.catch_type, stmt.catch_var, stmt.catch_body)
         else:
             # 有尝试块但没有捕获块：生成默认except块
             self._add_line("except Exception:")
@@ -1121,6 +1177,19 @@ class PythonCodeGenerator:
                 from_val = self._generate_expr(stmt.from_expr)
                 from_part = f" from {from_val}"
             self._add_line(f"raise {py_exc_name}(){from_part}")
+            return
+        # 检查是否抛出带参数的中文异常名（如 运行时错误("消息")）
+        if isinstance(stmt.value, ParagraphCall) and stmt.value.name in self.exception_name_map:
+            py_exc_name = self.exception_name_map[stmt.value.name]
+            args = []
+            for arg in stmt.value.args:
+                args.append(self._generate_expr(arg))
+            args_str = ', '.join(args)
+            from_part = ""
+            if stmt.from_expr:
+                from_val = self._generate_expr(stmt.from_expr)
+                from_part = f" from {from_val}"
+            self._add_line(f"raise {py_exc_name}({args_str}){from_part}")
             return
         value = self._generate_expr(stmt.value)
         # 确保抛出的是合法异常对象（Python 3 不允许 raise 字符串）
@@ -1415,16 +1484,36 @@ class PythonCodeGenerator:
 
     def _generate_with_stmt(self, stmt: WithStmt):
         """生成上下文管理语句"""
-        context_expr = self._generate_expr(stmt.context_expr)
-        # 在 with 语句中，读取文件(...) 应替换为 open(...)
-        context_expr = context_expr.replace('_duan_builtin.读取文件', 'open').replace('读取文件', 'open')
-        # 写入文件(...) 也应替换为 open(..., 'w')
-        context_expr = context_expr.replace('_duan_builtin.写入文件', 'open').replace('写入文件', 'open')
-        if stmt.variable:
-            var_name = self._sanitize_name(stmt.variable)
-            self._add_line(f"with {context_expr} as {var_name}:")
+        prefix = "async " if getattr(stmt, 'is_async', False) else ""
+        
+        # 检查是否有多个上下文管理器
+        items = getattr(stmt, 'items', None)
+        if items and len(items) > 1:
+            # 多个上下文管理器
+            parts = []
+            for expr, var in items:
+                expr_str = self._generate_expr(expr)
+                # 文件操作替换
+                expr_str = expr_str.replace('_duan_builtin.读取文件', 'open').replace('读取文件', 'open')
+                expr_str = expr_str.replace('_duan_builtin.写入文件', 'open').replace('写入文件', 'open')
+                if var:
+                    var_name = self._sanitize_name(var)
+                    parts.append(f"{expr_str} as {var_name}")
+                else:
+                    parts.append(expr_str)
+            context_str = ', '.join(parts)
+            self._add_line(f"{prefix}with {context_str}:")
         else:
-            self._add_line(f"with {context_expr}:")
+            context_expr = self._generate_expr(stmt.context_expr)
+            # 在 with 语句中，读取文件(...) 应替换为 open(...)
+            context_expr = context_expr.replace('_duan_builtin.读取文件', 'open').replace('读取文件', 'open')
+            # 写入文件(...) 也应替换为 open(..., 'w')
+            context_expr = context_expr.replace('_duan_builtin.写入文件', 'open').replace('写入文件', 'open')
+            if stmt.variable:
+                var_name = self._sanitize_name(stmt.variable)
+                self._add_line(f"{prefix}with {context_expr} as {var_name}:")
+            else:
+                self._add_line(f"{prefix}with {context_expr}:")
         self.indent_level += 1
         if stmt.body:
             for s in stmt.body:
@@ -1432,6 +1521,29 @@ class PythonCodeGenerator:
         else:
             self._add_line("pass")
         self.indent_level -= 1
+
+    def _generate_async_scope(self, stmt: AsyncScope):
+        """生成异步作用域（结构化并发，使用 asyncio.gather 实现）"""
+        if not stmt.tasks:
+            self._add_line("pass")
+            return
+        
+        # 生成任务表达式
+        task_exprs = []
+        for task in stmt.tasks:
+            expr = self._generate_expr(task)
+            task_exprs.append(expr)
+        
+        task_str = ', '.join(task_exprs)
+        
+        # 需要导入 asyncio
+        self._needs_asyncio = True
+        
+        if stmt.result_vars:
+            vars_str = ', '.join(self._sanitize_name(v) for v in stmt.result_vars)
+            self._add_line(f"{vars_str} = await asyncio.gather({task_str})")
+        else:
+            self._add_line(f"await asyncio.gather({task_str})")
 
     def _generate_decorator_definition(self, stmt: DecoratorDefinition):
         """生成装饰器定义"""
@@ -1471,6 +1583,31 @@ class PythonCodeGenerator:
             self._generate_paragraph(stmt.paragraph)
         else:
             raise CodeGenError("装饰器后必须是段落定义", type(stmt.paragraph).__name__)
+
+    def _generate_decorated_function(self, stmt: DecoratedFunction):
+        """生成装饰器链（多个装饰器 + 函数定义）"""
+        # 按顺序为每个装饰器生成 @ 行
+        for decorator_info in stmt.decorators:
+            decorator_name = decorator_info.name
+            sanitized = self._sanitize_name(decorator_name)
+            decorator_args = decorator_info.args
+            if decorator_args:
+                args_parts = []
+                for a in decorator_args:
+                    if isinstance(a, KeywordArg):
+                        args_parts.append(f"{a.name}={self._generate_expr(a.value)}")
+                    else:
+                        args_parts.append(self._generate_expr(a))
+                args_str = ', '.join(args_parts)
+                self._add_line(f"@{sanitized}({args_str})")
+            else:
+                self._add_line(f"@{sanitized}")
+        
+        # 生成被装饰的函数
+        if isinstance(stmt.function, Paragraph):
+            self._generate_paragraph(stmt.function)
+        else:
+            raise CodeGenError("装饰器链后必须是段落定义", type(stmt.function).__name__)
 
     def _generate_method(self, method, class_attributes=None):
         """生成方法定义"""

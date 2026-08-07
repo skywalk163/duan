@@ -5,6 +5,9 @@
 1. 守卫条件：情况 模式 若 条件
 2. 嵌套模式：列表嵌套、模式组合
 3. 绑定变量：模式中捕获变量
+4. 解构赋值：设 a, b = [1, 2]
+5. 空列表/空值模式
+6. 多值匹配场景
 """
 
 import sys
@@ -35,6 +38,14 @@ def run_duan(code: str) -> str:
         pass
     result = output.getvalue().strip()
     return result
+
+
+def _compile(duan_code: str) -> str:
+    """编译段言代码，返回Python源码"""
+    parser = DuanParser()
+    module = parser.parse(duan_code)
+    generator = PythonCodeGenerator()
+    return generator.generate(module)
 
 
 def test_guard_condition():
@@ -183,6 +194,167 @@ def test_combined_guard_and_binding():
     assert "大于5：7" in result, f"Expected '大于5：7', got '{result}'"
 
 
+def test_empty_list_pattern():
+    """空列表模式"""
+    result = run_duan('''
+设 列表 为 []。
+匹配 列表：
+  情况 []：
+    打印 "空列表"。
+  情况 _：
+    打印 "非空"。
+结束。
+''')
+    assert result == "空列表", f"Expected '空列表', got '{result}'"
+
+
+def test_string_pattern():
+    """字符串模式匹配"""
+    result = run_duan('''
+设 名称 为 "admin"。
+匹配 名称：
+  情况 "admin"：
+    打印 "管理员"。
+  情况 "user"：
+    打印 "用户"。
+  情况 _：
+    打印 "未知"。
+结束。
+''')
+    assert result == "管理员", f"Expected '管理员', got '{result}'"
+
+
+def test_null_pattern():
+    """空值模式匹配"""
+    result = run_duan('''
+设 值 为 空。
+匹配 值：
+  情况 空：
+    打印 "空值"。
+  情况 _：
+    打印 "非空"。
+结束。
+''')
+    assert result == "空值", f"Expected '空值', got '{result}'"
+
+
+def test_nested_match():
+    """嵌套匹配语句"""
+    result = run_duan('''
+设 值 为 2。
+匹配 值：
+  情况 1：
+    打印 "一"。
+  情况 2：
+    打印 "二"。
+  情况 _：
+    打印 "其他"。
+结束。
+''')
+    assert result == "二", f"Expected '二', got '{result}'"
+
+
+def test_destructuring_tuple():
+    """元组解构赋值：设 a, b = 列表"""
+    result = run_duan('''
+设 数据 为 [10, 20]。
+设 甲, 乙 为 数据。
+打印 转字符串(甲) + "," + 转字符串(乙)。
+''')
+    assert result == "10,20", f"Expected '10,20', got '{result}'"
+
+
+def test_destructuring_list():
+    """列表解构赋值：设 [甲, 乙] 为 列表"""
+    result = run_duan('''
+设 数据 为 [1, 2]。
+设 [甲, 乙] 为 数据。
+打印 转字符串(甲) + "," + 转字符串(乙)。
+''')
+    assert result == "1,2", f"Expected '1,2', got '{result}'"
+
+
+def test_destructuring_with_function():
+    """解构赋值与函数返回值"""
+    result = run_duan('''
+段落 获取坐标：
+  返回 [3, 4]。
+结束。
+
+设 甲, 乙 为 获取坐标()。
+打印 转字符串(甲) + "," + 转字符串(乙)。
+''')
+    assert result == "3,4", f"Expected '3,4', got '{result}'"
+
+
+def test_match_with_expression_guard():
+    """使用 如果 关键字作为守卫条件"""
+    result = run_duan('''
+设 值 为 15。
+匹配 值：
+  情况 甲 如果 甲 大于 10：
+    打印 "大于10"。
+  情况 _：
+    打印 "不大于10"。
+结束。
+''')
+    assert result == "大于10", f"Expected '大于10', got '{result}'"
+
+
+def test_multi_value_match():
+    """多值匹配场景"""
+    result = run_duan('''
+设 状态码 为 404。
+匹配 状态码：
+  情况 200：
+    打印 "成功"。
+  情况 301：
+    打印 "重定向"。
+  情况 302：
+    打印 "重定向"。
+  情况 404：
+    打印 "未找到"。
+  情况 500：
+    打印 "服务器错误"。
+  情况 _：
+    打印 "未知状态"。
+结束。
+''')
+    assert result == "未找到", f"Expected '未找到', got '{result}'"
+
+
+def test_match_with_guard_and_type():
+    """守卫条件与类型检查组合"""
+    result = run_duan('''
+设 值 为 "hello"。
+匹配 值：
+  情况 文本 甲 若 长度(甲) 大于 5：
+    打印 "长文本"。
+  情况 文本 甲：
+    打印 "短文本：" + 甲。
+  情况 _：
+    打印 "非文本"。
+结束。
+''')
+    assert "短文本" in result, f"Expected '短文本', got '{result}'"
+
+
+def test_wildcard_fallback():
+    """通配符兜底"""
+    result = run_duan('''
+设 值 为 99。
+匹配 值：
+  情况 1：
+    打印 "一"。
+  情况 2：
+    打印 "二"。
+  情况 _：
+    打印 "其他"。
+结束。
+''')
+    assert result == "其他", f"Expected '其他', got '{result}'"
+
+
 if __name__ == '__main__':
     tests = [
         ("守卫条件", test_guard_condition),
@@ -195,6 +367,17 @@ if __name__ == '__main__':
         ("布尔模式", test_boolean_pattern),
         ("嵌套模式", test_nested_pattern),
         ("守卫+绑定组合", test_combined_guard_and_binding),
+        ("空列表模式", test_empty_list_pattern),
+        ("字符串模式", test_string_pattern),
+        ("空值模式", test_null_pattern),
+        ("嵌套匹配", test_nested_match),
+        ("元组解构", test_destructuring_tuple),
+        ("列表解构", test_destructuring_list),
+        ("函数返回值解构", test_destructuring_with_function),
+        ("表达式守卫", test_match_with_expression_guard),
+        ("多值匹配", test_multi_value_match),
+        ("守卫+类型组合", test_match_with_guard_and_type),
+        ("通配符兜底", test_wildcard_fallback),
     ]
     passed = 0
     failed = 0

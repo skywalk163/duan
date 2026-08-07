@@ -673,7 +673,7 @@ class DictComprehension(ASTNode):
 
 class DecoratorDefinition(ASTNode):
     __slots__ = ('decorator_name', 'paragraph', 'args')
-    """装饰器定义"""
+    """装饰器定义（单个装饰器 + 被装饰函数）"""
     def __init__(self, decorator_name: str, paragraph, args=None):
         self.decorator_name = decorator_name
         self.paragraph = paragraph
@@ -681,6 +681,28 @@ class DecoratorDefinition(ASTNode):
     
     def __repr__(self):
         return f"DecoratorDefinition(@{self.decorator_name})"
+
+
+class DecoratorInfo(ASTNode):
+    __slots__ = ('name', 'args')
+    """单个装饰器信息（装饰器名 + 可选参数，不含被装饰函数）"""
+    def __init__(self, name: str, args=None):
+        self.name = name
+        self.args = args  # 可选的装饰器参数列表（如 @repeat(3) 中的 [3]）
+    
+    def __repr__(self):
+        return f"DecoratorInfo(@{self.name})"
+
+
+class DecoratedFunction(ASTNode):
+    __slots__ = ('decorators', 'function')
+    """被装饰器装饰的函数（支持装饰器链）"""
+    def __init__(self, decorators: list, function):
+        self.decorators = decorators  # List[DecoratorInfo]
+        self.function = function  # Paragraph 或 MethodDefinition
+    
+    def __repr__(self):
+        return f"DecoratedFunction({[d.name for d in self.decorators]})"
 
 
 class MethodSignature(ASTNode):
@@ -728,16 +750,29 @@ class DestructuringAssignment(ASTNode):
 
 
 class WithStmt(ASTNode):
-    __slots__ = ('context_expr', 'variable', 'body')
+    __slots__ = ('context_expr', 'variable', 'body', 'is_async', 'items')
     """上下文管理器"""
-    def __init__(self, context_expr: ASTNode, variable: str = None, body: List[ASTNode] = None):
+    def __init__(self, context_expr: ASTNode = None, variable: str = None, body: List[ASTNode] = None, is_async: bool = False, items: list = None):
         self.context_expr = context_expr
         self.variable = variable
         self.body = body or []
+        self.is_async = is_async  # 是否为异步上下文管理器（async with）
+        self.items = items  # 多个上下文管理器列表：[(expr, var), ...]
     
     def __repr__(self):
+        prefix = "async " if self.is_async else ""
         var = f" as {self.variable}" if self.variable else ""
-        return f"WithStmt({self.context_expr}{var})"
+        return f"WithStmt({prefix}{self.context_expr}{var})"
+
+
+class YieldStmt(ASTNode):
+    __slots__ = ('value',)
+    """生成语句（yield）"""
+    def __init__(self, value: Optional[ASTNode] = None):
+        self.value = value
+    
+    def __repr__(self):
+        return f"YieldStmt({self.value})"
 
 
 class DictLiteral(ASTNode):

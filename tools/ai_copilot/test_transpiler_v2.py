@@ -150,7 +150,7 @@ t("async def",
   """async def fetch_data(url):
     response = await get(url)
     return response""",
-  """异步 函数 fetch_data 接收 url：
+  """异步 段落 fetch_data 接收 url：
     设 response 为 等待 get(url)
     返回 response""")
 
@@ -158,20 +158,20 @@ t("async def 无参",
   """async def tick():
     await asyncio.sleep(1)
     return "done\"""",
-  """异步 函数 tick：
+  """异步 段落 tick：
     等待 asyncio.sleep(1)
     返回 "done\"""")
 
 t("async for",
   """async for item in async_iter:
     print(item)""",
-  """异步 遍历 item 之 async_iter：
+  """异步 遍历 item 于 async_iter：
     打印(item)""")
 
 t("async with",
   """async with session.get(url) as resp:
     data = await resp.json()""",
-  """异步 使用 session.get(url) 为 resp：
+  """异步 使用 获取(session, url) 为 resp：
     设 data 为 等待 resp.json()""")
 
 
@@ -185,14 +185,14 @@ t("函数默认参数",
   """def greet(name, greeting="Hello", times=1):
     for i in range(times):
         print(f"{greeting}, {name}!")""",
-  """函数 greet 接收 name, greeting 等于 "Hello", times 等于 1：
+  """段落 greet 接收 name, greeting 等于 "Hello", times 等于 1：
     遍历 i 于 0至times-1：
         打印(f"{greeting}, {name}!")""")
 
 t("函数默认参数-数字",
   """def multiply(a, b=2):
     return a * b""",
-  """函数 multiply 接收 a, b 等于 2：
+  """段落 multiply 接收 a, b 等于 2：
     返回 a 乘以 b""")
 
 t("函数默认参数-布尔",
@@ -200,7 +200,7 @@ t("函数默认参数-布尔",
     if debug:
         print(f"checking {n}")
     return n > 0""",
-  """函数 is_positive 接收 n, debug 等于 假：
+  """段落 is_positive 接收 n, debug 等于 假：
     如果 debug：
         打印(f"checking {n}")
     返回 n 大于 0""")
@@ -218,7 +218,7 @@ t("@staticmethod",
     def helper():
         return 42""",
   """类 MyClass：
-    静态 函数 helper：
+    静态 段落 helper：
         返回 42""")
 
 t("@property",
@@ -227,7 +227,7 @@ t("@property",
     def count(self):
         return len(self.items)""",
   """类 MyClass：
-    特性 函数 count：
+    特性 段落 count：
         返回 len(己.items)""")
 
 t("@classmethod",
@@ -236,7 +236,7 @@ t("@classmethod",
     def create(cls, val):
         return cls(val)""",
   """类 MyClass：
-    类方法 函数 create 接收 val：
+    类方法 段落 create 接收 val：
         返回 cls(val)""")
 
 t("@自定义装饰器",
@@ -246,7 +246,7 @@ t("@自定义装饰器",
         pass""",
   """类 MyClass：
     标注 my_decorator
-    函数 process：""")
+    段落 process：""")
 
 t("@装饰器带参数",
   """class MyClass:
@@ -255,7 +255,7 @@ t("@装饰器带参数",
         return 1""",
   """类 MyClass：
     标注 decorator(param=10)
-    函数 method：
+    段落 method：
         返回 1""")
 
 t("@装饰器链",
@@ -266,7 +266,7 @@ t("@装饰器链",
         pass""",
   """类 MyClass：
     静态 标注 my_decorator
-    函数 process：""")
+    段落 process：""")
 
 t("@classmethod 链",
   """class MyClass:
@@ -276,7 +276,7 @@ t("@classmethod 链",
         return cls(val)""",
   """类 MyClass：
     类方法 标注 validate
-    函数 create 接收 val：
+    段落 create 接收 val：
         返回 cls(val)""")
 
 
@@ -304,7 +304,7 @@ t("混合调用 obj.method().attr",
 
 t("append 链式",
   "self.data.items.append(10)",
-  "己.data.items.append(10)")
+  "追加(己.data.items, 10)")
 
 t("多层方法链式",
   "result = a.b().c().d()",
@@ -360,23 +360,23 @@ t("链式返回值+方法",
 
 t("链式在返回语句中",
   "def get(): return self.data.items",
-  "函数 get：\n    返回 己.data.items")
+  "段落 get：\n    返回 己.data.items")
 
 t("列表推导式中链式",
   "result = [x.method() for x in items]",
-  "设 result 为 [x.method() 遍历 x 之 items]")
+  "设 result 为 [x.method() 遍历 x 于 items]")
 
 t("方法调用中的链式",
   "print(self.data.strip().upper())",
-  "打印(己.data.strip().upper())")
+  "打印(字符串转大写(字符串去空白(己.data)))")
 
 t("复杂链式+赋值",
   "self.cache.get(key).update(value)",
-  "己.cache.get(key).update(value)")
+  "获取(己.cache, key).update(value)")
 
 t("三元表达式中的链式",
   "result = a if obj.is_valid() else b",
-  "设 result 为 a 如果 obj.is_valid() 否则 b")
+  "设 result 为 如果 obj.is_valid() 则 a 否则 b")
 
 
 print()
@@ -473,17 +473,17 @@ verify_tests = [
         打印("Not Found")
     情况 _：
         打印("Unknown")"""),
-    ("async 解析", """异步 函数 fetch_data 接收 url：
+    ("async 解析", """异步 段落 fetch_data 接收 url：
     设 response 为 等待 get(url)
     返回 response"""),
-    ("函数默认参数 解析", """函数 greet 接收 name, greeting 等于 "Hello", times 等于 1：
+    ("函数默认参数 解析", """段落 greet 接收 name, greeting 等于 "Hello", times 等于 1：
     遍历 i 于 0至times-1：
         打印(f"{greeting}, {name}!")"""),
     ("链式调用 解析", """设 result 为 obj.method().chain()"""),
     ("链式+属性 解析", """设 result 为 obj.method().value"""),
     ("深层属性 解析", """设 result 为 己.data.items"""),
     ("混合调用 解析", """设 result 为 obj.method().chain().value"""),
-    ("append 解析", """己.data.items.append(10)"""),
+    ("append 解析", """追加(己.data.items, 10)"""),
     ("多层方法链式 解析", """设 result 为 a.b().c().d()"""),
     ("属性+方法混合 解析", """设 result 为 obj.attr.method().prop"""),
     ("self 链式 解析", """己.a.b.c()"""),
@@ -495,11 +495,11 @@ verify_tests = [
     ("链式在if条件中 解析", """如果 obj.is_valid() 且 obj.check()："""),
     ("链式调用带关键字参数 解析", """设 result 为 obj.method(a=1, b=2).chain()"""),
     ("链式返回值+方法 解析", """obj.get_config().save()"""),
-    ("链式在返回语句中 解析", """函数 get：\n    返回 己.data.items"""),
-    ("列表推导式中链式 解析", """设 result 为 [x.method() 遍历 x 之 items]"""),
-    ("方法调用中的链式 解析", """打印(己.data.strip().upper())"""),
-    ("复杂链式+赋值 解析", """己.cache.get(key).update(value)"""),
-    ("三元表达式中的链式 解析", """设 result 为 a 如果 obj.is_valid() 否则 b"""),
+    ("链式在返回语句中 解析", """段落 get：\n    返回 己.data.items"""),
+    ("列表推导式中链式 解析", """设 result 为 [x.method() 遍历 x 于 items]"""),
+    ("方法调用中的链式 解析", """打印(字符串转大写(字符串去空白(己.data)))"""),
+    ("复杂链式+赋值 解析", """获取(己.cache, key).update(value)"""),
+    ("三元表达式中的链式 解析", """设 result 为 如果 obj.is_valid() 则 a 否则 b"""),
 ]
 
 for name, duan_code in verify_tests:

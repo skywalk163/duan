@@ -1,6 +1,6 @@
 # Duan (段言) Programming Language
 
-> **Version:** v5.5.0
+> **Version:** v6.0
 > **Last updated:** 2026-08-07
 
 **Duan** is a modern programming language with Chinese keywords, designed to make programming more intuitive and accessible for Chinese speakers.
@@ -168,9 +168,9 @@ duan ai generate "排序算法"    # AI-assisted code generation
 
 ## Project Status
 
-Current version: **v5.5.0**
+Current version: **v6.0**
 
-Duan is under active development. The v6.0.0 release is planned for late 2026, featuring enhanced exception handling, pattern matching, async/await support, and more.
+Duan v6.0 introduces type annotations, nullable types, interfaces/protocols, enhanced pattern matching, async/await support, and comprehensive package management. The language is under active development with a focus on self-hosting compiler and native compilation via LLVM.
 
 ## Contributing
 

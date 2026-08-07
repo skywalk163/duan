@@ -250,6 +250,10 @@ class ParserStmtMixin:
         if tok.type == TokenType.KEYWORD and tok.value == '抛出':
             return self._parse_throw_stmt()
         
+        # 生成器/生成语句：生成 表达式
+        if tok.type == TokenType.KEYWORD and tok.value == '生成':
+            return self._parse_yield_stmt()
+        
         # 异步相关：异步 段落 / 异步作用域 / 异步 遍历 / 等待
         if tok.type == TokenType.KEYWORD and tok.value == '异步':
             # 查看下一个 token 判断是异步段落还是异步作用域还是异步遍历
@@ -372,9 +376,89 @@ class ParserStmtMixin:
         if tok.type == TokenType.STRING:
             return self._parse_expr_stmt()
 
-        # 装饰器：@段落名 标注 段落 ...
+        # 装饰器：@段落名 标注 段落 ...（支持装饰器链）
         if tok.type == TokenType.AT:
-            return self._parse_decorator()
+            saved_pos = self.pos
+            # 收集所有 @decorator 行
+            decorators = []
+            custom_decorator_seen = False
+            while self._current() and self._current().type == TokenType.AT:
+                # 检测是否是 @C（FFI标记，非装饰器）
+                peek = self._peek(1)
+                if peek and peek.type == TokenType.IDENTIFIER and peek.value == 'C':
+                    # 这是 @C FFI，不是装饰器
+                    # 如果已经收集了装饰器，回退并报错
+                    if decorators:
+                        self._error("装饰器不能与 @C FFI 标记混用")
+                    break
+                decorator_info = self._parse_decorator_info()
+                if decorator_info:
+                    # 检查是否是内置装饰器
+                    if decorator_info.name in ('静态方法', '类方法', '特性', '抽象'):
+                        # 内置装饰器后必须紧跟函数定义，不能有多个装饰器
+                        if decorators:
+                            self._error(f"内置装饰器 @{decorator_info.name} 不能与其他装饰器链式使用")
+                        # 回退，使用原有的 _parse_decorator 处理
+                        self.pos = saved_pos
+                        return self._parse_decorator()
+                    decorators.append(decorator_info)
+                    custom_decorator_seen = True
+                # 跳过装饰器后的 NEWLINE
+                while self._match(TokenType.NEWLINE):
+                    self._consume(TokenType.NEWLINE)
+                # 跳过 INDENT（如果装饰器后有缩进）
+                while self._match(TokenType.INDENT):
+                    self._consume(TokenType.INDENT)
+            
+            if not decorators:
+                self._error("期望装饰器名")
+            
+            # 跳过 NEWLINE
+            while self._match(TokenType.NEWLINE):
+                self._consume(TokenType.NEWLINE)
+            # 跳过 INDENT
+            while self._match(TokenType.INDENT):
+                self._consume(TokenType.INDENT)
+            
+            # 标注（可选关键字）
+            if self._match(TokenType.KEYWORD, '标注'):
+                self._consume(TokenType.KEYWORD, '标注')
+                while self._match(TokenType.NEWLINE):
+                    self._consume(TokenType.NEWLINE)
+                while self._match(TokenType.INDENT):
+                    self._consume(TokenType.INDENT)
+            
+            # 解析被装饰的函数定义
+            paragraph = None
+            if self._match(TokenType.LBOOK):
+                # 《段名》段 语法
+                self._consume(TokenType.LBOOK)
+                name_tok = self._current()
+                if name_tok and name_tok.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                    name = self._consume().value
+                    if self._match(TokenType.RBOOK):
+                        self._consume(TokenType.RBOOK)
+                        if self._match(TokenType.KEYWORD, '段') or self._match(TokenType.KEYWORD, '函数') or self._match(TokenType.KEYWORD, '段落'):
+                            self._consume()
+                            paragraph = self._parse_paragraph_v2(name=name)
+                        else:
+                            tok = self._current()
+                            self._error(f"期望 '段' 关键字，但得到 {tok.value if tok else '输入结束'}")
+                    else:
+                        tok = self._current()
+                        self._error(f"期望 '》'，但得到 {tok.value if tok else '输入结束'}")
+                else:
+                    tok = self._current()
+                    self._error(f"期望段名，但得到 {tok.type if tok else '输入结束'}")
+            elif self._match(TokenType.KEYWORD, '函数') or self._match(TokenType.KEYWORD, '段落'):
+                paragraph = self._parse_paragraph_v2()
+            elif self._match(TokenType.KEYWORD, '构造'):
+                paragraph = self._parse_method_definition(is_constructor=True)
+            else:
+                tok = self._current()
+                self._error(f"装饰器后必须跟函数定义（'函数 段名' 或 '《段名》段'），但得到 {tok.value if tok else '输入结束'}")
+            
+            return DecoratedFunction(decorators, paragraph)
         
         # 明确标注不支持的特性（P1-3）：async / await 关键字
         if tok.type == TokenType.IDENTIFIER and tok.value == 'async':
@@ -2258,10 +2342,10 @@ class ParserStmtMixin:
         # 异常值
         value = self._parse_expr()
         
-        # from 子句（可选）：抛出 ValueError(...) from 空
+        # from 子句（可选）：抛出 ValueError(...) from 空 或 抛出 值错误 从 原异常
         from_expr = None
-        if self._current() and self._current().value == 'from':
-            self._consume()  # consume 'from' (IDENTIFIER or KEYWORD)
+        if self._current() and self._current().value in ('from', '从'):
+            self._consume()  # consume 'from' or '从' (IDENTIFIER or KEYWORD)
             from_expr = self._parse_expr()
         
         # 句号（可选）
@@ -2269,6 +2353,33 @@ class ParserStmtMixin:
             self._consume(TokenType.PERIOD)
         
         return ThrowStmt(value, from_expr)
+
+    def _parse_yield_stmt(self):
+        """解析生成语句
+        
+        语法：生成 表达式。 或 生成。
+        """
+        from ast_nodes_v3 import YieldStmt
+        # 生成
+        self._consume(TokenType.KEYWORD, '生成')
+        
+        # 检查是否是裸生成（生成 None）
+        tok = self._current()
+        if tok and tok.type in (TokenType.NEWLINE, TokenType.DEDENT, TokenType.PERIOD, TokenType.EOF):
+            # 句号（可选）
+            if self._current() and self._current().type == TokenType.PERIOD:
+                self._consume(TokenType.PERIOD)
+            return YieldStmt(None)
+        
+        # 生成值
+        value = self._parse_expr()
+        
+        # 句号（可选）
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
+        
+        return YieldStmt(value)
+
     def _is_paragraph_definition(self) -> bool:
         """向前扫描，判断 段落 主(...) 是段落定义还是段落调用。
         
@@ -2614,6 +2725,15 @@ class ParserStmtMixin:
         self._consume(TokenType.KEYWORD, '异步')
         self._consume(TokenType.KEYWORD, '作用域')
         
+        # 可选的结果变量名列表
+        result_vars = []
+        tok = self._current()
+        if tok and tok.type == TokenType.IDENTIFIER:
+            # 收集变量名，直到遇到冒号
+            while self._current() and self._current().type == TokenType.IDENTIFIER:
+                result_vars.append(self._current().value)
+                self._consume(TokenType.IDENTIFIER)
+        
         self._consume(TokenType.COLON)
         
         # 消耗所有连续的 NEWLINE 和 INDENT（处理空行和注释行）
@@ -2624,7 +2744,6 @@ class ParserStmtMixin:
         
         # 解析任务列表（每个语句是一个任务）
         tasks = []
-        result_vars = []
         
         body = self._parse_body()
         
@@ -3775,10 +3894,10 @@ class ParserStmtMixin:
     def _parse_with_stmt(self) -> WithStmt:
         """解析上下文管理器：使用 表达式 为 变量：...（依赖缩进）
 
-        语法：
-        使用 表达式 为 变量：
-            语句。
-        （缩进结束）
+        支持：
+        - 使用 表达式 为 变量：...（同步上下文管理器）
+        - 使用 异步 表达式 为 变量：...（异步上下文管理器）
+        - 使用 表达式1 为 变量1, 表达式2 为 变量2：...（多个上下文管理器）
         """
         # 使用
         self._consume(TokenType.KEYWORD, '使用')
@@ -3800,28 +3919,52 @@ class ParserStmtMixin:
             # 不是通配符导入，回退
             self.pos = saved_pos
 
-        # 上下文表达式
+        # 检测异步上下文管理器：使用 异步 ...
+        is_async = False
+        if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '异步':
+            self._consume(TokenType.KEYWORD, '异步')
+            is_async = True
+
+        # 解析上下文管理器列表（支持多个：使用 expr1 为 v1, expr2 为 v2）
+        # 注意：由于 _parse_expr() 会将逗号作为管道操作符消费，
+        # 多个上下文管理器会先被解析为 Pipeline 节点，需要在此拆分
+        items = []
+
+        # 解析上下文表达式（可能包含多个逗号分隔的表达式，被解析为 Pipeline）
         context_expr = self._parse_expr()
 
-        # 为 变量（可选）
-        # 注意：如果表达式中有 '为'，它会被 _parse_expr 解析为 '==' 运算符
-        # 例如：使用 读取文件('test.txt') 为 f：会被解析为 读取文件('test.txt') == f
-        # 我们需要检测这种情况并提取出上下文表达式和变量名
-        variable = None
-        if isinstance(context_expr, BinaryOp) and context_expr.operator == '==':
-            # '为' 被解析为 '==' 运算符，提取左右两边
-            if isinstance(context_expr.right, Identifier):
-                variable = context_expr.right.name
-                context_expr = context_expr.left
-        elif self._match(TokenType.KEYWORD, '为'):
-            self._consume(TokenType.KEYWORD, '为')
-            var_tok = self._current()
-            if var_tok and var_tok.type == TokenType.IDENTIFIER:
-                variable = self._consume(TokenType.IDENTIFIER).value
-            elif var_tok and var_tok.type == TokenType.KEYWORD:
-                variable = self._consume(TokenType.KEYWORD).value
-            else:
-                self._error(f"期望变量名，但得到 {var_tok.type if var_tok else '输入结束'}")
+        # 检查是否为 Pipeline（多个上下文管理器通过逗号分隔）
+        if isinstance(context_expr, Pipeline):
+            # 每个 stage 是一个上下文管理器表达式
+            for stage in context_expr.stages:
+                variable = None
+                if isinstance(stage, BinaryOp) and stage.operator == '==':
+                    # '为' 被解析为 '==' 运算符，提取左右两边
+                    if isinstance(stage.right, Identifier):
+                        variable = stage.right.name
+                        stage = stage.left
+                items.append((stage, variable))
+        else:
+            # 单个上下文管理器
+            variable = None
+            if isinstance(context_expr, BinaryOp) and context_expr.operator == '==':
+                # '为' 被解析为 '==' 运算符，提取左右两边
+                if isinstance(context_expr.right, Identifier):
+                    variable = context_expr.right.name
+                    context_expr = context_expr.left
+            elif self._match(TokenType.KEYWORD, '为'):
+                self._consume(TokenType.KEYWORD, '为')
+                var_tok = self._current()
+                if var_tok and var_tok.type == TokenType.IDENTIFIER:
+                    variable = self._consume(TokenType.IDENTIFIER).value
+                elif var_tok and var_tok.type == TokenType.KEYWORD:
+                    variable = self._consume(TokenType.KEYWORD).value
+                else:
+                    self._error(f"期望变量名，但得到 {var_tok.type if var_tok else '输入结束'}")
+            items.append((context_expr, variable))
+
+        # 保存第一个上下文管理器到 context_expr / variable（兼容旧代码）
+        first_expr, first_var = items[0] if items else (None, None)
 
         # 冒号（可选）
         if self._match(TokenType.COLON):
@@ -3833,8 +3976,82 @@ class ParserStmtMixin:
 
         # 体
         body = self._parse_body()
-        
-        return WithStmt(context_expr, variable, body)
+
+        return WithStmt(first_expr, first_var, body, is_async=is_async, items=items)
+
+    def _parse_decorator_info(self) -> DecoratorInfo:
+        """解析单个装饰器信息（@名字 或 @名字(参数)）
+
+        返回装饰器信息（DecoratorInfo），不含被装饰函数。
+        用于装饰器链场景：多个 @decorator 行后跟一个函数定义。
+        """
+        # @
+        self._consume(TokenType.AT)
+
+        # 装饰器名（支持多token名称）
+        name_parts = []
+        while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+            # 遇到"标注"、"函数"、"段落"、"构造"、"《"或"("时停止收集名称
+            if self._current().type == TokenType.KEYWORD and self._current().value in ('标注', '函数', '段落', '构造'):
+                break
+            if self._current().type == TokenType.LBOOK:
+                break
+            if self._current().type == TokenType.LPAREN:
+                break
+            name_parts.append(self._consume().value)
+        if not name_parts:
+            tok = self._current()
+            self._error(f"期望装饰器名，但得到 {tok.type if tok else '输入结束'}")
+        decorator_name = ''.join(name_parts)
+
+        # 可选的装饰器参数：@decorator(args)
+        decorator_args = None
+        if self._current() and self._current().type == TokenType.LPAREN:
+            self._consume(TokenType.LPAREN)
+            decorator_args = []
+            while not self._match(TokenType.RPAREN):
+                if self._current() and self._current().type in (TokenType.NEWLINE, TokenType.INDENT, TokenType.DEDENT):
+                    self._consume()
+                    continue
+                # 支持关键字参数：name = value
+                _kwarg_saved_pos = self.pos
+                _kwarg_name_parts = []
+                _kwarg_stop_kws = frozenset({
+                    '为', '等于', '接收', '返回', '令', '循环', '断言', '输出',
+                    '如果', '否则', '那么', '若', '则', '当', '遍历', '设', '定义',
+                    '类', '构造', '函数', '段落', '尝试', '捕获', '抛出', '最终', '导入',
+                    '导出', '从', '真', '假', '空', '且', '或', '非', '与', '等待',
+                    '匹配', '情况', '的', '之', '对', '步', '至', '到',
+                })
+                while self._current():
+                    _t = self._current()
+                    if _t.type == TokenType.IDENTIFIER:
+                        _kwarg_name_parts.append(self._consume().value)
+                    elif _t.type == TokenType.KEYWORD and _t.value not in _kwarg_stop_kws:
+                        _kwarg_name_parts.append(self._consume().value)
+                    else:
+                        break
+                if _kwarg_name_parts and self._current() and self._current().type == TokenType.EQUALS:
+                    # 确认是关键字参数，消耗 =
+                    self._consume(TokenType.EQUALS)
+                    kwarg_val = self._parse_comparison()
+                    if kwarg_val is not None:
+                        kwarg_name = ''.join(_kwarg_name_parts)
+                        from ast_nodes_v3 import KeywordArg
+                        decorator_args.append(KeywordArg(kwarg_name, kwarg_val))
+                else:
+                    # 不是关键字参数，回退
+                    self.pos = _kwarg_saved_pos
+                    arg = self._parse_comparison()
+                    if arg is not None:
+                        decorator_args.append(arg)
+                    else:
+                        break
+                if self._match(TokenType.COMMA):
+                    self._consume(TokenType.COMMA)
+            self._consume(TokenType.RPAREN)
+
+        return DecoratorInfo(decorator_name, decorator_args)
 
     def _parse_decorator(self) -> DecoratorDefinition:
         """解析装饰器定义

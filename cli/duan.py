@@ -34,7 +34,7 @@ sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
 
-VERSION = '段言编译器 v5.5.0'
+VERSION = '段言编译器 v6.0.0'
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -550,6 +550,19 @@ CATEGORY_NAMES = {
 
 def cmd_pkg_search(args):
     """按关键词搜索 duanpub 包"""
+    # 远程搜索
+    if getattr(args, 'remote', False):
+        from package_installer import PackageInstaller
+        project_root = Path(getattr(args, 'project', '.')).resolve()
+        registry_url = getattr(args, 'registry_url', None)
+        if not registry_url:
+            registry_url = 'http://localhost:8000'
+        installer = PackageInstaller(project_root=project_root, registry_url=registry_url)
+        results = installer.remote_search(args.keyword)
+        if not results:
+            print(f"未找到匹配 '{args.keyword}' 的包")
+        return
+
     PACKAGES, _, _ = _load_duanpub_index()
     keyword = args.keyword.lower()
     results = []
@@ -1128,6 +1141,8 @@ def main():
     # ── pkg search ──
     pkg_search = pkg_sub.add_parser('search', help='搜索 duanpub 包')
     pkg_search.add_argument('keyword', help='搜索关键词（包名/描述/关键词）')
+    pkg_search.add_argument('--remote', '-r', action='store_true', help='从远程注册中心搜索')
+    pkg_search.add_argument('--registry-url', default=None, help='远程注册中心 URL（默认: http://localhost:8000）')
 
     # ── pkg info ──
     pkg_info = pkg_sub.add_parser('info', help='查看 duanpub 包详情')

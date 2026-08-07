@@ -63,6 +63,11 @@ KEYWORDS_ASYNC = {
     '异步', '等待', '作用域',
 }
 
+# 生成器（yield）
+KEYWORDS_GENERATOR = {
+    '生成',
+}
+
 # 模式匹配（新增）
 KEYWORDS_MATCH = {
     '匹配', '情况',
@@ -102,6 +107,7 @@ KEYWORDS_DOUBLE = (
     KEYWORDS_CLASS |
     KEYWORDS_MODULE |
     KEYWORDS_ASYNC |
+    KEYWORDS_GENERATOR |
     KEYWORDS_MATCH |
     KEYWORDS_CONTEXT |
     KEYWORDS_EMBED |

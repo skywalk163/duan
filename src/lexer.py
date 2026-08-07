@@ -63,6 +63,18 @@ COMMON_COMPOUND_WORDS = frozenset({
     # 科学计算中"X函数"作为标识符（如"导函数"、"函数对象"）
     '导函数', '目标函数', '梯度函数', '海森函数', '函数对象',
     '伽马函数', '误差函数', '贝塔函数', '激活函数', '损失函数', '核函数',
+    # 中文异常类型名
+    '迭代停止', '停止迭代',
+    '值错误', '类型错误', '索引错误', '键错误', '属性错误',
+    '导入错误', '零除错误', '文件错误', '运行时错误',
+    '溢出错误', '递归错误', '内存错误', '系统错误', '断言错误',
+    '外部错误', 'FFI错误', '系统错误码',
+    # 异步 I/O 函数名
+    '异步读取文件', '异步写入文件', '异步追加文件',
+    '异步读取二进制', '异步写入二进制',
+    '异步HTTP获取', '异步睡眠',
+    '创建事件循环', '事件循环运行', '事件循环停止',
+    '事件循环创建任务', '异步任务等待', '异步任务取消',
 })
 
 # CJK 汉字范围
@@ -1131,6 +1143,30 @@ class Lexer:
             # 遇到符号，结束
             if ch in _symbol_map or ch in _punctuation:
                 break
+
+            # 先检查完整汉字序列是否在常见复合词中（优先级高于中文数字拆分）
+            # 例如"零除错误"不应被拆分为 零(数字)+除错误
+            _full_seq_collected = None
+            if ch in _simple_nums or ch in _cn_digits:
+                _j = pos
+                while _j < n and _is_han(source[_j]):
+                    if source[_j] in _symbol_map or source[_j] in _punctuation:
+                        break
+                    _j += 1
+                _full_seq = source[pos:_j]
+                if _full_seq in _common_compounds or _full_seq in user_definitions:
+                    _full_seq_collected = _full_seq
+
+            if _full_seq_collected:
+                # 完整标识符在常见复合词或用户定义中，整体输出，不拆分
+                kw_check, _ = _match_kw(source, pos)
+                if kw_check == _full_seq_collected:
+                    _tokens_append(_Token(_TokenType.KEYWORD, _full_seq_collected, line, current_col))
+                else:
+                    _tokens_append(_Token(_TokenType.IDENTIFIER, _full_seq_collected, line, current_col))
+                consumed += len(_full_seq_collected)
+                current_col += len(_full_seq_collected)
+                continue
 
             # 检查是否是简单中文数字（一～十）
             if ch in _simple_nums:
