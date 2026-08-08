@@ -1507,6 +1507,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#text-str-int_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        显示宽度(text: str) -&gt; int
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#text-str-index-int-str" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3577,6 +3588,10 @@
 <td>获取字符串长度</td>
 </tr>
 <tr>
+<td><code>显示宽度(text)</code></td>
+<td>获取字符串显示宽度（中文/全角字符计 2，其余计 1）</td>
+</tr>
+<tr>
 <td><code>字符串获取(text, index)</code></td>
 <td>获取字符串中指定位置的字符</td>
 </tr>
@@ -4708,6 +4723,35 @@
 </tbody>
 </table>
 <p><strong>返回：</strong> <code>int</code></p>
+<hr />
+<h3 id="text-str-int_2"><code>显示宽度(text: str) -&gt; int</code><a class="headerlink" href="#text-str-int_2" title="Permanent link">&para;</a></h3>
+<p>获取字符串的终端显示宽度。中文、日文等全角（CJK）及宽字符计为 2，其余字符（ASCII、半角符号等）计为 1。用于终端表格/边框对齐，避免 <code>字符串长度</code> 把全角字符按 1 个字符计算导致右侧错位。</p>
+<p><strong>参数：</strong></p>
+<table>
+<thead>
+<tr>
+<th>参数名</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>text</code></td>
+<td><code>str</code></td>
+<td>待测量显示宽度的字符串</td>
+</tr>
+</tbody>
+</table>
+<p><strong>返回：</strong> <code>int</code>（显示宽度）</p>
+<p><strong>示例：</strong></p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">显示宽度</span><span class="p">(</span><span class="s2">&quot;中文abc&quot;</span><span class="p">)</span>   <span class="c1"># =&gt; 7  （中、文 各 2，a、b、c 各 1）</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">显示宽度</span><span class="p">(</span><span class="s2">&quot;hello&quot;</span><span class="p">)</span>     <span class="c1"># =&gt; 5</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">显示宽度</span><span class="p">(</span><span class="s2">&quot;A中&quot;</span><span class="p">)</span>       <span class="c1"># =&gt; 3  （A 为 1，中 为 2）</span>
+</span></code></pre></div>
+<blockquote>
+<p>说明：与 <code>字符串长度</code> 不同，后者返回字符个数（如 <code>"中文abc"</code> 长度为 5），而 <code>显示宽度</code> 返回实际占据的列数（7）。</p>
+</blockquote>
 <hr />
 <h3 id="text-str-index-int-str"><code>字符串获取(text: str, index: int) -&gt; str</code><a class="headerlink" href="#text-str-index-int-str" title="Permanent link">&para;</a></h3>
 <p>获取字符串中指定位置的字符</p>
