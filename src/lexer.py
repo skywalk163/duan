@@ -1060,10 +1060,12 @@ class Lexer:
                             tokens[-1] = _Token(_TokenType.IDENTIFIER, last.value + suffix, last.line, last.col)
                             consumed += len(suffix)
                         elif last.type == TokenType.KEYWORD:
-                            # 关键字后紧跟ASCII字母/数字（如"分割Pointer_内部"），合并为完整标识符
+                            # 关键字后紧跟ASCII字母（如"分割Pointer_内部"），合并为完整标识符
                             # 语法如"引 Python:"中间有空格，不会进入此分支
-                            tokens[-1] = _Token(_TokenType.IDENTIFIER, last.value + suffix, last.line, last.col)
-                            consumed += len(suffix)
+                            # 不合并数字后缀（如"至10"、"为123"），避免破坏范围表达式/赋值
+                            if suffix[0].isalpha() or suffix[0] == '_':
+                                tokens[-1] = _Token(_TokenType.IDENTIFIER, last.value + suffix, last.line, last.col)
+                                consumed += len(suffix)
 
             return tokens, consumed
         else:
