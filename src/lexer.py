@@ -35,6 +35,7 @@ IDENTIFIER_SAFE_KEYWORDS = frozenset({
     '接口', '结构体',  # 类型相关
     '枚举', '联合体',  # FFI 类型
     '回调',  # FFI 回调（如"回调函数"、"回调结构体"）
+    '匹配',  '配',  # 匹配/配（如"配置"、"完全匹配"应为复合标识符）
 })
 
 # 常见复合词保护列表（这些词包含运算符动词或中文数字，但应该作为整体识别）
@@ -202,11 +203,22 @@ _COMPOUND_SAFE_SINGLE_KEYWORDS = frozenset({
     '且',   # 并且
     '或',   # 或者
     '非',   # 非常
+    '出',   # 弹出/输出/退出
+    '引',   # 引号/引用/引导（L4引用关键字，但常见于复合词）
     # 算术运算符（v4.2 补全 — 常见于复合词）
     '加',   # 加法/增加
     '减',   # 减法/减少
     '乘',   # 乘法/乘坐
     '除',   # 除法/删除
+    '步',   # 步骤/逐步
+    '骤',   # 步骤
+    '类',   # 类别/分类
+    '模',   # 模拟/模块
+    '接',   # 接口/连接/直接（L0核心字，但常见于复合词）
+    '序',   # 序列/顺序/程序（常见于遍历循环变量）
+    '试',   # 尝试/测试/重试（L0异常关键字，但常见于复合词）
+    '否',   # 否则（L0条件关键字，但常见于"是否"等复合词）
+    '跳',   # 跳出（L0循环控制关键字，但常见于"心跳"等复合词）
 })
 
 # 符号到 TokenType 的映射（模块级常量）
@@ -468,7 +480,11 @@ class Lexer:
                 if source[i:i+2] == '嵌入':
                     embed_prefix_len = 2  # 旧写法：嵌入
                 elif source[i] == '引':
-                    embed_prefix_len = 1  # 新写法：引
+                    # 新写法：引 —— 仅当后面紧跟空格/冒号/换行时才触发
+                    # 避免把"引号"、"引用"等复合词中的"引"误判为嵌入块前缀
+                    if i + 1 < len(source) and source[i+1] in ' \t:\n':
+                        embed_prefix_len = 1
+                    # 否则作为普通标识符，不触发嵌入块
             if embed_prefix_len > 0:
                 token, consumed = self._tokenize_embed_block(source, i, line, col, embed_prefix_len)
                 if token:
@@ -1037,10 +1053,17 @@ class Lexer:
                         else:
                             break
                     suffix = source[next_pos:j]
-                    # 将后缀合并到最后一个token（如果是标识符）
-                    if tokens and tokens[-1].type == TokenType.IDENTIFIER:
-                        tokens[-1] = _Token(_TokenType.IDENTIFIER, tokens[-1].value + suffix, tokens[-1].line, tokens[-1].col)
-                        consumed += len(suffix)
+                    # 将后缀合并到最后一个token
+                    if tokens:
+                        last = tokens[-1]
+                        if last.type == TokenType.IDENTIFIER:
+                            tokens[-1] = _Token(_TokenType.IDENTIFIER, last.value + suffix, last.line, last.col)
+                            consumed += len(suffix)
+                        elif last.type == TokenType.KEYWORD:
+                            # 关键字后紧跟ASCII字母/数字（如"分割Pointer_内部"），合并为完整标识符
+                            # 语法如"引 Python:"中间有空格，不会进入此分支
+                            tokens[-1] = _Token(_TokenType.IDENTIFIER, last.value + suffix, last.line, last.col)
+                            consumed += len(suffix)
 
             return tokens, consumed
         else:
@@ -1218,11 +1241,19 @@ class Lexer:
                             prefix_matched = prefix
                             break
                 if prefix_matched:
-                    # 输出用户定义的前缀部分作为标识符，剩余部分由后续循环处理
-                    _tokens_append(_Token(_TokenType.IDENTIFIER, prefix_matched, line, current_col))
-                    consumed += len(prefix_matched)
-                    current_col += len(prefix_matched)
-                    continue
+                    # 检查剩余部分是否为 compound_safe 单字关键字
+                    # 如果是，则不拆分（保持完整标识符），避免：
+                    # - "路径段"被拆为"路径"+"段"（段是compound_safe）
+                    # - "甲序"被拆为"甲"+"序"（序是compound_safe）
+                    remaining = full_identifier[len(prefix_matched):]
+                    if len(remaining) == 1 and remaining in _compound_safe:
+                        prefix_matched = None
+                    else:
+                        # 输出用户定义的前缀部分作为标识符，剩余部分由后续循环处理
+                        _tokens_append(_Token(_TokenType.IDENTIFIER, prefix_matched, line, current_col))
+                        consumed += len(prefix_matched)
+                        current_col += len(prefix_matched)
+                        continue
             
             # 第一层：尝试最长匹配关键字
             keyword, length = _match_kw(source, pos)
@@ -1611,6 +1642,53 @@ class Lexer:
                         if j >= n or source[j] in '。：\n':
                             break
                 i = j
+                continue
+
+            # 查找 "段 函数名(参数)" 模式（新式函数定义语法）
+            if source[i] == '段' and i + 1 < n and _is_space_tab(source[i + 1]):
+                j = i + 1
+                # 跳过空白
+                while j < n and _is_space_tab(source[j]):
+                    j += 1
+                # 收集函数名
+                k = j
+                while k < n and _is_han(source[k]):
+                    k += 1
+                if k > j:
+                    func_name = source[j:k]
+                    # 跳过空白，检查是否紧跟 ( 或 （
+                    m = k
+                    while m < n and _is_space_tab(source[m]):
+                        m += 1
+                    if m < n and source[m] in '（(':
+                        # 收集函数名
+                        if func_name not in ALL_KEYWORDS and func_name not in VERB_ARITY:
+                            definitions.add(func_name)
+                        # 收集括号内的参数
+                        p = m + 1
+                        while p < n and source[p] not in ')）':
+                            if _is_space_tab(source[p]) or source[p] in '，,':
+                                p += 1
+                                continue
+                            # 收集参数名
+                            param_start = p
+                            while p < n and _is_han(source[p]) and source[p] not in '，, )）':
+                                p += 1
+                            if p > param_start:
+                                param_name = source[param_start:p]
+                                if param_name not in ALL_KEYWORDS:
+                                    definitions.add(param_name)
+                            else:
+                                p += 1
+                        # 跳过右括号
+                        if p < n and source[p] in ')）':
+                            p += 1
+                        i = p
+                    else:
+                        # 没有括号，属于函数调用（如 段 函数名 参数 参数名），跳过函数名
+                        i = k
+                    continue
+                i = k
                 continue
 
             # 查找 "定义" 或 "设" 开头的定义语句

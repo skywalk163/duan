@@ -339,7 +339,8 @@ def _compile_to_exe(py_code: str, exe_path: Path, args):
             if error_msg:
                 # 只显示最后几行关键错误
                 lines = error_msg.strip().split('\n')
-                print(f"PyInstaller 错误:\n{'\n'.join(lines[-10:])}", file=sys.stderr)
+                error_detail = '\n'.join(lines[-10:])
+                print(f"PyInstaller 错误:\n{error_detail}", file=sys.stderr)
             raise RuntimeError(f"PyInstaller 打包失败 (exit code {result.returncode})")
 
         # 清理构建文件

@@ -97,6 +97,7 @@ nav:
     - Playground 使用: tools/playground.md
     - LSP 集成: tools/lsp.md
     - 调试器: tools/debugger.md
+    - 搜索配置: 搜索配置.md
   - 生态:
     - 教学资源: ecosystem/教学资源.md
   - 迁移指南:
