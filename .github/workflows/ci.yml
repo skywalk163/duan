@@ -193,7 +193,7 @@ jobs:
           python -c "import platform; print(f'OS: {platform.system()} {platform.release()}')"
           pytest tests/test_cross_platform.py -v --tb=short --cov=src --cov-report=term
 
-      - name: Stdlib Phase4 tests (新模块: 缓存/进度条/数据验证)
+      - name: "Stdlib Phase4 tests (新模块: 缓存/进度条/数据验证)"
         env:
           PYTHONPATH: ${{ github.workspace }}/stdlib
         run: |
@@ -212,32 +212,7 @@ jobs:
           PYTHONPATH: ${{ github.workspace }}/stdlib
         run: |
           echo "=== 标准库模块导入验证 ==="
-          python -c "
-import sys, os
-sys.path.insert(0, os.path.join(os.getcwd(), 'stdlib'))
-modules = [
-    '网络', '加密', '日志', '缓存', '配置', '测试',
-    '日期时间', '正则表达式', '进度条', '数据验证',
-    'JSON', 'Base64', 'CSV', 'XML', '哈希',
-    '数学', '统计', '随机', '颜色', '信号',
-    '线程', '进程', '编码', '编码解码',
-    '文件系统', '字符串处理', '系统接口',
-    '对象池缓存', '时间管理', '高级文件',
-]
-failed = []
-for m in modules:
-    try:
-        __import__(m)
-        print(f'  ✓ {m}')
-    except Exception as e:
-        print(f'  ✗ {m}: {e}')
-        failed.append(m)
-if failed:
-    print(f'失败模块: {failed}')
-    sys.exit(1)
-else:
-    print(f'全部 {len(modules)} 个模块导入成功')
-"
+          python -c "import sys, os; sys.path.insert(0, os.path.join(os.getcwd(), 'stdlib')); modules = ['网络', '加密', '日志', '缓存', '配置', '测试', '日期时间', '正则表达式', '进度条', '数据验证', 'JSON', 'Base64', 'CSV', 'XML', '哈希', '数学', '统计', '随机', '颜色', '信号', '线程', '进程', '编码', '编码解码', '文件系统', '字符串处理', '系统接口', '对象池缓存', '时间管理', '高级文件']; failed = []; [exec('try: __import__(m); print(f\"  ✓ {m}\")\nexcept Exception as e: print(f\"  ✗ {m}: {e}\"); failed.append(m)') for m in modules]; (print(f'失败模块: {failed}'), sys.exit(1)) if failed else print(f'全部 {len(modules)} 个模块导入成功')"
 
       - name: Stdlib unit tests
         env:
@@ -443,14 +418,7 @@ else:
       - name: Build verification — 安装并测试导入
         run: |
           python -m pip install dist/*.whl
-          python -c "
-import sys
-# 验证核心模块可导入
-from src.compiler import Compiler
-from src.lexer import Lexer
-print('✅ 构建验证通过: 核心模块导入成功')
-print(f'Python {sys.version}')
-"
+          python -c "import sys; from src.compiler import Compiler; from src.lexer import Lexer; print('✅ 构建验证通过: 核心模块导入成功'); print(f'Python {sys.version}')"
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:

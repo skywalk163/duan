@@ -160,19 +160,7 @@ jobs:
           # 从 CHANGELOG.md 中提取当前版本的变更内容
           if [ -f CHANGELOG.md ]; then
             # 尝试提取当前版本对应的变更日志
-            NOTES=$(python -c "
-import re
-with open('CHANGELOG.md', 'r', encoding='utf-8') as f:
-    content = f.read()
-version = '${{ steps.version.outputs.version }}'
-# 匹配 ## [version] 到下一个 ## 之间的内容
-pattern = rf'## \[{re.escape(version)}\].*?(?=\n## |\Z)'
-match = re.search(pattern, content, re.DOTALL)
-if match:
-    print(match.group(0).strip())
-else:
-    print('请查看 CHANGELOG.md 获取详细变更。')
-")
+            NOTES=$(python -c "import re; content = open('CHANGELOG.md', encoding='utf-8').read(); version = '${{ steps.version.outputs.version }}'; pattern = rf'## \[{re.escape(version)}\].*?(?=\n## |\Z)'; match = re.search(pattern, content, re.DOTALL); print(match.group(0).strip() if match else '请查看 CHANGELOG.md 获取详细变更。')")
             EOF=$(dd if=/dev/urandom bs=1 count=8 2>/dev/null | od -An -tx1 | tr -d ' \n')
             echo "notes<<$EOF" >> $GITHUB_OUTPUT
             echo "$NOTES" >> $GITHUB_OUTPUT
