@@ -13,6 +13,7 @@ from lexer import Lexer, LexerError
 from tokens import Token, TokenType
 from keywords import VERB_ARITY, KEYWORDS_DOUBLE, KEYWORDS_SPECIAL
 from ast_nodes_v3 import *
+import os
 import sys
 
 
@@ -22,12 +23,13 @@ import sys
 
 class ParseError(Exception):
     """语法解析错误"""
-    def __init__(self, message: str, line: int = 0, col: int = 0, token_value: str = None, source_lines: list = None):
+    def __init__(self, message: str, line: int = 0, col: int = 0, token_value: str = None, source_lines: list = None, filename: str = None):
         self.message = message
         self.line = line
         self.col = col
         self.token_value = token_value
         self.source_lines = source_lines or []
+        self.filename = filename
         
         # 根据错误内容生成修复建议
         hint = _generate_hint(message, token_value)
@@ -42,6 +44,8 @@ class ParseError(Exception):
             pos_info = f"行 {line}"
             if col:
                 pos_info += f", 列 {col}"
+            if filename:
+                pos_info += f" ({os.path.basename(filename)})"
             parts.append(f"│ 位置: {pos_info}")
         
         # 源代码上下文
@@ -276,12 +280,20 @@ class DuanParserCore:
 
     def _error(self, message: str, line: int = 0, col: int = 0, token_value: str = None):
         """报告解析错误（抛出 ParseError）"""
-        raise ParseError(message, line, col, token_value)
+        raise ParseError(message, line, col, token_value, filename=getattr(self, '_filename', None))
     
-    def parse(self, source: str) -> Module:
-        """解析段言代码，支持多错误收集（T1.4 恐慌模式 Error Recovery）"""
-        # 词法分析
-        tokens = self.lexer.tokenize(source)
+    def parse(self, source: str, filename: str = None, extra_definitions: set = None) -> Module:
+        """解析段言代码，支持多错误收集（T1.4 恐慌模式 Error Recovery）
+        
+        Args:
+            source: 段言源代码
+            filename: 源文件路径（用于错误信息显示）
+            extra_definitions: 跨模块的用户定义标识符集合（如已注册模块的导出函数名）
+        """
+        self._filename = filename
+        
+        # 词法分析（传入跨模块定义，使 lexer 能识别其他模块的函数名）
+        tokens = self.lexer.tokenize(source, extra_definitions=extra_definitions)
         
         # 过滤掉 EOF，保留 NEWLINE、INDENT/DEDENT 用于块结构解析
         self.tokens = [t for t in tokens if t.type != TokenType.EOF]
@@ -352,7 +364,8 @@ class DuanParserCore:
                     f"内部解析异常: {type(e).__name__}: {e}",
                     tok.line if tok else 0,
                     tok.col if tok else 0,
-                    tok.value if tok else None
+                    tok.value if tok else None,
+                    filename=getattr(self, '_filename', None)
                 )
                 if hasattr(self, '_source_lines'):
                     pe.source_lines = self._source_lines
@@ -432,13 +445,13 @@ class DuanParserCore:
                 if expected_value:
                     hint += f" = '{expected_value}'"
                 hint += ")"
-            raise ParseError(f"输入意外结束{hint}（建议检查是否缺少表达式或语句）", line, col)
+            raise ParseError(f"输入意外结束{hint}（建议检查是否缺少表达式或语句）", line, col, filename=getattr(self, '_filename', None))
         
         if expected_type and tok.type != expected_type:
-            raise ParseError(f"期望 {expected_type}，但得到 {tok.type}（附近: '{tok.value}'）", tok.line, tok.col, tok.value)
+            raise ParseError(f"期望 {expected_type}，但得到 {tok.type}（附近: '{tok.value}'）", tok.line, tok.col, tok.value, filename=getattr(self, '_filename', None))
         
         if expected_value and tok.value != expected_value:
-            raise ParseError(f"期望'{expected_value}'，但得到'{tok.value}'（附近: '{tok.value}'）", tok.line, tok.col)
+            raise ParseError(f"期望'{expected_value}'，但得到'{tok.value}'（附近: '{tok.value}'）", tok.line, tok.col, filename=getattr(self, '_filename', None))
         
         self.pos += 1
         return tok
@@ -478,5 +491,6 @@ class DuanParserCore:
         raise ParseError(
             f"期望'函数'（或兼容写法'段落'/'段'），但得到 {tok.type if tok else '输入结束'}"
             f"（附近: '{tok.value if tok else ''}'）",
-            tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None
+            tok.line if tok else 0, tok.col if tok else 0, tok.value if tok else None,
+            filename=getattr(self, '_filename', None)
         )

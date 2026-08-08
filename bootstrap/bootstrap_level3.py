@@ -82,6 +82,9 @@ if importlib:
         _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)
         _duan_builtin.列表包含 = lambda lst, item: item in lst
         _duan_builtin.包含 = lambda sub, s: sub in s
+        _duan_builtin.字符串包含 = lambda s, sub: sub in s
+        _duan_builtin.字符串替换 = lambda s, old, new: s.replace(old, new)
+        _duan_builtin.字符串反转 = lambda s: s[::-1]
         _duan_builtin.字符串长度 = len
         _duan_builtin.字符串获取 = lambda s, i: s[i]
         _duan_builtin.截取 = lambda s, start, end: s[start:end]
@@ -89,6 +92,11 @@ if importlib:
         _duan_builtin.转小写 = lambda s: s.lower()
         _duan_builtin.结尾 = lambda s, suffix: s.endswith(suffix)
         _duan_builtin.开头 = lambda s, prefix: s.startswith(prefix)
+        _duan_builtin.去除空白 = lambda s: s.strip()
+        _duan_builtin.分割字符串 = lambda s, sep=None: s.split(sep)
+        _duan_builtin.连接字符串 = lambda parts, sep='': sep.join(parts)
+        _duan_builtin.替换字符串 = lambda s, old, new: s.replace(old, new)
+        _duan_builtin.字符串分割 = lambda s, sep=None: s.split(sep)
         _duan_builtin.字典创建 = dict
         _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})
         _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)
@@ -126,11 +134,21 @@ else:
     _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)
     _duan_builtin.列表包含 = lambda lst, item: item in lst
     _duan_builtin.包含 = lambda sub, s: sub in s
+    _duan_builtin.字符串包含 = lambda s, sub: sub in s
+    _duan_builtin.字符串替换 = lambda s, old, new: s.replace(old, new)
+    _duan_builtin.字符串反转 = lambda s: s[::-1]
     _duan_builtin.字符串长度 = len
     _duan_builtin.字符串获取 = lambda s, i: s[i]
     _duan_builtin.截取 = lambda s, start, end: s[start:end]
     _duan_builtin.转大写 = lambda s: s.upper()
     _duan_builtin.转小写 = lambda s: s.lower()
+    _duan_builtin.结尾 = lambda s, suffix: s.endswith(suffix)
+    _duan_builtin.开头 = lambda s, prefix: s.startswith(prefix)
+    _duan_builtin.去除空白 = lambda s: s.strip()
+    _duan_builtin.分割字符串 = lambda s, sep=None: s.split(sep)
+    _duan_builtin.连接字符串 = lambda parts, sep='': sep.join(parts)
+    _duan_builtin.替换字符串 = lambda s, old, new: s.replace(old, new)
+    _duan_builtin.字符串分割 = lambda s, sep=None: s.split(sep)
     _duan_builtin.字典创建 = dict
     _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})
     _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)
@@ -923,13 +941,13 @@ def compile_class_body(toks, p, end_p, class_name):
                 attr_tok = _duan_builtin.列表获取(toks, np)
                 attr_name = _duan_builtin.列表获取(attr_tok, 1)
                 p = (np + 1)
-                继续()
+                continue
         if 是函数关键字(tv):
             func结果 = compile_class_method(toks, p, class_name)
             method_code = _duan_builtin.列表获取(func结果, 0)
             p = _duan_builtin.列表获取(func结果, 1)
             out = (out + method_code)
-            继续()
+            continue
         if (tv == "结束"):
             return out
         p = (p + 1)

@@ -272,17 +272,19 @@ class TypeCheckToggleStmt(ASTNode):
 
 
 class TryStmt(ASTNode):
-    __slots__ = ('try_body', 'catch_clauses', 'catch_type', 'catch_var', 'catch_body', 'finally_body')
+    __slots__ = ('try_body', 'catch_clauses', 'catch_type', 'catch_var', 'catch_body', 'finally_body', 'else_body')
     """异常捕获语句"""
     def __init__(self, try_body: List[ASTNode], catch_clauses: List = None, 
                  catch_type: str = None, catch_var: str = None,
-                 catch_body: List[ASTNode] = None, finally_body: List[ASTNode] = None):
+                 catch_body: List[ASTNode] = None, finally_body: List[ASTNode] = None,
+                 else_body: List[ASTNode] = None):
         self.try_body = try_body
         self.catch_clauses = catch_clauses or []
         self.catch_type = catch_type
         self.catch_var = catch_var
         self.catch_body = catch_body or []
         self.finally_body = finally_body or []
+        self.else_body = else_body or []
     
     def __repr__(self):
         if self.catch_clauses:
@@ -313,6 +315,22 @@ class ThrowStmt(ASTNode):
         if self.from_expr:
             return f"ThrowStmt({self.value} from {self.from_expr})"
         return f"ThrowStmt({self.value})"
+
+
+class AssertStmt(ASTNode):
+    __slots__ = ('condition', 'message')
+    """断言语句
+    
+    语法：断言 <条件>, <可选消息>。
+    """
+    def __init__(self, condition: ASTNode, message: ASTNode = None):
+        self.condition = condition
+        self.message = message
+    
+    def __repr__(self):
+        if self.message:
+            return f"AssertStmt({self.condition}, {self.message})"
+        return f"AssertStmt({self.condition})"
 
 
 class Pipeline(ASTNode):

@@ -24,7 +24,6 @@ import os
 import argparse
 import subprocess
 from pathlib import Path
-from feedback_collector import setup_feedback_subparser, run_feedback_cli
 
 # ── 路径设置 ──────────────────────────────────────────────────────
 _CLI_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,6 +33,8 @@ _PROJECT_DIR = os.path.dirname(_CLI_DIR)
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'antlrparser'))
 sys.path.insert(0, os.path.join(_PROJECT_DIR, 'src'))
 sys.path.insert(0, _PROJECT_DIR)
+
+from feedback_collector import setup_feedback_subparser, run_feedback_cli
 
 VERSION = '段言编译器 v6.2.0'
 
@@ -98,13 +99,114 @@ def _compile_src(source: str) -> str:
     return generator.generate(module)
 
 
+def _resolve_local_imports(source: str, source_dir: str) -> dict:
+    """解析源代码中的本地模块导入，递归查找所有 .duan 依赖
+
+    Returns:
+        {module_name: compiled_python_code, ...}
+    """
+    from duan_parser_v3 import DuanParser, ImportStmt
+    from code_generator import PythonCodeGenerator
+    from pathlib import Path
+
+    parser = DuanParser()
+    module = parser.parse(source)
+    if module is None:
+        return {}
+
+    def _collect_imports(mod):
+        """从模块的 statements 中收集所有 ImportStmt"""
+        result = []
+        for stmt in getattr(mod, 'statements', None) or []:
+            if isinstance(stmt, ImportStmt):
+                result.append(stmt)
+        return result
+
+    result = {}
+    visited = set()
+
+    def _resolve_one(mod_name: str, base_dir: str):
+        if mod_name in visited:
+            return
+        visited.add(mod_name)
+
+        # 查找 .duan 文件
+        mod_path = Path(base_dir) / f"{mod_name}.duan"
+        if not mod_path.exists():
+            return
+
+        mod_src = mod_path.read_text(encoding='utf-8')
+        mod_parser = DuanParser()
+        mod_module = mod_parser.parse(mod_src)
+        if mod_module is None:
+            return
+
+        # 编译
+        gen = PythonCodeGenerator()
+        code = gen.generate(mod_module)
+        result[mod_name] = code
+
+        # 递归解析子导入
+        for imp in _collect_imports(mod_module):
+            child_mod = imp.module_name
+            if child_mod not in visited and getattr(imp, 'language', None) is None:
+                _resolve_one(child_mod, base_dir)
+
+    # 解析主文件的所有导入
+    for imp in _collect_imports(module):
+        mod_name = imp.module_name
+        if getattr(imp, 'language', None) is None:
+            _resolve_one(mod_name, source_dir)
+
+    return result
+
+
 def _run_src(source: str, file_path: str | None = None) -> str:
-    """用 src 后端执行，返回输出"""
+    """用 src 后端执行，返回输出（支持多模块依赖自动解析）"""
     import os
+    from pathlib import Path
 
-    py_code = _compile_src(source)
+    # 解析本地模块依赖
+    source_dir = os.path.dirname(os.path.abspath(file_path)) if file_path else os.getcwd()
+    dep_modules = _resolve_local_imports(source, source_dir)
+
+    # 编译主文件
+    main_code = _compile_src(source)
+
+    # 构建完整代码：依赖模块在前，主文件在后
+    # 注意：生成的代码中 import 语句会引用段言模块名（如 '引擎'），
+    # 而 Python 找不到这些模块。因此我们注入依赖模块的代码，
+    # 并替换所有代码中的 "from 模块名 import" 为注释，
+    # 因为依赖模块的代码已经定义了所有需要的符号。
+
+    import re
+
+    # 先收集所有代码（deps + main）到一个字符串
+    combined_parts = []
+    for mod_name, dep_code in dep_modules.items():
+        combined_parts.append(f"# === 段言模块: {mod_name} ===\n")
+        combined_parts.append(dep_code)
+        combined_parts.append("\n")
+    combined_parts.append(main_code)
+    py_code = ''.join(combined_parts)
+
+    # 对所有代码，替换本地模块的 import 为注释
+    for mod_name in dep_modules:
+        py_code = re.sub(
+            rf'^from\s+{re.escape(mod_name)}\s+import\s+.*$',
+            f'# 已注入: from {mod_name} import ... (模块代码已内联)',
+            py_code,
+            flags=re.MULTILINE
+        )
+        py_code = re.sub(
+            rf'^import\s+{re.escape(mod_name)}\s*$',
+            f'# 已注入: import {mod_name} (模块代码已内联)',
+            py_code,
+            flags=re.MULTILINE
+        )
+
+    # 执行
     output_lines = []
-
     def _capture_print(*args, **kwargs):
         line = ' '.join(str(a) for a in args)
         output_lines.append(line)
@@ -112,7 +214,15 @@ def _run_src(source: str, file_path: str | None = None) -> str:
     namespace = {'print': _capture_print, '__name__': '__main__'}
     if file_path:
         namespace['__file__'] = os.path.abspath(file_path)
-    exec(py_code, namespace)
+    # 添加源文件目录到 Python 路径，确保 `导入 Python:` 能找到本地 .py 模块
+    import sys
+    sys.path.insert(0, source_dir)
+    try:
+        exec(py_code, namespace)
+    finally:
+        # 执行后移除临时路径，避免影响后续调用
+        if sys.path[0] == source_dir:
+            sys.path.pop(0)
     return '\n'.join(output_lines)
 
 
@@ -388,6 +498,7 @@ def cmd_tokens(args):
 
 def cmd_check(args):
     """语法检查：解析源代码但不执行"""
+    from enhanced_errors import format_error
     source = _read_source(args.file)
 
     errors = []
@@ -399,7 +510,18 @@ def cmd_check(args):
             parser = DuanParser()
             module = parser.parse(source)
             if module is None:
-                errors.append("解析失败：返回空模块")
+                first_unparsed = None
+                for i in range(parser.pos, len(parser.tokens)):
+                    t = parser.tokens[i]
+                    if t.type.name not in ('NEWLINE', 'DEDENT', 'INDENT', 'DOT', 'EOF'):
+                        first_unparsed = t
+                        break
+                if first_unparsed:
+                    err_msg = f"解析失败：无法识别语法 '{first_unparsed.value}'"
+                    formatted = format_error(source, Exception(err_msg), first_unparsed.line, first_unparsed.col)
+                    errors.append(formatted)
+                else:
+                    errors.append("解析失败：返回空模块")
             else:
                 # 检查是否有未消费的实质性 token（解析器提前停止）
                 first_unparsed = None
@@ -409,10 +531,9 @@ def cmd_check(args):
                         first_unparsed = t
                         break
                 if first_unparsed:
-                    errors.append(
-                        f"解析失败：无法识别代码语法。"
-                        f"第{first_unparsed.line}行第{first_unparsed.col}列附近: '{first_unparsed.value}'"
-                    )
+                    err_msg = f"解析失败：无法识别语法 '{first_unparsed.value}'"
+                    formatted = format_error(source, Exception(err_msg), first_unparsed.line, first_unparsed.col)
+                    errors.append(formatted)
         else:
             from duan_visitor import DuanParser
             from code_generator_unified import UnifiedCodeGenerator
@@ -420,9 +541,15 @@ def cmd_check(args):
             parser = DuanParser()
             module = parser.parse(processed_source)
             if module is None:
-                errors.extend(parser.errors)
+                for err in parser.errors:
+                    errors.append(err)
     except Exception as e:
-        errors.append(str(e))
+        # 使用增强错误格式化器
+        try:
+            formatted = format_error(source, e)
+            errors.append(formatted)
+        except Exception:
+            errors.append(str(e))
 
     # 简单统计
     lines = source.split('\n')
@@ -435,28 +562,29 @@ def cmd_check(args):
         'comment_lines': sum(1 for l in lines if _is_comment_line(l)),
     }
 
-    print(f"检查文件: {args.file}")
-    print(f"  总行数: {stats['total_lines']}")
-    print(f"  代码行: {stats['code_lines']}")
-    print(f"  注释行: {stats['comment_lines']}")
+    print(f"📄 检查文件: {args.file}")
+    print(f"   总行数: {stats['total_lines']}")
+    print(f"   代码行: {stats['code_lines']}")
+    print(f"   注释行: {stats['comment_lines']}")
 
     if errors:
         print(f"\n❌ 发现 {len(errors)} 个错误:")
         for err in errors:
-            print(f"    - {err}")
+            print(f"  {err}")
         sys.exit(1)
     else:
         print(f"\n✅ 语法检查通过，未发现错误。")
 
-    # 类型检查
-    if args.type_check:
-        _run_type_check(source, args.type_check, args.file)
+    # 默认启用类型检查（除非显式指定 --no-type-check）
+    if not getattr(args, 'no_type_check', False):
+        _run_type_check(source, getattr(args, 'type_check', '表达式'), args.file)
 
 
 def _run_type_check(source: str, level_str: str, file_path: str):
     """运行类型检查并输出结果"""
     from compiler import DuanCompiler
     from core.config import TypeCheckLevel
+    from enhanced_errors import format_error
 
     level_map = {
         '签名': TypeCheckLevel.SIGNATURE, 'signature': TypeCheckLevel.SIGNATURE,
@@ -470,7 +598,11 @@ def _run_type_check(source: str, level_str: str, file_path: str):
     compiler._config.type_check_level = level
 
     # 解析并运行类型检查
-    result = compiler.compile(source, optimize=False)
+    try:
+        result = compiler.compile(source, optimize=False)
+    except Exception as e:
+        print(format_error(source, e), file=sys.stderr)
+        sys.exit(1)
 
     print(f"\n━━━ 类型检查（级别: {level_str}）━━━")
 
@@ -483,7 +615,15 @@ def _run_type_check(source: str, level_str: str, file_path: str):
     if type_errors:
         print(f"\n❌ 类型错误 ({len(type_errors)} 个):")
         for e in type_errors:
-            print(f"  {e}")
+            # 尝试提取行号并显示源码上下文
+            import re
+            line_match = re.search(r'第(\d+)行', e)
+            if line_match:
+                line_num = int(line_match.group(1))
+                formatted = format_error(source, Exception(e), line_num)
+                print(f"  {formatted}")
+            else:
+                print(f"  {e}")
         sys.exit(1)
     else:
         print("✅ 类型检查通过")
@@ -801,6 +941,12 @@ def cmd_test(args):
     from test_runner import run_tests, run_single_file
 
     if args.file:
+        if os.path.isdir(args.file):
+            return run_tests(
+                args.file,
+                filter_pattern=args.filter,
+                verbose=args.verbose
+            )
         return run_single_file(args.file, verbose=args.verbose)
     else:
         return run_tests(
@@ -1103,12 +1249,14 @@ def main():
     tok_p.add_argument('file', help='源文件路径')
 
     # ── check ──
-    check_p = subparsers.add_parser('check', help='语法检查')
+    check_p = subparsers.add_parser('check', help='语法检查（默认启用类型检查）')
     check_p.add_argument('file', help='源文件路径')
     check_p.add_argument('--backend', choices=['antlr', 'src'], default='src',
                          help='使用的后端（默认: src）')
     check_p.add_argument('--type-check', choices=['签名', '变量', '表达式', 'signature', 'variable', 'expression'],
-                         default=None, help='启用类型检查并指定级别')
+                         default='表达式', help='类型检查级别（默认: 表达式）')
+    check_p.add_argument('--no-type-check', action='store_true',
+                         help='跳过类型检查')
 
     # ── type-check ──
     tc_p = subparsers.add_parser('type-check', help='独立类型检查')

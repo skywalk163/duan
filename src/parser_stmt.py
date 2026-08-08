@@ -202,9 +202,9 @@ class ParserStmtMixin:
                 self._consume(TokenType.PERIOD)
             return BreakStmt()
         
-        # 跳过语句：跳过
-        if tok.type == TokenType.KEYWORD and tok.value == '跳过':
-            self._consume(TokenType.KEYWORD, '跳过')
+        # 跳过语句：跳过 / 继续
+        if tok.type == TokenType.KEYWORD and tok.value in ('跳过', '继续'):
+            self._consume(TokenType.KEYWORD, tok.value)
             if self._current() and self._current().type == TokenType.PERIOD:
                 self._consume(TokenType.PERIOD)
             return ContinueStmt()
@@ -472,6 +472,10 @@ class ParserStmtMixin:
                 tok.line, tok.col
             )
         
+        # 断言语句：断言 <条件>，<可选消息>。
+        if tok.type == TokenType.IDENTIFIER and tok.value == '断言':
+            return self._parse_assert_stmt()
+
         # 赋值语句：标识符 等于 值。
         if tok.type == TokenType.IDENTIFIER:
             return self._parse_assignment_stmt()
@@ -512,6 +516,41 @@ class ParserStmtMixin:
                 f"请检查语句是否正确，或参考段言语法文档。",
                 tok.line, tok.col, tok.value
             )
+
+    def _parse_assert_stmt(self) -> ASTNode:
+        """解析断言语句：断言 <条件>，<可选消息>。
+        
+        语法：
+            断言 <条件表达式>。
+            断言 <条件表达式>，<消息表达式>。
+        
+        示例：
+            断言 结果 等于 42。
+            断言 字符串包含(结果, "测试")，"问候语应包含名称"。
+        
+        注意：使用 _parse_logical_expr 而非 _parse_expr 解析条件，
+        因为 _parse_expr 会把逗号（，）当作管道操作符，导致消息
+        被错误地解析为管道链的一部分。
+        """
+        from ast_nodes_v3 import AssertStmt
+        
+        # 消耗 断言
+        self._consume(TokenType.IDENTIFIER, '断言')
+        
+        # 解析条件表达式（使用 _parse_logical_expr 避免逗号被当作管道）
+        condition = self._parse_logical_expr()
+        
+        # 检查是否有逗号（，或,）分隔的消息
+        message = None
+        if self._current() and self._current().type == TokenType.COMMA:
+            self._consume(TokenType.COMMA)
+            message = self._parse_expr()
+        
+        # 消耗句号
+        if self._current() and self._current().type == TokenType.PERIOD:
+            self._consume(TokenType.PERIOD)
+        
+        return AssertStmt(condition, message)
 
     def _parse_expr_stmt(self) -> ASTNode:
         """解析表达式语句（动词调用等）"""
@@ -2127,7 +2166,7 @@ class ParserStmtMixin:
                             is_stmt_keyword = True
                     else:
                         is_stmt_keyword = (tok.value in ('设', '定义', '当', '如果', '若', '遍历', 
-                                                          '打印', '导入', '导出', '跳出', '跳过', 
+                                                          '打印', '导入', '导出', '跳出', '跳过', '继续',
                                                           '尝试', '抛出', '匹配', '返回', '属性', 
                                                           '构造', '类', '接口'))
                 if not is_stmt_keyword:
@@ -2337,6 +2376,21 @@ class ParserStmtMixin:
             # finally块
             finally_body = self._parse_body()
         
+        # 否则（可选）- try 块的 else 子句，没有异常时执行
+        else_body = []
+        if self._match(TokenType.KEYWORD, '否则'):
+            self._consume(TokenType.KEYWORD, '否则')
+            self._consume(TokenType.COLON)
+            has_newline = False
+            while self._current() and self._current().type == TokenType.NEWLINE:
+                has_newline = True
+                self._consume(TokenType.NEWLINE)
+            if self._current() and self._current().type == TokenType.INDENT:
+                self._consume(TokenType.INDENT)
+            else_body = self._parse_body(allow_single_line=not has_newline, stop_on_else=True)
+            if self._current() and self._current().type == TokenType.DEDENT:
+                self._consume(TokenType.DEDENT)
+        
         # 消耗"结束"关键字（可选）
         if self._current() and self._current().type == TokenType.KEYWORD and self._current().value == '结束':
             self._consume(TokenType.KEYWORD, '结束')
@@ -2349,7 +2403,8 @@ class ParserStmtMixin:
         
         return TryStmt(try_body, catch_clauses=catch_clauses, 
                        catch_type=catch_type, catch_var=catch_var, 
-                       catch_body=catch_body, finally_body=finally_body)
+                       catch_body=catch_body, finally_body=finally_body,
+                       else_body=else_body)
     
     def _parse_throw_stmt(self) -> ThrowStmt:
         """解析抛出异常语句
@@ -2855,7 +2910,7 @@ class ParserStmtMixin:
 
             # 否则标记（if语句的else分支）- 在 depth==0 时遇到否则总是停止
             # 让调用者（如_parse_if_stmt）来处理
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '否则':
+            if stop_on_else and depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '否则':
                 # 检查后面是否是冒号或如果
                 next_tok = self._peek(1)
                 if next_tok and next_tok.type == TokenType.COLON:
@@ -2864,12 +2919,12 @@ class ParserStmtMixin:
                 if next_tok and next_tok.type == TokenType.KEYWORD and next_tok.value == '如果':
                     # 否则如果 - 这是 if 语句的 elif 分支，停止解析让调用者处理
                     break
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '否则若':
+            if stop_on_else and depth == 0 and tok.type == TokenType.KEYWORD and tok.value == '否则若':
                 # 否则若 - 作为单个token的elif，停止解析让调用者处理
                 break
 
-            # 异常处理的特殊标记（捕获、最终、结束）- 仅在 depth==0 时停止
-            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('捕获', '最终', '结束'):
+            # 异常处理的特殊标记（捕获、最终、否则、结束）- 仅在 depth==0 时停止
+            if depth == 0 and tok.type == TokenType.KEYWORD and tok.value in ('捕获', '最终', '否则', '结束'):
                 break
             if depth == 0 and tok.type == TokenType.IDENTIFIER and tok.value == '结束':
                 break

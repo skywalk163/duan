@@ -11,7 +11,7 @@ import ast_nodes as ast_nodes_module
 
 # 需要导入新的AST节点类型
 from duan_parser_v3 import ImportStmt, ExportStmt, IndexAccess, SliceExpr, SetComprehension, TupleLiteral, BreakStmt, ContinueStmt, PassStmt, ClassInstantiation, MemberAccess, TryStmt, ThrowStmt, Parameter, ParameterList, StringInterpolation, ListComprehension, LambdaExpression, MatchStmt, MatchCase, MatchPattern, DictComprehension, DestructuringAssignment, WithStmt, DecoratorDefinition, DictLiteral, InterfaceDefinition, MethodSignature, IndexedAssignment, RangeExpr, FFILoadLibrary, FFIFunctionDecl, FFIStructDef, FFICallbackDef, FFICreateArray, FFISetArrayElement, FFIAllocMemory, FFIFreeMemory, FFISetPointerValue, FFISetErrno, FFITryCatch, FFIEnumDef, FFIUnionDef, FFICreateCallback, FFIVarArgsDecl, FFIStructByValue, FFILibraryPath, FFITypedefDef, FFIBitfieldDef, FFIFuncPtrDef, FFIDebugConfig, FFIPreprocessorDef, FFIPointerType, FFIArrayType, FFIAddressOf, FFIDereference, FFIPointerOffset, FFIGetLastError, FFIGetErrno
-from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock, FunctionCallExpr, CatchClause, YieldStmt, AsyncScope, DecoratedFunction, DecoratorInfo
+from ast_nodes_v3 import Assignment, TypeCheckToggleStmt, AwaitExpr, KeywordArg, IndexedCompoundAssignment, PassStmt, AssignmentExpression, SetLiteral, EmbedBlock, FunctionCallExpr, CatchClause, YieldStmt, AsyncScope, DecoratedFunction, DecoratorInfo, AssertStmt
 from ast_nodes import ExpressionStatement, SegmentName
 
 
@@ -132,6 +132,7 @@ class PythonCodeGenerator:
             '断言错误': 'AssertionError',
             '停止迭代': 'StopIteration',
             '错误': 'Exception',
+            '异常': 'Exception',
         }
         
         # 运算符映射
@@ -482,6 +483,9 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("        _duan_builtin.包含 = lambda sub, s: sub in s")
+        self._add_line("        _duan_builtin.字符串包含 = lambda s, sub: sub in s")
+        self._add_line("        _duan_builtin.字符串替换 = lambda s, old, new: s.replace(old, new)")
+        self._add_line("        _duan_builtin.字符串反转 = lambda s: s[::-1]")
         self._add_line("        _duan_builtin.字符串长度 = len")
         self._add_line("        _duan_builtin.字符串获取 = lambda s, i: s[i]")
         self._add_line("        _duan_builtin.截取 = lambda s, start, end: s[start:end]")
@@ -489,6 +493,11 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.转小写 = lambda s: s.lower()")
         self._add_line("        _duan_builtin.结尾 = lambda s, suffix: s.endswith(suffix)")
         self._add_line("        _duan_builtin.开头 = lambda s, prefix: s.startswith(prefix)")
+        self._add_line("        _duan_builtin.去除空白 = lambda s: s.strip()")
+        self._add_line("        _duan_builtin.分割字符串 = lambda s, sep=None: s.split(sep)")
+        self._add_line("        _duan_builtin.连接字符串 = lambda parts, sep='': sep.join(parts)")
+        self._add_line("        _duan_builtin.替换字符串 = lambda s, old, new: s.replace(old, new)")
+        self._add_line("        _duan_builtin.字符串分割 = lambda s, sep=None: s.split(sep)")
         self._add_line("        _duan_builtin.字典创建 = dict")
         self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
@@ -526,11 +535,21 @@ class PythonCodeGenerator:
         self._add_line("    _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)")
         self._add_line("    _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("    _duan_builtin.包含 = lambda sub, s: sub in s")
+        self._add_line("    _duan_builtin.字符串包含 = lambda s, sub: sub in s")
+        self._add_line("    _duan_builtin.字符串替换 = lambda s, old, new: s.replace(old, new)")
+        self._add_line("    _duan_builtin.字符串反转 = lambda s: s[::-1]")
         self._add_line("    _duan_builtin.字符串长度 = len")
         self._add_line("    _duan_builtin.字符串获取 = lambda s, i: s[i]")
         self._add_line("    _duan_builtin.截取 = lambda s, start, end: s[start:end]")
         self._add_line("    _duan_builtin.转大写 = lambda s: s.upper()")
         self._add_line("    _duan_builtin.转小写 = lambda s: s.lower()")
+        self._add_line("    _duan_builtin.结尾 = lambda s, suffix: s.endswith(suffix)")
+        self._add_line("    _duan_builtin.开头 = lambda s, prefix: s.startswith(prefix)")
+        self._add_line("    _duan_builtin.去除空白 = lambda s: s.strip()")
+        self._add_line("    _duan_builtin.分割字符串 = lambda s, sep=None: s.split(sep)")
+        self._add_line("    _duan_builtin.连接字符串 = lambda parts, sep='': sep.join(parts)")
+        self._add_line("    _duan_builtin.替换字符串 = lambda s, old, new: s.replace(old, new)")
+        self._add_line("    _duan_builtin.字符串分割 = lambda s, sep=None: s.split(sep)")
         self._add_line("    _duan_builtin.字典创建 = dict")
         self._add_line("    _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("    _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")
@@ -665,6 +684,8 @@ class PythonCodeGenerator:
             self._generate_try_stmt(stmt)
         elif isinstance(stmt, ThrowStmt):
             self._generate_throw_stmt(stmt)
+        elif isinstance(stmt, AssertStmt):
+            self._generate_assert_stmt(stmt)
         elif isinstance(stmt, ParagraphCall):
             # 动词调用作为独立语句
             expr_code = self._generate_expr(stmt)
@@ -1168,6 +1189,14 @@ class PythonCodeGenerator:
             for s in stmt.finally_body:
                 self._generate_statement(s)
             self.indent_level -= 1
+        
+        # else块（try块没有异常时执行）
+        if stmt.else_body:
+            self._add_line("else:")
+            self.indent_level += 1
+            for s in stmt.else_body:
+                self._generate_statement(s)
+            self.indent_level -= 1
     
     def _generate_throw_stmt(self, stmt: ThrowStmt):
         """生成抛出异常语句"""
@@ -1205,6 +1234,19 @@ class PythonCodeGenerator:
             from_part = f" from {from_val}"
         self._add_line(f"_duan_exc = {value}")
         self._add_line(f"raise _duan_exc if isinstance(_duan_exc, BaseException) else Exception(_duan_exc){from_part}")
+    
+    def _generate_assert_stmt(self, stmt: AssertStmt):
+        """生成断言语句
+        
+        语法：断言 <条件>，<可选消息>。
+        生成：assert <条件>, <消息>
+        """
+        cond = self._generate_expr(stmt.condition)
+        if stmt.message:
+            msg = self._generate_expr(stmt.message)
+            self._add_line(f"assert {cond}, {msg}")
+        else:
+            self._add_line(f"assert {cond}")
     
     def _generate_self_assignment(self, stmt):
         """生成self赋值语句"""
@@ -1620,7 +1662,7 @@ class PythonCodeGenerator:
         method_name = method.name
 
         # 构造函数特殊处理
-        is_ctor = getattr(method, 'is_constructor', False) or method_name == '构造'
+        is_ctor = getattr(method, 'is_constructor', False) or method_name in ('构造', '初始化')
         if is_ctor:
             method_name = '__init__'
 

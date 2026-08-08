@@ -329,30 +329,36 @@ class Executor:
     def _compile_and_run(self, code: str) -> Any:
         """编译并执行复杂代码
 
+        使用 src 手写解析器后端（DuanParser + PythonCodeGenerator）。
         如果编译执行失败，会回退到解释执行。
         """
         try:
-            # 尝试使用 ANTLR 解析器
-            from antlrparser.duan_visitor import parse_source
-            from code_generator_unified import UnifiedCodeGenerator
+            # 使用 src 手写解析器后端
+            from duan_parser_v3 import DuanParser
+            from code_generator import PythonCodeGenerator
 
-            module = parse_source(code)
+            parser = DuanParser()
+            module = parser.parse(code)
             if module:
-                generator = UnifiedCodeGenerator()
+                generator = PythonCodeGenerator()
                 python_code = generator.generate(module)
 
-                # 在隔离的环境中执行
-                exec_globals = {
-                    '__builtins__': __builtins__,
-                    '_duan_env': self.env,
-                }
+                # 使用持久化执行环境，维持 REPL 会话状态
+                if not hasattr(self, '_exec_globals'):
+                    self._exec_globals = {
+                        '__builtins__': __builtins__,
+                    }
+                exec_globals = self._exec_globals
 
                 exec(python_code, exec_globals)
 
-                # 更新环境
+                # 更新 Environment 中的变量和函数（供后续解释执行使用）
                 for name, value in exec_globals.items():
                     if not name.startswith('_'):
-                        self.env.set(name, value)
+                        if callable(value):
+                            self.env.set_function(name, value)
+                        else:
+                            self.env.set(name, value)
 
                 return None
         except Exception as e:
@@ -370,6 +376,8 @@ class Executor:
         """重置环境"""
         self.env = Environment()
         self._setup_builtins()
+        if hasattr(self, '_exec_globals'):
+            del self._exec_globals
 
 
 # =============================================================================

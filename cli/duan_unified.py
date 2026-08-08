@@ -33,14 +33,15 @@ if os.path.isdir(_local_src):
 if os.path.isdir(_local_antlr):
     sys.path.insert(0, _local_antlr)
 
-# 已安装版本（pip install），将 src 下模块暴露到顶层路径
-try:
-    import src as _src_pkg
-    _installed_src = str(Path(_src_pkg.__file__).parent)
-    if _installed_src not in sys.path and os.path.isdir(_installed_src):
-        sys.path.insert(0, _installed_src)
-except ImportError:
-    pass
+# 已安装版本（pip install），仅在本地 src 不可用时回退
+if not os.path.isdir(_local_src):
+    try:
+        import src as _src_pkg
+        _installed_src = str(Path(_src_pkg.__file__).parent)
+        if _installed_src not in sys.path and os.path.isdir(_installed_src):
+            sys.path.insert(0, _installed_src)
+    except ImportError:
+        pass
 
 
 class DuanUnifiedCLI:
@@ -115,30 +116,32 @@ class DuanUnifiedCLI:
         
         return 0
     
-    def _resolve_user_module_imports(self, source: str, source_dir: str,
-                                      resolved: set = None) -> str:
-        """解析用户自定义模块导入，将模块源码内联到主源码中。
+    def _register_user_modules(self, source: str, source_dir: str,
+                                registered: set = None,
+                                exported_names: set = None) -> None:
+        """预编译用户自定义模块并注册到 sys.modules
 
-        src 后端在生成 Python 代码时，会将 `从 清洗器 导入 ...` 直接翻译为
-        `from 清洗器 import ...`，但 Python 解析器无法识别中文模块名。
-        本方法在解析前将用户自定义模块的源码内联，消除跨模块导入依赖。
+        段言的导入语句（如 导入《工具》为 工具）会被翻译为 Python 的
+        import 工具 as 工具，但 Python 无法直接找到中文模块名。
+        此方法在运行前预编译用户模块的 .duan 文件，创建 Python 模块对象
+        并注册到 sys.modules 中，使 import 语句能正常解析。
 
         Args:
-            source: 源代码
+            source: 源代码（用于提取导入语句）
             source_dir: 源文件所在目录（用于查找模块文件）
-            resolved: 已解析的模块名集合（避免循环依赖）
-
-        Returns:
-            内联后的源码（所有用户模块已内联为单一源码）
+            registered: 已注册的模块名集合（防止循环依赖）
+            exported_names: 收集到的所有模块导出函数名集合（用于跨模块标识符识别）
         """
-        import re
-        import os
+        import types
         from duan_parser_v3 import DuanParser, ImportStmt
+        from code_generator import PythonCodeGenerator
 
-        if resolved is None:
-            resolved = set()
+        if registered is None:
+            registered = set()
+        # 防止重复收集导出名
+        _already_collected = set()
 
-        # 已知的标准库 / Python 模块名（不应被内联）
+        # 已知的标准库 / Python 模块名（不应被预编译）
         KNOWN_STDLIB = {
             '文件系统', 'JSON', 'sys', '字符串工具', '数学', '时间', '日期时间',
             'csv', 'json', 'os', 're', 'random', 'math', 'datetime', 'time',
@@ -151,43 +154,60 @@ class DuanUnifiedCLI:
         parser = DuanParser()
         module = parser.parse(source)
         if not module:
-            return source
+            return
 
-        # 收集用户自定义模块导入
-        replacements = []
         for stmt in getattr(module, 'statements', []):
             if not isinstance(stmt, ImportStmt):
                 continue
             mod_name = stmt.module_name
-            if mod_name in resolved or mod_name in KNOWN_STDLIB:
+            if mod_name in registered or mod_name in KNOWN_STDLIB:
                 continue
+            if getattr(stmt, 'language', None) in ('python', 'c'):
+                continue
+
             # 检查模块文件是否存在
             mod_path = os.path.join(source_dir, f"{mod_name}.duan")
             if not os.path.exists(mod_path):
-                continue
+                # 尝试从项目根目录查找
+                alt_path = os.path.join(os.path.dirname(source_dir), f"{mod_name}.duan")
+                if os.path.exists(alt_path):
+                    mod_path = alt_path
+                else:
+                    continue
+
             # 读取模块源码
             with open(mod_path, 'r', encoding='utf-8') as f:
                 mod_source = f.read()
-            # 递归解析模块中的导入
-            resolved.add(mod_name)
-            mod_source = self._resolve_user_module_imports(
-                mod_source, source_dir, resolved
-            )
-            # 构建匹配导入语句的正则表达式
-            # 格式: 从 模块名 导入 符号1, 符号2, ...
-            # 或: 导入 模块名。
-            # 使用 re.DOTALL 以支持多行符号列表
-            if stmt.symbols:
-                pattern = rf'从\s+{re.escape(mod_name)}\s+导入\s+.+?。'
-            else:
-                pattern = rf'导入\s+{re.escape(mod_name)}。'
-            replacements.append((pattern, mod_source))
 
-        # 逆序替换，保持行号位置正确
-        for pattern, mod_source in reversed(replacements):
-            source = re.sub(pattern, mod_source, source, count=1, flags=re.DOTALL)
+            # 标记为已注册，防止循环依赖
+            registered.add(mod_name)
 
-        return source
+            # 递归注册模块自身的导入
+            self._register_user_modules(mod_source, os.path.dirname(mod_path), registered, exported_names)
+
+            # 编译模块并注册为 Python 模块
+            try:
+                mod_parser = DuanParser()
+                mod_module = mod_parser.parse(mod_source, filename=mod_path)
+                if mod_module:
+                    mod_generator = PythonCodeGenerator()
+                    mod_py_code = mod_generator.generate(mod_module)
+                    mod_ns = {'__builtins__': __builtins__}
+                    exec(mod_py_code, mod_ns)
+                    mod_obj = types.ModuleType(mod_name)
+                    for k, v in mod_ns.items():
+                        if not k.startswith('_'):
+                            setattr(mod_obj, k, v)
+                    sys.modules[mod_name] = mod_obj
+                    # 收集模块的导出函数名（用于跨模块标识符识别）
+                    if exported_names is not None and mod_name not in _already_collected:
+                        _already_collected.add(mod_name)
+                        for name in dir(mod_obj):
+                            if not name.startswith('_') and callable(getattr(mod_obj, name, None)):
+                                exported_names.add(name)
+            except Exception:
+                # 注册失败时不中断，让后续的 import 抛出更清晰的错误
+                pass
 
     def compile_with_src(self, source: str, output_file: Optional[str] = None,
                          run: bool = False, target: str = 'python',
@@ -238,22 +258,32 @@ class DuanUnifiedCLI:
             #   “未知语句类型 VariableDeclaration”，与 cli/duan.py 的
             #   _compile_src 保持一致的可用路径）
 
-            # 解析用户自定义模块导入（内联 .duan 文件内容）
+            # 解析用户自定义模块导入（预编译并注册模块）
+            mod_registered = set()
+            mod_exported_names = set()
             if source_file:
                 source_dir = os.path.dirname(os.path.abspath(source_file))
-                source = self._resolve_user_module_imports(source, source_dir)
+                self._register_user_modules(source, source_dir, mod_registered, mod_exported_names)
 
-            from duan_parser_v3 import DuanParser
-            from code_generator import PythonCodeGenerator
+            from duan_parser_v3 import DuanParser, ParseError
+            from code_generator import PythonCodeGenerator, CodeGenError
 
-            parser = DuanParser()
-            module = parser.parse(source)
-            if not module:
-                print("[语法错误] 解析失败", file=sys.stderr)
+            try:
+                parser = DuanParser()
+                module = parser.parse(source, filename=source_file, extra_definitions=mod_exported_names)
+                if not module:
+                    print(f"[语法错误] 解析失败: {source_file}", file=sys.stderr)
+                    return 1
+            except ParseError as e:
+                print(f"[语法错误]\n{e}", file=sys.stderr)
                 return 1
 
-            generator = PythonCodeGenerator()
-            python_code = generator.generate(module)
+            try:
+                generator = PythonCodeGenerator()
+                python_code = generator.generate(module)
+            except CodeGenError as e:
+                print(f"[代码生成错误] {e}", file=sys.stderr)
+                return 1
             
             if output_file:
                 with open(output_file, 'w', encoding='utf-8') as f:
@@ -268,6 +298,9 @@ class DuanUnifiedCLI:
                         '__builtins__': __builtins__,
                     }
                     exec(python_code, exec_globals)
+                except SyntaxError as e:
+                    print(f"[运行错误] 生成的 Python 代码存在语法错误 (行 {e.lineno}): {e.msg}", file=sys.stderr)
+                    return 1
                 except Exception as e:
                     print(f"[运行错误] {e}", file=sys.stderr)
                     return 1
@@ -281,24 +314,48 @@ class DuanUnifiedCLI:
             source_file: 源文件路径
             script_args: 传递给脚本的参数列表（不含文件路径）
         """
+        source_file = os.path.abspath(source_file)
+        if not os.path.exists(source_file):
+            print(f"[错误] 文件不存在: {source_file}", file=sys.stderr)
+            return 1
+        
         try:
             with open(source_file, 'r', encoding='utf-8') as f:
                 source = f.read()
-            # 设置脚本的 sys.argv
-            old_argv = sys.argv
-            sys.argv = [source_file] + (script_args or [])
-            try:
-                return self.compile_with_src(source, run=True, source_file=source_file)
-            finally:
-                sys.argv = old_argv
+        except IOError as e:
+            print(f"[错误] 无法读取文件 {source_file}: {e}", file=sys.stderr)
+            return 1
+        
+        # 设置脚本的 sys.argv
+        old_argv = sys.argv
+        sys.argv = [source_file] + (script_args or [])
+        try:
+            return self.compile_with_src(source, run=True, source_file=source_file)
         except Exception as e:
-            print(f"[运行错误] {e}", file=sys.stderr)
+            print(f"[内部错误] 编译器异常: {e}", file=sys.stderr)
             import traceback
             traceback.print_exc()
             return 1
+        finally:
+            sys.argv = old_argv
     
-    def start_repl(self) -> int:
-        """启动REPL"""
+    def start_repl(self, v3: bool = False) -> int:
+        """启动REPL
+
+        Args:
+            v3: 是否使用基于 v3 解析器的 REPL
+        """
+        if v3:
+            try:
+                from tools.repl_v3 import DuanREPLV3
+                repl = DuanREPLV3()
+                repl.run()
+                return 0
+            except ImportError as e:
+                print(f"[错误] REPL v3 模块不可用: {e}", file=sys.stderr)
+                # 回退到旧版 REPL
+                pass
+
         try:
             # 先尝试导入 tools.repl（新位置）
             from tools.repl import DuanREPL
@@ -314,8 +371,15 @@ class DuanUnifiedCLI:
             repl_main()
             return 0
         except ImportError:
-            print("[错误] REPL模块不可用", file=sys.stderr)
-            return 1
+            # 最后尝试 v3 REPL
+            try:
+                from tools.repl_v3 import DuanREPLV3
+                repl = DuanREPLV3()
+                repl.run()
+                return 0
+            except ImportError:
+                print("[错误] REPL模块不可用", file=sys.stderr)
+                return 1
     
     def start_debug_repl(self) -> int:
         """启动调试REPL"""
@@ -335,32 +399,166 @@ class DuanUnifiedCLI:
             print(f"[错误] 目录已存在: {project_dir}", file=sys.stderr)
             return 1
 
+        # 创建目录结构
         project_dir.mkdir(parents=True)
+        (project_dir / 'src').mkdir()
+        (project_dir / 'tests').mkdir()
+        (project_dir / 'lib').mkdir()
 
-        # main.duan - 示例入口文件
-        main_duan = project_dir / 'main.duan'
-        main_duan.write_text('''# 段言示例程序
-# 这是 main.duan — 项目入口文件
+        # .gitignore - 遵循安全规则，不提交敏感信息
+        gitignore = project_dir / '.gitignore'
+        gitignore.write_text('''# 段言项目忽略文件
 
-设 甲 为 42。
-打印("甲 = ", 甲)
+# 编译产物
+*.py
+!build.py
+__pycache__/
+*.pyc
 
-段落 加法 接收 数甲, 数乙:
-    返回 数甲 加 数乙。
+# 环境变量与密钥
+.env
+.env.local
+*.key
+*.pem
 
-设 结果 为 加法(3, 5)。
-打印("3 + 5 = ", 结果)
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 项目构建缓存
+.duan_cache/
+build/
 ''', encoding='utf-8')
 
-        # duan.json - 项目配置文件
+        # duan.json - 项目配置
         duan_json = project_dir / 'duan.json'
         duan_json.write_text('''{
     "name": "%s",
     "version": "0.1.0",
     "entry": "main.duan",
-    "description": "段言项目"
+    "description": "段言项目",
+    "dependencies": {},
+    "scripts": {
+        "build": "duan compile main.duan",
+        "test": "duan test",
+        "run": "duan run main.duan"
+    }
 }
 ''' % project_name, encoding='utf-8')
+
+        # main.duan - 入口文件（展示模块化结构）
+        main_duan = project_dir / 'main.duan'
+        main_duan.write_text('''# 段言项目入口
+# 这是项目的主入口文件，负责初始化并启动应用
+
+导入《工具》为 工具。
+
+段落 主():
+    打印("=" * 40)
+    打印("欢迎使用 {项目名称}！")
+    打印("=" * 40)
+    
+    设 问候 为 工具.生成问候语("段言开发者")。
+    打印(问候)
+    
+    工具.演示功能()
+    
+    打印("\\n程序执行完毕。")
+
+# 启动程序
+主()。
+'''.replace('{项目名称}', project_name), encoding='utf-8')
+
+        # 工具.duan - 工具模块示例（放在项目根目录，方便导入）
+        utils_duan = project_dir / '工具.duan'
+        utils_duan.write_text('''# 工具模块 — 提供通用功能函数
+
+段落 生成问候语(名称):
+    返回 "你好，{名称}！欢迎使用段言编程语言。"
+
+段落 演示功能():
+    打印("\\n--- 功能演示 ---")
+    
+    # 变量与计算
+    设 数字 为 [1, 2, 3, 4, 5]。
+    设 总和 为 0。
+    遍历 项 之 数字:
+        总和 = 总和 加 项。
+    打印("1+2+3+4+5 = ", 总和)
+    
+    # 条件判断
+    设 分数 为 85。
+    如果 分数 大于等于 90:
+        打印("成绩: 优秀")
+    否则 如果 分数 大于等于 80:
+        打印("成绩: 良好")
+    否则:
+        打印("成绩: 一般")
+    
+    # 字典使用
+    设 配置 为 {"语言": "段言", "版本": "0.1", "作者": "开发者"}。
+    打印("配置: ", 配置)
+    
+    # 异常处理
+    尝试:
+        设 结果 为 10 除以 0。
+    捕获 异常 为 错误:
+        打印("捕获到异常: ", 错误)
+    否则:
+        打印("结果: ", 结果)
+
+段落 计算平均数(数字列表):
+    """计算数字列表的平均数"""
+    设 长度 为 数字列表.长度()。
+    如果 长度 等于 0:
+        返回 0。
+    设 总和 为 0。
+    遍历 数 之 数字列表:
+        总和 = 总和 加 数。
+    返回 总和 除以 长度。
+''', encoding='utf-8')
+
+        # src/__init__.duan - 源文件目录说明
+        src_init = project_dir / 'src' / '__init__.duan'
+        src_init.write_text('''# 源文件目录
+# 将项目的核心代码放在 src/ 目录下
+# 大型项目建议按模块拆分到不同文件
+# 使用「导入」语句引用其他模块
+''', encoding='utf-8')
+
+        # tests/__init__.duan - 测试初始化
+        tests_init = project_dir / 'tests' / '__init__.duan'
+        tests_init.write_text('''# 测试目录
+# 将测试文件放在 tests/ 目录下
+# 使用「断言」关键字编写测试用例
+''', encoding='utf-8')
+
+        # tests/test_工具.duan - 测试示例
+        test_utils = project_dir / 'tests' / 'test_工具.duan'
+        test_utils.write_text('''# 工具模块测试
+导入《工具》为 工具。
+
+段落 测试_生成问候语():
+    设 结果 为 工具.生成问候语("测试")。
+    断言 字符串包含(结果, "测试")，"问候语应包含名称"。
+    断言 字符串包含(结果, "段言")，"问候语应包含语言名称"。
+    打印("✓ 测试_生成问候语 通过")
+
+段落 测试_计算平均数():
+    断言 工具.计算平均数([1, 2, 3]) 等于 2，"1,2,3的平均数应为2"。
+    断言 工具.计算平均数([]) 等于 0，"空列表的平均数应为0"。
+    断言 工具.计算平均数([5]) 等于 5，"单元素列表的平均数应为其本身"。
+    打印("✓ 测试_计算平均数 通过")
+
+# 运行全部测试
+段落 运行测试():
+    打印("运行测试...")
+    测试_生成问候语()
+    测试_计算平均数()
+    打印("\\n全部测试通过！")
+
+运行测试()。
+''', encoding='utf-8')
 
         # build.py - 构建脚本
         build_py = project_dir / 'build.py'
@@ -382,7 +580,7 @@ def build():
         print(f"[错误] 入口文件不存在: {entry}")
         return False
 
-    # 调用 duan compile
+    # 编译入口文件
     result = subprocess.run(
         [sys.executable, "-m", "cli.duan_unified", "compile", str(entry)],
         capture_output=True, text=True, cwd=str(project_dir)
@@ -391,20 +589,64 @@ def build():
         print(result.stderr or result.stdout)
         return False
 
-    print(f"[成功] 已编译: {entry}")
+    # 编译测试文件
+    test_entry = project_dir / "tests" / "test_工具.duan"
+    if test_entry.exists():
+        result = subprocess.run(
+            [sys.executable, "-m", "cli.duan_unified", "compile", str(test_entry)],
+            capture_output=True, text=True, cwd=str(project_dir)
+        )
+        if result.returncode != 0:
+            print(result.stderr or result.stdout)
+            return False
+
+    print(f"[成功] 项目构建完成: {project_dir}")
+    return True
+
+
+def run_tests():
+    """运行测试"""
+    project_dir = Path(__file__).parent
+    test_file = project_dir / "tests" / "test_工具.duan"
+    
+    if not test_file.exists():
+        print("[错误] 测试文件不存在")
+        return False
+    
+    result = subprocess.run(
+        [sys.executable, "-m", "cli.duan_unified", "run", str(test_file)],
+        capture_output=True, text=True, cwd=str(project_dir)
+    )
+    print(result.stdout)
+    if result.returncode != 0:
+        print(result.stderr)
+        return False
     return True
 
 
 if __name__ == "__main__":
-    success = build()
+    # 默认构建，如果参数是 "test" 则运行测试
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        success = run_tests()
+    else:
+        success = build()
     sys.exit(0 if success else 1)
 ''', encoding='utf-8')
 
         print(f"[成功] 已创建项目: {project_name}/")
-        print(f"  main.duan    入口文件")
-        print(f"  duan.json    项目配置")
-        print(f"  build.py     构建脚本")
+        print(f"  main.duan            入口文件")
+        print(f"  duan.json            项目配置")
+        print(f"  .gitignore           忽略文件（安全规则）")
+        print(f"  工具.duan            工具模块示例")
+        print(f"  src/                 源文件目录")
+        print(f"    __init__.duan       模块初始化")
+        print(f"  tests/               测试目录")
+        print(f"    __init__.duan       测试初始化")
+        print(f"    test_工具.duan      测试文件示例")
+        print(f"  lib/                 第三方库目录")
+        print(f"  build.py             构建脚本")
         print(f"\n运行: duan run {project_name}/main.duan")
+        print(f"测试: duan test {project_name}")
         print(f"构建: cd {project_name} && duan pkg build")
         return 0
 
@@ -465,6 +707,25 @@ if __name__ == "__main__":
         print(f"\n[摘要] 成功: {success_count}/{len(duan_files)}")
         return 0 if success_count > 0 else 1
 
+    def run_tests(self, target: str = None, filter_pattern: str = None, verbose: bool = False) -> int:
+        """运行段言测试
+
+        Args:
+            target: 项目目录或测试文件路径（默认: 当前目录）
+            filter_pattern: 按名称过滤测试文件
+            verbose: 详细输出
+
+        Returns:
+            退出码（0=全部通过）
+        """
+        from test_runner import run_tests as _run_tests, run_single_file
+
+        if target and os.path.isfile(target):
+            return run_single_file(target, verbose=verbose)
+        else:
+            directory = target or os.getcwd()
+            return _run_tests(directory, filter_pattern=filter_pattern, verbose=verbose)
+
     def syntax_check(self, source_file: str) -> int:
         """检查文件语法是否正确"""
         try:
@@ -473,11 +734,11 @@ if __name__ == "__main__":
 
             # 尝试 src 后端解析
             try:
-                from duan_parser_v3 import DuanParser
+                from duan_parser_v3 import DuanParser, ParseError
                 parser = DuanParser()
-                module = parser.parse(source)
+                module = parser.parse(source, filename=source_file)
                 if module is None:
-                    print("[语法错误] 解析失败", file=sys.stderr)
+                    print(f"[语法错误] 解析失败: {source_file}", file=sys.stderr)
                     return 1
                 if hasattr(parser, 'errors') and parser.errors:
                     for error in parser.errors:
@@ -485,6 +746,9 @@ if __name__ == "__main__":
                     return 1
                 print("[通过] 语法检查通过")
                 return 0
+            except ParseError as e:
+                print(f"[语法错误]\n{e}", file=sys.stderr)
+                return 1
             except ImportError:
                 pass
 
@@ -510,6 +774,15 @@ if __name__ == "__main__":
                 return 1
         except Exception as e:
             print(f"[错误] 语法检查失败: {e}", file=sys.stderr)
+            return 1
+
+    def format_code(self, target: str, check_only: bool = False) -> int:
+        """格式化段言代码"""
+        try:
+            from formatter import run_formatter
+            return run_formatter(target, check_only)
+        except ImportError as e:
+            print(f"[错误] 格式化模块不可用: {e}", file=sys.stderr)
             return 1
 
     def show_ast(self, source: str, backend: str = 'antlr') -> int:
@@ -567,11 +840,12 @@ def main():
         '运行': 'run',
         '编译': 'compile',
         '语法检查': 'check',
+        '格式化': 'fmt',
         '项目构建': 'pkg build',
         '原生编译': 'compile --target llvm',
         '交互式': 'repl',
         '调试': 'debug',
-        '新建项目': 'pkg init',
+        '新建项目': 'new',
         '版本': '--version',
         '帮助': '--help',
     }
@@ -588,7 +862,7 @@ def main():
     cli = DuanUnifiedCLI()
     
     # 检查是否是子命令模式
-    if len(sys.argv) > 1 and sys.argv[1] in ['run', 'compile', 'repl', 'debug', 'pkg', 'check']:
+    if len(sys.argv) > 1 and sys.argv[1] in ['run', 'compile', 'repl', 'debug', 'pkg', 'check', 'fmt', 'new', 'test']:
         # 子命令模式
         parser = argparse.ArgumentParser(description='段言（Duan）编程语言编译器')
         subparsers = parser.add_subparsers(dest='command', help='子命令')
@@ -607,7 +881,8 @@ def main():
                                    help='目标代码（默认：py，llvm 生成 LLVM IR）')
         
         # repl 子命令
-        subparsers.add_parser('repl', help='启动交互式REPL')
+        repl_parser = subparsers.add_parser('repl', help='启动交互式REPL')
+        repl_parser.add_argument('--v3', action='store_true', help='使用基于 v3 解析器的 REPL（推荐）')
         
         # debug 子命令
         debug_parser = subparsers.add_parser('debug', help='启动调试REPL')
@@ -618,6 +893,22 @@ def main():
         check_parser.add_argument('file', help='源文件路径')
         check_parser.add_argument('--backend', choices=['antlr', 'src'], default='src',
                                   help='选择解析后端（默认：src）')
+        
+        # fmt 子命令
+        fmt_parser = subparsers.add_parser('fmt', help='格式化代码')
+        fmt_parser.add_argument('target', help='文件或目录路径')
+        fmt_parser.add_argument('--check', action='store_true', help='仅检查格式，不修改文件')
+        
+        # new 子命令
+        new_parser = subparsers.add_parser('new', help='创建新项目')
+        new_parser.add_argument('name', help='项目名称')
+        
+        # test 子命令
+        test_parser = subparsers.add_parser('test', help='运行测试')
+        test_parser.add_argument('target', nargs='?', default=None,
+                                help='项目目录或测试文件路径（默认: 当前目录）')
+        test_parser.add_argument('-v', '--verbose', action='store_true', help='详细输出')
+        test_parser.add_argument('--filter', help='按名称过滤测试文件')
         
         # pkg 子命令
         pkg_parser = subparsers.add_parser('pkg', help='项目管理（init/build）')
@@ -652,10 +943,10 @@ def main():
             if args.backend == 'antlr':
                 return cli.compile_with_antlr(source, output_file=output_file, run=False)
             else:
-                return cli.compile_with_src(source, output_file=output_file, run=False, target=args.target)
+                return cli.compile_with_src(source, output_file=output_file, run=False, target=args.target, source_file=args.file)
         
         elif args.command == 'repl':
-            return cli.start_repl()
+            return cli.start_repl(v3=getattr(args, 'v3', False))
         
         elif args.command == 'debug':
             if args.file:
@@ -675,6 +966,19 @@ def main():
                 print(f"[错误] 文件不存在: {args.file}", file=sys.stderr)
                 return 1
             return cli.syntax_check(args.file)
+        
+        elif args.command == 'fmt':
+            return cli.format_code(args.target, check_only=args.check)
+        
+        elif args.command == 'new':
+            return cli.pkg_init(args.name)
+        
+        elif args.command == 'test':
+            return cli.run_tests(
+                target=args.target,
+                filter_pattern=getattr(args, 'filter', None),
+                verbose=args.verbose
+            )
         
         elif args.command == 'pkg':
             if not getattr(args, 'pkg_command', None):
@@ -758,7 +1062,7 @@ def main():
             if args.backend == 'antlr':
                 return cli.compile_with_antlr(source, output_file=output_file, run=run_mode)
             else:
-                return cli.compile_with_src(source, output_file=output_file, run=run_mode)
+                return cli.compile_with_src(source, output_file=output_file, run=run_mode, source_file=args.file)
         
         else:
             # 无参数时启动REPL
