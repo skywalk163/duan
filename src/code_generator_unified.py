@@ -144,6 +144,7 @@ class UnifiedCodeGenerator:
             '转浮点': '_duan_builtin.转浮点',
             '转字符串': '_duan_builtin.转字符串',
             '字符串长度': '_duan_builtin.字符串长度',
+            '显示宽度': '_duan_builtin.显示宽度',
             '分割字符串': '_duan_builtin.分割字符串',
             '连接字符串': '_duan_builtin.连接字符串',
             '替换字符串': '_duan_builtin.替换字符串',
@@ -284,6 +285,7 @@ class UnifiedCodeGenerator:
         self._add_line("        _duan_builtin.列表插入 = lambda lst, i, v: lst.insert(i, v)")
         self._add_line("        _duan_builtin.列表包含 = lambda lst, item: item in lst")
         self._add_line("        _duan_builtin.字符串长度 = len")
+        self._add_line("        _duan_builtin.显示宽度 = lambda text: sum(2 if __import__('unicodedata').east_asian_width(ch) in ('W', 'F') else 1 for ch in str(text))")
         self._add_line("        _duan_builtin.字典创建 = dict")
         self._add_line("        _duan_builtin.字典设置 = lambda d, k, v: d.update({k: v})")
         self._add_line("        _duan_builtin.字典获取 = lambda d, k, default=None: d.get(k, default)")

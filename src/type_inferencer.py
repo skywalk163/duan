@@ -1661,6 +1661,7 @@ class TypeInferencer:
             '长': TYPE_NUMBER,
             '长度': TYPE_NUMBER,
             '字符串长度': TYPE_NUMBER,
+            '显示宽度': TYPE_NUMBER,
             '列表长度': TYPE_NUMBER,
             '转整数': TYPE_NUMBER,
             '转为整数': TYPE_NUMBER,

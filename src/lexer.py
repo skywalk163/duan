@@ -1640,8 +1640,8 @@ class Lexer:
         _is_space_tab = _is_ascii_space_tab
 
         # 使用 str.find() 跳跃到关键位置，避免逐字符扫描
-        # 搜索目标：'《' (段落/类/方法定义), '设' (变量定义), '定义' (变量定义), '函数', '段落' (函数定义)
-        search_targets = ('《', '设', '定', '函', '段')
+        # 搜索目标：'《' (段落/类/方法定义), '设' (变量定义), '定义' (变量定义), '函数', '段落' (函数定义), '导' (导出/导入 列表)
+        search_targets = ('《', '设', '定', '函', '段', '导')
         i = 0
 
         # 安全计数器（防止意外死循环）
@@ -1704,6 +1704,37 @@ class Lexer:
                         elif name not in ALL_KEYWORDS and name not in ALL_VERB_ARITY:
                             definitions.add(name)
                 i = k + 1
+                continue
+
+            # 查找 "导出 名称1 名称2 ..." 或 "从 模块 导入 名称1 名称2 ..."
+            # 将导出/导入列表中的名字也加入白名单，避免带关键字前缀的名字被拆分成 关键字 + 标识符
+            # 例如 "导出 生成AI阶段提示。" -> "生成" 是关键字，若不加入白名单会被拆成 KEYWORD(生成) + IDENTIFIER(AI阶段提示)
+            if source[i:i+2] in ('导出', '导入'):
+                j = i + 2
+                # 跳过名称列表前的所有空白（含换行、全角空格）
+                while j < n and source[j] in ' \t\n\r\f\v　':
+                    j += 1
+                # 逐段收集名字（名字以空白分隔，遇到句号或换行结束）
+                while j < n and source[j] not in '。\n':
+                    # 跳过名字之间的空白
+                    while j < n and source[j] in ' \t\n\r\f\v　':
+                        j += 1
+                    if j >= n or source[j] in '。\n':
+                        break
+                    # 收集一个标识符：汉字 或 ASCII 字母/数字（支持中英混合，如 生成AI阶段提示）
+                    k = j
+                    while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])) and source[k] not in ' \t\n\r\f\v　。':
+                        k += 1
+                    if k > j:
+                        name = source[j:k]
+                        if name not in ALL_KEYWORDS:
+                            definitions.add(name)
+                        j = k
+                    else:
+                        # 遇到非标识符、非空白字符（如冒号、标点）时跳过一个字符，
+                        # 避免死循环。例如 "导入 Python: ai_api_helper。" 中的 ":"
+                        j += 1
+                i = j
                 continue
 
             # 查找 "函数/段落 段名 参数 参数名" 格式

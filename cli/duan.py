@@ -207,9 +207,13 @@ def _run_src(source: str, file_path: str | None = None) -> str:
 
     # 执行
     output_lines = []
+    import sys as _sys
     def _capture_print(*args, **kwargs):
         line = ' '.join(str(a) for a in args)
         output_lines.append(line)
+        # 实时输出并立即刷新，避免运行中途异常导致缓冲内容（已打印的部分）丢失
+        print(*args, **kwargs)
+        _sys.stdout.flush()
 
     namespace = {'print': _capture_print, '__name__': '__main__'}
     if file_path:
@@ -293,9 +297,8 @@ def cmd_run(args):
 
     try:
         if args.backend == 'src':
-            output = _run_src(source, file_path=args.file)
-            if output:
-                print(output)
+            # 输出已由 _run_src 实时打印（含异常前的部分），不再二次打印
+            _run_src(source, file_path=args.file)
         else:
             _run_antlr(source)
 

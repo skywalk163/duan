@@ -70,7 +70,11 @@ def call_ai(system_prompt, user_prompt, config=None):
         response = requests.post(url, json=payload, headers=headers, timeout=60)
         response.raise_for_status()
         result = response.json()
-        return result['choices'][0]['message']['content']
+        content = result['choices'][0]['message']['content']
+        # 空内容视为失败，返回 None，便于上层回退到模拟内容
+        if not content or not content.strip():
+            return None
+        return content
     except requests.exceptions.Timeout:
         print("  [AI API 超时: 请求超过 60 秒]")
         return None

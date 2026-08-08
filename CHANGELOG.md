@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **内置函数 `显示宽度(text)`**: 返回字符串终端显示宽度，中文/全角（CJK）及宽字符计 2、其余计 1。用于终端表格与边框对齐，避免 `字符串长度` 把全角字符按 1 列计算导致右侧错位。已注册至 `src/keywords.py`、`src/code_generator.py`、`src/code_generator_unified.py`、`src/type_inferencer.py`。文档见 `docs/api/builtins.md`
+
+### Fixed
+- **词法器导出/导入名白名单**：`导出`/`导入` 列表中的名字（如 `生成AI阶段提示`）此前会被关键字贪婪切分为 `生成`+`AI阶段提示`，现纳入用户标识符白名单，跨模块标识符不再被拆切（`src/lexer.py`）
+- **词法器死循环**：`_scan_user_definitions()` 遇到 `导入 Python: xxx。` 中的 `:` 时指针不前进导致卡死，已加 `else: j += 1` 保证每次迭代前进
+- **CLI 报错前输出丢失**：`cli/duan.py` 原先仅缓冲输出、成功后才打印，异常即丢；改为实时打印并 flush
+- **AI 调用空内容不回退**：`demo/reasonix/ai_api_helper.py` 的 `call_ai` 在模型返回空内容时改为返回 `None`，使 `引擎.duan` 的「不等于 空」判断能正确回退到模拟内容
+
+### Changed
+- **Reasonix demo 改用语言内置 `显示宽度`**：移除 `demo/reasonix/display_utils.py` Python 辅助补丁，边框对齐完全由段言内置函数实现
+
 ## [6.3.0] - 2026-08-07
 
 ### Added

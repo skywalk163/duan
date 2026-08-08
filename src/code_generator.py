@@ -279,6 +279,7 @@ class PythonCodeGenerator:
             '到数字': '_duan_builtin.转浮点',
             '转数字': '_duan_builtin.转浮点',
             '字符串长度': '_duan_builtin.字符串长度',
+            '显示宽度': '_duan_builtin.显示宽度',
             '字符串获取': '_duan_builtin.字符串获取',
             '字符串包含': '_duan_builtin.字符串包含',
             '包含': '_duan_builtin.包含',
@@ -487,6 +488,7 @@ class PythonCodeGenerator:
         self._add_line("        _duan_builtin.字符串替换 = lambda s, old, new: s.replace(old, new)")
         self._add_line("        _duan_builtin.字符串反转 = lambda s: s[::-1]")
         self._add_line("        _duan_builtin.字符串长度 = len")
+        self._add_line("        _duan_builtin.显示宽度 = lambda text: sum(2 if __import__('unicodedata').east_asian_width(ch) in ('W', 'F') else 1 for ch in str(text))")
         self._add_line("        _duan_builtin.字符串获取 = lambda s, i: s[i]")
         self._add_line("        _duan_builtin.截取 = lambda s, start, end: s[start:end]")
         self._add_line("        _duan_builtin.转大写 = lambda s: s.upper()")
