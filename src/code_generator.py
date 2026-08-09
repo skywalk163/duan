@@ -82,15 +82,12 @@ class PythonCodeGenerator:
         self.method_name_map = {
             '追加': 'append',
             '添加': 'append',
-            '长度': '__len__',
-            '取长度': '__len__',
             '插入': 'insert',
             '删除': 'remove',
             '弹出': 'pop',
             '清空': 'clear',
             '反转': 'reverse',
             '排序': 'sort',
-            '包含': '__contains__',
             '获取': 'get',
             '设置': '__setitem__',
             # 字符串方法
@@ -106,7 +103,19 @@ class PythonCodeGenerator:
             '查找': 'find',
             '计数': 'count',
         }
-        
+
+        # 方法定义名映射：与方法调用映射(method_name_map)保持一致，使
+        # 用户自定义类的方法“定义名”与“调用名”在生成的 Python 中一致。
+        # 调用侧 method_name_map 会把 弹出->pop、插入->insert 等翻译成中文
+        # 调用(obj.pop())，但定义侧原先保留中文(def 弹出)，导致
+        # 'X' object has no attribute 'pop'。此处把定义名也翻译过去即可对齐。
+        # 排除 长度/取长度/包含：它们的调用被特判为 len(obj) / (item in obj)，
+        # 与方法签名不匹配，翻译成 __len__/__contains__ 会破坏参数，故保留中文。
+        self._method_def_name_map = {
+            k: v for k, v in self.method_name_map.items()
+            if k not in ('长度', '取长度', '包含')
+        }
+
         # 模块名映射（中文到Python模块）
         self.module_name_map = {
             'JSON': 'json',
@@ -1766,6 +1775,11 @@ class PythonCodeGenerator:
             method_name = '__enter__'
         elif method_name == '__退出__':
             method_name = '__exit__'
+
+        # 方法定义名翻译：与调用侧 method_name_map 对齐（见 _method_def_name_map）
+        # 必须在协议名/构造名映射之后、私有前缀之前执行。映射表中不含魔术方法
+        # 名，故 __init__/__iter__ 等会原样返回，无需额外判断。
+        method_name = self._method_def_name_map.get(method_name, method_name)
 
         # 静态方法不需要 self 参数
         is_static = getattr(method, 'is_static', False)
