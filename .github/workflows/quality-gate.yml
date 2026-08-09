@@ -96,8 +96,24 @@ jobs:
                  -v --tb=short \
                  --cov=src --cov-report=term --cov-append --cov-report=xml:coverage-full.xml
 
-      - name: 检查测试覆盖率（不低于 80%）
-        run: python -c "exec('import sys, xml.etree.ElementTree as ET\ntry:\n t = ET.parse(\"coverage-full.xml\")\n r = t.getroot()\n p = float(r.get(\"line-rate\", 0)) * 100\n print(f\"测试覆盖率: {p:.2f}%\")\n if p >= 25.0:\n  print(f\"覆盖率达标 ({p:.2f}% >= 25.0%)\")\n else:\n  print(f\"覆盖率不足 ({p:.2f}% < 25.0%)\")\n  sys.exit(1)\nexcept:\n print(\"无法解析覆盖率报告, 跳过\")\n sys.exit(0)')"
+      - name: 检查测试覆盖率（不低于 25%）
+        run: |
+          python -c "
+          import sys, xml.etree.ElementTree as ET
+          try:
+              t = ET.parse('coverage-full.xml')
+              r = t.getroot()
+              p = float(r.get('line-rate', 0)) * 100
+              print(f'测试覆盖率: {p:.2f}%')
+              if p >= 25.0:
+                  print(f'覆盖率达标 ({p:.2f}% >= 25.0%)')
+              else:
+                  print(f'覆盖率不足 ({p:.2f}% < 25.0%)')
+                  sys.exit(1)
+          except Exception as e:
+              print(f'无法解析覆盖率报告: {e}, 跳过')
+              sys.exit(0)
+          "
 
       - name: 上传覆盖率报告
         uses: actions/upload-artifact@v4
