@@ -32,6 +32,7 @@ def _id18_checksum(body17: str) -> str:
 
 
 def 升级15位到18位(id15: str) -> str:
+    # 别名：升级15位身份证到18位（在文件末尾定义）
     id15 = id15.strip()
     if not _ID15_PAT.match(id15):
         raise ValueError("15位身份证格式错误")
@@ -184,7 +185,7 @@ _EMAIL_PAT = _re.compile(r'[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}')
 _ID18_FIND = _re.compile(r'(?<!\d)(\d{17}[\dXx]|\d{15})(?!\d)')
 _URL_PAT = _re.compile(r'https?://[^\s\u4e00-\u9fa5，。；、"<>]+|www\.[^\s\u4e00-\u9fa5，。；、"<>]+')
 # 中文姓名：2~4 个中文汉字（不包含生僻字覆盖，通常够用）
-_NAME_PAT = _re.compile(r'[\u4e00-\u9fa5]{2,4}')
+_NAME_PAT = _re.compile(r'[\u4e00-\u9fa5]{2,3}')
 # 车牌（宽松）：1汉字 + 1字母 + 5~7位字母数字，允许末尾 学/警/港/澳
 _PLATE_FIND = _re.compile(r'[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-Z0-9]{4,7}[学警港澳]?')
 # 银行卡号（宽松 12~19 位数字，允许 4 位分组空格）
@@ -203,12 +204,12 @@ def 抽取邮箱(text: str) -> List[str]:
     return _extract(_EMAIL_PAT, text)
 
 
-def 抽取身份证(text: str, 校验位: bool = True) -> List[Dict[str, Any]]:
+def 抽取身份证(text: str, 需校验: bool = True) -> List[Dict[str, Any]]:
     cands = _extract(_ID18_FIND, text)
     out = []
     for c in cands:
         info = 校验身份证(c, 严格地区=False)
-        if not 校验位 or info['是否合法']:
+        if not 需校验 or info['是否合法']:
             info['原文'] = c
             out.append(info)
     return out
@@ -219,7 +220,7 @@ def 抽取URL(text: str) -> List[str]:
 
 
 def 抽取姓名(text: str, 排除停用词: Optional[List[str]] = None) -> List[str]:
-    """简单姓名抽取：2~4字中文。会排除「但是/因为/所以/公司/政府」这类停用词组合。"""
+    """简单姓名抽取：2~3字中文。会排除「但是/因为/所以/公司/政府」这类停用词组合。"""
     stop = set(排除停用词 or [])
     default_stop = {'但是', '因为', '所以', '如果', '或者', '而且', '并且', '虽然', '然后', '就是',
                     '已经', '知道', '什么', '怎么', '公司', '政府', '北京', '上海', '深圳', '广州',
@@ -228,9 +229,14 @@ def 抽取姓名(text: str, 排除停用词: Optional[List[str]] = None) -> List
     stop |= default_stop
     res = []
     for m in _NAME_PAT.findall(text or ''):
-        if m in stop:
-            continue
-        res.append(m)
+        # 从每个匹配中提取所有 2-3 字子串，避免贪婪匹配吞掉 2 字姓名
+        for i in range(len(m)):
+            for j in range(i + 2, min(i + 4, len(m) + 1)):
+                sub = m[i:j]
+                if sub in stop:
+                    continue
+                if sub not in res:
+                    res.append(sub)
     return res
 
 
@@ -254,3 +260,7 @@ def 抽取银行卡(text: str, 必须Luhn合法: bool = True) -> List[Dict[str, 
             info['原文'] = c
             out.append(info)
     return out
+
+
+# 别名 — 与 .duan 文件导出名保持一致
+升级15位身份证到18位 = 升级15位到18位

@@ -89,7 +89,7 @@ def 解析相对时间(描述: str, 基准: Optional[datetime] = None) -> dateti
         return _add_days(now, delta_days[desc])
 
     # 1. N天前 / N天后 / N日之前 / N日之后 / N小时前/后 / N分钟前/后 / N秒前/后 / N周前/后
-    m = _re.match(r'^(.+?)\s*(天|日|小时|时|分钟|分|秒|周|个月|月|年)\s*(前|之前|以前|后|之后|以后)$', desc)
+    m = _re.match(r'^(.+?)\s*(天|日|小时|时|分钟|分|秒|周|个月|月|年)\s*(前|之前|以前|后|之后|以后|後)$', desc)
     if m:
         n = _parse_han_int(m.group(1))
         if n is None:
@@ -106,8 +106,7 @@ def 解析相对时间(描述: str, 基准: Optional[datetime] = None) -> dateti
         current_wd = now.weekday()
         diff_days = target_wd - current_wd
         if prefix == '本':
-            if diff_days < 0:
-                diff_days += 7
+            pass  # diff_days stay as-is, negative means earlier this week
         elif prefix == '上' or prefix == '上上':
             diff_days -= 7 if prefix == '上' else 14
             if diff_days > 0:
