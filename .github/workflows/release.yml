@@ -61,10 +61,10 @@ jobs:
             artifact-name: duan6-macos-x64
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -98,7 +98,7 @@ jobs:
           "
 
       - name: 上传可执行文件产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact-name }}
           path: dist/duan6${{ matrix.exe-suffix }}
@@ -109,10 +109,10 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
@@ -127,7 +127,7 @@ jobs:
           python -m twine check dist/*
 
       - name: 上传包产物
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-package
           path: dist/
@@ -138,10 +138,10 @@ jobs:
     needs: [build-exe, build-package]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 下载所有构建产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: release-artifacts
 
@@ -195,15 +195,15 @@ jobs:
       name: pypi
       url: https://pypi.org/project/duan4/
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: 设置 Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
       - name: 下载构建产物
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: python-package
           path: dist
@@ -225,10 +225,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: 检出代码
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: 设置 Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.11'
 
