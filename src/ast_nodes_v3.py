@@ -724,15 +724,27 @@ class DecoratedFunction(ASTNode):
 
 
 class MethodSignature(ASTNode):
-    __slots__ = ('name', 'parameters', 'return_type')
-    """接口方法签名"""
-    def __init__(self, name: str, parameters: List[Parameter] = None, return_type: str = None):
+    __slots__ = ('name', 'parameters', 'return_type', 'body')
+    """接口方法签名
+
+    body 为 None 表示抽象方法（仅声明，实现类必须覆写）；
+    body 为语句列表表示协议提供的默认实现，实现类可直接继承使用。
+    """
+    def __init__(self, name: str, parameters: List[Parameter] = None,
+                 return_type: str = None, body: List = None):
         self.name = name
         self.parameters = parameters or []
         self.return_type = return_type
-    
+        self.body = body
+
+    @property
+    def is_abstract(self) -> bool:
+        """是否为抽象方法（没有默认实现）"""
+        return not self.body
+
     def __repr__(self):
-        return f"MethodSignature({self.name})"
+        kind = 'abstract' if self.is_abstract else 'default'
+        return f"MethodSignature({self.name}, {kind})"
 
 
 class InterfaceDefinition(ASTNode):

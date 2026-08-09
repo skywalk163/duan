@@ -390,12 +390,70 @@ class PythonCodeGenerator:
             '获取宏': '_duan_ffi.获取宏',
         }
     
+    def _register_imported_names(self, module) -> None:
+        """把 import 显式引入的名字登记为「用户已定义」。
+
+        为什么必须做：内置函数映射（builtin_map）是无条件替换的，
+        `范围(0,3)` 会被直接翻译成 `range(0,3)`。于是
+        `从《列表工具》导入《范围》` 之后再调用 `范围`，拿到的仍是
+        Python 的 range —— 用户导入的东西被静默忽略了。更糟的是
+        `包含` 这类映射到 `_duan_builtin.包含`（该内置并不存在），
+        运行期直接 AttributeError。
+
+        显式导入是用户最强的意图表达，必须压过内置映射。否则
+        「用段言写段言标准库」只要撞上内置名就永远调不通。
+
+        这里做整棵树的遍历（含类体、函数体里的局部导入），
+        并在生成任何代码之前完成，所以不受书写顺序影响。
+        """
+        # AST 节点用 __slots__，各类块语句的子语句字段名不统一，逐个尝试
+        CHILD_ATTRS = (
+            'statements', 'body', 'then_body', 'else_body', 'orelse',
+            'try_body', 'catch_body', 'finally_body', 'catch_clauses',
+            'methods', 'members', 'cases', 'stages',
+        )
+
+        seen = set()
+
+        def walk(node):
+            if node is None:
+                return
+            if isinstance(node, (list, tuple)):
+                for item in node:
+                    walk(item)
+                return
+            if id(node) in seen:
+                return
+            seen.add(id(node))
+
+            if isinstance(node, ImportStmt):
+                for sym in (getattr(node, 'symbols', None) or ()):
+                    if isinstance(sym, str) and sym:
+                        self._user_defined_functions.add(sym)
+                alias = getattr(node, 'alias', None)
+                if isinstance(alias, str) and alias:
+                    self._user_defined_functions.add(alias)
+
+            for attr in CHILD_ATTRS:
+                child = getattr(node, attr, None)
+                if isinstance(child, (list, tuple)):
+                    walk(child)
+
+        try:
+            walk(getattr(module, 'statements', None))
+        except Exception:
+            # 预扫描失败不应阻断编译，最坏退化成旧行为
+            pass
+    
     def generate(self, module: Module) -> str:
         """生成Python代码"""
         self.output_lines = []
         self.indent_level = 0  # 重置缩进级别，防止跨条目状态污染
         self._user_defined_functions = set()  # 重置用户自定义函数追踪
         self._ffi_user_types = {}  # 重置 FFI 用户自定义类型注册表
+        
+        # 预扫描：显式 import 进来的名字优先级高于内置函数映射
+        self._register_imported_names(module)
         
         # 添加文件头
         self._add_line("# 由段言编译器生成")
@@ -435,6 +493,13 @@ class PythonCodeGenerator:
         self._add_line("    _duan_parent = os.path.dirname(_duan_stdlib)")
         self._add_line("    if _duan_parent not in sys.path:")
         self._add_line("        sys.path.insert(0, _duan_parent)")
+        self._add_line("")
+        self._add_line("# 让 import 机制认识纯段言模块（只有 .duan、没有 .py 的那种）")
+        self._add_line("try:")
+        self._add_line("    import _duan_import_hook as _duan_hook")
+        self._add_line("    _duan_hook.install([_duan_stdlib, _duan_file_dir, os.getcwd()])")
+        self._add_line("except Exception:")
+        self._add_line("    pass")
         self._add_line("")
         self._add_line("import stdlib.FFI as _duan_ffi")
         self._add_line("")
@@ -1437,26 +1502,49 @@ class PythonCodeGenerator:
         self._add_line("")
     
     def _generate_abstract_method(self, method: MethodSignature):
-        """生成抽象方法"""
-        self._needs_abc = True
+        """生成协议方法。
+
+        无方法体 → 抽象方法（@abstractmethod + pass）；
+        有方法体 → 默认实现（普通方法，实现类可直接继承或覆写）。
+        """
         method_name = self._sanitize_name(method.name)
-        
+
         # 参数列表
         params = ['self']
         for param in method.parameters:
-            param_name = self._sanitize_name(param.name)
-            params.append(param_name)
-        
+            params.append(self._sanitize_name(param.name))
         params_str = ', '.join(params)
-        
-        self._add_line("@abstractmethod")
+
+        has_body = bool(getattr(method, 'body', None))
+        if not has_body:
+            self._needs_abc = True
+            self._add_line("@abstractmethod")
+
         if method.return_type:
-            ret_type = self._sanitize_name(method.return_type)
+            # 必须走 _map_type 做段言→Python 类型映射，
+            # 直接用 _sanitize_name 会把「整数」原样写进注解导致 NameError。
+            ret_type = self._map_type(method.return_type)
             self._add_line(f"def {method_name}({params_str}) -> {ret_type}:")
         else:
             self._add_line(f"def {method_name}({params_str}):")
+
         self.indent_level += 1
-        self._add_line("pass")
+        if has_body:
+            emitted = len(self.output_lines)
+            # 必须置位 _in_function，否则方法体里的「返回」会被当成模块级语句
+            # 降级成 print(...)，默认实现将永远返回 None。
+            prev_in_function = self._in_function
+            self._in_function = True
+            try:
+                for stmt in method.body:
+                    self._generate_statement(stmt)
+            finally:
+                self._in_function = prev_in_function
+            # 方法体可能全是注释等不产出代码的节点，兜底补 pass
+            if len(self.output_lines) == emitted:
+                self._add_line("pass")
+        else:
+            self._add_line("pass")
         self.indent_level -= 1
     
     def _generate_match_stmt(self, stmt: MatchStmt):

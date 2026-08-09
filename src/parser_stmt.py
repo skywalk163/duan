@@ -1387,6 +1387,12 @@ class ParserStmtMixin:
             if self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
                 continue
             
+            # 紧邻的书名号：导入《符号一》《符号二》《符号三》。
+            # 缺这一支会在读完第一个《符号》后直接 break，后面的符号被
+            # 静默丢弃——解析、代码生成全部通过，直到运行期才报 NameError。
+            if self._current() and self._current().type == TokenType.LBOOK:
+                continue
+            
             # 检查是否结束（句号）
             if self._current() and self._current().type == TokenType.PERIOD:
                 break
@@ -3842,14 +3848,23 @@ class ParserStmtMixin:
 
         return InterfaceDefinition(name, methods, properties, super_interfaces) 
 
-    def _parse_method_signature(self) -> MethodSignature:
-        """解析接口方法签名
+    # 方法名收集时遇到这些关键字必须停止：它们是参数/返回值的引导词，
+    # 不能被吞进方法名。否则「段落 解码 接收 raw」会得到方法名"解码接收raw"。
+    _METHOD_NAME_STOP_KEYWORDS = ('返回', '接收', '参数', '需要')
 
-        语法：
-        段落 方法名 参数 参数名 返回 类型。
-        段落 方法名(参数) 返回 类型。
-        段落 方法名 返回 类型。
-        段落 方法名。
+    def _parse_method_signature(self) -> MethodSignature:
+        """解析接口/协议中的方法。
+
+        既支持抽象声明，也支持带默认实现的方法体：
+
+        抽象声明（实现类必须覆写）：
+            段落 方法名 接收 参数名 返回 类型。
+            段落 方法名(参数) 返回 类型。
+            段落 方法名。
+
+        默认实现（实现类可直接继承）：
+            段落 方法名 接收 参数名：
+                语句。
         """
         # 消耗 函数 或 段落 关键字
         if self._match(TokenType.KEYWORD, '函数'):
@@ -3864,10 +3879,11 @@ class ParserStmtMixin:
         # 方法名（可能由多个token组成，如"从JSON"被拆为从+JSON）
         name_parts = []
         while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
-            # 遇到LPAREN、返回、PERIOD、句号等停止
+            # 遇到LPAREN、参数/返回引导词、句号、冒号等停止
             if self._current().type == TokenType.LPAREN:
                 break
-            if self._current().type == TokenType.KEYWORD and self._current().value == '返回':
+            if (self._current().type == TokenType.KEYWORD
+                    and self._current().value in self._METHOD_NAME_STOP_KEYWORDS):
                 break
             if self._current().type in (TokenType.PERIOD, TokenType.COLON):
                 break
@@ -3898,6 +3914,29 @@ class ParserStmtMixin:
                 else:
                     break
             self._consume(TokenType.RPAREN)
+        # 无括号参数：接收 参数1, 参数2 / 参数 参数1, 参数2
+        elif (self._current() and self._current().type == TokenType.KEYWORD
+                and self._current().value in ('接收', '参数', '需要')):
+            self._consume(TokenType.KEYWORD, self._current().value)
+            while self._current() and self._current().type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                # 「返回」引导返回类型，不是参数名
+                if (self._current().type == TokenType.KEYWORD
+                        and self._current().value == '返回'):
+                    break
+                param_name = self._consume().value
+                param_type = None
+                # 类型注解：参数名: 类型（注意与块起始冒号区分——
+                # 块冒号后面跟的是换行，类型注解后面跟的是类型名）
+                if self._match(TokenType.COLON):
+                    nxt = self._peek(1)
+                    if nxt and nxt.type in (TokenType.IDENTIFIER, TokenType.KEYWORD):
+                        self._consume(TokenType.COLON)
+                        param_type = self._parse_type_annotation()
+                params.append(Parameter(param_name, param_type))
+                if self._match(TokenType.COMMA):
+                    self._consume(TokenType.COMMA)
+                    continue
+                break
 
         # 返回类型（可选）
         return_type = None
@@ -3905,11 +3944,18 @@ class ParserStmtMixin:
             self._consume(TokenType.KEYWORD, '返回')
             return_type = self._parse_type_annotation()
 
-        # 句号（可选）
+        # 默认实现方法体（可选）：冒号 + 缩进块
+        body = None
+        if self._match(TokenType.COLON):
+            self._consume(TokenType.COLON)
+            body = self._parse_body()
+            return MethodSignature(name, params, return_type, body)
+
+        # 句号（可选）—— 纯抽象声明
         if self._current() and self._current().type == TokenType.PERIOD:
             self._consume(TokenType.PERIOD)
 
-        return MethodSignature(name, params, return_type)
+        return MethodSignature(name, params, return_type, None)
 
     def _parse_match_stmt(self) -> MatchStmt:
         """解析模式匹配语句

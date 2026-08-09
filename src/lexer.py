@@ -101,6 +101,28 @@ def _is_han_fast(ch: str) -> bool:
     return _HAN_START <= cp <= _HAN_END
 
 
+# 非 ASCII、非汉字的「字母类」字符缓存（希腊字母 π/α/θ、西里尔字母、假名等）
+_EXTRA_LETTER_CACHE = {}
+
+
+def _is_extra_letter(ch: str) -> bool:
+    """判断是否为可用于标识符的其他 Unicode 字母。
+
+    数学库里 `弧度π`、`角度θ` 这类命名很自然，但这些字符既不是 ASCII 字母
+    也不在 CJK 区间，早期实现会直接抛「未知字符」，导致 stdlib/数学 里
+    含 π 的导出名在段言侧完全不可用。这里放行 Unicode 字母类字符；
+    标点、符号、emoji 仍然会被拒绝。
+    """
+    cp = ord(ch)
+    if cp < 128 or _HAN_START <= cp <= _HAN_END:
+        return False
+    cached = _EXTRA_LETTER_CACHE.get(ch)
+    if cached is None:
+        cached = ch.isalpha()
+        _EXTRA_LETTER_CACHE[ch] = cached
+    return cached
+
+
 # ASCII 字符分类查表（0-127）
 _ASCII_CLASS = bytearray(128)
 
@@ -499,7 +521,7 @@ class Lexer:
             
             # 处理标识符和关键字（核心：无空格分词）
             ch_i = source[i]
-            if _is_han_fast(ch_i) or _is_ascii_alpha(ch_i) or ch_i == '_':
+            if _is_han_fast(ch_i) or _is_ascii_alpha(ch_i) or ch_i == '_' or _is_extra_letter(ch_i):
                 new_tokens, consumed = self._tokenize_identifier_or_keyword(source, i, line, col, user_definitions)
                 tokens.extend(new_tokens)
                 col += consumed
@@ -1049,6 +1071,18 @@ class Lexer:
         _Token = Token
         _TokenType = TokenType
 
+        # 白名单优先（仅限「汉字 + 数字/英文」混排的名字）
+        #
+        # 预扫描已把 导出/导入 列表、函数名等收进 user_definitions，但纯汉字路径
+        # 只在 _tokenize_chinese_sequence 里查白名单，遇到 `随机0到1` 这种带数字的
+        # 名字会先切出 `随机0`，再把 `到` 当成关键字，名字被拦腰截断。
+        # 这里只处理「含混排后缀」的情形，纯汉字标识符的既有行为完全不变。
+        if user_definitions:
+            mixed = self._match_mixed_user_definition(source, i, user_definitions)
+            if mixed:
+                tokens.append(_Token(_TokenType.IDENTIFIER, mixed, line, col))
+                return tokens, len(mixed)
+
         # 收集连续的汉字（或英文标识符）
         if _is_han(source[i]):
             # 汉字处理：实现三层分词
@@ -1059,12 +1093,14 @@ class Lexer:
             if next_pos < n:
                 next_ch = source[next_pos]
                 cp_next = ord(next_ch)
-                if cp_next < 128 and (_is_ascii_alnum_f(next_ch) or next_ch == '_'):
+                if (cp_next < 128 and (_is_ascii_alnum_f(next_ch) or next_ch == '_')) \
+                        or _is_extra_letter(next_ch):
                     j = next_pos
                     while j < n:
                         ch = source[j]
                         cp = ord(ch)
-                        if cp < 128 and (_is_ascii_alnum_f(ch) or ch == '_'):
+                        if (cp < 128 and (_is_ascii_alnum_f(ch) or ch == '_')) \
+                                or _is_extra_letter(ch):
                             j += 1
                         else:
                             break
@@ -1120,9 +1156,10 @@ class Lexer:
 
             return tokens, consumed
         else:
-            # 英文标识符：收集连续的字母、数字、下划线
+            # 英文标识符：收集连续的字母、数字、下划线（含 π/α 等 Unicode 字母）
             j = i + 1
-            while j < n and (_is_ascii_alnum_f(source[j]) or source[j] == '_'):
+            while j < n and (_is_ascii_alnum_f(source[j]) or source[j] == '_'
+                             or _is_extra_letter(source[j])):
                 j += 1
 
             # 检查是否紧跟汉字（如 evennum集），如果是则合并
@@ -1158,6 +1195,47 @@ class Lexer:
 
             return tokens, j - i
     
+    def _match_mixed_user_definition(self, source: str, i: int, user_definitions: Set[str]):
+        """在位置 i 处对「含数字/英文的用户定义名」做最长匹配。
+
+        只有当名字在纯汉字前缀之后还有 ASCII/其他字母后缀时才生效，
+        避免干扰既有的纯汉字分词逻辑（那条路径自己会查白名单）。
+
+        例：`导出 随机0到1。` 预扫描已把 `随机0到1` 加入白名单，
+        这里整体返回，防止被切成 `随机0` + 关键字`到` + `1`。
+        """
+        n = len(source)
+        han_end = i
+        while han_end < n and _is_han_fast(source[han_end]):
+            han_end += 1
+
+        j = han_end
+        while j < n:
+            ch = source[j]
+            if _is_ascii_alnum(ch) or ch == '_' or _is_han_fast(ch) or _is_extra_letter(ch):
+                j += 1
+            else:
+                break
+
+        if j <= han_end:
+            return None  # 没有混排后缀，交给原有逻辑
+
+        while j > han_end:
+            candidate = source[i:j]
+            if candidate in user_definitions and candidate not in ALL_KEYWORDS:
+                # 不能在标识符「中间」停下：若 candidate 之后仍是合法的标识符续接字符
+                # （ASCII 字母/数字/下划线/其他 Unicode 字母/汉字），说明这只是一个更长名字
+                # 的前缀，应当继续缩短，否则会把 `ai_api_helper`（白名单里只有被误拆的 `ai`）
+                # 错切成 `ai` + `_api_helper`，运行期报 No module named 'ai'。
+                after = source[j] if j < n else ''
+                if after and (after == '_' or _is_ascii_alnum(after)
+                              or _is_han_fast(after) or _is_extra_letter(after)):
+                    j -= 1
+                    continue
+                return candidate
+            j -= 1
+        return None
+
     def _tokenize_chinese_sequence(self, source: str, i: int, line: int, col: int, tokens: List[Token], user_definitions: Set[str] = None) -> int:
         """
         处理连续的汉字序列（实现三层分词）
@@ -1721,9 +1799,11 @@ class Lexer:
                         j += 1
                     if j >= n or source[j] in '。\n':
                         break
-                    # 收集一个标识符：汉字 或 ASCII 字母/数字（支持中英混合，如 生成AI阶段提示）
+                    # 收集一个标识符：汉字 或 ASCII 字母/数字/下划线/点（支持中英混合、
+                    # 含下划线的 Python 模块名，如 生成AI阶段提示、ai_api_helper、a.b.c）
                     k = j
-                    while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])) and source[k] not in ' \t\n\r\f\v　。':
+                    while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])
+                                     or source[k] == '_' or source[k] == '.') and source[k] not in ' \t\n\r\f\v　。':
                         k += 1
                     if k > j:
                         name = source[j:k]

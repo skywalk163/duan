@@ -506,6 +506,7 @@ def cmd_check(args):
 
     errors = []
     warnings = []
+    module = None
 
     try:
         if args.backend == 'src':
@@ -553,6 +554,21 @@ def cmd_check(args):
             errors.append(formatted)
         except Exception:
             errors.append(str(e))
+
+    # 解析通过 ≠ 能跑：再走一遍代码生成，拦截「check 通过但 run 失败」的情况
+    if not errors and module is not None and args.backend == 'src':
+        try:
+            from code_generator import PythonCodeGenerator
+            generated = PythonCodeGenerator().generate(module)
+            try:
+                compile(generated, args.file, 'exec')
+            except SyntaxError as se:
+                errors.append(
+                    f"代码生成结果非法（生成的 Python 无法编译）：{se.msg}"
+                    f"（生成代码第 {se.lineno} 行）"
+                )
+        except Exception as e:
+            errors.append(f"代码生成失败：{type(e).__name__}: {e}")
 
     # 简单统计
     lines = source.split('\n')

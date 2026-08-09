@@ -372,20 +372,54 @@ class DuanParserCore:
                 errors.append(pe)
                 self._synchronize_to_statement_boundary()
         
-        # 如果有错误，报告所有错误
+        # 如果有错误，报告错误
         if errors:
             if len(errors) == 1:
                 raise errors[0]
-            else:
-                # 多错误：合并报告
-                combined = f"发现 {len(errors)} 个语法错误:\n\n"
-                combined += "\n\n---\n\n".join(
-                    f"错误 {i+1}/{len(errors)}:\n{str(e)}" 
-                    for i, e in enumerate(errors)
-                )
-                raise ParseError(combined)
-        
+            raise self._build_aggregate_error(errors)
+
         return Module(statements)
+
+    # 一次最多详细展示多少个错误。超出部分只做归类统计——
+    # 语法错误绝大多数是级联的，第一个错之后的几十上百条都是它的回声，
+    # 全量打印会把真正有用的第一条淹没掉。
+    MAX_REPORTED_ERRORS = 8
+
+    def _build_aggregate_error(self, errors):
+        """把多个语法错误聚合成一份可读的报告。
+
+        策略：按出现顺序展示前 MAX_REPORTED_ERRORS 条完整信息，
+        其余按「原因」归类只给计数，并提示如何查看全部。
+        完整错误列表挂在异常的 all_errors 属性上，供工具链程序化读取。
+        """
+        total = len(errors)
+        shown = errors[:self.MAX_REPORTED_ERRORS]
+        rest = errors[self.MAX_REPORTED_ERRORS:]
+
+        head = (f"发现 {total} 个语法错误"
+                f"（下面详列前 {len(shown)} 个，建议从第 1 个开始修）:\n\n")
+        body = "\n\n---\n\n".join(
+            f"错误 {i + 1}/{total}:\n{str(e)}" for i, e in enumerate(shown)
+        )
+
+        tail = ""
+        if rest:
+            buckets = {}
+            for e in rest:
+                key = (getattr(e, 'message', None) or str(e).strip().splitlines()[0])[:70]
+                buckets[key] = buckets.get(key, 0) + 1
+            tail = f"\n\n---\n\n另有 {len(rest)} 个错误（按原因归类）:\n"
+            for reason, cnt in sorted(buckets.items(), key=lambda kv: -kv[1])[:8]:
+                tail += f"  × {cnt:<4} {reason}\n"
+            if len(buckets) > 8:
+                tail += f"  ...（还有 {len(buckets) - 8} 类）\n"
+            tail += ("\n提示：这些多半是第 1 个错误引发的级联错误，"
+                     "修好前面的通常会一起消失。")
+
+        agg = ParseError(head + body + tail)
+        agg.all_errors = errors
+        agg.error_count = total
+        return agg
     
     def _synchronize_to_statement_boundary(self):
         """T1.4: 恐慌模式同步 — 跳过 token 直到下一个语句边界
