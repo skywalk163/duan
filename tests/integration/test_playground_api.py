@@ -13,11 +13,25 @@ import time
 _project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, _project_root)
 
-# 启动 Flask 测试客户端
-from playground.server import app
+# 尝试导入 Flask 测试客户端，若 Flask 未安装则跳过所有测试
+try:
+    from playground.server import app
+    _FLASK_AVAILABLE = True
+except ImportError as _e:
+    _FLASK_AVAILABLE = False
+    _FLASK_IMPORT_ERROR = str(_e)
 
 
-class TestPlaygroundDemosAPI(unittest.TestCase):
+class _FlaskTestBase(unittest.TestCase):
+    """基类：Flask 不可用时跳过所有测试"""
+
+    @classmethod
+    def setUpClass(cls):
+        if not _FLASK_AVAILABLE:
+            raise unittest.SkipTest(f"Flask 不可用，跳过 Playground API 测试: {_FLASK_IMPORT_ERROR}")
+
+
+class TestPlaygroundDemosAPI(_FlaskTestBase):
     """Demo 相关 API"""
 
     def setUp(self):
@@ -98,7 +112,7 @@ class TestPlaygroundDemosAPI(unittest.TestCase):
         self.assertEqual(resp.status_code, 404)
 
 
-class TestPlaygroundExecuteAPI(unittest.TestCase):
+class TestPlaygroundExecuteAPI(_FlaskTestBase):
     """代码执行 API"""
 
     def setUp(self):
@@ -208,7 +222,7 @@ class TestPlaygroundParseAPI(unittest.TestCase):
         self.assertFalse(data['success'])
 
 
-class TestPlaygroundExamplesAPI(unittest.TestCase):
+class TestPlaygroundExamplesAPI(_FlaskTestBase):
     """示例和语法参考 API"""
 
     def setUp(self):
