@@ -277,3 +277,11 @@ lsp/lsp_protocol.py
 
 # 工作区内部数据（非临时缓存，但不应入库）
 .workbuddy/
+
+# ===== 段言积木组合（积木库/） =====
+# 索引与配方是系统核心，必须入库（覆盖上方全局 *.json 忽略）
+!积木库/**/*.json
+# 用户本地 LLM 密钥配置不入库，见 llm_config.example.json
+积木库/llm_config.json
+# 每次运行生成的临时产物
+积木库/组合结果.duan
