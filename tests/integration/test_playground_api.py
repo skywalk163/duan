@@ -177,7 +177,7 @@ class TestPlaygroundExecuteAPI(_FlaskTestBase):
         self.assertFalse(data['success'])
 
 
-class TestPlaygroundParseAPI(unittest.TestCase):
+class TestPlaygroundParseAPI(_FlaskTestBase):
     """解析和词法分析 API"""
 
     def setUp(self):
