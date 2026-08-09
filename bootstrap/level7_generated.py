@@ -741,6 +741,9 @@ def 一元表达式(toks, p):
                 if 列表获取(tok, 0) == "COMMA":
                     np = np + 1
                     continue
+                if 列表获取(tok, 0) in ("NEWLINE", "INDENT", "DEDENT"):
+                    np = np + 1
+                    continue
                 结果 = 表达式(toks, np)
                 expr = 列表获取(结果, 0)
                 np = 列表获取(结果, 1)
@@ -769,6 +772,9 @@ def 一元表达式(toks, p):
                         i = i + 1
                     return 列表创建("{" + item_str + "}", np + 1)
                 if 列表获取(tok, 0) == "COMMA":
+                    np = np + 1
+                    continue
+                if 列表获取(tok, 0) in ("NEWLINE", "INDENT", "DEDENT"):
                     np = np + 1
                     continue
                 # 解析键

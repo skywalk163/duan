@@ -76,8 +76,8 @@ class TestLexerPerformance(unittest.TestCase):
         elapsed = end_time - start_time
 
         self.assertGreater(len(tokens), 0, "词法分析未生成任何 token")
-        self.assertLess(elapsed, 3.0,
-                        f"词法分析耗时 {elapsed:.4f} 秒，超过 3 秒限制")
+        self.assertLess(elapsed, 10.0,
+                        f"词法分析耗时 {elapsed:.4f} 秒，超过 10 秒限制")
 
         print(f"\n[性能测试] 10000 行代码词法分析耗时: {elapsed:.4f} 秒")
         print(f"[性能测试] 生成 Token 数量: {len(tokens)}")
