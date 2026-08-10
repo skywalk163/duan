@@ -292,3 +292,4 @@ lsp/lsp_protocol.py
 积木库/_探针.duan
 积木库/tmp*.duan
 积木库/.冒烟残留/
+积木库/.计划缓存.json
