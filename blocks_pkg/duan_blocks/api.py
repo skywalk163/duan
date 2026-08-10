@@ -83,8 +83,7 @@ def combo(r: 请求):
     方案, 候选 = res
     是兜底 = bool(方案.get('_兜底'))
     duan = mod._定位运行时()
-    rc, out, err = mod._运行_单次(方案, os.path.join(os.path.dirname(积木库路径()),
-                                                    '组合结果.duan'), duan)
+    rc, out, err = mod._运行_单次(方案, os.path.join(积木库路径(), '组合结果.duan'), duan)
     成功 = mod._成功(rc, out)
     诊断['成功'] = 成功
     诊断['最终rc'] = rc or 0

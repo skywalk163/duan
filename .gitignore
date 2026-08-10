@@ -298,3 +298,5 @@ lsp/lsp_protocol.py
 blocks_pkg/duan_blocks/_data/
 build_blocks/
 积木库/运行日志.jsonl
+/组合结果.duan
+/运行日志.jsonl
