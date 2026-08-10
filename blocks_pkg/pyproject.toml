@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "duan-blocks"
-version = "1.0.0"
+version = "1.0.1"
 description = "段言积木组合平台——零 token 组合式代码生成（选块/校验/接线/粘合全本地）"
 readme = "README.md"
 license = {text = "MIT"}
