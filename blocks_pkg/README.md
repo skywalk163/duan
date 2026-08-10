@@ -4,6 +4,13 @@
 
 > ✅ 已发布到 PyPI：`pip install duan-blocks` — https://pypi.org/project/duan-blocks/
 
+## 演示
+
+![duan-blocks 概念海报](https://raw.githubusercontent.com/skywalk163/duan/main/blocks_pkg/duan-blocks-poster.png)
+
+- 🎬 概念演示视频（10s，1080P）：[`demo_video/Cinematic_product_launch_video_2026-08-10T13-02-22.mp4`](https://raw.githubusercontent.com/skywalk163/duan/main/demo_video/Cinematic_product_launch_video_2026-08-10T13-02-22.mp4)（仓库 `demo_video/` 目录）
+- 🖥️ 本地交互演示页：安装后 `uvicorn duan_blocks.api:app --port 8123` → 打开 `http://localhost:8123/`（输入需求实时看积木组合与运行结果）
+
 ```
 # 命令行
 duan-combo "对一批数字求和再算平均" --输入 "[1,2,3,4,5]"
