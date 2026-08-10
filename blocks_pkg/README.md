@@ -2,6 +2,8 @@
 
 段言积木组合平台——把「用户自然语言需求」映射为「预置积木的组合装配」，零 token、全离线。
 
+> ✅ 已发布到 PyPI：`pip install duan-blocks` — https://pypi.org/project/duan-blocks/
+
 ```
 # 命令行
 duan-combo "对一批数字求和再算平均" --输入 "[1,2,3,4,5]"
