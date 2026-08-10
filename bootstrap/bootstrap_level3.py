@@ -34,6 +34,13 @@ if _duan_stdlib:
     if _duan_parent not in sys.path:
         sys.path.insert(0, _duan_parent)
 
+# 让 import 机制认识纯段言模块（只有 .duan、没有 .py 的那种）
+try:
+    import _duan_import_hook as _duan_hook
+    _duan_hook.install([_duan_stdlib, _duan_file_dir, os.getcwd()])
+except Exception:
+    pass
+
 import stdlib.FFI as _duan_ffi
 
 if importlib:
@@ -86,6 +93,7 @@ if importlib:
         _duan_builtin.字符串替换 = lambda s, old, new: s.replace(old, new)
         _duan_builtin.字符串反转 = lambda s: s[::-1]
         _duan_builtin.字符串长度 = len
+        _duan_builtin.显示宽度 = lambda text: sum(2 if __import__('unicodedata').east_asian_width(ch) in ('W', 'F') else 1 for ch in str(text))
         _duan_builtin.字符串获取 = lambda s, i: s[i]
         _duan_builtin.截取 = lambda s, start, end: s[start:end]
         _duan_builtin.转大写 = lambda s: s.upper()

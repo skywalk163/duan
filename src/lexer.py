@@ -1826,7 +1826,8 @@ class Lexer:
                 # 收集段名（遇到段落语法关键字或冒号停止）
                 # 支持汉字和ASCII字母数字的标识符
                 k = j
-                while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])):
+                while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])
+                                 or source[k] == '_'):
                     # 检查当前位置是否匹配段落语法关键字（接收、返回）
                     kw, kw_len = self._match_keyword(source, k)
                     if kw and kw_len > 0 and kw in ('接收', '返回'):
@@ -1851,7 +1852,8 @@ class Lexer:
                     # 支持汉字和ASCII字母数字的标识符
                     while j < n:
                         k = j
-                        while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])) and source[k] not in '。：':
+                        while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])
+                                         or source[k] == '_') and source[k] not in '。：':
                             k += 1
                         if k > j:
                             param_name = source[j:k]
@@ -1877,7 +1879,8 @@ class Lexer:
                 # 收集标识符（收集到赋值关键字"等于"/"为"为止）
                 # 支持汉字和ASCII字母数字组成的标识符（如"变量1"、"数据2"）
                 k = j
-                while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])):
+                while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])
+                                 or source[k] == '_'):
                     # 只把赋值关键字（等于、为）作为断点
                     # 其他关键字（如结束、返回、跳过等）都可以是变量名的一部分
                     next_kw, length = self._match_keyword(source, k)
@@ -1901,7 +1904,8 @@ class Lexer:
                 # 支持汉字和ASCII字母数字组成的标识符（如"环节1"、"数据2"）
                 k = j
                 collected_something = False
-                while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])):
+                while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])
+                                 or source[k] == '_'):
                     # 只检查是否遇到"为"或"等于"关键字（跳过空格），动词在开头时可跳过
                     lookahead = k
                     while lookahead < n and _is_space_tab(source[lookahead]):
