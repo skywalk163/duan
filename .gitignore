@@ -293,3 +293,8 @@ lsp/lsp_protocol.py
 积木库/tmp*.duan
 积木库/.冒烟残留/
 积木库/.计划缓存.json
+
+# duan-blocks 构建产物（python blocks_pkg/打包数据.py 生成）
+blocks_pkg/duan_blocks/_data/
+build_blocks/
+积木库/运行日志.jsonl
