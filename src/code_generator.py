@@ -510,7 +510,19 @@ class PythonCodeGenerator:
         self._add_line("except Exception:")
         self._add_line("    pass")
         self._add_line("")
-        self._add_line("import stdlib.FFI as _duan_ffi")
+        # FFI 模块：尽量导入；失败时降级为占位对象，避免非 FFI 程序因 stdlib 路径问题整体崩溃。
+        # 对应 E2E 失败项 F01：编译产物不可移植，临时目录无 stdlib 时 import 直接抛错。
+        # _duan_ffi_available 为「FFI 可用」特征位，下游/测试可据此判断 FFI 能力是否具备。
+        self._add_line("# FFI 模块：尽量导入；失败则降级为占位对象（见 _duan_ffi_available 特征位），避免非 FFI 程序因 stdlib 路径缺失而整体崩溃")
+        self._add_line("try:")
+        self._add_line("    import stdlib.FFI as _duan_ffi")
+        self._add_line("    _duan_ffi_available = True")
+        self._add_line("except Exception:")
+        self._add_line("    _duan_ffi_available = False")
+        self._add_line("    class _DuanFFIUnavailable:")
+        self._add_line("        def __getattr__(self, _name):")
+        self._add_line("            raise RuntimeError('FFI 不可用：未能导入 stdlib.FFI（请确认 stdlib 路径已加入 sys.path）')")
+        self._add_line("    _duan_ffi = _DuanFFIUnavailable()")
         self._add_line("")
         self._add_line("if importlib:")
         self._add_line("    try:")
