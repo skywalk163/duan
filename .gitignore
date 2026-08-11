@@ -289,6 +289,7 @@ lsp/lsp_protocol.py
 积木库/.embed_cache/
 
 积木库/_冒烟工位.duan
+积木库/_冒烟工位_*.duan
 积木库/_探针.duan
 积木库/tmp*.duan
 积木库/.冒烟残留/
@@ -302,3 +303,8 @@ build_blocks/
 /运行日志.jsonl
 dist_blocks/
 dist_blocks/
+# 评估工具运行期产物（非源码，CI/本地跑分时会再生）
+积木库/评估/规划/
+积木库/评估/报告/_护栏校验.json
+积木库/评估/报告/_基线快照.json
+积木库/生成/待审/
