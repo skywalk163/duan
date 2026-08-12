@@ -64,17 +64,19 @@ duan = "cli.duan_unified:main"
 duanc = "cli.duanc:main"
 
 [tool.setuptools.packages.find]
-include = ["src*", "cli*", "stdlib*", "antlrparser*"]
+include = ["src*", "cli*", "stdlib*", "antlrparser*", "积木库*"]
 exclude = [
     "tests*", "benchmarks*", "examples*", "project*", "bootstrap*",
     "docs*", "tools*", "lsp*", "debug-adapter*", "vscode-extension*", "scripts*",
     "**/test*", "**/*_test*", "**/self_hosted*", "**/duan_parser*", "**/duan_parser2*", "**/duan_parser_new*",
-    "**/web_playground*", "**/*_debug*", "**/ir.py", "**/codegen_x64.py", "**/linker.py"
+    "**/web_playground*", "**/*_debug*", "**/ir.py", "**/codegen_x64.py", "**/linker.py",
+    "积木库/生成*", "积木库/评估/运行日志*", "积木库/评估/*_v*", "积木库/评估/待审*", "积木库/__pycache__*"
 ]
 
 [tool.setuptools.package-data]
 "*" = ["*.duan"]
 "stdlib" = ["*.duan", "*.py"]
+"积木库" = ["*.duan", "*.json", "*.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
