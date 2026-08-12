@@ -32,11 +32,13 @@ jobs:
           python -m pip install pytest pytest-cov
 
       - name: 单元测试
+        env:
+          # 词法器 perf 预算：本地开发默认 2.0s（见 test_lexer_perf.py）；
+          # FreeBSD runner 比 Linux 慢约 1.7x，实测 3.53s，给 5.0s 预算作为 CI 门禁（仍能在严重回退时失败）。
+          LEXER_PERF_LIMIT: "5.0"
         run: |
           . .venv/bin/activate
-          # FreeBSD runner 比 GitHub/Linux 慢，词法器万行 perf 微基准（2.0s 阈值）在此会偶发超标；
-          # 该测试保留在仓库内，仅在本机 CI 门禁中排除（非代码回归）。
-          pytest tests/unit/ tests/integration/ -v --tb=short --ignore=tests/unit/test_lexer_perf.py
+          pytest tests/unit/ tests/integration/ -v --tb=short
 
       - name: 端到端测试
         run: |
