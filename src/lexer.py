@@ -1839,21 +1839,24 @@ class Lexer:
                     if segment_name not in ALL_KEYWORDS:
                         definitions.add(segment_name)
 
-                # 检查是否有 "参数" 关键字
+                # 检查是否有 "接收" 或 "参数" 关键字（旧式 接收 / 新式 参数）
+                # 旧式「段落 名 接收 参数：」的参数名必须整体注册进白名单，
+                # 否则含已注册子名的复合参数名（如 年月）会被最长匹配切碎成 年/月
                 j = k
                 while j < n and _is_space_tab(source[j]):
                     j += 1
-                if source[j:j+2] == '参数':
+                if source[j:j+2] in ('接收', '参数'):
                     j += 2
                     # 跳过空白
                     while j < n and _is_space_tab(source[j]):
                         j += 1
-                    # 收集参数名（可能多个参数）
-                    # 支持汉字和ASCII字母数字的标识符
+                    # 收集参数名（可能多个参数，空格或中英文逗号分隔，遇冒号/句号/换行结束）
+                    # 支持汉字和 ASCII 字母数字的标识符
                     while j < n:
+                        prev_j = j
                         k = j
                         while k < n and (_is_han(source[k]) or _is_ascii_alnum(source[k])
-                                         or source[k] == '_') and source[k] not in '。：':
+                                         or source[k] == '_') and source[k] not in '。：，, 、；;':
                             k += 1
                         if k > j:
                             param_name = source[j:k]
@@ -1861,12 +1864,14 @@ class Lexer:
                             if param_name not in ALL_KEYWORDS and param_name not in ALL_VERB_ARITY:
                                 definitions.add(param_name)
                         j = k
-                        # 跳过空白
-                        while j < n and _is_space_tab(source[j]):
+                        # 跳过空白与参数分隔符（中英文逗号/顿号/分号）
+                        while j < n and (_is_space_tab(source[j]) or source[j] in '，,、；;'):
                             j += 1
-                        # 检查是否结束（句号、冒号或换行）
                         if j >= n or source[j] in '。：\n':
                             break
+                        # 兜底：本回合无任何前进则跳过一个字符，避免遇到非常规分隔符时死循环
+                        if j == prev_j:
+                            j += 1
                 i = j
                 continue
 
