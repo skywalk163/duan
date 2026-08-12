@@ -1,0 +1,52 @@
+# 段言 Duan · 本地 CI（Gitea Actions，FreeBSD host 模式，无 Docker）
+#
+# 等价于 .github/workflows/ci.yml 的 Linux 测试路径：
+#   - runs-on: freebsd（act_runner，系统 python3 v3.11 / node v24）
+#   - 去掉 os 矩阵与 actions/setup-python，改用 venv 系统 python3
+#   - checkout 走本地 actions/checkout
+#   - 去掉 GitHub 专属的 build/twine/upload-artifact（release/publish 不在本地跑）
+#
+# 仅安装 pytest/pytest-cov（与 GitHub test job 一致），测试直接 import 仓库内 duan 包。
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: freebsd
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: 安装测试依赖 (venv)
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install pytest pytest-cov
+
+      - name: 单元测试
+        run: |
+          . .venv/bin/activate
+          pytest tests/unit/ tests/integration/ -v --tb=short
+
+      - name: 端到端测试
+        run: |
+          . .venv/bin/activate
+          pytest tests/e2e/ -v --tb=short
+
+      # 根目录测试（与 GitHub Linux job 一致；失败不阻塞，和原配置相同）
+      - name: 根目录测试
+        run: |
+          . .venv/bin/activate
+          pytest tests/test_parser.py tests/test_lexer.py tests/test_async.py tests/test_codegen.py tests/test_exception.py tests/test_executor.py tests/test_semantic.py tests/test_class_definition.py tests/test_duan_syntax.py tests/test_e2e.py tests/test_edge_cases.py tests/test_commands.py tests/test_file_io.py tests/test_interface.py tests/test_json_import.py tests/test_module_system.py tests/test_module_resolver.py tests/test_summary.py tests/test_ternary.py tests/test_advanced_semantic.py tests/test_duan_stdlib.py tests/test_duan_stdlib2.py tests/test_class_advanced.py tests/test_llvm_async.py tests/test_lsp_protocol.py tests/test_lsp_protocol_full.py tests/test_modern_features.py -v --tb=short --ignore=tests/archive 2>&1 || true
+
+      - name: 统一测试运行器
+        run: |
+          . .venv/bin/activate
+          python tests/run_tests.py --quick
