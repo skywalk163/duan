@@ -41,7 +41,16 @@ try:
 except Exception:
     pass
 
-import stdlib.FFI as _duan_ffi
+# FFI 模块：尽量导入；失败则降级为占位对象（见 _duan_ffi_available 特征位），避免非 FFI 程序因 stdlib 路径缺失而整体崩溃
+try:
+    import stdlib.FFI as _duan_ffi
+    _duan_ffi_available = True
+except Exception:
+    _duan_ffi_available = False
+    class _DuanFFIUnavailable:
+        def __getattr__(self, _name):
+            raise RuntimeError('FFI 不可用：未能导入 stdlib.FFI（请确认 stdlib 路径已加入 sys.path）')
+    _duan_ffi = _DuanFFIUnavailable()
 
 if importlib:
     try:
@@ -165,6 +174,34 @@ else:
     _duan_builtin.时间戳 = lambda: __import__('time').time()
     _duan_builtin.格式化时间 = lambda t, f='%Y-%m-%d %H:%M:%S': __import__('datetime').datetime.fromtimestamp(t).strftime(f) if isinstance(t, (int, float)) else __import__('datetime').datetime.strptime(t, '%Y-%m-%d %H:%M:%S').strftime(f)
 
+# stdlib 物理缺失时的兜底：补齐常用 builtin + 注册 文件系统 模块
+for _duan_n, _duan_f in [
+    ('列表排序', lambda lst, 反向=False: lst.sort(reverse=反向)),
+    ('列表反转', lambda lst: lst.reverse()),
+    ('列表清空', lambda lst: lst.clear()),
+    ('列表移除', lambda lst, item: lst.remove(item)),
+    ('列表长度', len),
+    ('追加文件', lambda path, content, encoding='utf-8': open(path, 'a', encoding=encoding).write(content) or None),
+    ('删除文件', lambda path: __import__('os').remove(path) if __import__('os').path.isfile(path) else None),
+    ('复制文件', lambda src, dst: __import__('shutil').copy2(src, dst)),
+    ('移动文件', lambda src, dst: __import__('shutil').move(src, dst)),
+    ('创建目录', lambda path: __import__('os').makedirs(path, exist_ok=True)),
+    ('删除目录', lambda path: __import__('shutil').rmtree(path)),
+    ('路径连接', lambda *parts: __import__('os').path.join(*parts)),
+    ('当前工作目录', lambda: __import__('os').getcwd()),
+]:
+    if not hasattr(_duan_builtin, _duan_n):
+        setattr(_duan_builtin, _duan_n, _duan_f)
+if (not _duan_stdlib) or (not os.path.isdir(_duan_stdlib or '')):
+    try:
+        import types as _duan_types
+        _duan_fs = _duan_types.ModuleType('文件系统')
+        for _duan_fn in ('读取文件', '写入文件', '追加文件', '文件存在', '删除文件', '复制文件', '移动文件', '创建目录', '删除目录', '目录存在', '路径连接', '当前工作目录', '读取行'):
+            if hasattr(_duan_builtin, _duan_fn):
+                setattr(_duan_fs, _duan_fn, getattr(_duan_builtin, _duan_fn))
+        sys.modules.setdefault('文件系统', _duan_fs)
+    except Exception:
+        pass
 # 可空类型解包辅助函数
 def _duan_unwrap(_x):
     assert _x is not None, "尝试解包空值"

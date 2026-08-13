@@ -687,6 +687,16 @@ class PythonCodeGenerator:
         self._add_line("    if not _cond:")
         self._add_line("        raise AssertionError(_msg)")
         self._add_line("")
+        # 连接辅助函数：中文里「列表.连接(分隔符)」和「分隔符.连接(列表)」都通顺，
+        # 但 join 只接受后者。原先无条件发射 obj.join(arg)，前者一律
+        # AttributeError: 'list' object has no attribute 'join'
+        # （LLM 兜底生成的「词序反转」块正是栽在这里）。按运行期类型分派即可两种都成立。
+        self._add_line("# 连接辅助函数（列表.连接(分隔符) 与 分隔符.连接(列表) 均可）")
+        self._add_line("def _duan_join(_o, _s=''):")
+        self._add_line("    if isinstance(_o, str):")
+        self._add_line("        return _o.join(_s)")
+        self._add_line("    return _s.join([_x if isinstance(_x, str) else str(_x) for _x in _o])")
+        self._add_line("")
 
         # 生成语句
         for stmt in module.statements:
@@ -2152,8 +2162,16 @@ class PythonCodeGenerator:
                 if expr.member == '长度':
                     return f"len({obj})"
                 # 特殊处理：包含方法 -> item in obj
+                # 必须加括号：`in` 在 Python 里是比较运算符，会与外层比较串成链式比较。
+                # 例如 `文本.包含("z") 等于 假` 若发射成 `"z" in 文本 == False`，
+                # Python 解释为 `("z" in 文本) and (文本 == False)`，恒为假 —— 
+                # 分支永不进入、程序静默无输出（rc=0），坏块因此逃过护栏。
                 elif expr.member == '包含':
-                    return f"{args_str} in {obj}"
+                    return f"({args_str} in {obj})"
+                # 特殊处理：连接 -> 运行期分派（见 _duan_join）。只接管「带 1 个实参」
+                # 的调用，`连接对象.连接()` 这类用户自定义无参方法保持原样透传。
+                elif expr.member == '连接' and len(expr.args) == 1:
+                    return f"_duan_join({obj}, {args_str})"
 
                 # P5 核心改造：内置函数式优先
                 # 如果方法名在 builtin_map 中且映射到 _duan_builtin，转为函数式调用

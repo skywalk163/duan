@@ -1872,6 +1872,34 @@ class ParserExprMixin:
         self._consume(TokenType.RBRACE)
         return self._parse_postfix(DictLiteral(entries))
 
+    def _列表字面量下标(self, node: ASTNode) -> ASTNode:
+        """列表字面量紧跟后缀符时，把后缀接到字面量上。
+
+        为什么必须做：字典/集合字面量都走 _parse_postfix，唯独列表字面量直接返回
+        （见 _parse_primary 的 `return self._parse_list_literal()`），于是
+        `[1,2,3][0]` 被解析成「两个相邻表达式」，静默算出 `([1,2,3], [0])`
+        且 rc=0 —— 错误结果冒充成功，护栏（rc==0 且有输出）抓不到。
+        同理，`[1,2,3].连接(",")` 也会因 `.` 未被接上而报「意外的标记 .」。
+
+        这里在下一个 token 是「后缀触发符」时转交 _parse_postfix。_parse_postfix 自身
+        只在遇到 BANG/LPAREN/DOT/「的」/「之」/LBRACKET 时才动作，其余（逗号、右括号、
+        换行）一律原样返回，故影响面仅限真正的后缀写法，不改变 `设 表 为 [1,2,3]`、
+        嵌套列表 `[[1],[2]]`、`打印([1,2,3])` 等行为。
+        """
+        tok = self._current()
+        if tok is None:
+            return node
+        _后缀触发 = (
+            tok.type == TokenType.LBRACKET
+            or tok.type == TokenType.DOT
+            or tok.type == TokenType.BANG
+            or tok.type == TokenType.LPAREN
+            or (tok.type == TokenType.KEYWORD and tok.value in ('的', '之'))
+        )
+        if _后缀触发:
+            return self._parse_postfix(node)
+        return node
+
     def _parse_list_literal(self) -> ASTNode:
         """解析列表字面量或列表推导
         
@@ -2024,11 +2052,11 @@ class ParserExprMixin:
             # 单个generator时保持向后兼容
             if len(generators) == 1:
                 var, it, cond = generators[0]
-                return ListComprehension(first_expr, var, it, cond)
+                return self._列表字面量下标(ListComprehension(first_expr, var, it, cond))
             else:
                 # 多重generator
                 first_gen = generators[0]
-                return ListComprehension(first_expr, first_gen[0], first_gen[1], first_gen[2], generators=generators)
+                return self._列表字面量下标(ListComprehension(first_expr, first_gen[0], first_gen[1], first_gen[2], generators=generators))
 
         # 普通列表字面量：元素, 元素, ...
         elements = [first_expr]
@@ -2042,7 +2070,7 @@ class ParserExprMixin:
             elem = self._parse_comparison()
             elements.append(elem)
         self._consume(TokenType.RBRACKET)
-        return ListLiteral(elements)
+        return self._列表字面量下标(ListLiteral(elements))
     
     def _parse_fstring_parts(self, str_val: str) -> list:
         """解析 f-string 内容，返回交替的 str 和 ASTNode 列表"""

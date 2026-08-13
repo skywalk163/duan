@@ -302,7 +302,13 @@ def cmd_run(args):
         else:
             _run_antlr(source)
 
+    except SystemExit:
+        # 运行期若经 段言 运行时走到 sys.exit（含非零码，代表运行期错误），
+        # 必须原样上浮，不能当作成功（rc==0 会被护栏误判为通过）。
+        raise
     except Exception as e:
+        # 运行期错误（越界/除零/NameError…）必须「浮出水面」：打 stderr 且返回非零 rc，
+        # 否则护栏（组合.py `_成功` / 冒烟.py）依赖的「rc==0 且 非空 stdout」会把它误判为成功。
         print(format_error(source, e), file=sys.stderr)
         if args.verbose:
             import traceback
