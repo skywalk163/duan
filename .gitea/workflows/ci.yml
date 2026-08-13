@@ -1,12 +1,12 @@
 # 段言 Duan · 本地 CI（Gitea Actions，FreeBSD host 模式，无 Docker）
 #
-# 等价于 .github/workflows/ci.yml 的 Linux 测试路径：
-#   - runs-on: freebsd（act_runner，系统 python3 v3.11 / node v24）
-#   - 去掉 os 矩阵与 actions/setup-python，改用 venv 系统 python3
-#   - checkout 走本地 actions/checkout
-#   - 去掉 GitHub 专属的 build/twine/upload-artifact（release/publish 不在本地跑）
+# 与之前版本一致，但依赖安装改为「持久 venv 复用」：
+#   第三方依赖（pytest/pytest-cov）装进 /var/db/act_runner/venvs/duan，
+#   跨 CI run 复用，不再每次 pip install；项目自身用 editable 指向稳定软链
+#   /var/db/act_runner/venvs/duan.src（每 run 用 ln -sfn $PWD 更新），
+#   既复用第三方依赖、又能 import 最新 checkout。
 #
-# 仅安装 pytest/pytest-cov（与 GitHub test job 一致），测试直接 import 仓库内 duan 包。
+# checkout 固定走本地 actions/checkout，避免回落 github.com。
 
 name: CI
 
@@ -21,37 +21,33 @@ jobs:
     runs-on: freebsd
     steps:
       - name: Checkout
-        # 固定走本地 actions/checkout，避免 Gitea 对裸写 uses 的解析偶发回落到 github.com
         uses: http://192.168.1.5:3000/actions/checkout@v4
 
-      - name: 安装测试依赖 (venv)
+      - name: 准备持久 venv（第三方依赖复用）
         run: |
-          python3 -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install pytest pytest-cov
+          VENV_BIN="$(/usr/local/sbin/ci_venv.sh duan 'pytest pytest-cov')"
+          echo "VENV_BIN=$VENV_BIN" >> "$GITHUB_ENV"
+          ln -sfn "$PWD" "/var/db/act_runner/venvs/duan.src"
+          "$VENV_BIN/pip" install -e "/var/db/act_runner/venvs/duan.src" --no-build-isolation >/dev/null 2>&1 || "$VENV_BIN/pip" install -e . --no-build-isolation >/dev/null 2>&1 || true
 
       - name: 单元测试
         env:
-          # 词法器 perf 预算：本地开发默认 2.0s（见 test_lexer_perf.py）；
-          # FreeBSD runner 比 Linux 慢约 1.7x，实测 3.53s，给 5.0s 预算作为 CI 门禁（仍能在严重回退时失败）。
           LEXER_PERF_LIMIT: "5.0"
         run: |
-          . .venv/bin/activate
+          . "$VENV_BIN/activate"
           pytest tests/unit/ tests/integration/ -v --tb=short
 
       - name: 端到端测试
         run: |
-          . .venv/bin/activate
+          . "$VENV_BIN/activate"
           pytest tests/e2e/ -v --tb=short
 
-      # 根目录测试（与 GitHub Linux job 一致；失败不阻塞，和原配置相同）
       - name: 根目录测试
         run: |
-          . .venv/bin/activate
+          . "$VENV_BIN/activate"
           pytest tests/test_parser.py tests/test_lexer.py tests/test_async.py tests/test_codegen.py tests/test_exception.py tests/test_executor.py tests/test_semantic.py tests/test_class_definition.py tests/test_duan_syntax.py tests/test_e2e.py tests/test_edge_cases.py tests/test_commands.py tests/test_file_io.py tests/test_interface.py tests/test_json_import.py tests/test_module_system.py tests/test_module_resolver.py tests/test_summary.py tests/test_ternary.py tests/test_advanced_semantic.py tests/test_duan_stdlib.py tests/test_duan_stdlib2.py tests/test_class_advanced.py tests/test_llvm_async.py tests/test_lsp_protocol.py tests/test_lsp_protocol_full.py tests/test_modern_features.py -v --tb=short --ignore=tests/archive 2>&1 || true
 
       - name: 统一测试运行器
         run: |
-          . .venv/bin/activate
+          . "$VENV_BIN/activate"
           python tests/run_tests.py --quick
