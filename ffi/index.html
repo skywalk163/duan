@@ -2735,14 +2735,14 @@
 </table>
 <h2 id="_4">快速入门<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="_5">加载库并调用函数<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>加载库 &quot;libm.so&quot; 为 math。
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>加载库 "libm.so" 为 math。
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>外部 段落 平方根 接收 输入: 小数 返回 小数 在 math。
 </span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>设 结果 为 平方根(16.0)
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>打印 结果  # 输出: 4.0
 </span></code></pre></div>
 <h3 id="windows-dll">在 Windows 上加载 DLL<a class="headerlink" href="#windows-dll" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>加载库 &quot;kernel32.dll&quot; 为 kernel。
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>加载库 "kernel32.dll" 为 kernel。
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>外部 段落 获取当前进程ID 返回 整数 在 kernel。
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
 </span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>令 pid = 获取当前进程ID()
@@ -2750,7 +2750,7 @@
 </span></code></pre></div>
 <h2 id="ffi">第一阶段：基础 FFI<a class="headerlink" href="#ffi" title="Permanent link">&para;</a></h2>
 <h3 id="_6">加载动态库<a class="headerlink" href="#_6" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>加载库 &quot;库路径&quot; 为 库别名
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>加载库 "库路径" 为 库别名
 </span></code></pre></div>
 <ul>
 <li><code>库路径</code>：动态库文件路径</li>
@@ -2760,7 +2760,7 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>外部 段落 函数名 接收 参数1: 类型, 参数2: 类型 返回 返回类型 在 库别名
 </span></code></pre></div>
 <p>自定义 C 函数名：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>外部 段落 打印 为 &quot;printf&quot; 接收 格式: 文本 返回 整数 在 libc
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>外部 段落 打印 为 "printf" 接收 格式: 文本 返回 整数 在 libc
 </span></code></pre></div>
 <h3 id="c_1">定义 C 结构体<a class="headerlink" href="#c_1" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>外部 结构体 点 {
@@ -2859,7 +2859,7 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>尝试：
 </span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    设 结果 为 可能要失败的FFI函数()
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>捕获 外部错误 为 甲：
-</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    打印 &quot;FFI 调用失败: &quot; + 甲
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>    打印 "FFI 调用失败: " + 甲
 </span></code></pre></div>
 <table>
 <thead>
@@ -2904,7 +2904,7 @@
 </span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>}
 </span></code></pre></div>
 <h3 id="_14">变长参数<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>外部 变长参数 段落 格式化 为 &quot;sprintf&quot; 接收 缓冲区: 文本 返回 整数 在 libc
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>外部 变长参数 段落 格式化 为 "sprintf" 接收 缓冲区: 文本 返回 整数 在 libc
 </span></code></pre></div>
 <h3 id="_15">回调创建<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>外部 回调 回调类型 接收 整数 返回 整数
@@ -2919,9 +2919,9 @@
 </span></code></pre></div>
 <h3 id="_17">跨平台库路径<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>设 路径 为 解析库路径({
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    &quot;win&quot;: &quot;kernel32.dll&quot;,
-</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    &quot;linux&quot;: &quot;libc.so.6&quot;,
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    &quot;mac&quot;: &quot;libc.dylib&quot;
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    "win": "kernel32.dll",
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    "linux": "libc.so.6",
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    "mac": "libc.dylib"
 </span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>})
 </span></code></pre></div>
 <h3 id="_18">结构体工具<a class="headerlink" href="#_18" title="Permanent link">&para;</a></h3>
@@ -2970,15 +2970,15 @@
 </span><span id="__span-18-11"><a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>}
 </span></code></pre></div>
 <p>位域操作：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>位域设置(标志, &#39;读&#39;, 1)
-</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>设 状态 为 位域获取(标志, &#39;读&#39;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>位域设置(标志, '读', 1)
+</span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>设 状态 为 位域获取(标志, '读')
 </span></code></pre></div>
 <h3 id="_20">函数指针类型<a class="headerlink" href="#_20" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>外部 函数指针 比较器 接收 甲: 整数, 乙: 整数 返回 整数
 </span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>外部 函数指针 无参回调 接收 返回 无
 </span></code></pre></div>
 <h3 id="_21">回调生命周期管理<a class="headerlink" href="#_21" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>设 键 为 注册回调(&quot;我的回调&quot;, 回调函数指针)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>设 键 为 注册回调("我的回调", 回调函数指针)
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>设 cb 为 获取回调(键)
 </span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>打印 列出回调()  # 所有已注册回调
 </span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>注销回调(键)       # 释放回调
@@ -3030,11 +3030,11 @@
 </span></code></pre></div>
 <h3 id="c_4">C 预处理器宏<a class="headerlink" href="#c_4" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a>外部 宏 缓冲区大小 为 1024
-</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>外部 宏 版本 为 &quot;1.0.0&quot;
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a>外部 宏 版本 为 "1.0.0"
 </span></code></pre></div>
 <p>宏管理：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>定义宏(&quot;最大连接&quot;, &quot;100&quot;)
-</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>设 值 为 获取宏(&quot;最大连接&quot;)  # &quot;100&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>定义宏("最大连接", "100")
+</span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>设 值 为 获取宏("最大连接")  # "100"
 </span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>打印 列出宏()  # 所有宏定义
 </span><span id="__span-25-4"><a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>清理宏()
 </span></code></pre></div>
@@ -3120,9 +3120,9 @@
 <h2 id="_23">错误处理<a class="headerlink" href="#_23" title="Permanent link">&para;</a></h2>
 <h3 id="_24">异常捕获<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>尝试：
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    加载库 &quot;不存在的库.so&quot; 为 lib
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    加载库 "不存在的库.so" 为 lib
 </span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>捕获 外部错误 为 错误：
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    打印 &quot;加载失败: &quot; + 错误
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>    打印 "加载失败: " + 错误
 </span></code></pre></div>
 <h3 id="_25">错误码查询<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a>设 码 为 系统错误码()
@@ -3130,20 +3130,20 @@
 </span></code></pre></div>
 <h2 id="_26">完整示例<a class="headerlink" href="#_26" title="Permanent link">&para;</a></h2>
 <h3 id="libm">调用 libm 数学库<a class="headerlink" href="#libm" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>加载库 &quot;libm.so&quot; 为 math
+<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>加载库 "libm.so" 为 math
 </span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>
 </span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>外部 段落 平方根 接收 输入: 小数 返回 小数 在 math
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>外部 段落 幂运算 为 &quot;pow&quot; 接收 底数: 小数, 指数: 小数 返回 小数 在 math
-</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>外部 段落 正弦 为 &quot;sin&quot; 接收 角度: 小数 返回 小数 在 math
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>外部 段落 幂运算 为 "pow" 接收 底数: 小数, 指数: 小数 返回 小数 在 math
+</span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>外部 段落 正弦 为 "sin" 接收 角度: 小数 返回 小数 在 math
 </span><span id="__span-28-6"><a id="__codelineno-28-6" name="__codelineno-28-6" href="#__codelineno-28-6"></a>
 </span><span id="__span-28-7"><a id="__codelineno-28-7" name="__codelineno-28-7" href="#__codelineno-28-7"></a>设 根 为 平方根(25.0)
-</span><span id="__span-28-8"><a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>打印 &quot;sqrt(25) = &quot; + 根  # 5.0
+</span><span id="__span-28-8"><a id="__codelineno-28-8" name="__codelineno-28-8" href="#__codelineno-28-8"></a>打印 "sqrt(25) = " + 根  # 5.0
 </span><span id="__span-28-9"><a id="__codelineno-28-9" name="__codelineno-28-9" href="#__codelineno-28-9"></a>
 </span><span id="__span-28-10"><a id="__codelineno-28-10" name="__codelineno-28-10" href="#__codelineno-28-10"></a>设 幂 为 幂运算(2.0, 10.0)
-</span><span id="__span-28-11"><a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>打印 &quot;2^10 = &quot; + 幂  # 1024.0
+</span><span id="__span-28-11"><a id="__codelineno-28-11" name="__codelineno-28-11" href="#__codelineno-28-11"></a>打印 "2^10 = " + 幂  # 1024.0
 </span><span id="__span-28-12"><a id="__codelineno-28-12" name="__codelineno-28-12" href="#__codelineno-28-12"></a>
 </span><span id="__span-28-13"><a id="__codelineno-28-13" name="__codelineno-28-13" href="#__codelineno-28-13"></a>设 值 为 正弦(3.14159 / 2)
-</span><span id="__span-28-14"><a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>打印 &quot;sin(pi/2) = &quot; + 值  # ~1.0
+</span><span id="__span-28-14"><a id="__codelineno-28-14" name="__codelineno-28-14" href="#__codelineno-28-14"></a>打印 "sin(pi/2) = " + 值  # ~1.0
 </span></code></pre></div>
 <h3 id="_27">结构体传参<a class="headerlink" href="#_27" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a>外部 结构体 矩形 {
@@ -3168,7 +3168,7 @@
 </span><span id="__span-30-8"><a id="__codelineno-30-8" name="__codelineno-30-8" href="#__codelineno-30-8"></a>    返回 0
 </span><span id="__span-30-9"><a id="__codelineno-30-9" name="__codelineno-30-9" href="#__codelineno-30-9"></a>
 </span><span id="__span-30-10"><a id="__codelineno-30-10" name="__codelineno-30-10" href="#__codelineno-30-10"></a>设 比较器 为 创建回调(排序比较器, 升序比较)
-</span><span id="__span-30-11"><a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a>设 键 为 注册回调(&quot;排序&quot;, 比较器)
+</span><span id="__span-30-11"><a id="__codelineno-30-11" name="__codelineno-30-11" href="#__codelineno-30-11"></a>设 键 为 注册回调("排序", 比较器)
 </span></code></pre></div>
 <h2 id="_29">测试与验证<a class="headerlink" href="#_29" title="Permanent link">&para;</a></h2>
 <p>段言 C FFI 提供了完整的测试覆盖，84 个测试用例分布在 4 个阶段中：</p>

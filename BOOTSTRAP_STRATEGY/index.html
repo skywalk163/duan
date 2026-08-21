@@ -2699,20 +2699,20 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a># 创建令牌
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>段落 创建令牌 接收 种别, 值, 横, 纵：
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  定义 令牌 等于 《字典创建》()。
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  《字典设置》(令牌, &quot;种别&quot;, 种别)。
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  《字典设置》(令牌, &quot;值&quot;, 值)。
-</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  《字典设置》(令牌, &quot;横&quot;, 横)。
-</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  《字典设置》(令牌, &quot;纵&quot;, 纵)。
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  《字典设置》(令牌, "种别", 种别)。
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  《字典设置》(令牌, "值", 值)。
+</span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  《字典设置》(令牌, "横", 横)。
+</span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>  《字典设置》(令牌, "纵", 纵)。
 </span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>  返回 令牌。
 </span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>结束。
 </span></code></pre></div>
 <h3 id="42-ast">4.2 AST<a class="headerlink" href="#42-ast" title="Permanent link">&para;</a></h3>
 <p>使用列表（数组）表示，节点类型为第一个元素：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a># 示例：变量声明节点
-</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>[&quot;var_decl&quot;, &quot;名称&quot;, [&quot;number&quot;, &quot;42&quot;]]
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>["var_decl", "名称", ["number", "42"]]
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a># 示例：函数定义节点
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>[&quot;paragraph_def&quot;, &quot;函数名&quot;, [&quot;参数1&quot;, &quot;参数2&quot;], [body_stmt1, body_stmt2]]
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>["paragraph_def", "函数名", ["参数1", "参数2"], [body_stmt1, body_stmt2]]
 </span></code></pre></div>
 <p>支持的节点类型：<code>program</code>, <code>paragraph_def</code>, <code>var_decl</code>, <code>assign</code>, <code>compound_assign</code>, <code>if_stmt</code>, <code>while_loop</code>, <code>return</code>, <code>expr_stmt</code>, <code>identifier</code>, <code>number</code>, <code>string</code>, <code>boolean</code>, <code>null</code>, <code>binary_op</code>, <code>unary_op</code>, <code>func_call</code>, <code>member_access</code></p>
 <hr />
@@ -2734,11 +2734,11 @@
 </span><span id="__span-7-5"><a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>python<span class="w"> </span>bootstrap/test_bootstrap_pipeline.py
 </span><span id="__span-7-6"><a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>
 </span><span id="__span-7-7"><a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="c1"># 方式3：直接通过 ANTLR 解释器</span>
-</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;</span>
+</span><span id="__span-7-8"><a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">"</span>
 </span><span id="__span-7-9"><a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="s2">from duan_interpreter import run_source</span>
-</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="s2">interp = run_source(open(&#39;bootstrap/compiler.duan&#39;).read())</span>
-</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="s2"># 然后调用 interp.env.get(&#39;compile_source&#39;) 等</span>
-</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="s2">&quot;</span>
+</span><span id="__span-7-10"><a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a><span class="s2">interp = run_source(open('bootstrap/compiler.duan').read())</span>
+</span><span id="__span-7-11"><a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a><span class="s2"># 然后调用 interp.env.get('compile_source') 等</span>
+</span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a><span class="s2">"</span>
 </span></code></pre></div>
 <hr />
 <h2 id="_5">六、下一步工作<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>

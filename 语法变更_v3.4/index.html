@@ -2635,15 +2635,15 @@
 <p>符号与中文运算符可自由混用：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>令 a = 3 + 5
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>如果 a 大于 5:
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    打印 &quot;yes&quot;
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    打印 "yes"
 </span></code></pre></div>
 <h3 id="34">3.4 额外修复：一元负号<a class="headerlink" href="#34" title="Permanent link">&para;</a></h3>
 <p>代码生成器中一元负号的输出格式从 <code>(- 5)</code> 修正为 <code>(-5)</code>：</p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># 修复前</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">op</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">operand</span><span class="si">}</span><span class="s2">)&quot;</span>    <span class="c1"># → (- 5)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">return</span> <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">op</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">operand</span><span class="si">}</span><span class="s2">)"</span>    <span class="c1"># → (- 5)</span>
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># 修复后</span>
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;(</span><span class="si">{</span><span class="n">op</span><span class="si">}{</span><span class="n">operand</span><span class="si">}</span><span class="s2">)&quot;</span>     <span class="c1"># → (-5)</span>
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="k">return</span> <span class="sa">f</span><span class="s2">"(</span><span class="si">{</span><span class="n">op</span><span class="si">}{</span><span class="n">operand</span><span class="si">}</span><span class="s2">)"</span>     <span class="c1"># → (-5)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="4">4. 测试结果<a class="headerlink" href="#4" title="Permanent link">&para;</a></h2>

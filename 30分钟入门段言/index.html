@@ -3143,7 +3143,7 @@
 <hr />
 <h3 id="13">1.3 你的第一个段言程序<a class="headerlink" href="#13" title="Permanent link">&para;</a></h3>
 <p>创建文件 <code>hello.duan</code>，写入：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>打印 &quot;你好，段言！&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>打印 "你好，段言！"
 </span></code></pre></div>
 <p><strong>为什么文件后缀是 <code>.duan</code>？</strong> 后缀名告诉计算机「这是一个段言源文件」，就像 <code>.docx</code> 表示 Word 文档一样。</p>
 <p>运行它：</p>
@@ -3185,7 +3185,7 @@
 <h2 id="5_1">🚀 第二部分：第一个完整程序（5 分钟）<a class="headerlink" href="#5_1" title="Permanent link">&para;</a></h2>
 <h3 id="21">2.1 变量——为什么需要「盒子」？<a class="headerlink" href="#21" title="Permanent link">&para;</a></h3>
 <p>变量就像厨房里的储物盒——你把不同的东西放进不同的盒子，需要时打开盒子取出来。计算机用变量来「记住」数据。</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>设 名字 为 &quot;张三&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>设 名字 为 "张三"
 </span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>设 年龄 为 25
 </span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>设 身高 为 1.75
 </span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
@@ -3202,10 +3202,10 @@
 <hr />
 <h3 id="22">2.2 字符串插值——把变量嵌入文字<a class="headerlink" href="#22" title="Permanent link">&para;</a></h3>
 <p>如果想把变量嵌入到一段文字中，用 <code>f</code> 开头的字符串（f-string）：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>设 名字 为 &quot;段言&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>设 名字 为 "段言"
 </span><span id="__span-7-2"><a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>设 版本 为 1.11
 </span><span id="__span-7-3"><a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
-</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>打印(f&quot;语言：{名字}，版本：{版本}&quot;)
+</span><span id="__span-7-4"><a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>打印(f"语言：{名字}，版本：{版本}")
 </span></code></pre></div>
 <p><strong>为什么叫 f-string？</strong> 这里的 <code>f</code> 代表「format」（格式化）。<code>{名字}</code> 就像一个占位符，运行时会被变量的实际值替换。输出：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>语言：段言，版本：1.11
@@ -3223,8 +3223,8 @@
 <hr />
 <h3 id="24">2.4 交互式输入——让程序和你对话<a class="headerlink" href="#24" title="Permanent link">&para;</a></h3>
 <p>使用 <code>输入</code> 函数让程序等待用户输入：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>设 名字 为 输入(&quot;请输入你的名字：&quot;)
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>打印(f&quot;你好，{名字}！欢迎学习段言！&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>设 名字 为 输入("请输入你的名字：")
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>打印(f"你好，{名字}！欢迎学习段言！")
 </span></code></pre></div>
 <p><strong>为什么需要 <code>输入</code>？</strong> 没有它，程序只能输出固定的内容。有了它，程序可以根据用户的输入做出不同响应——这才是真正的「交互」。</p>
 <hr />
@@ -3273,7 +3273,7 @@
 </span></code></pre></div>
 <h3 id="32-repl">3.2 REPL 基础操作<a class="headerlink" href="#32-repl" title="Permanent link">&para;</a></h3>
 <p>试试在 <code>&gt;&gt;&gt;</code> 后面敲这些：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>&gt;&gt;&gt; 打印 &quot;你好，REPL！&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>&gt;&gt;&gt; 打印 "你好，REPL！"
 </span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>你好，REPL！
 </span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
 </span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>&gt;&gt;&gt; 设 甲 为 10
@@ -3288,9 +3288,9 @@
 <h3 id="33-repl">3.3 REPL 中的多行代码<a class="headerlink" href="#33-repl" title="Permanent link">&para;</a></h3>
 <p>复杂语句需要多行时，REPL 会自动识别：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>&gt;&gt;&gt; 如果 10 &gt; 5：
-</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>...     打印 &quot;10 大于 5&quot;
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>...     打印 "10 大于 5"
 </span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>... 否则：
-</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>...     打印 &quot;这个不会被执行&quot;
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>...     打印 "这个不会被执行"
 </span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>...
 </span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>10 大于 5
 </span></code></pre></div>
@@ -3301,7 +3301,7 @@
 </span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>786432
 </span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
 </span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>&gt;&gt;&gt; # 字符串操作
-</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>&gt;&gt;&gt; &quot;段言&quot; + &quot;真棒&quot;
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>&gt;&gt;&gt; "段言" + "真棒"
 </span><span id="__span-15-7"><a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>段言真棒
 </span><span id="__span-15-8"><a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
 </span><span id="__span-15-9"><a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a>&gt;&gt;&gt; # 查看帮助
@@ -3376,24 +3376,24 @@
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>设 有身份证 为 真
 </span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
 </span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>如果 年龄 &gt;= 18 且 有身份证：
-</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    打印 &quot;可以上网&quot;
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>    打印 "可以上网"
 </span></code></pre></div>
 <hr />
 <h3 id="44">4.4 条件判断——让程序做决策<a class="headerlink" href="#44" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>设 分数 为 85
 </span><span id="__span-19-2"><a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>
 </span><span id="__span-19-3"><a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>如果 分数 &gt;= 90：
-</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    打印 &quot;优秀&quot;
+</span><span id="__span-19-4"><a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>    打印 "优秀"
 </span><span id="__span-19-5"><a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>否则如果 分数 &gt;= 60：
-</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    打印 &quot;及格&quot;
+</span><span id="__span-19-6"><a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a>    打印 "及格"
 </span><span id="__span-19-7"><a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a>否则：
-</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>    打印 &quot;不及格&quot;
+</span><span id="__span-19-8"><a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a>    打印 "不及格"
 </span></code></pre></div>
 <p><strong>为什么用冒号和缩进？</strong> 冒号（<code>：</code>）告诉段言「接下来是条件成立时要执行的代码」，缩进（前面空两格或四格）标示哪些代码属于这个条件。这是 Python 和段言共同的风格——<strong>强制缩进让代码结构一目了然</strong>。</p>
 <hr />
 <h3 id="45">4.5 三元表达式——一行写完二选一<a class="headerlink" href="#45" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>设 数 为 10
-</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>设 结果 为 &quot;偶数&quot; 如果 数 % 2 == 0 否则 &quot;奇数&quot;
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>设 结果 为 "偶数" 如果 数 % 2 == 0 否则 "奇数"
 </span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>打印 结果    # 输出: 偶数
 </span></code></pre></div>
 <p><strong>为什么叫「三元」？</strong> 因为它有三个部分：条件（<code>数 % 2 == 0</code>）、条件成立时的值（<code>"偶数"</code>）、条件不成立时的值（<code>"奇数"</code>）。</p>
@@ -3403,7 +3403,7 @@
 <p><strong>当循环（while）——「只要条件成立，就一直做」：</strong></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>设 计数 为 1
 </span><span id="__span-21-2"><a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>当 计数 &lt;= 5：
-</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    打印(f&quot;第{计数}次&quot;)
+</span><span id="__span-21-3"><a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>    打印(f"第{计数}次")
 </span><span id="__span-21-4"><a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>    计数 = 计数 + 1
 </span></code></pre></div>
 <p><strong>为什么叫「当」？</strong> 你读出来就是「当计数小于等于5时，执行大括号里的代码」——和日常说话完全一致。</p>
@@ -3412,7 +3412,7 @@
 </span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>    打印 项
 </span></code></pre></div>
 <p><strong>遍历列表：</strong></p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>设 水果 为 [&quot;苹果&quot;, &quot;香蕉&quot;, &quot;橘子&quot;]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>设 水果 为 ["苹果", "香蕉", "橘子"]
 </span><span id="__span-23-2"><a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a>遍历 水果 为 果：
 </span><span id="__span-23-3"><a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a>    打印 果
 </span></code></pre></div>
@@ -3468,16 +3468,16 @@
 <h2 id="3">⚡ 第五部分：段落（函数）——把代码打包（3 分钟）<a class="headerlink" href="#3" title="Permanent link">&para;</a></h2>
 <h3 id="51">5.1 定义和调用——为什么需要「段落」？<a class="headerlink" href="#51" title="Permanent link">&para;</a></h3>
 <p>想象你每天都在写：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>打印 &quot;你好，张三！&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>打印 "你好，张三！"
 </span><span id="__span-25-2"><a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a># ... 50行代码 ...
-</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>打印 &quot;你好，张三！&quot;
+</span><span id="__span-25-3"><a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>打印 "你好，张三！"
 </span></code></pre></div>
 <p>太重复了！函数就是把这些代码「打包」成一个名字，需要时叫一下名字就行：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>段落 问好 接收 名字：
-</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    打印(f&quot;你好，{名字}！&quot;)
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>    打印(f"你好，{名字}！")
 </span><span id="__span-26-3"><a id="__codelineno-26-3" name="__codelineno-26-3" href="#__codelineno-26-3"></a>
-</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>问好(&quot;张三&quot;)   # 输出：你好，张三！
-</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>问好(&quot;李四&quot;)   # 输出：你好，李四！
+</span><span id="__span-26-4"><a id="__codelineno-26-4" name="__codelineno-26-4" href="#__codelineno-26-4"></a>问好("张三")   # 输出：你好，张三！
+</span><span id="__span-26-5"><a id="__codelineno-26-5" name="__codelineno-26-5" href="#__codelineno-26-5"></a>问好("李四")   # 输出：你好，李四！
 </span></code></pre></div>
 <p><strong>为什么叫「段落」？</strong> 文章由段落组成，程序也由一个个「段落」组成。每个段落做一件事，组合起来就是一个完整的程序。</p>
 <p><strong>语法拆解：</strong>
@@ -3495,10 +3495,10 @@
 </span></code></pre></div>
 <p><strong>为什么需要 <code>返回</code>？</strong> 没有 <code>返回</code>，函数虽然计算了 <code>a + b</code>，但结果只在函数内部「消化」了，外面拿不到。<code>返回</code> 就是把结果「传递」出来。</p>
 <h3 id="53">5.3 默认参数——给参数一个「保底值」<a class="headerlink" href="#53" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>段落 问候 接收 名字 = &quot;世界&quot;：
-</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>    打印(f&quot;你好，{名字}！&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a>段落 问候 接收 名字 = "世界"：
+</span><span id="__span-28-2"><a id="__codelineno-28-2" name="__codelineno-28-2" href="#__codelineno-28-2"></a>    打印(f"你好，{名字}！")
 </span><span id="__span-28-3"><a id="__codelineno-28-3" name="__codelineno-28-3" href="#__codelineno-28-3"></a>
-</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>问候(&quot;张三&quot;)    # 你好，张三！
+</span><span id="__span-28-4"><a id="__codelineno-28-4" name="__codelineno-28-4" href="#__codelineno-28-4"></a>问候("张三")    # 你好，张三！
 </span><span id="__span-28-5"><a id="__codelineno-28-5" name="__codelineno-28-5" href="#__codelineno-28-5"></a>问候()          # 你好，世界！
 </span></code></pre></div>
 <p><strong>为什么需要默认参数？</strong> 有些参数大多数时候用同一个值，只有少数情况需要改。默认参数让你少写代码。</p>
@@ -3550,9 +3550,9 @@
 <hr />
 <h2 id="3_1">📦 第六部分：列表、字符串与字典（3 分钟）<a class="headerlink" href="#3_1" title="Permanent link">&para;</a></h2>
 <h3 id="61">6.1 列表——多个东西放一起<a class="headerlink" href="#61" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>设 水果 为 [&quot;苹果&quot;, &quot;香蕉&quot;, &quot;橘子&quot;]
+<div class="language-text highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>设 水果 为 ["苹果", "香蕉", "橘子"]
 </span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>打印 水果[0]    # 输出：苹果（为什么从0开始？下文解释）
-</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>水果.追加(&quot;葡萄&quot;)
+</span><span id="__span-31-3"><a id="__codelineno-31-3" name="__codelineno-31-3" href="#__codelineno-31-3"></a>水果.追加("葡萄")
 </span><span id="__span-31-4"><a id="__codelineno-31-4" name="__codelineno-31-4" href="#__codelineno-31-4"></a>打印 长度(水果)  # 输出：4
 </span></code></pre></div>
 <p><strong>为什么索引从 0 开始？</strong> 计算机内部，列表是一块连续的内存地址。<code>[0]</code> 表示「第一个元素的位置」，偏移 0 个单位。<code>[1]</code> 表示偏移 1 个单位。虽然初学者觉得从 1 开始更自然，但几乎所有编程语言都从 0 开始——这是编程的「通用约定」。</p>
@@ -3566,15 +3566,15 @@
 </span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>打印 偶数  # [2, 4, 6, 8, 10]
 </span></code></pre></div>
 <h3 id="63">6.3 字符串操作<a class="headerlink" href="#63" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>设 名字 为 &quot;段言&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>设 名字 为 "段言"
 </span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>打印 长度(名字)  # 输出：2
 </span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>打印 名字[0]    # 输出：段
-</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>打印 名字 + &quot;真棒&quot;  # 输出：段言真棒
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>打印 名字 + "真棒"  # 输出：段言真棒
 </span></code></pre></div>
 <h3 id="64">6.4 字典——键值对映射<a class="headerlink" href="#64" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>设 学生 为 {&quot;名字&quot;: &quot;张三&quot;, &quot;年龄&quot;: 25, &quot;成绩&quot;: 95}
-</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>打印 学生[&quot;名字&quot;]    # 输出：张三
-</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>打印(f&quot;{学生[&#39;名字&#39;]}的年龄是{学生[&#39;年龄&#39;]}&quot;)
+<div class="language-text highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>设 学生 为 {"名字": "张三", "年龄": 25, "成绩": 95}
+</span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>打印 学生["名字"]    # 输出：张三
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>打印(f"{学生['名字']}的年龄是{学生['年龄']}")
 </span></code></pre></div>
 <p><strong>为什么需要字典？</strong> 列表用数字索引（0, 1, 2...），但数字不直观。字典让你用「名字」这样的文字来查找——就像查字典一样。</p>
 <hr />
@@ -3609,7 +3609,7 @@
 <h2 id="3_2">🏗️ 第七部分：类与对象（3 分钟）<a class="headerlink" href="#3_2" title="Permanent link">&para;</a></h2>
 <h3 id="71">7.1 面向对象——为什么需要类和对象？<a class="headerlink" href="#71" title="Permanent link">&para;</a></h3>
 <p>写程序时，我们经常需要表示「现实世界的事物」——比如一个学生有名字、年龄、成绩，还能计算平均分。用之前学的变量可以做到，但会很零散：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>设 张三的名字 为 &quot;张三&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>设 张三的名字 为 "张三"
 </span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>设 张三的年龄 为 20
 </span><span id="__span-36-3"><a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a>设 张三的成绩 为 [85, 92, 78]
 </span><span id="__span-36-4"><a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a># ... 如果有10个学生，就有30个变量，太乱了！
@@ -3635,10 +3635,10 @@
 </span><span id="__span-37-18"><a id="__codelineno-37-18" name="__codelineno-37-18" href="#__codelineno-37-18"></a>        返回 总和 / 长度(己.成绩)
 </span><span id="__span-37-19"><a id="__codelineno-37-19" name="__codelineno-37-19" href="#__codelineno-37-19"></a>
 </span><span id="__span-37-20"><a id="__codelineno-37-20" name="__codelineno-37-20" href="#__codelineno-37-20"></a># 创建对象——根据「蓝图」造出「实物」
-</span><span id="__span-37-21"><a id="__codelineno-37-21" name="__codelineno-37-21" href="#__codelineno-37-21"></a>设 张三 为 学生(&quot;张三&quot;, 20)
+</span><span id="__span-37-21"><a id="__codelineno-37-21" name="__codelineno-37-21" href="#__codelineno-37-21"></a>设 张三 为 学生("张三", 20)
 </span><span id="__span-37-22"><a id="__codelineno-37-22" name="__codelineno-37-22" href="#__codelineno-37-22"></a>张三.添加成绩(85)
 </span><span id="__span-37-23"><a id="__codelineno-37-23" name="__codelineno-37-23" href="#__codelineno-37-23"></a>张三.添加成绩(92)
-</span><span id="__span-37-24"><a id="__codelineno-37-24" name="__codelineno-37-24" href="#__codelineno-37-24"></a>打印(f&quot;{张三.名字}的平均分是{张三.平均分()}&quot;)
+</span><span id="__span-37-24"><a id="__codelineno-37-24" name="__codelineno-37-24" href="#__codelineno-37-24"></a>打印(f"{张三.名字}的平均分是{张三.平均分()}")
 </span></code></pre></div>
 <p><strong>为什么要用 <code>己</code>？</strong> <code>己</code> 相当于其他语言的 <code>this</code> 或 <code>self</code>，表示「当前对象自己」。<code>己.名字</code> 的意思是「这个学生自己的名字」。</p>
 <h3 id="72">7.2 继承——减少重复代码<a class="headerlink" href="#72" title="Permanent link">&para;</a></h3>
@@ -3650,13 +3650,13 @@
 </span><span id="__span-38-5"><a id="__codelineno-38-5" name="__codelineno-38-5" href="#__codelineno-38-5"></a>        己.名字 为 名字
 </span><span id="__span-38-6"><a id="__codelineno-38-6" name="__codelineno-38-6" href="#__codelineno-38-6"></a>
 </span><span id="__span-38-7"><a id="__codelineno-38-7" name="__codelineno-38-7" href="#__codelineno-38-7"></a>    段落 介绍 接收：
-</span><span id="__span-38-8"><a id="__codelineno-38-8" name="__codelineno-38-8" href="#__codelineno-38-8"></a>        打印(f&quot;我叫{己.名字}&quot;)
+</span><span id="__span-38-8"><a id="__codelineno-38-8" name="__codelineno-38-8" href="#__codelineno-38-8"></a>        打印(f"我叫{己.名字}")
 </span><span id="__span-38-9"><a id="__codelineno-38-9" name="__codelineno-38-9" href="#__codelineno-38-9"></a>
 </span><span id="__span-38-10"><a id="__codelineno-38-10" name="__codelineno-38-10" href="#__codelineno-38-10"></a>类 狗 继承 动物：
 </span><span id="__span-38-11"><a id="__codelineno-38-11" name="__codelineno-38-11" href="#__codelineno-38-11"></a>    段落 叫 接收：
-</span><span id="__span-38-12"><a id="__codelineno-38-12" name="__codelineno-38-12" href="#__codelineno-38-12"></a>        打印 &quot;汪汪！&quot;
+</span><span id="__span-38-12"><a id="__codelineno-38-12" name="__codelineno-38-12" href="#__codelineno-38-12"></a>        打印 "汪汪！"
 </span><span id="__span-38-13"><a id="__codelineno-38-13" name="__codelineno-38-13" href="#__codelineno-38-13"></a>
-</span><span id="__span-38-14"><a id="__codelineno-38-14" name="__codelineno-38-14" href="#__codelineno-38-14"></a>设 小狗 为 狗(&quot;旺财&quot;)
+</span><span id="__span-38-14"><a id="__codelineno-38-14" name="__codelineno-38-14" href="#__codelineno-38-14"></a>设 小狗 为 狗("旺财")
 </span><span id="__span-38-15"><a id="__codelineno-38-15" name="__codelineno-38-15" href="#__codelineno-38-15"></a>小狗.介绍()    # 我叫旺财（继承自动物）
 </span><span id="__span-38-16"><a id="__codelineno-38-16" name="__codelineno-38-16" href="#__codelineno-38-16"></a>小狗.叫()      # 汪汪！（自己的方法）
 </span></code></pre></div>
@@ -3709,36 +3709,36 @@
 </span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>    设 结果 为 10 / 0
 </span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>    打印 结果
 </span><span id="__span-40-4"><a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a>捕获 错误：
-</span><span id="__span-40-5"><a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a>    打印(&quot;出错了：&quot; + 转字符串(错误))
+</span><span id="__span-40-5"><a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a>    打印("出错了：" + 转字符串(错误))
 </span><span id="__span-40-6"><a id="__codelineno-40-6" name="__codelineno-40-6" href="#__codelineno-40-6"></a>最终：
-</span><span id="__span-40-7"><a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a>    打印(&quot;无论是否异常都会执行&quot;)
+</span><span id="__span-40-7"><a id="__codelineno-40-7" name="__codelineno-40-7" href="#__codelineno-40-7"></a>    打印("无论是否异常都会执行")
 </span></code></pre></div>
 <p><strong>为什么需要 <code>最终</code>？</strong> 有些操作无论成功还是失败都必须执行——比如关闭文件、释放资源。<code>最终</code> 保证了这一点。</p>
 <h3 id="82">8.2 主动抛出异常<a class="headerlink" href="#82" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>段落 检查年龄 接收 年龄：
 </span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>    如果 年龄 &lt; 0：
-</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>        抛出 &quot;年龄不能为负数&quot;
-</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>    打印(f&quot;年龄是{年龄}&quot;)
+</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>        抛出 "年龄不能为负数"
+</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>    打印(f"年龄是{年龄}")
 </span><span id="__span-41-5"><a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>
 </span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>尝试：
 </span><span id="__span-41-7"><a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a>    检查年龄(-5)
 </span><span id="__span-41-8"><a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a>捕获 e：
-</span><span id="__span-41-9"><a id="__codelineno-41-9" name="__codelineno-41-9" href="#__codelineno-41-9"></a>    打印(&quot;捕获到异常：&quot; + 转字符串(e))
+</span><span id="__span-41-9"><a id="__codelineno-41-9" name="__codelineno-41-9" href="#__codelineno-41-9"></a>    打印("捕获到异常：" + 转字符串(e))
 </span></code></pre></div>
 <h3 id="83">8.3 文件操作<a class="headerlink" href="#83" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a># 写入文件
-</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>写入文件(&quot;note.txt&quot;, &quot;你好，段言！&quot;)
-</span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>打印(&quot;文件已写入&quot;)
+</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>写入文件("note.txt", "你好，段言！")
+</span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>打印("文件已写入")
 </span><span id="__span-42-4"><a id="__codelineno-42-4" name="__codelineno-42-4" href="#__codelineno-42-4"></a>
 </span><span id="__span-42-5"><a id="__codelineno-42-5" name="__codelineno-42-5" href="#__codelineno-42-5"></a># 读取文件
-</span><span id="__span-42-6"><a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a>设 内容 为 读取文件(&quot;note.txt&quot;)
+</span><span id="__span-42-6"><a id="__codelineno-42-6" name="__codelineno-42-6" href="#__codelineno-42-6"></a>设 内容 为 读取文件("note.txt")
 </span><span id="__span-42-7"><a id="__codelineno-42-7" name="__codelineno-42-7" href="#__codelineno-42-7"></a>打印(内容)
 </span><span id="__span-42-8"><a id="__codelineno-42-8" name="__codelineno-42-8" href="#__codelineno-42-8"></a>
 </span><span id="__span-42-9"><a id="__codelineno-42-9" name="__codelineno-42-9" href="#__codelineno-42-9"></a># 检查文件是否存在
-</span><span id="__span-42-10"><a id="__codelineno-42-10" name="__codelineno-42-10" href="#__codelineno-42-10"></a>如果 文件存在(&quot;note.txt&quot;)：
-</span><span id="__span-42-11"><a id="__codelineno-42-11" name="__codelineno-42-11" href="#__codelineno-42-11"></a>    打印(&quot;文件存在&quot;)
+</span><span id="__span-42-10"><a id="__codelineno-42-10" name="__codelineno-42-10" href="#__codelineno-42-10"></a>如果 文件存在("note.txt")：
+</span><span id="__span-42-11"><a id="__codelineno-42-11" name="__codelineno-42-11" href="#__codelineno-42-11"></a>    打印("文件存在")
 </span><span id="__span-42-12"><a id="__codelineno-42-12" name="__codelineno-42-12" href="#__codelineno-42-12"></a>否则：
-</span><span id="__span-42-13"><a id="__codelineno-42-13" name="__codelineno-42-13" href="#__codelineno-42-13"></a>    打印(&quot;文件不存在&quot;)
+</span><span id="__span-42-13"><a id="__codelineno-42-13" name="__codelineno-42-13" href="#__codelineno-42-13"></a>    打印("文件不存在")
 </span></code></pre></div>
 <p><strong>为什么用「写入文件/读取文件」而不是 <code>open/write/close</code>？</strong> 段言把常见的文件操作封装成了直观的中文函数——初学者不需要理解「文件句柄」「缓冲区」等底层概念。</p>
 <hr />
@@ -3777,16 +3777,16 @@
 </span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>
 </span><span id="__span-43-3"><a id="__codelineno-43-3" name="__codelineno-43-3" href="#__codelineno-43-3"></a>设 半径 为 5
 </span><span id="__span-43-4"><a id="__codelineno-43-4" name="__codelineno-43-4" href="#__codelineno-43-4"></a>设 面积 为 数学.圆周率 * 半径 * 半径
-</span><span id="__span-43-5"><a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a>打印(f&quot;圆的面积：{面积}&quot;)
+</span><span id="__span-43-5"><a id="__codelineno-43-5" name="__codelineno-43-5" href="#__codelineno-43-5"></a>打印(f"圆的面积：{面积}")
 </span><span id="__span-43-6"><a id="__codelineno-43-6" name="__codelineno-43-6" href="#__codelineno-43-6"></a>
 </span><span id="__span-43-7"><a id="__codelineno-43-7" name="__codelineno-43-7" href="#__codelineno-43-7"></a>设 随机数 为 数学.随机整数(1, 100)
-</span><span id="__span-43-8"><a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a>打印(f&quot;随机数：{随机数}&quot;)
+</span><span id="__span-43-8"><a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a>打印(f"随机数：{随机数}")
 </span></code></pre></div>
 <h3 id="92">9.2 从模块导入特定函数<a class="headerlink" href="#92" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>从 数学 导入 平方根, 绝对值
 </span><span id="__span-44-2"><a id="__codelineno-44-2" name="__codelineno-44-2" href="#__codelineno-44-2"></a>
-</span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>打印(f&quot;根号16 = {平方根(16)}&quot;)
-</span><span id="__span-44-4"><a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>打印(f&quot;|-5| = {绝对值(-5)}&quot;)
+</span><span id="__span-44-3"><a id="__codelineno-44-3" name="__codelineno-44-3" href="#__codelineno-44-3"></a>打印(f"根号16 = {平方根(16)}")
+</span><span id="__span-44-4"><a id="__codelineno-44-4" name="__codelineno-44-4" href="#__codelineno-44-4"></a>打印(f"|-5| = {绝对值(-5)}")
 </span></code></pre></div>
 <h3 id="93">9.3 创建自己的模块<a class="headerlink" href="#93" title="Permanent link">&para;</a></h3>
 <p>创建 <code>工具.duan</code>：</p>
@@ -3794,7 +3794,7 @@
 </span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a>    返回 数 * 2
 </span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a>
 </span><span id="__span-45-4"><a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a>段落 问候 接收 名：
-</span><span id="__span-45-5"><a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a>    返回 &quot;你好，&quot; + 名 + &quot;！&quot;
+</span><span id="__span-45-5"><a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a>    返回 "你好，" + 名 + "！"
 </span><span id="__span-45-6"><a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a>
 </span><span id="__span-45-7"><a id="__codelineno-45-7" name="__codelineno-45-7" href="#__codelineno-45-7"></a>导出 双倍, 问候
 </span></code></pre></div>
@@ -3802,7 +3802,7 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>导入 工具
 </span><span id="__span-46-2"><a id="__codelineno-46-2" name="__codelineno-46-2" href="#__codelineno-46-2"></a>
 </span><span id="__span-46-3"><a id="__codelineno-46-3" name="__codelineno-46-3" href="#__codelineno-46-3"></a>打印 工具.双倍(21)
-</span><span id="__span-46-4"><a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>打印 工具.问候(&quot;小明&quot;)
+</span><span id="__span-46-4"><a id="__codelineno-46-4" name="__codelineno-46-4" href="#__codelineno-46-4"></a>打印 工具.问候("小明")
 </span></code></pre></div>
 <hr />
 <h2 id="bug-3">🔍 第十部分：调试——找出程序的 Bug（额外 3 分钟）<a class="headerlink" href="#bug-3" title="Permanent link">&para;</a></h2>
@@ -3882,7 +3882,7 @@
 </span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>    返回 n * 阶乘(n - 1)
 </span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>
 </span><span id="__span-48-6"><a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a>设 结果 为 阶乘(5)
-</span><span id="__span-48-7"><a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a>打印(f&quot;5! = {结果}&quot;)
+</span><span id="__span-48-7"><a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a>打印(f"5! = {结果}")
 </span></code></pre></div>
 <p>运行调试：</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a>duan<span class="w"> </span>debug<span class="w"> </span>bug.duan
@@ -4016,42 +4016,42 @@
 <p>错误是学习编程的最佳老师。下面列出段言新手最常见的错误，遇到时对照检查。</p>
 <h3 id="1">错误 1：忘了写 <code>为</code><a class="headerlink" href="#1" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a># ❌ 错误
-</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>设 名字 &quot;张三&quot;
+</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>设 名字 "张三"
 </span><span id="__span-55-3"><a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>
 </span><span id="__span-55-4"><a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a># ✅ 正确
-</span><span id="__span-55-5"><a id="__codelineno-55-5" name="__codelineno-55-5" href="#__codelineno-55-5"></a>设 名字 为 &quot;张三&quot;
+</span><span id="__span-55-5"><a id="__codelineno-55-5" name="__codelineno-55-5" href="#__codelineno-55-5"></a>设 名字 为 "张三"
 </span></code></pre></div>
 <p><strong>为什么？</strong> <code>设 X 为 Y</code> 是固定语法结构，<code>为</code> 是必须的关键字，漏掉它会报语法错误。</p>
 <h3 id="2_1">错误 2：混淆 <code>=</code> 和 <code>==</code><a class="headerlink" href="#2_1" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a># ❌ 错误：这是赋值，不是比较
 </span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>如果 分数 = 100：
-</span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>    打印 &quot;满分&quot;
+</span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>    打印 "满分"
 </span><span id="__span-56-4"><a id="__codelineno-56-4" name="__codelineno-56-4" href="#__codelineno-56-4"></a>
 </span><span id="__span-56-5"><a id="__codelineno-56-5" name="__codelineno-56-5" href="#__codelineno-56-5"></a># ✅ 正确：== 才是比较
 </span><span id="__span-56-6"><a id="__codelineno-56-6" name="__codelineno-56-6" href="#__codelineno-56-6"></a>如果 分数 == 100：
-</span><span id="__span-56-7"><a id="__codelineno-56-7" name="__codelineno-56-7" href="#__codelineno-56-7"></a>    打印 &quot;满分&quot;
+</span><span id="__span-56-7"><a id="__codelineno-56-7" name="__codelineno-56-7" href="#__codelineno-56-7"></a>    打印 "满分"
 </span></code></pre></div>
 <p><strong>为什么？</strong> <code>=</code> 是「把右边的值放进左边」，<code>==</code> 是「判断左右两边是否相等」。这个错误几乎每个编程初学者都会犯——<strong>连有经验的程序员偶尔也会写错</strong>。</p>
 <h3 id="3_4">错误 3：忘记冒号 <code>：</code><a class="headerlink" href="#3_4" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a># ❌ 错误
 </span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>如果 年龄 &gt;= 18
-</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>    打印 &quot;成年&quot;
+</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>    打印 "成年"
 </span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>
 </span><span id="__span-57-5"><a id="__codelineno-57-5" name="__codelineno-57-5" href="#__codelineno-57-5"></a># ✅ 正确
 </span><span id="__span-57-6"><a id="__codelineno-57-6" name="__codelineno-57-6" href="#__codelineno-57-6"></a>如果 年龄 &gt;= 18：
-</span><span id="__span-57-7"><a id="__codelineno-57-7" name="__codelineno-57-7" href="#__codelineno-57-7"></a>    打印 &quot;成年&quot;
+</span><span id="__span-57-7"><a id="__codelineno-57-7" name="__codelineno-57-7" href="#__codelineno-57-7"></a>    打印 "成年"
 </span></code></pre></div>
 <p><strong>为什么？</strong> 冒号告诉段言「条件写完了，后面是要执行的代码块」。段言中 <code>如果</code>、<code>否则</code>、<code>遍历</code>、<code>当</code>、<code>段落</code>、<code>类</code> 后面都需要冒号。</p>
 <h3 id="4">错误 4：缩进不一致<a class="headerlink" href="#4" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-58-1"><a id="__codelineno-58-1" name="__codelineno-58-1" href="#__codelineno-58-1"></a># ❌ 错误：缩进混乱
 </span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>如果 真：
-</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>    打印 &quot;第一行&quot;
-</span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>  打印 &quot;第二行&quot;  # 缩进不对
+</span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>    打印 "第一行"
+</span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>  打印 "第二行"  # 缩进不对
 </span><span id="__span-58-5"><a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a>
 </span><span id="__span-58-6"><a id="__codelineno-58-6" name="__codelineno-58-6" href="#__codelineno-58-6"></a># ✅ 正确：统一缩进
 </span><span id="__span-58-7"><a id="__codelineno-58-7" name="__codelineno-58-7" href="#__codelineno-58-7"></a>如果 真：
-</span><span id="__span-58-8"><a id="__codelineno-58-8" name="__codelineno-58-8" href="#__codelineno-58-8"></a>    打印 &quot;第一行&quot;
-</span><span id="__span-58-9"><a id="__codelineno-58-9" name="__codelineno-58-9" href="#__codelineno-58-9"></a>    打印 &quot;第二行&quot;
+</span><span id="__span-58-8"><a id="__codelineno-58-8" name="__codelineno-58-8" href="#__codelineno-58-8"></a>    打印 "第一行"
+</span><span id="__span-58-9"><a id="__codelineno-58-9" name="__codelineno-58-9" href="#__codelineno-58-9"></a>    打印 "第二行"
 </span></code></pre></div>
 <p><strong>为什么？</strong> 段言用缩进（空格或 Tab）来标示代码块的归属。缩进不统一，段言无法判断某行代码属于哪个块。<strong>建议统一使用 4 个空格</strong>。</p>
 <h3 id="5_3">错误 5：变量名冲突<a class="headerlink" href="#5_3" title="Permanent link">&para;</a></h3>
@@ -4074,16 +4074,16 @@
 </span><span id="__span-60-7"><a id="__codelineno-60-7" name="__codelineno-60-7" href="#__codelineno-60-7"></a>如果 长度(列表) &gt; 5：
 </span><span id="__span-60-8"><a id="__codelineno-60-8" name="__codelineno-60-8" href="#__codelineno-60-8"></a>    打印 列表[5]
 </span><span id="__span-60-9"><a id="__codelineno-60-9" name="__codelineno-60-9" href="#__codelineno-60-9"></a>否则：
-</span><span id="__span-60-10"><a id="__codelineno-60-10" name="__codelineno-60-10" href="#__codelineno-60-10"></a>    打印(f&quot;列表只有{长度(列表)}个元素，索引5不存在&quot;)
+</span><span id="__span-60-10"><a id="__codelineno-60-10" name="__codelineno-60-10" href="#__codelineno-60-10"></a>    打印(f"列表只有{长度(列表)}个元素，索引5不存在")
 </span></code></pre></div>
 <p><strong>为什么？</strong> 列表索引从 0 开始，长度为 3 的列表，有效索引是 0、1、2。</p>
 <h3 id="7">错误 7：字符串引号不匹配<a class="headerlink" href="#7" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-61-1"><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a># ❌ 错误
-</span><span id="__span-61-2"><a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>设 消息 为 &quot;你好&#39;
+</span><span id="__span-61-2"><a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a>设 消息 为 "你好'
 </span><span id="__span-61-3"><a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a>
 </span><span id="__span-61-4"><a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a># ✅ 正确：引号成对
-</span><span id="__span-61-5"><a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a>设 消息 为 &quot;你好&quot;
-</span><span id="__span-61-6"><a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a>设 消息2 为 &#39;你好&#39;
+</span><span id="__span-61-5"><a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a>设 消息 为 "你好"
+</span><span id="__span-61-6"><a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a>设 消息2 为 '你好'
 </span></code></pre></div>
 <p><strong>为什么？</strong> 字符串必须用成对的引号包裹。<code>"</code> 开始就要用 <code>"</code> 结束，<code>'</code> 开始就要用 <code>'</code> 结束。</p>
 <h3 id="8">错误 8：修改列表时用 <code>设</code><a class="headerlink" href="#8" title="Permanent link">&para;</a></h3>
@@ -4105,23 +4105,23 @@
 </span><span id="__span-63-5"><a id="__codelineno-63-5" name="__codelineno-63-5" href="#__codelineno-63-5"></a>设 尝试次数 为 0
 </span><span id="__span-63-6"><a id="__codelineno-63-6" name="__codelineno-63-6" href="#__codelineno-63-6"></a>设 猜中 为 假
 </span><span id="__span-63-7"><a id="__codelineno-63-7" name="__codelineno-63-7" href="#__codelineno-63-7"></a>
-</span><span id="__span-63-8"><a id="__codelineno-63-8" name="__codelineno-63-8" href="#__codelineno-63-8"></a>打印 &quot;=== 猜数字游戏 ===&quot;
-</span><span id="__span-63-9"><a id="__codelineno-63-9" name="__codelineno-63-9" href="#__codelineno-63-9"></a>打印 &quot;我已经想好了一个 1 到 100 之间的数字&quot;
-</span><span id="__span-63-10"><a id="__codelineno-63-10" name="__codelineno-63-10" href="#__codelineno-63-10"></a>打印 &quot;你能猜出来吗？&quot;
+</span><span id="__span-63-8"><a id="__codelineno-63-8" name="__codelineno-63-8" href="#__codelineno-63-8"></a>打印 "=== 猜数字游戏 ==="
+</span><span id="__span-63-9"><a id="__codelineno-63-9" name="__codelineno-63-9" href="#__codelineno-63-9"></a>打印 "我已经想好了一个 1 到 100 之间的数字"
+</span><span id="__span-63-10"><a id="__codelineno-63-10" name="__codelineno-63-10" href="#__codelineno-63-10"></a>打印 "你能猜出来吗？"
 </span><span id="__span-63-11"><a id="__codelineno-63-11" name="__codelineno-63-11" href="#__codelineno-63-11"></a>
 </span><span id="__span-63-12"><a id="__codelineno-63-12" name="__codelineno-63-12" href="#__codelineno-63-12"></a>当 非 猜中：
-</span><span id="__span-63-13"><a id="__codelineno-63-13" name="__codelineno-63-13" href="#__codelineno-63-13"></a>    设 猜测 为 转整数(输入(&quot;请猜一个数字：&quot;))
+</span><span id="__span-63-13"><a id="__codelineno-63-13" name="__codelineno-63-13" href="#__codelineno-63-13"></a>    设 猜测 为 转整数(输入("请猜一个数字："))
 </span><span id="__span-63-14"><a id="__codelineno-63-14" name="__codelineno-63-14" href="#__codelineno-63-14"></a>    尝试次数 = 尝试次数 + 1
 </span><span id="__span-63-15"><a id="__codelineno-63-15" name="__codelineno-63-15" href="#__codelineno-63-15"></a>
 </span><span id="__span-63-16"><a id="__codelineno-63-16" name="__codelineno-63-16" href="#__codelineno-63-16"></a>    如果 猜测 == 目标：
-</span><span id="__span-63-17"><a id="__codelineno-63-17" name="__codelineno-63-17" href="#__codelineno-63-17"></a>        打印(f&quot;🎉 恭喜！你猜中了！用了{尝试次数}次&quot;)
+</span><span id="__span-63-17"><a id="__codelineno-63-17" name="__codelineno-63-17" href="#__codelineno-63-17"></a>        打印(f"🎉 恭喜！你猜中了！用了{尝试次数}次")
 </span><span id="__span-63-18"><a id="__codelineno-63-18" name="__codelineno-63-18" href="#__codelineno-63-18"></a>        猜中 = 真
 </span><span id="__span-63-19"><a id="__codelineno-63-19" name="__codelineno-63-19" href="#__codelineno-63-19"></a>    否则如果 猜测 &lt; 目标：
-</span><span id="__span-63-20"><a id="__codelineno-63-20" name="__codelineno-63-20" href="#__codelineno-63-20"></a>        打印(&quot;太小了，再试试&quot;)
+</span><span id="__span-63-20"><a id="__codelineno-63-20" name="__codelineno-63-20" href="#__codelineno-63-20"></a>        打印("太小了，再试试")
 </span><span id="__span-63-21"><a id="__codelineno-63-21" name="__codelineno-63-21" href="#__codelineno-63-21"></a>    否则：
-</span><span id="__span-63-22"><a id="__codelineno-63-22" name="__codelineno-63-22" href="#__codelineno-63-22"></a>        打印(&quot;太大了，再试试&quot;)
+</span><span id="__span-63-22"><a id="__codelineno-63-22" name="__codelineno-63-22" href="#__codelineno-63-22"></a>        打印("太大了，再试试")
 </span><span id="__span-63-23"><a id="__codelineno-63-23" name="__codelineno-63-23" href="#__codelineno-63-23"></a>
-</span><span id="__span-63-24"><a id="__codelineno-63-24" name="__codelineno-63-24" href="#__codelineno-63-24"></a>打印 &quot;游戏结束！&quot;
+</span><span id="__span-63-24"><a id="__codelineno-63-24" name="__codelineno-63-24" href="#__codelineno-63-24"></a>打印 "游戏结束！"
 </span></code></pre></div>
 <p><strong>运行：</strong></p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-64-1"><a id="__codelineno-64-1" name="__codelineno-64-1" href="#__codelineno-64-1"></a>duan<span class="w"> </span>run<span class="w"> </span>guess.duan
@@ -4208,7 +4208,7 @@
 </span><span id="__span-65-3"><a id="__codelineno-65-3" name="__codelineno-65-3" href="#__codelineno-65-3"></a>duan<span class="w"> </span>tokens<span class="w"> </span>hello.duan<span class="w">     </span><span class="c1"># 查看 Token 流（看代码如何被拆分）</span>
 </span><span id="__span-65-4"><a id="__codelineno-65-4" name="__codelineno-65-4" href="#__codelineno-65-4"></a>duan<span class="w"> </span>check<span class="w"> </span>hello.duan<span class="w">      </span><span class="c1"># 语法检查（快速定位语法错误）</span>
 </span><span id="__span-65-5"><a id="__codelineno-65-5" name="__codelineno-65-5" href="#__codelineno-65-5"></a>duan<span class="w"> </span>ai<span class="w"> </span>card<span class="w">               </span><span class="c1"># 查看语法速查卡</span>
-</span><span id="__span-65-6"><a id="__codelineno-65-6" name="__codelineno-65-6" href="#__codelineno-65-6"></a>duan<span class="w"> </span>ai<span class="w"> </span>generate<span class="w"> </span><span class="s2">&quot;需求&quot;</span><span class="w">    </span><span class="c1"># AI 辅助生成段言代码</span>
+</span><span id="__span-65-6"><a id="__codelineno-65-6" name="__codelineno-65-6" href="#__codelineno-65-6"></a>duan<span class="w"> </span>ai<span class="w"> </span>generate<span class="w"> </span><span class="s2">"需求"</span><span class="w">    </span><span class="c1"># AI 辅助生成段言代码</span>
 </span></code></pre></div>
 <h3 id="143">14.3 更多语法特性（进阶）<a class="headerlink" href="#143" title="Permanent link">&para;</a></h3>
 <table>

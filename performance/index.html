@@ -2452,39 +2452,39 @@
 <hr />
 <h2 id="_4">三、可视化图表<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
 <h3 id="31">3.1 各阶段平均耗时对比<a class="headerlink" href="#31" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>%%{init: {&#39;theme&#39;: &#39;base&#39;, &#39;themeVariables&#39;: {&#39;primaryColor&#39;: &#39;#3fb950&#39;, &#39;secondaryColor&#39;: &#39;#58a6ff&#39;, &#39;tertiaryColor&#39;: &#39;#bc8cff&#39;}}}%%
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#3fb950', 'secondaryColor': '#58a6ff', 'tertiaryColor': '#bc8cff'}}}%%
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>bar
 </span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  title 段言编译管线各阶段耗时 (ms)
-</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  &quot;Lexer 小文件&quot; : 2.04
-</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  &quot;Lexer 大文件&quot; : 0.35
-</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  &quot;Parser 小文件&quot; : 3.05
-</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  &quot;Parser 大文件&quot; : 5.35
-</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  &quot;Codegen 小文件&quot; : 0.23
-</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  &quot;Codegen 大文件&quot; : 0.27
-</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  &quot;完整管线 小文件&quot; : 5.39
-</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  &quot;完整管线 大文件&quot; : 9.45
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>  "Lexer 小文件" : 2.04
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>  "Lexer 大文件" : 0.35
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>  "Parser 小文件" : 3.05
+</span><span id="__span-1-7"><a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>  "Parser 大文件" : 5.35
+</span><span id="__span-1-8"><a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>  "Codegen 小文件" : 0.23
+</span><span id="__span-1-9"><a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>  "Codegen 大文件" : 0.27
+</span><span id="__span-1-10"><a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>  "完整管线 小文件" : 5.39
+</span><span id="__span-1-11"><a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>  "完整管线 大文件" : 9.45
 </span></code></pre></div>
 <h3 id="32">3.2 编译管线各阶段占比（小文件）<a class="headerlink" href="#32" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pie
 </span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>  title 小文件各阶段耗时占比
-</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  &quot;Lexer 词法分析&quot; : 37.8
-</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  &quot;Parser 语法解析&quot; : 56.5
-</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  &quot;Codegen 代码生成&quot; : 4.2
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  "Lexer 词法分析" : 37.8
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  "Parser 语法解析" : 56.5
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>  "Codegen 代码生成" : 4.2
 </span></code></pre></div>
 <h3 id="33">3.3 编译管线各阶段占比（大文件）<a class="headerlink" href="#33" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pie
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>  title 大文件各阶段耗时占比
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  &quot;Lexer 词法分析&quot; : 3.7
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  &quot;Parser 语法解析&quot; : 56.6
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  &quot;Codegen 代码生成&quot; : 2.8
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  &quot;其他（模块加载等）&quot; : 36.8
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  "Lexer 词法分析" : 3.7
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  "Parser 语法解析" : 56.6
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>  "Codegen 代码生成" : 2.8
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  "其他（模块加载等）" : 36.8
 </span></code></pre></div>
 <h3 id="34-vs-cpython">3.4 段言 vs CPython 执行时间对比<a class="headerlink" href="#34-vs-cpython" title="Permanent link">&para;</a></h3>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>%%{init: {&#39;theme&#39;: &#39;base&#39;, &#39;themeVariables&#39;: {&#39;primaryColor&#39;: &#39;#f85149&#39;, &#39;secondaryColor&#39;: &#39;#3fb950&#39;}}}%%
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#f85149', 'secondaryColor': '#3fb950'}}}%%
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>bar
 </span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  title 段言 vs CPython 执行时间 (ms)
-</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  &quot;段言 编译+执行&quot; : 8.36
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  &quot;CPython 直接执行&quot; : 0.37
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  "段言 编译+执行" : 8.36
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  "CPython 直接执行" : 0.37
 </span></code></pre></div>
 <hr />
 <h2 id="_5">四、详细分析<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
@@ -2729,8 +2729,8 @@
 </span><span id="__span-5-20"><a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>    <span class="n">返回</span> <span class="n">快排</span><span class="p">(</span><span class="n">左列</span><span class="p">)</span> <span class="n">加</span> <span class="p">[</span><span class="n">基准</span><span class="p">]</span> <span class="n">加</span> <span class="n">快排</span><span class="p">(</span><span class="n">右列</span><span class="p">)</span>
 </span><span id="__span-5-21"><a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
 </span><span id="__span-5-22"><a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="n">设</span> <span class="n">数据</span> <span class="n">为</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span>
-</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="n">打印</span><span class="p">(</span><span class="s2">&quot;斐波那契(10) = &quot;</span><span class="p">)</span><span class="n">打印</span><span class="p">(</span><span class="n">斐波那契</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
-</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="n">打印</span><span class="p">(</span><span class="s2">&quot;排序结果 = &quot;</span><span class="p">)</span><span class="n">打印</span><span class="p">(</span><span class="n">快排</span><span class="p">(</span><span class="n">数据</span><span class="p">))</span>
+</span><span id="__span-5-23"><a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="n">打印</span><span class="p">(</span><span class="s2">"斐波那契(10) = "</span><span class="p">)</span><span class="n">打印</span><span class="p">(</span><span class="n">斐波那契</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
+</span><span id="__span-5-24"><a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a><span class="n">打印</span><span class="p">(</span><span class="s2">"排序结果 = "</span><span class="p">)</span><span class="n">打印</span><span class="p">(</span><span class="n">快排</span><span class="p">(</span><span class="n">数据</span><span class="p">))</span>
 </span></code></pre></div>
 <h3 id="_9">测试代码 (大文件)<a class="headerlink" href="#_9" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># 大文件基准测试</span>
@@ -2755,8 +2755,8 @@
 </span><span id="__span-7-12"><a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>    <span class="k">return</span> <span class="n">quicksort</span><span class="p">(</span><span class="n">left</span><span class="p">)</span> <span class="o">+</span> <span class="p">[</span><span class="n">pivot</span><span class="p">]</span> <span class="o">+</span> <span class="n">quicksort</span><span class="p">(</span><span class="n">right</span><span class="p">)</span>
 </span><span id="__span-7-13"><a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>
 </span><span id="__span-7-14"><a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a><span class="n">data</span> <span class="o">=</span> <span class="p">[</span><span class="mi">5</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="mi">8</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">9</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">7</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">6</span><span class="p">]</span>
-</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;fibonacci(10) =&quot;</span><span class="p">,</span> <span class="n">fibonacci</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
-</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;sorted =&quot;</span><span class="p">,</span> <span class="n">quicksort</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+</span><span id="__span-7-15"><a id="__codelineno-7-15" name="__codelineno-7-15" href="#__codelineno-7-15"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"fibonacci(10) ="</span><span class="p">,</span> <span class="n">fibonacci</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
+</span><span id="__span-7-16"><a id="__codelineno-7-16" name="__codelineno-7-16" href="#__codelineno-7-16"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"sorted ="</span><span class="p">,</span> <span class="n">quicksort</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
 </span></code></pre></div>
 
 

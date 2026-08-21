@@ -2234,15 +2234,15 @@
 </ul>
 <h3 id="24">2.4 代码示例<a class="headerlink" href="#24" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a># hello.duan
-</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>打印 &quot;你好，世界！&quot;
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>打印 "你好，世界！"
 </span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
-</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>设 名字 为 输入(&quot;请输入你的名字：&quot;)
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>打印 &quot;你好，&quot; + 名字
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>设 名字 为 输入("请输入你的名字：")
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>打印 "你好，" + 名字
 </span></code></pre></div>
 <p>SRC 后端将其编译为等价于以下 Python 字节码：</p>
-<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;你好，世界！&quot;</span><span class="p">)</span>
-</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">name</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">&quot;请输入你的名字：&quot;</span><span class="p">)</span>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nb">print</span><span class="p">(</span><span class="s2">&quot;你好，&quot;</span> <span class="o">+</span> <span class="n">name</span><span class="p">)</span>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"你好，世界！"</span><span class="p">)</span>
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">name</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s2">"请输入你的名字："</span><span class="p">)</span>
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="nb">print</span><span class="p">(</span><span class="s2">"你好，"</span> <span class="o">+</span> <span class="n">name</span><span class="p">)</span>
 </span></code></pre></div>
 <h3 id="25">2.5 使用方式<a class="headerlink" href="#25" title="Permanent link">&para;</a></h3>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># 默认使用 SRC 后端</span>
@@ -2328,14 +2328,14 @@
 <div class="language-python highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">llvm.compiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">compile_duan_typed</span>
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
 </span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># 编译单文件</span>
-</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">exe_path</span> <span class="o">=</span> <span class="n">compile_duan_typed</span><span class="p">(</span><span class="s1">&#39;hello.duan&#39;</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;编译成功: </span><span class="si">{</span><span class="n">exe_path</span><span class="si">}</span><span class="s1">&#39;</span><span class="p">)</span>
+</span><span id="__span-8-4"><a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">exe_path</span> <span class="o">=</span> <span class="n">compile_duan_typed</span><span class="p">(</span><span class="s1">'hello.duan'</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</span><span id="__span-8-5"><a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s1">'编译成功: </span><span class="si">{</span><span class="n">exe_path</span><span class="si">}</span><span class="s1">'</span><span class="p">)</span>
 </span><span id="__span-8-6"><a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
 </span><span id="__span-8-7"><a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># 指定输出路径</span>
-</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">compile_duan_typed</span><span class="p">(</span><span class="s1">&#39;hello.duan&#39;</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="s1">&#39;dist/hello.exe&#39;</span><span class="p">)</span>
+</span><span id="__span-8-8"><a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="n">compile_duan_typed</span><span class="p">(</span><span class="s1">'hello.duan'</span><span class="p">,</span> <span class="n">output_path</span><span class="o">=</span><span class="s1">'dist/hello.exe'</span><span class="p">)</span>
 </span><span id="__span-8-9"><a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
 </span><span id="__span-8-10"><a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># 设置优化级别</span>
-</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="n">compile_duan_typed</span><span class="p">(</span><span class="s1">&#39;hello.duan&#39;</span><span class="p">,</span> <span class="n">opt_level</span><span class="o">=</span><span class="s1">&#39;-O2&#39;</span><span class="p">)</span>
+</span><span id="__span-8-11"><a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="n">compile_duan_typed</span><span class="p">(</span><span class="s1">'hello.duan'</span><span class="p">,</span> <span class="n">opt_level</span><span class="o">=</span><span class="s1">'-O2'</span><span class="p">)</span>
 </span></code></pre></div>
 <hr />
 <h2 id="4-llvm-ir">4. 段言代码的 LLVM IR 对照速查<a class="headerlink" href="#4-llvm-ir" title="Permanent link">&para;</a></h2>
@@ -2391,7 +2391,7 @@
 <h3 id="43">4.3 条件判断<a class="headerlink" href="#43" title="Permanent link">&para;</a></h3>
 <p><strong>段言代码：</strong>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>如果 x 大于 0：
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    打印 &quot;正数&quot;
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    打印 "正数"
 </span></code></pre></div></p>
 <p><strong>LLVM IR（类型优化，已知 x 为 INT）：</strong>
 <div class="language-llvm highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c">; 提取 x 的 i64 值</span>
@@ -2401,7 +2401,7 @@
 </span><span id="__span-17-5"><a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="k">br</span><span class="w"> </span><span class="kt">i1</span><span class="w"> </span><span class="nv">%cmp</span><span class="p">,</span><span class="w"> </span><span class="kt">label</span><span class="w"> </span><span class="nv">%if_then_1</span><span class="p">,</span><span class="w"> </span><span class="kt">label</span><span class="w"> </span><span class="nv">%if_end_2</span>
 </span><span id="__span-17-6"><a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
 </span><span id="__span-17-7"><a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="nl">if_then_1:</span>
-</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span><span class="c">; 构造 &quot;正数&quot; 字符串</span>
+</span><span id="__span-17-8"><a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a><span class="w">  </span><span class="c">; 构造 "正数" 字符串</span>
 </span><span id="__span-17-9"><a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a><span class="w">  </span><span class="k">call</span><span class="w"> </span><span class="k">void</span><span class="w"> </span><span class="vg">@dv_println</span><span class="p">(</span><span class="kt">ptr</span><span class="w"> </span><span class="vg">@str_正数</span><span class="p">)</span>
 </span><span id="__span-17-10"><a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="w">  </span><span class="k">br</span><span class="w"> </span><span class="kt">label</span><span class="w"> </span><span class="nv">%if_end_2</span>
 </span><span id="__span-17-11"><a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>
@@ -2418,7 +2418,7 @@
 </span></code></pre></div></p>
 <h3 id="44">4.4 函数调用<a class="headerlink" href="#44" title="Permanent link">&para;</a></h3>
 <p><strong>段言代码：</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>打印 &quot;你好，世界！&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>打印 "你好，世界！"
 </span></code></pre></div></p>
 <p><strong>LLVM IR：</strong>
 <div class="language-llvm highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c">; 声明运行时函数</span>
@@ -2545,9 +2545,9 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>尝试：
 </span><span id="__span-30-2"><a id="__codelineno-30-2" name="__codelineno-30-2" href="#__codelineno-30-2"></a>    设 结果 为 10 除以 0
 </span><span id="__span-30-3"><a id="__codelineno-30-3" name="__codelineno-30-3" href="#__codelineno-30-3"></a>捕获 e：
-</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>    打印 &quot;出错了：&quot; + e
+</span><span id="__span-30-4"><a id="__codelineno-30-4" name="__codelineno-30-4" href="#__codelineno-30-4"></a>    打印 "出错了：" + e
 </span><span id="__span-30-5"><a id="__codelineno-30-5" name="__codelineno-30-5" href="#__codelineno-30-5"></a>最终：
-</span><span id="__span-30-6"><a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>    打印 &quot;清理资源&quot;
+</span><span id="__span-30-6"><a id="__codelineno-30-6" name="__codelineno-30-6" href="#__codelineno-30-6"></a>    打印 "清理资源"
 </span><span id="__span-30-7"><a id="__codelineno-30-7" name="__codelineno-30-7" href="#__codelineno-30-7"></a>结束。
 </span></code></pre></div></p>
 <p><strong>LLVM IR（setjmp/longjmp 模式）：</strong>
@@ -2613,7 +2613,7 @@
 </span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="w">  </span><span class="c">; 加载恢复点</span>
 </span><span id="__span-35-5"><a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="w">  </span><span class="nv">%rp_ptr</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="k">getelementptr</span><span class="w"> </span><span class="nv">%struct.DuanCoroutine</span><span class="p">,</span><span class="w"> </span><span class="kt">ptr</span><span class="w"> </span><span class="nv">%coro</span><span class="p">,</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="m">1</span>
 </span><span id="__span-35-6"><a id="__codelineno-35-6" name="__codelineno-35-6" href="#__codelineno-35-6"></a><span class="w">  </span><span class="nv">%rp</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="k">load</span><span class="w"> </span><span class="kt">i32</span><span class="p">,</span><span class="w"> </span><span class="kt">ptr</span><span class="w"> </span><span class="nv">%rp_ptr</span>
-</span><span id="__span-35-7"><a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="w">  </span><span class="c">; Duff&#39;s device 状态机</span>
+</span><span id="__span-35-7"><a id="__codelineno-35-7" name="__codelineno-35-7" href="#__codelineno-35-7"></a><span class="w">  </span><span class="c">; Duff's device 状态机</span>
 </span><span id="__span-35-8"><a id="__codelineno-35-8" name="__codelineno-35-8" href="#__codelineno-35-8"></a><span class="w">  </span><span class="k">switch</span><span class="w"> </span><span class="kt">i32</span><span class="w"> </span><span class="nv">%rp</span><span class="p">,</span><span class="w"> </span><span class="kt">label</span><span class="w"> </span><span class="nv">%coro_end</span><span class="w"> </span><span class="p">[</span>
 </span><span id="__span-35-9"><a id="__codelineno-35-9" name="__codelineno-35-9" href="#__codelineno-35-9"></a><span class="w">    </span><span class="kt">i32</span><span class="w"> </span><span class="m">0</span><span class="p">,</span><span class="w"> </span><span class="kt">label</span><span class="w"> </span><span class="nv">%resume_0</span>
 </span><span id="__span-35-10"><a id="__codelineno-35-10" name="__codelineno-35-10" href="#__codelineno-35-10"></a><span class="w">    </span><span class="kt">i32</span><span class="w"> </span><span class="m">1</span><span class="p">,</span><span class="w"> </span><span class="kt">label</span><span class="w"> </span><span class="nv">%resume_1</span>
@@ -2674,7 +2674,7 @@
 <h3 id="413">4.13 布尔运算<a class="headerlink" href="#413" title="Permanent link">&para;</a></h3>
 <p><strong>段言代码：</strong>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>如果 x 大于 0 且 x 小于 100：
-</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>    打印 &quot;范围内&quot;
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>    打印 "范围内"
 </span></code></pre></div></p>
 <p><strong>LLVM IR：</strong>
 <div class="language-llvm highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="nv">%x_i64</span><span class="w"> </span><span class="p">=</span><span class="w"> </span><span class="k">extractvalue</span><span class="w"> </span><span class="nv">%struct.DuanValue</span><span class="w"> </span><span class="nv">%x_dv</span><span class="p">,</span><span class="w"> </span><span class="m">1</span>
@@ -3219,7 +3219,7 @@
 <p><strong>DuanCoroutine 结构体：</strong></p>
 <div class="language-c highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a><span class="k">typedef</span><span class="w"> </span><span class="k">struct</span><span class="w"> </span><span class="nc">DuanCoroutine</span><span class="w"> </span><span class="p">{</span>
 </span><span id="__span-45-2"><a id="__codelineno-45-2" name="__codelineno-45-2" href="#__codelineno-45-2"></a><span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">state</span><span class="p">;</span><span class="w">              </span><span class="c1">// DV_CORO_READY/SUSPENDED/DONE/ERROR</span>
-</span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">resume_point</span><span class="p">;</span><span class="w">       </span><span class="c1">// 恢复点（Duff&#39;s device 的 case 标签）</span>
+</span><span id="__span-45-3"><a id="__codelineno-45-3" name="__codelineno-45-3" href="#__codelineno-45-3"></a><span class="w">    </span><span class="kt">int</span><span class="w"> </span><span class="n">resume_point</span><span class="p">;</span><span class="w">       </span><span class="c1">// 恢复点（Duff's device 的 case 标签）</span>
 </span><span id="__span-45-4"><a id="__codelineno-45-4" name="__codelineno-45-4" href="#__codelineno-45-4"></a><span class="w">    </span><span class="n">DuanCoroFunc</span><span class="w"> </span><span class="n">func</span><span class="p">;</span><span class="w">      </span><span class="c1">// 协程函数指针</span>
 </span><span id="__span-45-5"><a id="__codelineno-45-5" name="__codelineno-45-5" href="#__codelineno-45-5"></a><span class="w">    </span><span class="n">DuanValue</span><span class="w"> </span><span class="n">result</span><span class="p">;</span><span class="w">       </span><span class="c1">// 返回值</span>
 </span><span id="__span-45-6"><a id="__codelineno-45-6" name="__codelineno-45-6" href="#__codelineno-45-6"></a><span class="w">    </span><span class="n">DuanValue</span><span class="o">*</span><span class="w"> </span><span class="n">args</span><span class="p">;</span><span class="w">        </span><span class="c1">// 参数数组（堆分配）</span>
@@ -3324,10 +3324,10 @@
 <p><strong>类型追踪系统：</strong></p>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a><span class="c1"># 代码生成器维护变量类型映射表</span>
 </span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a><span class="bp">self</span><span class="o">.</span><span class="n">_var_types</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
-</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>    <span class="s1">&#39;甲&#39;</span><span class="p">:</span> <span class="n">DV_INT</span><span class="p">,</span>      <span class="c1"># 设 甲 为 10 → 推断为 INT</span>
-</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>    <span class="s1">&#39;乙&#39;</span><span class="p">:</span> <span class="n">DV_FLOAT</span><span class="p">,</span>    <span class="c1"># 设 乙 为 3.14 → 推断为 FLOAT</span>
-</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>    <span class="s1">&#39;丙&#39;</span><span class="p">:</span> <span class="n">DV_STR</span><span class="p">,</span>      <span class="c1"># 设 丙 为 &quot;你好&quot; → 推断为 STR</span>
-</span><span id="__span-48-6"><a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a>    <span class="s1">&#39;丁&#39;</span><span class="p">:</span> <span class="n">DV_BOOL</span><span class="p">,</span>     <span class="c1"># 设 丁 为 真 → 推断为 BOOL</span>
+</span><span id="__span-48-3"><a id="__codelineno-48-3" name="__codelineno-48-3" href="#__codelineno-48-3"></a>    <span class="s1">'甲'</span><span class="p">:</span> <span class="n">DV_INT</span><span class="p">,</span>      <span class="c1"># 设 甲 为 10 → 推断为 INT</span>
+</span><span id="__span-48-4"><a id="__codelineno-48-4" name="__codelineno-48-4" href="#__codelineno-48-4"></a>    <span class="s1">'乙'</span><span class="p">:</span> <span class="n">DV_FLOAT</span><span class="p">,</span>    <span class="c1"># 设 乙 为 3.14 → 推断为 FLOAT</span>
+</span><span id="__span-48-5"><a id="__codelineno-48-5" name="__codelineno-48-5" href="#__codelineno-48-5"></a>    <span class="s1">'丙'</span><span class="p">:</span> <span class="n">DV_STR</span><span class="p">,</span>      <span class="c1"># 设 丙 为 "你好" → 推断为 STR</span>
+</span><span id="__span-48-6"><a id="__codelineno-48-6" name="__codelineno-48-6" href="#__codelineno-48-6"></a>    <span class="s1">'丁'</span><span class="p">:</span> <span class="n">DV_BOOL</span><span class="p">,</span>     <span class="c1"># 设 丁 为 真 → 推断为 BOOL</span>
 </span><span id="__span-48-7"><a id="__codelineno-48-7" name="__codelineno-48-7" href="#__codelineno-48-7"></a><span class="p">}</span>
 </span></code></pre></div>
 <p><strong>类型推断规则：</strong></p>
@@ -3468,7 +3468,7 @@
 <h3 id="71">7.1 最简单的示例<a class="headerlink" href="#71" title="Permanent link">&para;</a></h3>
 <p><strong>创建源码：</strong>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a># hello.duan
-</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>打印 &quot;你好，世界！&quot;
+</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>打印 "你好，世界！"
 </span></code></pre></div></p>
 <p><strong>编译为独立 EXE：</strong>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a><span class="c1"># 使用默认配置（LLVM 后端）</span>
@@ -3494,10 +3494,10 @@
 </span><span id="__span-56-2"><a id="__codelineno-56-2" name="__codelineno-56-2" href="#__codelineno-56-2"></a>从 io_utils 导入 提示输入
 </span><span id="__span-56-3"><a id="__codelineno-56-3" name="__codelineno-56-3" href="#__codelineno-56-3"></a>
 </span><span id="__span-56-4"><a id="__codelineno-56-4" name="__codelineno-56-4" href="#__codelineno-56-4"></a>段落 主程序：
-</span><span id="__span-56-5"><a id="__codelineno-56-5" name="__codelineno-56-5" href="#__codelineno-56-5"></a>    设 输入值 为 提示输入(&quot;请输入一个数字：&quot;)
+</span><span id="__span-56-5"><a id="__codelineno-56-5" name="__codelineno-56-5" href="#__codelineno-56-5"></a>    设 输入值 为 提示输入("请输入一个数字：")
 </span><span id="__span-56-6"><a id="__codelineno-56-6" name="__codelineno-56-6" href="#__codelineno-56-6"></a>    设 数字 为 转整数(输入值)
 </span><span id="__span-56-7"><a id="__codelineno-56-7" name="__codelineno-56-7" href="#__codelineno-56-7"></a>    设 结果 为 阶乘(数字)
-</span><span id="__span-56-8"><a id="__codelineno-56-8" name="__codelineno-56-8" href="#__codelineno-56-8"></a>    打印 &quot;阶乘结果是：&quot; + 转字符串(结果)
+</span><span id="__span-56-8"><a id="__codelineno-56-8" name="__codelineno-56-8" href="#__codelineno-56-8"></a>    打印 "阶乘结果是：" + 转字符串(结果)
 </span><span id="__span-56-9"><a id="__codelineno-56-9" name="__codelineno-56-9" href="#__codelineno-56-9"></a>
 </span><span id="__span-56-10"><a id="__codelineno-56-10" name="__codelineno-56-10" href="#__codelineno-56-10"></a>主程序()
 </span></code></pre></div></p>
@@ -3514,7 +3514,7 @@
 </span><span id="__span-58-2"><a id="__codelineno-58-2" name="__codelineno-58-2" href="#__codelineno-58-2"></a>
 </span><span id="__span-58-3"><a id="__codelineno-58-3" name="__codelineno-58-3" href="#__codelineno-58-3"></a>段落 提示输入 接收 提示文本：
 </span><span id="__span-58-4"><a id="__codelineno-58-4" name="__codelineno-58-4" href="#__codelineno-58-4"></a>    打印 提示文本
-</span><span id="__span-58-5"><a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a>    返回 输入(&quot;&quot;)
+</span><span id="__span-58-5"><a id="__codelineno-58-5" name="__codelineno-58-5" href="#__codelineno-58-5"></a>    返回 输入("")
 </span></code></pre></div></p>
 <p><strong>编译步骤：</strong>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-59-1"><a id="__codelineno-59-1" name="__codelineno-59-1" href="#__codelineno-59-1"></a><span class="c1"># 方式一：直接编译主文件（自动解析依赖）</span>

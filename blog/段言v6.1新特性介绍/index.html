@@ -2115,11 +2115,11 @@
 <p>v6.1 最显著的变化是：<strong>所有错误信息现在 100% 使用中文</strong>。从词法错误到语法错误，从类型错误到运行时错误，用户看到的都是清晰的中文描述。</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># 之前</span>
 </span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>$<span class="w"> </span>duan<span class="w"> </span>run<span class="w"> </span>test.duan
-</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>SyntaxError:<span class="w"> </span>unexpected<span class="w"> </span>token<span class="w"> </span><span class="s1">&#39;}&#39;</span>
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>SyntaxError:<span class="w"> </span>unexpected<span class="w"> </span>token<span class="w"> </span><span class="s1">'}'</span>
 </span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
 </span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># 现在</span>
 </span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>$<span class="w"> </span>duan<span class="w"> </span>run<span class="w"> </span>test.duan
-</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>语法错误：第<span class="w"> </span><span class="m">3</span><span class="w"> </span>行第<span class="w"> </span><span class="m">12</span><span class="w"> </span>列，发现意外的符号<span class="w"> </span><span class="s1">&#39;}&#39;</span>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>语法错误：第<span class="w"> </span><span class="m">3</span><span class="w"> </span>行第<span class="w"> </span><span class="m">12</span><span class="w"> </span>列，发现意外的符号<span class="w"> </span><span class="s1">'}'</span>
 </span></code></pre></div>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># 之前</span>
 </span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>$<span class="w"> </span>duan<span class="w"> </span>run<span class="w"> </span>test.duan
@@ -2245,47 +2245,47 @@
 <h4 id="_3">数据压缩模块<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h4>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>导入 数据压缩。
 </span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>
-</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>设 原始数据 为 &quot;这是一段需要压缩的数据。&quot; * 100
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>设 原始数据 为 "这是一段需要压缩的数据。" * 100
 </span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>设 压缩后 为 数据压缩.压缩(原始数据)
-</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>打印(&quot;原始大小: &quot;, 字符串长度(原始数据), &quot; 字节&quot;)
-</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>打印(&quot;压缩后大小: &quot;, 字符串长度(压缩后), &quot; 字节&quot;)
-</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>打印(&quot;压缩率: &quot;, 数据压缩.压缩率(原始数据, 压缩后))
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>打印("原始大小: ", 字符串长度(原始数据), " 字节")
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>打印("压缩后大小: ", 字符串长度(压缩后), " 字节")
+</span><span id="__span-3-7"><a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>打印("压缩率: ", 数据压缩.压缩率(原始数据, 压缩后))
 </span><span id="__span-3-8"><a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>
 </span><span id="__span-3-9"><a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>设 解压后 为 数据压缩.解压(压缩后)
-</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>打印(&quot;解压后与原始数据一致: &quot;, 解压后 等于 原始数据)
+</span><span id="__span-3-10"><a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>打印("解压后与原始数据一致: ", 解压后 等于 原始数据)
 </span></code></pre></div>
 <h4 id="_4">日志系统模块<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h4>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>导入 日志系统。
 </span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
-</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>设 日志器 为 日志系统.创建日志器(&quot;我的应用&quot;)
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>设 日志器 为 日志系统.创建日志器("我的应用")
 </span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>日志器.设置级别(日志系统.级别.调试)
-</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>日志器.添加文件输出(&quot;app.log&quot;)
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>日志器.添加文件输出("app.log")
 </span><span id="__span-4-6"><a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>日志器.添加控制台输出()
 </span><span id="__span-4-7"><a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
-</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>日志器.调试(&quot;这是调试信息&quot;)
-</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>日志器.信息(&quot;应用启动成功&quot;)
-</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>日志器.警告(&quot;磁盘空间不足：剩余 1.2GB&quot;)
-</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>日志器.错误(&quot;数据库连接失败：连接超时&quot;)
+</span><span id="__span-4-8"><a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>日志器.调试("这是调试信息")
+</span><span id="__span-4-9"><a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>日志器.信息("应用启动成功")
+</span><span id="__span-4-10"><a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>日志器.警告("磁盘空间不足：剩余 1.2GB")
+</span><span id="__span-4-11"><a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>日志器.错误("数据库连接失败：连接超时")
 </span><span id="__span-4-12"><a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>
 </span><span id="__span-4-13"><a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a># 带结构化上下文的日志
-</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>日志器.信息(&quot;用户登录&quot;, {&quot;用户&quot;: &quot;张三&quot;, &quot;IP&quot;: &quot;192.168.1.1&quot;})
+</span><span id="__span-4-14"><a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>日志器.信息("用户登录", {"用户": "张三", "IP": "192.168.1.1"})
 </span></code></pre></div>
 <h4 id="_5">定时任务模块<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h4>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>导入 定时任务。
 </span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>导入 时间。
 </span><span id="__span-5-3"><a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
 </span><span id="__span-5-4"><a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>段落 备份任务：
-</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    打印(&quot;执行备份：&quot;, 时间.当前时间字符串())
+</span><span id="__span-5-5"><a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    打印("执行备份：", 时间.当前时间字符串())
 </span><span id="__span-5-6"><a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
 </span><span id="__span-5-7"><a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>段落 清理任务：
-</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    打印(&quot;执行清理：&quot;, 时间.当前时间字符串())
+</span><span id="__span-5-8"><a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>    打印("执行清理：", 时间.当前时间字符串())
 </span><span id="__span-5-9"><a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
 </span><span id="__span-5-10"><a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>设 调度器 为 定时任务.创建调度器()
-</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>调度器.添加任务(&quot;每日备份&quot;, &quot;0 2 * * *&quot;, 备份任务)   # 每天凌晨 2 点
-</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>调度器.添加任务(&quot;每小时清理&quot;, &quot;0 * * * *&quot;, 清理任务)  # 每小时
+</span><span id="__span-5-11"><a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>调度器.添加任务("每日备份", "0 2 * * *", 备份任务)   # 每天凌晨 2 点
+</span><span id="__span-5-12"><a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>调度器.添加任务("每小时清理", "0 * * * *", 清理任务)  # 每小时
 </span><span id="__span-5-13"><a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>调度器.启动()
 </span><span id="__span-5-14"><a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
-</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>打印(&quot;定时任务已启动，按 Ctrl+C 停止&quot;)
+</span><span id="__span-5-15"><a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>打印("定时任务已启动，按 Ctrl+C 停止")
 </span><span id="__span-5-16"><a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a># 调度器会在后台运行
 </span></code></pre></div>
 <h3 id="23">2.3 现有模块改进<a class="headerlink" href="#23" title="Permanent link">&para;</a></h3>
@@ -2393,7 +2393,7 @@
 </ul>
 <h3 id="44">4.4 智能修复建议<a class="headerlink" href="#44" title="Permanent link">&para;</a></h3>
 <p>当编译错误发生时，AI Copilot 可以自动分析错误并提供修复建议：</p>
-<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>duan<span class="w"> </span>ai<span class="w"> </span>fix<span class="w"> </span>错误文件.duan<span class="w"> </span>--error<span class="w"> </span><span class="s2">&quot;错误信息&quot;</span>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>duan<span class="w"> </span>ai<span class="w"> </span>fix<span class="w"> </span>错误文件.duan<span class="w"> </span>--error<span class="w"> </span><span class="s2">"错误信息"</span>
 </span></code></pre></div>
 <p>AI 会分析错误上下文，生成包含修复代码的 prompt，帮助开发者快速定位和解决问题。</p>
 <hr />
@@ -2406,15 +2406,15 @@
 </span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
 </span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>段落 解析Markdown 接收 内容：
 </span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    # 支持标题、列表、代码块、链接等
-</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    设 行列表 为 字符串.分割(内容, &quot;\n&quot;)
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>    设 行列表 为 字符串.分割(内容, "\n")
 </span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>    设 结果 为 []
 </span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
 </span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    遍历 行 于 行列表：
-</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        如果 行.以(&quot;## &quot;开头)：
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        如果 行.以("## "开头)：
 </span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>            结果.添加(解析标题(行, 2))
-</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        否则 如果 行.以(&quot;# &quot;开头)：
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>        否则 如果 行.以("# "开头)：
 </span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>            结果.添加(解析标题(行, 1))
-</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>        否则 如果 行.以(&quot;- &quot;开头) 或 行.以(&quot;* &quot;开头)：
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>        否则 如果 行.以("- "开头) 或 行.以("* "开头)：
 </span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>            结果.添加(解析列表项(行))
 </span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a>        否则：
 </span><span id="__span-9-18"><a id="__codelineno-9-18" name="__codelineno-9-18" href="#__codelineno-9-18"></a>            结果.添加(解析普通段落(行))
@@ -2442,7 +2442,7 @@
 </span><span id="__span-10-18"><a id="__codelineno-10-18" name="__codelineno-10-18" href="#__codelineno-10-18"></a>        返回 自身.数据.获取(键, 默认值)
 </span><span id="__span-10-19"><a id="__codelineno-10-19" name="__codelineno-10-19" href="#__codelineno-10-19"></a>
 </span><span id="__span-10-20"><a id="__codelineno-10-20" name="__codelineno-10-20" href="#__codelineno-10-20"></a>    段落 保存：
-</span><span id="__span-10-21"><a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>        设 临时路径 为 自身.路径 + &quot;.tmp&quot;
+</span><span id="__span-10-21"><a id="__codelineno-10-21" name="__codelineno-10-21" href="#__codelineno-10-21"></a>        设 临时路径 为 自身.路径 + ".tmp"
 </span><span id="__span-10-22"><a id="__codelineno-10-22" name="__codelineno-10-22" href="#__codelineno-10-22"></a>        JSON.写入文件(临时路径, 自身.数据)
 </span><span id="__span-10-23"><a id="__codelineno-10-23" name="__codelineno-10-23" href="#__codelineno-10-23"></a>        文件系统.移动文件(临时路径, 自身.路径)
 </span></code></pre></div>

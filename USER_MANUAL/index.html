@@ -25,7 +25,7 @@
     
     
       
-        <title>段言（Duan）编程语言用户手册 - 段言 (Duan) 文档</title>
+        <title>USER MANUAL - 段言 (Duan) 文档</title>
       
     
     
@@ -108,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              段言（Duan）编程语言用户手册
+              USER MANUAL
             
           </span>
         </div>
@@ -2099,6 +2099,14 @@
   
 
 
+<blockquote>
+<p><strong>本项目已停止开发，所有功能已合并至 <a href="https://github.com/skywalk163/light">光明 (Light)</a> 项目。</strong></p>
+<p>光明项目整合了段言的全部能力并持续演进。请新用户直接前往光明项目，旧用户请迁移至光明项目以获得最新更新和支持。</p>
+<ul>
+<li>GitHub: https://github.com/skywalk163/light</li>
+<li>GitCode: https://gitcode.com/skywalk163/light</li>
+</ul>
+</blockquote>
 <h1 id="duan">段言（Duan）编程语言用户手册<a class="headerlink" href="#duan" title="Permanent link">&para;</a></h1>
 <p><strong>版本：</strong> v4.0<br />
 <strong>更新时间：</strong> 2026-08-04<br />
@@ -2136,7 +2144,7 @@
 </span></code></pre></div>
 <h3 id="_5">第一个程序<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h3>
 <p>创建 <code>hello.duan</code> 文件：</p>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>打印 &quot;你好，世界！&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>打印 "你好，世界！"
 </span></code></pre></div>
 <p>运行：</p>
 <div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>duan<span class="w"> </span>run<span class="w"> </span>hello.duan
@@ -2162,7 +2170,7 @@
 <p>段言支持以下注释语法：</p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a># 这是单行注释（推荐使用）
 </span><span id="__span-8-2"><a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>// 这也是单行注释
-</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>注：这也是注释（以&quot;注&quot;开头）
+</span><span id="__span-8-3"><a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>注：这也是注释（以"注"开头）
 </span></code></pre></div>
 <p>段言支持三种注释风格，可以灵活使用。</p>
 <h3 id="_8">语句结束<a class="headerlink" href="#_8" title="Permanent link">&para;</a></h3>
@@ -2217,7 +2225,7 @@
 <h3 id="_11">变量声明<a class="headerlink" href="#_11" title="Permanent link">&para;</a></h3>
 <p><strong>语法：</strong> <code>令 变量名 = 值</code> 或 <code>设 变量名 为 值</code></p>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>令 年龄 = 25
-</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>令 姓名 = &quot;张三&quot;
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>令 姓名 = "张三"
 </span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>令 成绩 = 95.5
 </span></code></pre></div>
 <h3 id="_12">数据类型<a class="headerlink" href="#_12" title="Permanent link">&para;</a></h3>
@@ -2227,7 +2235,7 @@
 </span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>令 中文数字 = 三 + 五  # 8
 </span></code></pre></div></p>
 <p><strong>字符串：</strong>
-<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>令 消息 = &quot;你好世界&quot;
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>令 消息 = "你好世界"
 </span></code></pre></div></p>
 <p><strong>布尔值：</strong>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>令 正确 = 真
@@ -2248,11 +2256,11 @@
 </span></code></pre></div>
 <h3 id="_14">比较运算<a class="headerlink" href="#_14" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>如果 甲 &gt; 乙:
-</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    打印 &quot;甲大&quot;
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    打印 "甲大"
 </span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>如果 甲 &lt; 乙:
-</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    打印 &quot;甲小&quot;
+</span><span id="__span-16-4"><a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    打印 "甲小"
 </span><span id="__span-16-5"><a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>如果 甲 == 乙:
-</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    打印 &quot;相等&quot;
+</span><span id="__span-16-6"><a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    打印 "相等"
 </span></code></pre></div>
 <hr />
 <h2 id="_15">控制流程<a class="headerlink" href="#_15" title="Permanent link">&para;</a></h2>
@@ -2265,13 +2273,13 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a>令 分数 = 85
 </span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>
 </span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>如果 分数 &gt;= 90:
-</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    打印 &quot;优秀&quot;
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    打印 "优秀"
 </span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>否则如果 分数 &gt;= 80:
-</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    打印 &quot;良好&quot;
+</span><span id="__span-18-6"><a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    打印 "良好"
 </span><span id="__span-18-7"><a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>否则如果 分数 &gt;= 70:
-</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    打印 &quot;中等&quot;
+</span><span id="__span-18-8"><a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    打印 "中等"
 </span><span id="__span-18-9"><a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>否则:
-</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    打印 &quot;及格&quot;
+</span><span id="__span-18-10"><a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    打印 "及格"
 </span></code></pre></div></p>
 <h3 id="_17">循环语句<a class="headerlink" href="#_17" title="Permanent link">&para;</a></h3>
 <p><strong>遍历循环：</strong>
@@ -2342,9 +2350,9 @@
 </span><span id="__span-26-7"><a id="__codelineno-26-7" name="__codelineno-26-7" href="#__codelineno-26-7"></a>        己.年龄 = 年龄
 </span><span id="__span-26-8"><a id="__codelineno-26-8" name="__codelineno-26-8" href="#__codelineno-26-8"></a>
 </span><span id="__span-26-9"><a id="__codelineno-26-9" name="__codelineno-26-9" href="#__codelineno-26-9"></a>    函数 介绍():
-</span><span id="__span-26-10"><a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a>        打印 &quot;我叫&quot; + 己.姓名 + &quot;，今年&quot; + 己.年龄 + &quot;岁&quot;
+</span><span id="__span-26-10"><a id="__codelineno-26-10" name="__codelineno-26-10" href="#__codelineno-26-10"></a>        打印 "我叫" + 己.姓名 + "，今年" + 己.年龄 + "岁"
 </span><span id="__span-26-11"><a id="__codelineno-26-11" name="__codelineno-26-11" href="#__codelineno-26-11"></a>
-</span><span id="__span-26-12"><a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a>令 学生1 = 学生(&quot;张三&quot;, 20)
+</span><span id="__span-26-12"><a id="__codelineno-26-12" name="__codelineno-26-12" href="#__codelineno-26-12"></a>令 学生1 = 学生("张三", 20)
 </span><span id="__span-26-13"><a id="__codelineno-26-13" name="__codelineno-26-13" href="#__codelineno-26-13"></a>学生1.介绍()
 </span></code></pre></div></p>
 <h3 id="_24">继承<a class="headerlink" href="#_24" title="Permanent link">&para;</a></h3>
@@ -2356,7 +2364,7 @@
 </span><span id="__span-27-6"><a id="__codelineno-27-6" name="__codelineno-27-6" href="#__codelineno-27-6"></a>        己.专业 = 专业
 </span><span id="__span-27-7"><a id="__codelineno-27-7" name="__codelineno-27-7" href="#__codelineno-27-7"></a>
 </span><span id="__span-27-8"><a id="__codelineno-27-8" name="__codelineno-27-8" href="#__codelineno-27-8"></a>    函数 介绍():
-</span><span id="__span-27-9"><a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>        打印 &quot;我叫&quot; + 己.姓名 + &quot;，专业是&quot; + 己.专业
+</span><span id="__span-27-9"><a id="__codelineno-27-9" name="__codelineno-27-9" href="#__codelineno-27-9"></a>        打印 "我叫" + 己.姓名 + "，专业是" + 己.专业
 </span></code></pre></div>
 <h3 id="_25">访问修饰符<a class="headerlink" href="#_25" title="Permanent link">&para;</a></h3>
 <p>段言支持三种访问级别：</p>
@@ -2443,32 +2451,32 @@
 <div class="language-text highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>从 标准库 导入 json
 </span><span id="__span-32-2"><a id="__codelineno-32-2" name="__codelineno-32-2" href="#__codelineno-32-2"></a>从 标准库 导入 os
 </span><span id="__span-32-3"><a id="__codelineno-32-3" name="__codelineno-32-3" href="#__codelineno-32-3"></a>
-</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>令 数据 = json.加载(&quot;data.json&quot;)
+</span><span id="__span-32-4"><a id="__codelineno-32-4" name="__codelineno-32-4" href="#__codelineno-32-4"></a>令 数据 = json.加载("data.json")
 </span></code></pre></div>
 <hr />
 <h2 id="_32">异常处理<a class="headerlink" href="#_32" title="Permanent link">&para;</a></h2>
 <h3 id="_33">基本异常处理<a class="headerlink" href="#_33" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a>尝试：
-</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>  令 文件 = 打开(&quot;data.txt&quot;)
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a>  令 文件 = 打开("data.txt")
 </span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a>  令 内容 = 文件.读取
 </span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a>  打印 内容
 </span><span id="__span-33-5"><a id="__codelineno-33-5" name="__codelineno-33-5" href="#__codelineno-33-5"></a>捕获 FileNotFoundError 为 错误：
-</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>  打印 &quot;无法读取文件：&quot; + 错误.信息
+</span><span id="__span-33-6"><a id="__codelineno-33-6" name="__codelineno-33-6" href="#__codelineno-33-6"></a>  打印 "无法读取文件：" + 错误.信息
 </span></code></pre></div>
 <h3 id="_34">多异常捕获<a class="headerlink" href="#_34" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a>尝试：
-</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>  令 数值 = 转换整数(&quot;abc&quot;)
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a>  令 数值 = 转换整数("abc")
 </span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>捕获 ValueError 为 错误：
-</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>  打印 &quot;不是有效的数字&quot;
+</span><span id="__span-34-4"><a id="__codelineno-34-4" name="__codelineno-34-4" href="#__codelineno-34-4"></a>  打印 "不是有效的数字"
 </span><span id="__span-34-5"><a id="__codelineno-34-5" name="__codelineno-34-5" href="#__codelineno-34-5"></a>捕获 其他错误 为 错误：
-</span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a>  打印 &quot;发生未知错误&quot;
+</span><span id="__span-34-6"><a id="__codelineno-34-6" name="__codelineno-34-6" href="#__codelineno-34-6"></a>  打印 "发生未知错误"
 </span><span id="__span-34-7"><a id="__codelineno-34-7" name="__codelineno-34-7" href="#__codelineno-34-7"></a>最终：
-</span><span id="__span-34-8"><a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a>  打印 &quot;处理完成&quot;
+</span><span id="__span-34-8"><a id="__codelineno-34-8" name="__codelineno-34-8" href="#__codelineno-34-8"></a>  打印 "处理完成"
 </span></code></pre></div>
 <h3 id="_35">抛出异常<a class="headerlink" href="#_35" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>函数 检查年龄(年龄):
 </span><span id="__span-35-2"><a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a>  如果 年龄 &lt; 0:
-</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>    抛出 ValueError(&quot;年龄不能为负数&quot;)
+</span><span id="__span-35-3"><a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a>    抛出 ValueError("年龄不能为负数")
 </span><span id="__span-35-4"><a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a>  返回 年龄
 </span></code></pre></div>
 <hr />
@@ -2555,7 +2563,7 @@
 </table>
 <h3 id="python-api">Python API<a class="headerlink" href="#python-api" title="Permanent link">&para;</a></h3>
 <div class="language-python highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
-</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;src&#39;</span><span class="p">)</span>
+</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a><span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">'src'</span><span class="p">)</span>
 </span><span id="__span-40-3"><a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a>
 </span><span id="__span-40-4"><a id="__codelineno-40-4" name="__codelineno-40-4" href="#__codelineno-40-4"></a><span class="kn">from</span><span class="w"> </span><span class="nn">compiler</span><span class="w"> </span><span class="kn">import</span> <span class="n">DuanCompiler</span>
 </span><span id="__span-40-5"><a id="__codelineno-40-5" name="__codelineno-40-5" href="#__codelineno-40-5"></a><span class="kn">from</span><span class="w"> </span><span class="nn">code_generator_unified</span><span class="w"> </span><span class="kn">import</span> <span class="n">UnifiedCodeGenerator</span>
@@ -2564,28 +2572,28 @@
 </span><span id="__span-40-8"><a id="__codelineno-40-8" name="__codelineno-40-8" href="#__codelineno-40-8"></a><span class="n">compiler</span> <span class="o">=</span> <span class="n">DuanCompiler</span><span class="p">()</span>
 </span><span id="__span-40-9"><a id="__codelineno-40-9" name="__codelineno-40-9" href="#__codelineno-40-9"></a><span class="n">result</span> <span class="o">=</span> <span class="n">compiler</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
 </span><span id="__span-40-10"><a id="__codelineno-40-10" name="__codelineno-40-10" href="#__codelineno-40-10"></a>
-</span><span id="__span-40-11"><a id="__codelineno-40-11" name="__codelineno-40-11" href="#__codelineno-40-11"></a><span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;success&#39;</span><span class="p">]:</span>
+</span><span id="__span-40-11"><a id="__codelineno-40-11" name="__codelineno-40-11" href="#__codelineno-40-11"></a><span class="k">if</span> <span class="n">result</span><span class="p">[</span><span class="s1">'success'</span><span class="p">]:</span>
 </span><span id="__span-40-12"><a id="__codelineno-40-12" name="__codelineno-40-12" href="#__codelineno-40-12"></a>    <span class="n">code_gen</span> <span class="o">=</span> <span class="n">UnifiedCodeGenerator</span><span class="p">()</span>
-</span><span id="__span-40-13"><a id="__codelineno-40-13" name="__codelineno-40-13" href="#__codelineno-40-13"></a>    <span class="n">py_code</span> <span class="o">=</span> <span class="n">code_gen</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">&#39;ast&#39;</span><span class="p">])</span>
+</span><span id="__span-40-13"><a id="__codelineno-40-13" name="__codelineno-40-13" href="#__codelineno-40-13"></a>    <span class="n">py_code</span> <span class="o">=</span> <span class="n">code_gen</span><span class="o">.</span><span class="n">generate</span><span class="p">(</span><span class="n">result</span><span class="p">[</span><span class="s1">'ast'</span><span class="p">])</span>
 </span><span id="__span-40-14"><a id="__codelineno-40-14" name="__codelineno-40-14" href="#__codelineno-40-14"></a>    <span class="nb">print</span><span class="p">(</span><span class="n">py_code</span><span class="p">)</span>
 </span><span id="__span-40-15"><a id="__codelineno-40-15" name="__codelineno-40-15" href="#__codelineno-40-15"></a><span class="k">else</span><span class="p">:</span>
-</span><span id="__span-40-16"><a id="__codelineno-40-16" name="__codelineno-40-16" href="#__codelineno-40-16"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;编译错误:&quot;</span><span class="p">,</span> <span class="n">result</span><span class="p">[</span><span class="s1">&#39;errors&#39;</span><span class="p">])</span>
+</span><span id="__span-40-16"><a id="__codelineno-40-16" name="__codelineno-40-16" href="#__codelineno-40-16"></a>    <span class="nb">print</span><span class="p">(</span><span class="s2">"编译错误:"</span><span class="p">,</span> <span class="n">result</span><span class="p">[</span><span class="s1">'errors'</span><span class="p">])</span>
 </span></code></pre></div>
 <hr />
 <h2 id="_41">示例程序<a class="headerlink" href="#_41" title="Permanent link">&para;</a></h2>
 <h3 id="1">1. 计算器<a class="headerlink" href="#1" title="Permanent link">&para;</a></h3>
 <div class="language-text highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>函数 计算器(操作, 甲, 乙):
-</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>  如果 操作 == &quot;加&quot;:
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>  如果 操作 == "加":
 </span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>      返回 甲 + 乙
-</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>  如果 操作 == &quot;减&quot;:
+</span><span id="__span-41-4"><a id="__codelineno-41-4" name="__codelineno-41-4" href="#__codelineno-41-4"></a>  如果 操作 == "减":
 </span><span id="__span-41-5"><a id="__codelineno-41-5" name="__codelineno-41-5" href="#__codelineno-41-5"></a>      返回 甲 - 乙
-</span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>  如果 操作 == &quot;乘&quot;:
+</span><span id="__span-41-6"><a id="__codelineno-41-6" name="__codelineno-41-6" href="#__codelineno-41-6"></a>  如果 操作 == "乘":
 </span><span id="__span-41-7"><a id="__codelineno-41-7" name="__codelineno-41-7" href="#__codelineno-41-7"></a>      返回 甲 * 乙
-</span><span id="__span-41-8"><a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a>  如果 操作 == &quot;除&quot;:
+</span><span id="__span-41-8"><a id="__codelineno-41-8" name="__codelineno-41-8" href="#__codelineno-41-8"></a>  如果 操作 == "除":
 </span><span id="__span-41-9"><a id="__codelineno-41-9" name="__codelineno-41-9" href="#__codelineno-41-9"></a>      返回 甲 / 乙
 </span><span id="__span-41-10"><a id="__codelineno-41-10" name="__codelineno-41-10" href="#__codelineno-41-10"></a>  返回 0
 </span><span id="__span-41-11"><a id="__codelineno-41-11" name="__codelineno-41-11" href="#__codelineno-41-11"></a>
-</span><span id="__span-41-12"><a id="__codelineno-41-12" name="__codelineno-41-12" href="#__codelineno-41-12"></a>令 结果 = 计算器(&quot;加&quot;, 10, 5)
+</span><span id="__span-41-12"><a id="__codelineno-41-12" name="__codelineno-41-12" href="#__codelineno-41-12"></a>令 结果 = 计算器("加", 10, 5)
 </span><span id="__span-41-13"><a id="__codelineno-41-13" name="__codelineno-41-13" href="#__codelineno-41-13"></a>打印 结果  # 15
 </span></code></pre></div>
 <h3 id="2">2. 学生成绩管理<a class="headerlink" href="#2" title="Permanent link">&para;</a></h3>
@@ -2607,10 +2615,10 @@
 </span><span id="__span-42-16"><a id="__codelineno-42-16" name="__codelineno-42-16" href="#__codelineno-42-16"></a>    返回 总和 / 长(己.成绩列表)
 </span><span id="__span-42-17"><a id="__codelineno-42-17" name="__codelineno-42-17" href="#__codelineno-42-17"></a>
 </span><span id="__span-42-18"><a id="__codelineno-42-18" name="__codelineno-42-18" href="#__codelineno-42-18"></a>  函数 显示信息():
-</span><span id="__span-42-19"><a id="__codelineno-42-19" name="__codelineno-42-19" href="#__codelineno-42-19"></a>    打印 &quot;学生：&quot; + 己.姓名
-</span><span id="__span-42-20"><a id="__codelineno-42-20" name="__codelineno-42-20" href="#__codelineno-42-20"></a>    打印 &quot;平均分：&quot; + 转字符串(己.计算平均分())
+</span><span id="__span-42-19"><a id="__codelineno-42-19" name="__codelineno-42-19" href="#__codelineno-42-19"></a>    打印 "学生：" + 己.姓名
+</span><span id="__span-42-20"><a id="__codelineno-42-20" name="__codelineno-42-20" href="#__codelineno-42-20"></a>    打印 "平均分：" + 转字符串(己.计算平均分())
 </span><span id="__span-42-21"><a id="__codelineno-42-21" name="__codelineno-42-21" href="#__codelineno-42-21"></a>
-</span><span id="__span-42-22"><a id="__codelineno-42-22" name="__codelineno-42-22" href="#__codelineno-42-22"></a>令 学生 = 学生(&quot;张三&quot;)
+</span><span id="__span-42-22"><a id="__codelineno-42-22" name="__codelineno-42-22" href="#__codelineno-42-22"></a>令 学生 = 学生("张三")
 </span><span id="__span-42-23"><a id="__codelineno-42-23" name="__codelineno-42-23" href="#__codelineno-42-23"></a>学生.添加成绩(85)
 </span><span id="__span-42-24"><a id="__codelineno-42-24" name="__codelineno-42-24" href="#__codelineno-42-24"></a>学生.添加成绩(92)
 </span><span id="__span-42-25"><a id="__codelineno-42-25" name="__codelineno-42-25" href="#__codelineno-42-25"></a>学生.添加成绩(78)
@@ -2627,22 +2635,22 @@
 </span><span id="__span-43-8"><a id="__codelineno-43-8" name="__codelineno-43-8" href="#__codelineno-43-8"></a>
 </span><span id="__span-43-9"><a id="__codelineno-43-9" name="__codelineno-43-9" href="#__codelineno-43-9"></a>  函数 存款(金额):
 </span><span id="__span-43-10"><a id="__codelineno-43-10" name="__codelineno-43-10" href="#__codelineno-43-10"></a>    如果 金额 &lt;= 0:
-</span><span id="__span-43-11"><a id="__codelineno-43-11" name="__codelineno-43-11" href="#__codelineno-43-11"></a>      抛出 ValueError(&quot;存款金额必须大于零&quot;)
+</span><span id="__span-43-11"><a id="__codelineno-43-11" name="__codelineno-43-11" href="#__codelineno-43-11"></a>      抛出 ValueError("存款金额必须大于零")
 </span><span id="__span-43-12"><a id="__codelineno-43-12" name="__codelineno-43-12" href="#__codelineno-43-12"></a>    己.余额 = 己.余额 + 金额
-</span><span id="__span-43-13"><a id="__codelineno-43-13" name="__codelineno-43-13" href="#__codelineno-43-13"></a>    打印 &quot;存款成功，当前余额：&quot; + 转字符串(己.余额)
+</span><span id="__span-43-13"><a id="__codelineno-43-13" name="__codelineno-43-13" href="#__codelineno-43-13"></a>    打印 "存款成功，当前余额：" + 转字符串(己.余额)
 </span><span id="__span-43-14"><a id="__codelineno-43-14" name="__codelineno-43-14" href="#__codelineno-43-14"></a>
 </span><span id="__span-43-15"><a id="__codelineno-43-15" name="__codelineno-43-15" href="#__codelineno-43-15"></a>  函数 取款(金额):
 </span><span id="__span-43-16"><a id="__codelineno-43-16" name="__codelineno-43-16" href="#__codelineno-43-16"></a>    如果 金额 &lt;= 0:
-</span><span id="__span-43-17"><a id="__codelineno-43-17" name="__codelineno-43-17" href="#__codelineno-43-17"></a>      抛出 ValueError(&quot;取款金额必须大于零&quot;)
+</span><span id="__span-43-17"><a id="__codelineno-43-17" name="__codelineno-43-17" href="#__codelineno-43-17"></a>      抛出 ValueError("取款金额必须大于零")
 </span><span id="__span-43-18"><a id="__codelineno-43-18" name="__codelineno-43-18" href="#__codelineno-43-18"></a>    如果 金额 &gt; 己.余额:
-</span><span id="__span-43-19"><a id="__codelineno-43-19" name="__codelineno-43-19" href="#__codelineno-43-19"></a>      抛出 ValueError(&quot;余额不足&quot;)
+</span><span id="__span-43-19"><a id="__codelineno-43-19" name="__codelineno-43-19" href="#__codelineno-43-19"></a>      抛出 ValueError("余额不足")
 </span><span id="__span-43-20"><a id="__codelineno-43-20" name="__codelineno-43-20" href="#__codelineno-43-20"></a>    己.余额 = 己.余额 - 金额
-</span><span id="__span-43-21"><a id="__codelineno-43-21" name="__codelineno-43-21" href="#__codelineno-43-21"></a>    打印 &quot;取款成功，当前余额：&quot; + 转字符串(己.余额)
+</span><span id="__span-43-21"><a id="__codelineno-43-21" name="__codelineno-43-21" href="#__codelineno-43-21"></a>    打印 "取款成功，当前余额：" + 转字符串(己.余额)
 </span><span id="__span-43-22"><a id="__codelineno-43-22" name="__codelineno-43-22" href="#__codelineno-43-22"></a>
 </span><span id="__span-43-23"><a id="__codelineno-43-23" name="__codelineno-43-23" href="#__codelineno-43-23"></a>  函数 查询余额():
 </span><span id="__span-43-24"><a id="__codelineno-43-24" name="__codelineno-43-24" href="#__codelineno-43-24"></a>    返回 己.余额
 </span><span id="__span-43-25"><a id="__codelineno-43-25" name="__codelineno-43-25" href="#__codelineno-43-25"></a>
-</span><span id="__span-43-26"><a id="__codelineno-43-26" name="__codelineno-43-26" href="#__codelineno-43-26"></a>令 账户 = 银行账户(&quot;12345&quot;, 1000)
+</span><span id="__span-43-26"><a id="__codelineno-43-26" name="__codelineno-43-26" href="#__codelineno-43-26"></a>令 账户 = 银行账户("12345", 1000)
 </span><span id="__span-43-27"><a id="__codelineno-43-27" name="__codelineno-43-27" href="#__codelineno-43-27"></a>账户.存款(500)
 </span><span id="__span-43-28"><a id="__codelineno-43-28" name="__codelineno-43-28" href="#__codelineno-43-28"></a>账户.取款(200)
 </span><span id="__span-43-29"><a id="__codelineno-43-29" name="__codelineno-43-29" href="#__codelineno-43-29"></a>打印 账户.查询余额()  # 1300
