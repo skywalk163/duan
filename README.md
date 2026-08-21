@@ -1,3 +1,9 @@
+﻿> **本项目已停止开发，所有功能已合并至 [光明 (Light)](https://github.com/skywalk163/light) 项目。**
+>
+> 光明项目整合了段言的全部能力并持续演进。请新用户直接前往光明项目，旧用户请迁移至光明项目以获得最新更新和支持。
+>
+> - GitHub: https://github.com/skywalk163/light
+> - GitCode: https://gitcode.com/skywalk163/light
 # 段言（DuanLang）—— 中文优先的编程语言
 
 **段言**是一门以中文为第一公民的现代化编程语言。全中文关键字、中文标准库、中文文档，让你用母语思维写代码，降低认知负担，提升开发效率。

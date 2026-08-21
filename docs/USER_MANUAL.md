@@ -1,3 +1,9 @@
+﻿> **本项目已停止开发，所有功能已合并至 [光明 (Light)](https://github.com/skywalk163/light) 项目。**
+>
+> 光明项目整合了段言的全部能力并持续演进。请新用户直接前往光明项目，旧用户请迁移至光明项目以获得最新更新和支持。
+>
+> - GitHub: https://github.com/skywalk163/light
+> - GitCode: https://gitcode.com/skywalk163/light
 # 段言（Duan）编程语言用户手册
 
 **版本：** v4.0  
@@ -736,3 +742,4 @@ duan run file.duan -v
 **文档版本：** v4.0  
 **最后更新：** 2026-08-04  
 **反馈与建议：** 请提交 Issue 或 Pull Request
+
